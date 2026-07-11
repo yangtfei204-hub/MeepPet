@@ -16,4 +16,4 @@ SillyTavern 桌宠插件 — 一只会陪你聊天的可互动桌宠。
 ## 安装
 
 1. 打开 SillyTavern，进入 **扩展 → 安装扩展**
-2. 粘贴本仓库地址：
+2. 粘贴本仓库地址：https://github.com/yangtfei204-hub/MeepPet.git
