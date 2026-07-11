@@ -1,0 +1,13 @@
+{
+  "display_name": "咪噗 ☆ MeepPet",
+  "loading_order": 100,
+  "requires": [],
+  "optional": [],
+  "js": "index.js",
+  "css": "style.css",
+  "author": "未初",
+  "version": "1.0.0",
+  "description": "一个可互动的桌宠插件，支持投喂、洗澡、聊天、AI 对话、记忆系统、自定义精灵图等功能。",
+  "homePage": "https://github.com/yangtfei204-hub/MeepPet.git",
+  "auto_update": true
+}
