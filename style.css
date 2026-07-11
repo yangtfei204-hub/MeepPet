@@ -205,26 +205,26 @@
 
 /* 按钮位置（舒适的圆形布局，半径约85px） */
 .sp-menu-btn[data-action="feed"] {
-  top: -90px;
-  left: -60px;
+  top: -70px;
+  left: -75px;
   transition-delay: 0.05s;
 }
 
 .sp-menu-btn[data-action="bath"] {
-  top: -90px;
-  left: 60px;
+  top: -70px;
+  left: 75px;
   transition-delay: 0.1s;
 }
 
 .sp-menu-btn[data-action="sleep"] {
-  top: -50px;
-  left: -82px;
+  top: -20px;
+  left: -90px;
   transition-delay: 0.15s;
 }
 
 .sp-menu-btn[data-action="chat"] {
-  top: -50px;
-  left: 82px;
+  top: -20px;
+  left: 90px;
   transition-delay: 0.2s;
 }
 
@@ -243,23 +243,23 @@
   }
 
   .sp-menu-btn[data-action="feed"] {
-    top: -72px;
-    left: -48px;
+    top: -58px;
+    left: -60px;
   }
 
   .sp-menu-btn[data-action="bath"] {
-    top: -72px;
-    left: 48px;
+    top: -58px;
+    left: 60px;
   }
 
   .sp-menu-btn[data-action="sleep"] {
-    top: -40px;
-    left: -65px;
+    top: -16px;
+    left: -72px;
   }
 
   .sp-menu-btn[data-action="chat"] {
-    top: -40px;
-    left: 65px;
+    top: -16px;
+    left: 72px;
   }
 
   .sp-menu-btn[data-action="settings"] {
@@ -276,23 +276,23 @@
   }
 
   .sp-menu-btn[data-action="feed"] {
-    top: -60px;
-    left: -40px;
+    top: -48px;
+    left: -50px;
   }
 
   .sp-menu-btn[data-action="bath"] {
-    top: -60px;
-    left: 40px;
+    top: -48px;
+    left: 50px;
   }
 
   .sp-menu-btn[data-action="sleep"] {
-    top: -33px;
-    left: -54px;
+    top: -10px;
+    left: -60px;
   }
 
   .sp-menu-btn[data-action="chat"] {
-    top: -33px;
-    left: 54px;
+    top: -10px;
+    left: 60px;
   }
 
   .sp-menu-btn[data-action="settings"] {
@@ -300,6 +300,7 @@
     left: 0;
   }
 }
+
 
 /* ===== 聊天框 ===== */
 #silly-pet-chat {
