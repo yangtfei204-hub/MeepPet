@@ -315,6 +315,7 @@
   // ============================================================
   let settings = {};
   let state = {};
+  let settingsDragAbortController = null; // 新增：用于防止设置拖拽事件重复绑定的控制器
   let wanderInterval = null;
   let decayInterval = null;
   let lastReactTime = 0;
@@ -555,6 +556,57 @@
     URL.revokeObjectURL(url);
   }
 
+    // 新增：加载存档/导入数据后的热更新 UI 函数
+  function applyLoadedProfileUI() {
+    // 1. 应用新存档的主题配色
+    applyTheme(settings.currentTheme || 'default');
+
+    // 2. 准备重新渲染设置面板并保留当前 active 标签页、位置和显示状态
+    const settingsPanel = document.getElementById('silly-pet-settings');
+    const wasSettingsVisible = settingsPanel?.classList.contains('visible');
+    const activeTab = document.querySelector('#silly-pet-settings .sp-tab.active')?.dataset.tab || 'api';
+    let settingsLeft = settingsPanel?.style.left;
+    let settingsTop = settingsPanel?.style.top;
+
+    renderSettingsUI(); // 重新渲染设置面板（会自动同步新数据、重新绑定事件）
+
+    const newSettingsPanel = document.getElementById('silly-pet-settings');
+    if (newSettingsPanel) {
+      // 恢复之前选中的标签页
+      if (activeTab !== 'api') {
+        newSettingsPanel.querySelectorAll('.sp-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === activeTab));
+        newSettingsPanel.querySelectorAll('.sp-tab-panel').forEach(p => p.classList.toggle('active', p.dataset.panel === activeTab));
+      }
+      // 恢复显示状态和面板位置
+      if (wasSettingsVisible) {
+        newSettingsPanel.classList.add('visible');
+        if (settingsLeft && settingsTop) {
+          newSettingsPanel.style.left = settingsLeft;
+          newSettingsPanel.style.top = settingsTop;
+        }
+      }
+    }
+
+    // 3. 更新桌宠本体的各种状态
+    updateStatusBars();
+    updateSpriteImage();
+    updateMoodDisplay();
+
+    // 4. 更新聊天面板（如果已打开）
+    const chatTitle = document.getElementById('sp-chat-title-name');
+    if (chatTitle) chatTitle.textContent = settings.petName || '咪噗';
+    renderChatHistory();
+
+    // 5. 应用启用/禁用状态，重启定时器
+    if (settings.enabled) {
+      showPet();
+      startWandering();
+      startDecayTimer();
+    } else {
+      hidePet();
+    }
+  }
+
   function importData(file) {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -564,8 +616,9 @@
         state = { ...DEFAULT_STATE, ...parsed.state };
         saveData();
         showBubble('存档导入成功啦～');
-        updateStatusBars();
-        updateMoodDisplay();
+        
+        // 👈 调用刚才写好的 UI 热更新函数
+        applyLoadedProfileUI();
       } catch (err) {
         showBubble('导入失败了…文件格式不对');
       }
@@ -1442,6 +1495,13 @@ function toggleChat() {
     const panel = document.getElementById('silly-pet-settings');
     if (!header || !panel) return;
 
+    // 清理上一次绑定在 document 上的事件监听，避免重复叠加
+    if (settingsDragAbortController) {
+      settingsDragAbortController.abort();
+    }
+    settingsDragAbortController = new AbortController();
+    const { signal } = settingsDragAbortController;
+
     let isDragging = false, offsetX = 0, offsetY = 0;
 
     const onDown = (e) => {
@@ -1471,10 +1531,10 @@ function toggleChat() {
 
     header.addEventListener('mousedown', onDown);
     header.addEventListener('touchstart', onDown, { passive: true });
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('touchmove', onMove, { passive: false });
-    document.addEventListener('mouseup', onUp);
-    document.addEventListener('touchend', onUp);
+    document.addEventListener('mousemove', onMove, { signal });
+    document.addEventListener('touchmove', onMove, { passive: false, signal });
+    document.addEventListener('mouseup', onUp, { signal });
+    document.addEventListener('touchend', onUp, { signal });
   }
 
 
@@ -2785,6 +2845,7 @@ async function refreshWorldPreview() {
     bindTabSwitching();
     bindSettingsClose();
     bindSettingsDrag();
+    bindSettingsEvents(); // 👈 新增：让设置面板渲染完后，立刻自动绑定它里面的所有按钮和输入框事件
   }
 
 
@@ -3080,7 +3141,6 @@ async function refreshWorldPreview() {
     });
 
     bindChatListener();
-    bindSettingsEvents();
   }
 
 
@@ -3451,7 +3511,7 @@ async function refreshWorldPreview() {
 
       if (!confirm(`确定加载存档「${profile.name}」吗？\n当前未保存的配置会丢失。`)) return;
 
-      // 保留 petProfiles 和 currentProfile
+      // 保留 petProfiles 和 currentProfile 列表本身
       const savedProfiles = settings.petProfiles;
       settings = { ...DEFAULT_SETTINGS, ...profile.settings };
       settings.petProfiles = savedProfiles;
@@ -3461,8 +3521,8 @@ async function refreshWorldPreview() {
       saveData();
       showBubble(`已切换到「${profile.name}」🐾`, 2000);
 
-      // 刷新整个界面
-      setTimeout(() => window.location.reload(), 500);
+      // 👈 这里是改动的关键：调用热更新，替换原来的 window.location.reload()
+      applyLoadedProfileUI();
     });
 
     document.getElementById('sp-profile-delete')?.addEventListener('click', () => {
