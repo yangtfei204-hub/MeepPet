@@ -430,6 +430,7 @@
     renderPetUI();
     renderSettingsUI();
     bindEvents();
+    registerSlashCommands(); 
 
     requestAnimationFrame(() => {
       updateMoodDisplay();
@@ -1053,16 +1054,183 @@ function clearSpriteLock() {
     }
   }
 
+  // ============================================================
+  // 核心控制：斜杠指令集中处理器（已修复：新旧版本参数智能兼容解析）
+  // ============================================================
+  function handlePetCommand(args, value) {
+    let subCommand = 'status';
+    let payload = '';
+
+    // 情况 1：如果 args 是数组 (兼容部分老版本酒馆)
+    if (Array.isArray(args) && args.length > 0) {
+      subCommand = args[0].toLowerCase();
+      payload = args.slice(1).join(' ');
+    }
+    // 情况 2：现代酒馆标准，args 是命名参数对象，value 是主体字符串 (例如 "/pet chat 123" -> value 是 "chat 123")
+    else if (typeof value === 'string' && value.trim()) {
+      const parts = value.trim().split(/\s+/);
+      subCommand = parts[0].toLowerCase();
+      payload = parts.slice(1).join(' ');
+    }
+    // 情况 3：如果只输入了 "/pet"
+    else {
+      subCommand = 'status';
+      payload = '';
+    }
+
+    console.log(`[meep-pet] 收到斜杠指令 -> 子命令: "${subCommand}", 参数: "${payload}"`);
+
+    switch (subCommand) {
+      case 'status':
+        return `🐾 **${settings.petName} 状态：**\n` +
+               `🍖 饱食度: ${Math.round(state.hunger)}%\n` +
+               `💧 清洁度: ${Math.round(state.cleanliness)}%\n` +
+               `⚡ 精力值: ${Math.round(state.energy)}%\n` +
+               `${getMoodEmoji()} 当前心情: ${state.mood}`;
+      
+      case 'feed':
+        feedPet();
+        return `🍖 你投喂了 ${settings.petName}！`;
+      
+      case 'bath':
+        bathPet();
+        return `🛁 你拉着 ${settings.petName} 泡了个热水澡！`;
+      
+      case 'sleep':
+        sleepPet();
+        return `🛏️ ${settings.petName} 揉了揉眼睛，睡觉去了...`;
+      
+      case 'summon':
+        const container = document.getElementById('silly-pet-container');
+        if (container) {
+          container.style.transition = 'none';
+          container.style.left = '50vw';
+          container.style.top = '50vh';
+          container.style.transform = '';
+          container.offsetHeight; // 强制重绘
+          container.style.transition = '';
+          showBubble('呼！谢谢主人把我拉回来～❤');
+          return `🐾 已强行将 ${settings.petName} 召唤回屏幕正中心！`;
+        }
+        return '❌ 召回失败：未找到桌宠实体。';
+      
+      case 'toggle':
+        settings.enabled = !settings.enabled;
+        const toggleTop = document.getElementById('sp-enabled-toggle-top');
+        if (toggleTop) toggleTop.checked = settings.enabled;
+        
+        if (settings.enabled) {
+          showPet();
+          startWandering();
+          startDecayTimer();
+          showBubble('我又出来啦～✨');
+        } else {
+          hidePet();
+        }
+        saveData();
+        return `🐾 桌宠已${settings.enabled ? '【启用】' : '【禁用】'}`;
+      
+      case 'chat':
+        if (!payload.trim()) {
+          return `❌ 用法：/pet chat <你想对${settings.petName}说的话>`;
+        }
+        // 如果聊天框没开，帮用户强行打开
+        if (!isChatOpen) toggleChat();
+        
+        // 发送消息给桌宠
+        sendChatMessage(payload);
+        return `💬 正在将口信传达给 ${settings.petName}...`;
+      
+      default:
+        return `❌ 未知指令。可用子命令：\n` +
+               `- \`/pet status\` 查看桌宠状态\n` +
+               `- \`/pet feed\` 投喂食物\n` +
+               `- \`/pet bath\` 泡澡清洁\n` +
+               `- \`/pet sleep\` 睡觉补充精力\n` +
+               `- \`/pet summon\` 强行召唤到屏幕中心\n` +
+               `- \`/pet toggle\` 切换桌宠开启/关闭\n` +
+               `- \`/pet chat <内容>\` 隔空开启对话`;
+    }
+  }
 
   // ============================================================
-  // 拖拽交互
+  // 健壮性：SillyTavern 快捷斜杠指令注册（已修复参数传递与丢失 Bug）
   // ============================================================
-function bindDragEvents() {
+  function registerSlashCommands() {
+    const maxAttempts = 20; // 最多轮询尝试 10 秒
+    let attempts = 0;
+
+    const tryRegister = () => {
+      attempts++;
+      const context = getContext();
+
+      if (!context) {
+        if (attempts < maxAttempts) {
+          setTimeout(tryRegister, 500); // 500毫秒后重试
+        } else {
+          console.error(`[${PLUGIN_NAME}] 轮询超时：未找到酒馆有效上下文，无法注册指令。`);
+        }
+        return;
+      }
+
+      // 1. 尝试使用标准 registerSlashCommand（直接扁平传递参数）
+      if (typeof context.registerSlashCommand === 'function') {
+        try {
+          context.registerSlashCommand(
+            'pet',
+            (args, value) => handlePetCommand(args, value),
+            [], // 别名 (Aliases)
+            `🐾 桌宠控制中心。用法: /pet [status | feed | bath | sleep | summon | toggle | chat]`,
+            true,  // isLocal (仅本地有效)
+            false  // isHidden (设为 false，确保输入 / 时能在联想菜单中看到)
+          );
+          console.log(`[${PLUGIN_NAME}] 成功使用 [酒馆标准 ES 模块 API] 注册 /pet 指令`);
+          return;
+        } catch (e) {
+          console.warn(`[${PLUGIN_NAME}] 标准注册尝试失败，转向备用注册方案:`, e);
+        }
+      }
+
+      // 2. 备用手段：尝试传统的 slashCommands 注册（兼容老版本酒馆）
+      const registry = context.slashCommands || window.SillyTavern?.slashCommands || window.parent?.SillyTavern?.slashCommands;
+      if (registry && typeof registry.registerCommand === 'function') {
+        try {
+          registry.registerCommand(
+            'pet',
+            (args, value) => handlePetCommand(args, value),
+            [],
+            `🐾 桌宠控制中心。用法: /pet [status | feed | bath | sleep | summon | toggle | chat]`,
+            true, // isRequired
+            true  // isLocal
+          );
+          console.log(`[${PLUGIN_NAME}] 成功使用 [传统全局 API] 注册 /pet 指令`);
+          return;
+        } catch (e) {
+          console.error(`[${PLUGIN_NAME}] 所有注册手段均失败:`, e);
+        }
+      }
+
+      // 如果当前上下文还没准备好这些属性，继续等
+      if (attempts < maxAttempts) {
+        setTimeout(tryRegister, 500);
+      }
+    };
+
+    tryRegister();
+  }
+
+
+  // ============================================================
+  // 拖拽交互（已优化：硬件加速 transform & 边缘吸附）
+  // ============================================================
+  function bindDragEvents() {
     const container = document.getElementById('silly-pet-container');
     const sprite = document.getElementById('silly-pet-sprite');
     if (!sprite || !container) return;
 
     let startX = 0, startY = 0, startTime = 0, moved = false;
+    let startLeft = 0, startTop = 0;
+    let lastMoveX = 0, lastMoveY = 0; // 用于精准记录最后一次移动坐标，防止松手抖动
     let isPointerDown = false;
     let lastTapTime = 0;
 
@@ -1072,26 +1240,32 @@ function bindDragEvents() {
       const clientY = e.touches ? e.touches[0].clientY : e.clientY;
       startX = clientX;
       startY = clientY;
+      lastMoveX = clientX;
+      lastMoveY = clientY;
       startTime = Date.now();
       moved = false;
       isDragging = false;
 
-      const rect = container.getBoundingClientRect();
-      dragOffset.x = clientX - rect.left;
-      dragOffset.y = clientY - rect.top;
+      // 记录初始 left/top 绝对坐标
+      startLeft = parseInt(container.style.left) || 0;
+      startTop = parseInt(container.style.top) || 0;
     };
 
     const pointerMove = (e) => {
       if (!isPointerDown) return;
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      lastMoveX = clientX;
+      lastMoveY = clientY;
+
       const dist = Math.hypot(clientX - startX, clientY - startY);
 
-      if (dist > 10 && !isDragging) {
+      // 位移超过 5 像素判定为拖拽
+      if (dist > 5 && !isDragging) {
         isDragging = true;
         moved = true;
         container.classList.add('dragging');
-        // 拖动开始时清除吸附状态
+        // 拖拽开始，清除上一次的吸附状态
         container.classList.remove('sp-edge-left', 'sp-edge-right', 'sp-edge-top');
         if (spriteStateLock === 'hang') {
           spriteStateLock = null;
@@ -1105,14 +1279,25 @@ function bindDragEvents() {
 
       if (isDragging) {
         if (e.cancelable) e.preventDefault();
-        let newX = clientX - dragOffset.x;
-        let newY = clientY - dragOffset.y;
-        newX = Math.max(0, Math.min(window.innerWidth - container.offsetWidth, newX));
-        newY = Math.max(0, Math.min(window.innerHeight - container.offsetHeight, newY));
-        container.style.left = newX + 'px';
-        container.style.top = newY + 'px';
-        container.style.bottom = 'auto';
-        container.style.right = 'auto';
+        
+        let dx = clientX - startX;
+        let dy = clientY - startY;
+
+        const maxLeft = window.innerWidth - container.offsetWidth;
+        const maxTop = window.innerHeight - container.offsetHeight;
+
+        // 计算边界约束，限制 dx/dy，不让桌宠滑出屏幕
+        let targetLeft = startLeft + dx;
+        let targetTop = startTop + dy;
+
+        if (targetLeft < 0) dx = -startLeft;
+        else if (targetLeft > maxLeft) dx = maxLeft - startLeft;
+
+        if (targetTop < 0) dy = -startTop;
+        else if (targetTop > maxTop) dy = maxTop - startTop;
+
+        // 【关键性能优化】改用 translate3d 触发 GPU 硬件加速，不触发 layout 重排
+        container.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
       }
     };
 
@@ -1123,19 +1308,41 @@ function bindDragEvents() {
       if (isDragging) {
         isDragging = false;
         container.classList.remove('dragging');
-        let left = parseInt(container.style.left) || 0;
-        let top = parseInt(container.style.top) || 0;
-        left = Math.max(0, Math.min(window.innerWidth - container.offsetWidth, left));
-        top = Math.max(0, Math.min(window.innerHeight - container.offsetHeight, top));
+
+        // 计算最终落点
+        const dx = lastMoveX - startX;
+        const dy = lastMoveY - startY;
+
+        let left = startLeft + dx;
+        let top = startTop + dy;
+
+        const maxLeft = window.innerWidth - container.offsetWidth;
+        const maxTop = window.innerHeight - container.offsetHeight;
+
+        left = Math.max(0, Math.min(maxLeft, left));
+        top = Math.max(0, Math.min(maxTop, top));
+
+        // 【关键优化：落点无缝写入】
+        // 1. 临时禁用 CSS 中的 2 秒过度动画，防止松手时出现“慢慢滑行”的漂移 Bug
+        container.style.transition = 'none';
+        // 2. 清除 transform 偏移
+        container.style.transform = '';
+        // 3. 将最终坐标写入 left/top
         container.style.left = left + 'px';
         container.style.top = top + 'px';
         container.style.bottom = 'auto';
+
+        // 4. 强制浏览器强制重绘（Reflow），使改动立刻生效
+        container.offsetHeight; 
+
+        // 5. 恢复原本的 wandering CSS 过渡
+        container.style.transition = '';
 
         // 边缘吸附检测
         const snapThreshold = settings.edgeSnapThreshold || 20;
         let snapped = false;
 
-                if (left <= snapThreshold) {
+        if (left <= snapThreshold) {
           container.style.left = '0px';
           container.classList.add('sp-edge-left');
           container.classList.remove('sp-edge-right', 'sp-edge-top');
@@ -1161,13 +1368,11 @@ function bindDragEvents() {
           }
         } else {
           container.classList.remove('sp-edge-left', 'sp-edge-right', 'sp-edge-top');
-          // ★ 新增：脱离边缘时清除挂墙锁
           if (spriteStateLock === 'hang') {
             clearSpriteLock();
           }
         }
 
-        // 晕乎乎也改用锁
         if (!snapped) {
           if (settings.spriteDizzy) {
             const dur = (settings.spriteDurations && settings.spriteDurations.spriteDizzy) || 2500;
@@ -1175,12 +1380,12 @@ function bindDragEvents() {
           }
         }
 
-
         const reactions = settings.reactions.drag.split('|').map(s => s.trim()).filter(Boolean);
         showBubble(reactions[Math.floor(Math.random() * reactions.length)], 2500);
         state.totalInteractions++;
         saveData();
       } else if (!moved && Date.now() - startTime < 300) {
+        // 点击/轻触逻辑
         const isMobile = window.innerWidth <= 768;
         if (isMobile) {
           const now = Date.now();
@@ -1204,75 +1409,7 @@ function bindDragEvents() {
     document.addEventListener('touchend', pointerUp);
   }
 
-
-
-
-
-  function onDragStart(e) {
-    // 不在这里 preventDefault，让 touchend 能正常触发点击判断
-    isDragging = true;
-    const container = document.getElementById('silly-pet-container');
-    container.classList.add('dragging');
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    const rect = container.getBoundingClientRect();
-    dragOffset.x = clientX - rect.left;
-    dragOffset.y = clientY - rect.top;
-
-    if (settings.spriteDrag) {
-      updateSpriteImage(settings.spriteDrag);
-    }
-  }
-
-
-  function onDragMove(e) {
-    if (!isDragging) return;
-    e.preventDefault();
-    const container = document.getElementById('silly-pet-container');
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-    let newX = clientX - dragOffset.x;
-    let newY = clientY - dragOffset.y;
-    newX = Math.max(0, Math.min(window.innerWidth - container.offsetWidth, newX));
-    newY = Math.max(0, Math.min(window.innerHeight - container.offsetHeight, newY));
-
-    container.style.left = newX + 'px';
-    container.style.top = newY + 'px';
-    container.style.bottom = 'auto';
-    container.style.right = 'auto';
-  }
-
-
-  function onDragEnd() {
-    if (!isDragging) return;
-    isDragging = false;
-    const container = document.getElementById('silly-pet-container');
-    container.classList.remove('dragging');
-
-    // 边界修正，防止拖出屏幕
-    let left = parseInt(container.style.left) || 0;
-    let top = parseInt(container.style.top) || 0;
-    left = Math.max(0, Math.min(window.innerWidth - container.offsetWidth, left));
-    top = Math.max(0, Math.min(window.innerHeight - container.offsetHeight, top));
-    container.style.left = left + 'px';
-    container.style.top = top + 'px';
-    container.style.bottom = 'auto';
-
-    if (settings.spriteDizzy) {
-      updateSpriteImage(settings.spriteDizzy);
-      const dur = (settings.spriteDurations && settings.spriteDurations.spriteDizzy) || 2500;
-      setTimeout(() => updateSpriteImage(), dur);
-    }
-
-    const reactions = settings.reactions.drag.split('|').map(s => s.trim()).filter(Boolean);
-    showBubble(reactions[Math.floor(Math.random() * reactions.length)], 2500);
-    state.totalInteractions++;
-    saveDataDebounced('拖拽结束');
-  }
-
-
-  // ============================================================
+// ============================================================
 // 互动贴图显示
 // ============================================================
 function showInteractionItem(imageSrc) {
@@ -4279,68 +4416,6 @@ function refreshCharPreview() {
   } else {
     box.style.display = 'none';
     content.textContent = '';
-  }
-}
-
-async function refreshWorldPreview() {
-  const box = document.getElementById('sp-world-preview');
-  const content = document.getElementById('sp-world-preview-content');
-  if (!box || !content) return;
-
-  const entries = await getWorldBookEntries();
-  if (entries.length > 0) {
-    content.innerHTML = entries.map((entry, i) => {
-      const excluded = settings.worldBookExcluded.includes(i);
-      return `
-        <div class="sp-wi-entry ${excluded ? 'sp-wi-excluded' : ''}" data-wi-idx="${i}">
-          <div class="sp-wi-entry-header">
-            <div class="sp-wi-header-left">
-              <span class="sp-wi-check" onclick="event.stopPropagation()">
-                <input type="checkbox" data-wi-idx="${i}" ${excluded ? '' : 'checked'} />
-              </span>
-              <span class="sp-wi-index">#${i + 1}</span>
-              ${entry.name ? `<span class="sp-wi-name">${entry.name}</span>` : ''}
-              ${entry.keys ? `<span class="sp-wi-keys">[${entry.keys}]</span>` : ''}
-            </div>
-            <span class="sp-wi-expand-arrow">▶</span>
-          </div>
-          <div class="sp-wi-entry-body">${entry.content}</div>
-        </div>
-      `;
-    }).join('');
-
-    const countEl = document.getElementById('sp-world-count');
-    if (countEl) countEl.textContent = entries.length;
-
-    box.style.display = '';
-
-    content.querySelectorAll('input[data-wi-idx]').forEach(cb => {
-      cb.onchange = (e) => {
-        e.stopPropagation();
-        const idx = parseInt(cb.dataset.wiIdx);
-        if (cb.checked) {
-          settings.worldBookExcluded = settings.worldBookExcluded.filter(i => i !== idx);
-        } else {
-          if (!settings.worldBookExcluded.includes(idx)) {
-            settings.worldBookExcluded.push(idx);
-          }
-        }
-        cb.closest('.sp-wi-entry').classList.toggle('sp-wi-excluded', !cb.checked);
-        saveData();
-      };
-    });
-
-    content.querySelectorAll('.sp-wi-entry-header').forEach(header => {
-      header.addEventListener('click', (e) => {
-        if (e.target.closest('.sp-wi-check')) return;
-        const entry = header.closest('.sp-wi-entry');
-        entry.classList.toggle('sp-wi-expanded');
-      });
-    });
-
-  } else {
-    box.style.display = 'none';
-    content.innerHTML = '<p style="font-size:12px;color:#999;">加载中或无条目…</p>';
   }
 }
 
