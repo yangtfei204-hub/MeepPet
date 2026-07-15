@@ -2178,6 +2178,51 @@ function toggleChat() {
     document.addEventListener('touchend', onUp, { signal });
   }
 
+  function showRegenConfirm(msgIdx) {
+    // 移除旧弹窗（如果有）
+    document.getElementById('sp-regen-confirm')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-regen-confirm';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:2147483649;';
+    overlay.innerHTML = `
+      <div id="sp-regen-confirm-box" style="background:var(--sp-bg-secondary);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--sp-border);border-radius:14px;padding:20px 24px;max-width:280px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.4);animation:sp-fade-in 0.15s ease;">
+        <div style="font-size:14px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">🔄 重新生成</div>
+        <div style="font-size:12px;color:var(--sp-text-secondary);margin-bottom:16px;line-height:1.5;">删除这条及之后的回复，重新让桌宠回答？</div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+          <button id="sp-regen-cancel" style="padding:6px 16px;border-radius:8px;border:1px solid var(--sp-border);background:var(--sp-bg-light);color:var(--sp-text-secondary);cursor:pointer;font-size:12px;transition:all 0.2s;">取消</button>
+          <button id="sp-regen-ok" style="padding:6px 16px;border-radius:8px;border:1px solid var(--sp-primary-border);background:var(--sp-primary);color:#fff;cursor:pointer;font-size:12px;transition:all 0.2s;">确认重新生成</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    // 手动居中定位（兼容移动端，和表情包弹窗同款逻辑）
+    requestAnimationFrame(() => {
+      const box = document.getElementById('sp-regen-confirm-box');
+      if (box) {
+        const boxH = box.offsetHeight || 160;
+        const boxW = box.offsetWidth || 280;
+        box.style.position = 'fixed';
+        box.style.top = Math.max(20, Math.floor((window.innerHeight - boxH) / 2)) + 'px';
+        box.style.left = Math.floor((window.innerWidth - boxW) / 2) + 'px';
+        box.style.margin = '0';
+      }
+    });
+
+    const cleanup = () => { overlay.remove(); };
+
+    document.getElementById('sp-regen-cancel').onclick = cleanup;
+    overlay.onclick = (e) => { if (e.target === overlay) cleanup(); };
+
+    document.getElementById('sp-regen-ok').onclick = () => {
+      cleanup();
+      state.petChatHistory = state.petChatHistory.slice(0, msgIdx);
+      saveDataImmediate('聊天重新生成');
+      renderChatHistory();
+      generateReply();
+    };
+  }
 
   function renderChatHistory() {
     const container = document.getElementById('silly-pet-chat-messages');
@@ -2202,6 +2247,28 @@ function toggleChat() {
         }
       } else {
         div.innerHTML = `${timeStr}${renderMarkdown(msg.content)}`;
+      }
+      // 桌宠的回复支持右键/长按重新生成
+      if (msg.role === 'assistant') {
+        div.style.cursor = 'context-menu';
+        const doRegenerate = () => {
+          const msgIdx = state.petChatHistory.indexOf(msg);
+          if (msgIdx < 0) return;
+          showRegenConfirm(msgIdx);
+        };
+        div.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          // 如果弹窗已存在（长按已触发），跳过
+          if (document.getElementById('sp-regen-confirm')) return;
+          doRegenerate();
+        });
+        // 移动端长按兼容
+        let longPressTimer = null;
+        div.addEventListener('touchstart', () => {
+          longPressTimer = setTimeout(() => { doRegenerate(); }, 600);
+        }, { passive: true });
+        div.addEventListener('touchend', () => { clearTimeout(longPressTimer); });
+        div.addEventListener('touchmove', () => { clearTimeout(longPressTimer); });
       }
       container.appendChild(div);
     });
@@ -5915,6 +5982,10 @@ function refreshCharPreview() {
     const maxX = window.innerWidth - container.offsetWidth;
     if (left > maxX) {
       container.style.left = Math.max(0, maxX - 10) + 'px';
+    }
+    // 菜单打开时重算方向
+    if (isMenuOpen) {
+      updateMenuPositions();
     }
   });
 

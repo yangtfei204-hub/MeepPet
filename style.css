@@ -54,6 +54,7 @@
 
 #silly-pet-container.dragging { transition: none; }
 #silly-pet-container * { pointer-events: auto; }
+#silly-pet-menu:not(.visible) .sp-menu-btn { pointer-events: none; }
 
 /* ===== 精灵 ===== */
 #silly-pet-sprite {
