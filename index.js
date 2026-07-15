@@ -205,6 +205,7 @@
     summaryPrompt: '请将以下对话内容总结为简洁的要点，保留关键信息和情感变化，用第三人称描述：',
     extractPrompt: '从以下对话中提取3-5条关键记忆点（主人的喜好、重要事件、情感变化等）。\n每条记忆用一行表示，格式为：[标签] 内容\n例如：[喜好] 主人喜欢喝奶茶\n只输出记忆条目，不要其他内容。',
     offlinePrompt: '现在是线下模式。主人正在线下和你互动，你们不在电脑前，而是在现实中相处。请用更加亲密、放松的语气回复，可以描述动作和场景。',
+    diaryPrompt: '请以桌宠的第一人称视角，根据以下信息写一篇简短的日记（100-200字）。记录今天发生的有趣的事、和主人的互动、心情变化等。语气要符合桌宠的性格设定。',
 
     // 行为
     activityLevel: 50,
@@ -218,6 +219,8 @@
 
     // 显示
     displayMode: '2d',
+    petScale: 1.0,            // 桌宠缩放比例 0.5~2.0
+    apiTimeout: 15,           // API 请求超时（秒）
     spriteIdle: '',
     spriteWalkLeft: '',      // 往左走
     spriteWalkRight: '',     // 往右走
@@ -269,8 +272,9 @@
      bath: '',
      sleep: '',
      chat: '',
+     diary: '',
      settings: ''
-   }, 
+   },
 
     // 表情包贴纸
     emojiStickers: [],            // [{image: 'base64...', name: ''}]
@@ -313,6 +317,9 @@
     lastSlept: 0,
     petChatArchive: [],       // 已总结归档的聊天记录
     isOfflineMode: false,
+    diaryEntries: [],             // [{date: '2024-01-15', content: '...', timestamp: 1705...}]
+    lastDiaryMemoryRange: null,   // {from: 1, to: 5}
+    lastDiaryChatRange: null,     // {from: 1, to: 20}
   };
 
   // ============================================================
@@ -455,6 +462,17 @@
     console.log(`[${PLUGIN_NAME}] 初始化完成，启用状态: ${settings.enabled}`);
   }
 
+  // ============================================================
+  // 桌宠缩放
+  // ============================================================
+  function applyPetScale() {
+    const container = document.getElementById('silly-pet-container');
+    if (!container) return;
+    const scale = settings.petScale || 1.0;
+    container.style.transform = `scale(${scale})`;
+    container.style.transformOrigin = 'center bottom';
+  }
+
  // 在 showPet 函数里加上初始位置修正
  function showPet() {
     const container = document.getElementById('silly-pet-container');
@@ -479,7 +497,7 @@
       container.style.bottom = 'auto';
     }
     container.style.right = 'auto';
-
+    applyPetScale();
     const statusBar = document.getElementById('silly-pet-status-bar');
     if (statusBar) statusBar.style.display = settings.showStatusBar !== false ? '' : 'none';
 
@@ -714,6 +732,11 @@
     if (offlineHours > 24) {
       setTimeout(() => {
         if (!settings.enabled) return;
+        // 挥手动画
+        if (settings.spriteWave) {
+          const dur = (settings.spriteDurations && settings.spriteDurations.spriteWave) || 3000;
+          setSpriteWithLock('wave', settings.spriteWave, dur);
+        }
         showBubble(settings.reactions.returnLong);
         state.energy = Math.min(100, state.energy + 10);
         updateStatusBars();
@@ -722,8 +745,22 @@
     } else if (offlineHours > 1) {
       setTimeout(() => {
         if (!settings.enabled) return;
+        // 挥手动画
+        if (settings.spriteWave) {
+          const dur = (settings.spriteDurations && settings.spriteDurations.spriteWave) || 2500;
+          setSpriteWithLock('wave', settings.spriteWave, dur);
+        }
         showBubble(settings.reactions.returnShort);
       }, 1500);
+    } else if (offlineHours > 0.01) {
+      // 短暂离开也打个招呼（超过约36秒）
+      setTimeout(() => {
+        if (!settings.enabled) return;
+        if (settings.spriteWave) {
+          const dur = (settings.spriteDurations && settings.spriteDurations.spriteWave) || 2000;
+          setSpriteWithLock('wave', settings.spriteWave, dur);
+        }
+      }, 1000);
     }
   }
 
@@ -734,6 +771,7 @@
         { action: 'bath', emoji: '🛁', title: '洗澡' },
         { action: 'sleep', emoji: '🛏️', title: '睡觉' },
         { action: 'chat', emoji: '💬', title: '聊天' },
+        { action: 'diary', emoji: '📔', title: '日记' },
         { action: 'settings', emoji: '⚙️', title: '设置' }
       ];
   
@@ -746,6 +784,7 @@
         return `<button class="sp-menu-btn ${hasCustom ? 'has-custom-icon' : ''}" data-action="${btn.action}" title="${btn.title}">${iconHTML}</button>`;
       }).join('');
     }
+
 
 
   // ============================================================
@@ -852,6 +891,45 @@
       </div>
     `;
     document.body.appendChild(emojiModal);
+
+    // 日记悬浮窗
+    const diary = document.createElement('div');
+    diary.id = 'silly-pet-diary';
+    diary.style.zIndex = '2147483646';
+    diary.innerHTML = `
+      <div id="sp-diary-header">
+        <span>📔 ${settings.petName || '咪噗'}的日记</span>
+        <div style="display:flex;gap:6px;">
+          <button id="sp-diary-close" style="background:none;border:none;font-size:16px;cursor:pointer;color:#aaa;" title="关闭">✕</button>
+        </div>
+      </div>
+      <div id="sp-diary-body">
+        <div class="sp-diary-calendar" id="sp-diary-calendar"></div>
+        <div id="sp-diary-content"></div>
+      </div>
+      <div id="sp-diary-generate-section">
+        <div class="sp-diary-range-row">
+          <label>📝 记忆范围:</label>
+          <span>第</span>
+          <input type="number" id="sp-diary-mem-from" min="1" value="1" />
+          <span>到</span>
+          <input type="number" id="sp-diary-mem-to" min="1" value="1" />
+          <span>条</span>
+        </div>
+        <div class="sp-diary-range-row">
+          <label>💬 聊天范围:</label>
+          <span>第</span>
+          <input type="number" id="sp-diary-chat-from" min="1" value="1" />
+          <span>到</span>
+          <input type="number" id="sp-diary-chat-to" min="1" value="1" />
+          <span>条</span>
+        </div>
+        <div class="sp-diary-range-hint" id="sp-diary-range-hint"></div>
+        <button id="sp-diary-generate-btn">✨ 生成今日日记</button>
+        <button id="sp-diary-export-btn" style="width:100%;padding:6px;font-size:11px;margin-top:6px;background:var(--sp-bg-light);color:var(--sp-text-secondary);border:1px solid var(--sp-border);border-radius:6px;cursor:pointer;">📄 导出全部日记</button>
+      </div>
+    `;
+    document.body.appendChild(diary);
 
     updateStatusBars();
     updateSpriteImage();
@@ -1337,7 +1415,9 @@ function clearSpriteLock() {
         else if (targetTop > maxTop) dy = maxTop - startTop;
 
         // 【关键性能优化】改用 translate3d 触发 GPU 硬件加速，不触发 layout 重排
-        container.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+        const scale = settings.petScale || 1.0;
+        container.style.transform = `scale(${scale}) translate3d(${dx / scale}px, ${dy / scale}px, 0)`;
+        container.style.transformOrigin = 'center bottom';
       }
     };
 
@@ -1366,7 +1446,9 @@ function clearSpriteLock() {
         // 1. 临时禁用 CSS 中的 2 秒过度动画，防止松手时出现“慢慢滑行”的漂移 Bug
         container.style.transition = 'none';
         // 2. 清除 transform 偏移
-        container.style.transform = '';
+        const scale = settings.petScale || 1.0;
+        container.style.transform = `scale(${scale})`;
+        container.style.transformOrigin = 'center bottom';
         // 3. 将最终坐标写入 left/top
         container.style.left = left + 'px';
         container.style.top = top + 'px';
@@ -1568,6 +1650,7 @@ function sleepPet() {
       case 'bath': bathPet(); break;
       case 'sleep': sleepPet(); break;
       case 'chat': toggleChat(); break;
+      case 'diary': toggleDiary(); break;
       case 'settings': toggleSettings(); break;
     }
     toggleMenu();
@@ -1763,7 +1846,7 @@ if (hasEmoji) {
     const sticker = emojiStickers.find(s => s.image === selectedEmoji);
     const emojiName = sticker?.name || '表情包';
     const emojiMsg = `[发送了表情包: ${emojiName}]`;
-    state.petChatHistory.push({ role: 'user', content: emojiMsg, image: selectedEmoji });
+    state.petChatHistory.push({ role: 'user', content: emojiMsg, image: selectedEmoji, timestamp: Date.now() });
       // 清除选中
       selectedEmoji = null;
       updateEmojiPreviewBar();
@@ -1773,7 +1856,7 @@ if (hasEmoji) {
 
     // 如果有文字，也加入
     if (hasText) {
-      state.petChatHistory.push({ role: 'user', content: text.trim() });
+      state.petChatHistory.push({ role: 'user', content: text.trim(), timestamp: Date.now() });
     }
 
     renderChatHistory();
@@ -1813,7 +1896,7 @@ if (hasEmoji) {
       if (spriteStateLock === 'think') clearSpriteLock();
 
       if (reply) {
-        state.petChatHistory.push({ role: 'assistant', content: reply });
+        state.petChatHistory.push({ role: 'assistant', content: reply, timestamp: Date.now() });
         renderChatHistory();
         showBubble(reply.slice(0, 50) + (reply.length > 50 ? '…' : ''), 4000);
         saveData();
@@ -2033,36 +2116,32 @@ function toggleChat() {
       const div = document.createElement('div');
       div.className = `sp-chat-msg ${msg.role === 'assistant' ? 'pet' : 'user'}`;
 
+      // 时间戳
+      let timeStr = '';
+      if (msg.timestamp) {
+        const d = new Date(msg.timestamp);
+        timeStr = `<span style="font-size:9px;color:var(--sp-text-muted);opacity:0.6;display:block;margin-bottom:2px;">${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}</span>`;
+      }
+
       // 如果有图片（表情包）
       if (msg.image) {
-        div.innerHTML = `<img src="${msg.image}" style="max-width:60px;max-height:60px;border-radius:6px;display:block;margin-bottom:4px;" alt="表情" />`;
+        div.innerHTML = `${timeStr}<img src="${msg.image}" style="max-width:60px;max-height:60px;border-radius:6px;display:block;margin-bottom:4px;" alt="表情" />`;
         if (msg.content && msg.content !== '[表情包]') {
-          const escaped = msg.content
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/\n/g, '<br>');
-          div.innerHTML += `<span>${escaped}</span>`;
+          div.innerHTML += `<span>${renderMarkdown(msg.content)}</span>`;
         }
       } else {
-        const escaped = msg.content
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/\n/g, '<br>');
-        div.innerHTML = escaped;
+        div.innerHTML = `${timeStr}${renderMarkdown(msg.content)}`;
       }
       container.appendChild(div);
     });
     container.scrollTop = container.scrollHeight;
   }
 
-
   async function sendChatMessage(text) {
     if (!text.trim()) return;
 
     try {
-      state.petChatHistory.push({ role: 'user', content: text.trim() });
+      state.petChatHistory.push({ role: 'user', content: text.trim(), timestamp: Date.now() });
       renderChatHistory();
       saveData();
 
@@ -2093,7 +2172,7 @@ function toggleChat() {
 
 
       if (reply) {
-        state.petChatHistory.push({ role: 'assistant', content: reply });
+        state.petChatHistory.push({ role: 'assistant', content: reply, timestamp: Date.now() });
         // 流式模式下已经有逐字显示的 div，重新渲染会闪一下但能保证数据一致
         renderChatHistory();
         showBubble(reply.slice(0, 50) + (reply.length > 50 ? '…' : ''), 4000);
@@ -2181,8 +2260,12 @@ function toggleChat() {
       return null;
     }
 
-    // 非流式：保持原来的逻辑
+    const timeoutMs = (settings.apiTimeout || 15) * 1000;
+
+    // 非流式
     if (!settings.enableStreaming) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
         const response = await fetch(`${settings.baseUrl}/chat/completions`, {
           method: 'POST',
@@ -2194,7 +2277,9 @@ function toggleChat() {
             model: settings.model, messages,
             max_tokens: settings.maxTokens, temperature: 0.8,
           }),
+          signal: controller.signal,
         });
+        clearTimeout(timer);
         if (!response.ok) {
           console.error(`[${PLUGIN_NAME}] API ${response.status}`);
           showBubble(`API错误: ${response.status}`, 3000);
@@ -2208,6 +2293,12 @@ function toggleChat() {
         }
         return content;
       } catch (err) {
+        clearTimeout(timer);
+        if (err.name === 'AbortError') {
+          console.error(`[${PLUGIN_NAME}] API 请求超时 (${settings.apiTimeout}s)`);
+          showBubble(`请求超时了…(${settings.apiTimeout}s) 检查网络或增加超时`, 4000);
+          return null;
+        }
         console.error(`[${PLUGIN_NAME}] API失败:`, err);
         showBubble(`API连接失败: ${err.message}`, 4000);
         return null;
@@ -2215,6 +2306,8 @@ function toggleChat() {
     }
 
     // 流式输出
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const response = await fetch(`${settings.baseUrl}/chat/completions`, {
         method: 'POST',
@@ -2227,7 +2320,9 @@ function toggleChat() {
           max_tokens: settings.maxTokens, temperature: 0.8,
           stream: true,
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timer);
       if (!response.ok) {
         console.error(`[${PLUGIN_NAME}] API ${response.status}`);
         showBubble(`API错误: ${response.status}`, 3000);
@@ -2252,9 +2347,21 @@ function toggleChat() {
         msgContainer.scrollTop = msgContainer.scrollHeight;
       }
 
+      // 流式读取期间用另一个超时：30秒内没有新数据则中断
+      let streamTimer = null;
+      const resetStreamTimer = () => {
+        if (streamTimer) clearTimeout(streamTimer);
+        streamTimer = setTimeout(() => {
+          console.warn(`[${PLUGIN_NAME}] 流式读取超时，强制结束`);
+          reader.cancel();
+        }, 30000);
+      };
+
+      resetStreamTimer();
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
+        resetStreamTimer();
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
@@ -2271,13 +2378,8 @@ function toggleChat() {
             const delta = parsed.choices?.[0]?.delta?.content;
             if (delta) {
               fullContent += delta;
-              // 逐字更新显示
-              const escaped = fullContent
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/\n/g, '<br>');
-              streamDiv.innerHTML = escaped;
+              // 逐字更新显示（带 Markdown 渲染）
+              streamDiv.innerHTML = renderMarkdown(fullContent);
               if (msgContainer) msgContainer.scrollTop = msgContainer.scrollHeight;
             }
           } catch (e) {
@@ -2285,6 +2387,7 @@ function toggleChat() {
           }
         }
       }
+      if (streamTimer) clearTimeout(streamTimer);
 
       if (!fullContent.trim()) {
         if (streamDiv.parentNode) streamDiv.remove();
@@ -2294,11 +2397,18 @@ function toggleChat() {
 
       return fullContent.trim();
     } catch (err) {
+      clearTimeout(timer);
+      if (err.name === 'AbortError') {
+        console.error(`[${PLUGIN_NAME}] API 请求超时`);
+        showBubble(`请求超时了…检查网络或增加超时设置`, 4000);
+        return null;
+      }
       console.error(`[${PLUGIN_NAME}] 流式API失败:`, err);
       showBubble(`API连接失败: ${err.message}`, 4000);
       return null;
     }
   }
+
 
   // 获取模型列表
   async function fetchModelsList() {
@@ -2338,6 +2448,28 @@ function toggleChat() {
     } catch (e) {
       showBubble('获取失败，检查网络', 3000);
     }
+  }
+
+  // ============================================================
+  // 轻量 Markdown 渲染
+  // ============================================================
+  function renderMarkdown(text) {
+    if (!text) return '';
+    let html = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    // 加粗 **text** 或 __text__
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+    // 斜体 *text* 或 _text_（不贪婪，避免误匹配）
+    html = html.replace(/\*([^\*\n]+?)\*/g, '<em>$1</em>');
+    html = html.replace(/(?<![a-zA-Z0-9])_([^_\n]+?)_(?![a-zA-Z0-9])/g, '<em>$1</em>');
+    // 行内代码 `code`
+    html = html.replace(/`([^`\n]+?)`/g, '<code style="background:rgba(100,180,255,0.1);padding:1px 4px;border-radius:3px;font-size:12px;">$1</code>');
+    // 换行
+    html = html.replace(/\n/g, '<br>');
+    return html;
   }
 
   // ============================================================
@@ -2414,7 +2546,16 @@ function toggleChat() {
       else if (hour >= 18 && hour < 22) timeOfDay = '晚上';
       else if (hour >= 22 || hour < 5) timeOfDay = '深夜';
       sys += `\n[时间] ${now.getMonth()+1}月${now.getDate()}日 星期${weekDays[now.getDay()]} ${hour}:${String(now.getMinutes()).padStart(2,'0')} (${timeOfDay})`;
+
+      // 最后一条聊天的时间
+      const lastMsg = state.petChatHistory[state.petChatHistory.length - 1];
+      if (lastMsg && lastMsg.timestamp) {
+        const lastD = new Date(lastMsg.timestamp);
+        const lastTimeStr = `${lastD.getMonth()+1}月${lastD.getDate()}日 ${String(lastD.getHours()).padStart(2,'0')}:${String(lastD.getMinutes()).padStart(2,'0')}`;
+        sys += `\n[上次对话时间] ${lastTimeStr}`;
+      }
     }
+
     if (isOfflineMode && settings.offlinePrompt) {
       sys += `\n\n[线下模式]\n${settings.offlinePrompt}`;
     }
@@ -2708,6 +2849,428 @@ async function refreshWorldPreview() {
       eventSource.on(eventTypes.MESSAGE_RECEIVED, () => {
         if (canReact()) setTimeout(() => triggerAutoComment(), 3000 + Math.random() * 8000);
       });
+    }
+  }
+
+  // ============================================================
+  // 日记系统
+  // ============================================================
+  let isDiaryOpen = false;
+  let diaryViewYear = new Date().getFullYear();
+  let diaryViewMonth = new Date().getMonth();
+  let diarySelectedDate = '';
+
+  function toggleDiary() {
+    const diaryEl = document.getElementById('silly-pet-diary');
+    if (!diaryEl) return;
+    isDiaryOpen = !isDiaryOpen;
+    diaryEl.classList.toggle('visible', isDiaryOpen);
+    if (isDiaryOpen) {
+      const w = Math.min(360, window.innerWidth - 20);
+      diaryEl.style.width = w + 'px';
+      requestAnimationFrame(() => {
+        const h = diaryEl.offsetHeight;
+        const maxTop = window.innerHeight - h - 20;
+        const centerTop = Math.floor((window.innerHeight - h) / 2);
+        diaryEl.style.left = Math.floor((window.innerWidth - w) / 2) + 'px';
+        diaryEl.style.top = Math.max(10, Math.min(centerTop, maxTop)) + 'px';
+      });
+      diaryViewYear = new Date().getFullYear();
+      diaryViewMonth = new Date().getMonth();
+      diarySelectedDate = '';
+      renderDiaryCalendar();
+      renderDiaryContent();
+      populateDiaryRanges();
+      bindDiaryEvents();
+    }
+  }
+
+  function populateDiaryRanges() {
+    const memFrom = document.getElementById('sp-diary-mem-from');
+    const memTo = document.getElementById('sp-diary-mem-to');
+    const chatFrom = document.getElementById('sp-diary-chat-from');
+    const chatTo = document.getElementById('sp-diary-chat-to');
+    const hint = document.getElementById('sp-diary-range-hint');
+
+    const memTotal = state.memories.length;
+    const chatTotal = state.petChatHistory.length;
+
+    if (memFrom) memFrom.max = memTotal || 1;
+    if (memTo) memTo.max = memTotal || 1;
+    if (chatFrom) chatFrom.max = chatTotal || 1;
+    if (chatTo) chatTo.max = chatTotal || 1;
+
+    if (state.lastDiaryMemoryRange) {
+      if (memFrom) memFrom.value = Math.min(state.lastDiaryMemoryRange.from, memTotal || 1);
+      if (memTo) memTo.value = Math.min(state.lastDiaryMemoryRange.to, memTotal || 1);
+    } else {
+      if (memFrom) memFrom.value = 1;
+      if (memTo) memTo.value = memTotal || 1;
+    }
+
+    if (state.lastDiaryChatRange) {
+      if (chatFrom) chatFrom.value = Math.min(state.lastDiaryChatRange.from, chatTotal || 1);
+      if (chatTo) chatTo.value = Math.min(state.lastDiaryChatRange.to, chatTotal || 1);
+    } else {
+      if (chatFrom) chatFrom.value = Math.max(1, chatTotal - 19);
+      if (chatTo) chatTo.value = chatTotal || 1;
+    }
+
+    if (hint) {
+      const parts = [];
+      if (state.lastDiaryMemoryRange) parts.push(`上次记忆: ${state.lastDiaryMemoryRange.from}-${state.lastDiaryMemoryRange.to}`);
+      if (state.lastDiaryChatRange) parts.push(`上次聊天: ${state.lastDiaryChatRange.from}-${state.lastDiaryChatRange.to}`);
+      hint.textContent = parts.length > 0 ? `💡 ${parts.join('，')}` : `💡 记忆共${memTotal}条，聊天共${chatTotal}条`;
+    }
+  }
+
+  function renderDiaryCalendar() {
+    const container = document.getElementById('sp-diary-calendar');
+    if (!container) return;
+
+    const year = diaryViewYear;
+    const month = diaryViewMonth;
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+
+    const diaryDates = new Set((state.diaryEntries || []).map(e => e.date));
+
+    let daysHtml = '';
+    for (let i = 0; i < firstDay; i++) {
+      daysHtml += `<div class="sp-diary-day empty"></div>`;
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const isToday = dateStr === todayStr;
+      const hasDiary = diaryDates.has(dateStr);
+      const isSelected = dateStr === diarySelectedDate;
+      const classes = ['sp-diary-day'];
+      if (isToday) classes.push('today');
+      if (hasDiary) classes.push('has-diary');
+      if (isSelected) classes.push('selected');
+      daysHtml += `<div class="${classes.join(' ')}" data-date="${dateStr}">${d}</div>`;
+    }
+
+    container.innerHTML = `
+      <div class="sp-diary-calendar-header">
+        <button id="sp-diary-prev-month" title="上个月">◀</button>
+        <span id="sp-diary-year-month-label" style="cursor:pointer;" title="点击快速跳转年月">${year}年 ${monthNames[month]}</span>
+        <button id="sp-diary-next-month" title="下个月">▶</button>
+      </div>
+      <div id="sp-diary-jump-panel" style="display:none;margin-bottom:8px;">
+        <div style="display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap;">
+          <select id="sp-diary-jump-year" style="padding:3px 6px;font-size:11px;border-radius:4px;border:1px solid var(--sp-border);background:var(--sp-bg-light);color:var(--sp-text-primary);">
+            ${(() => { let opts = ''; const cur = new Date().getFullYear(); for (let y = cur - 5; y <= cur + 1; y++) { opts += `<option value="${y}" ${y === year ? 'selected' : ''}>${y}年</option>`; } return opts; })()}
+          </select>
+          <select id="sp-diary-jump-month" style="padding:3px 6px;font-size:11px;border-radius:4px;border:1px solid var(--sp-border);background:var(--sp-bg-light);color:var(--sp-text-primary);">
+            ${monthNames.map((name, i) => `<option value="${i}" ${i === month ? 'selected' : ''}>${name}</option>`).join('')}
+          </select>
+          <button id="sp-diary-jump-go" style="padding:3px 8px;font-size:11px;border-radius:4px;border:1px solid var(--sp-primary-border);background:var(--sp-primary);color:#fff;cursor:pointer;">跳转</button>
+          <button id="sp-diary-jump-today" style="padding:3px 8px;font-size:11px;border-radius:4px;border:1px solid var(--sp-border);background:var(--sp-bg-light);color:var(--sp-text-secondary);cursor:pointer;">今天</button>
+        </div>
+      </div>
+      <div class="sp-diary-weekdays">
+        <div class="sp-diary-weekday">日</div>
+        <div class="sp-diary-weekday">一</div>
+        <div class="sp-diary-weekday">二</div>
+        <div class="sp-diary-weekday">三</div>
+        <div class="sp-diary-weekday">四</div>
+        <div class="sp-diary-weekday">五</div>
+        <div class="sp-diary-weekday">六</div>
+      </div>
+      <div class="sp-diary-days">${daysHtml}</div>
+    `;
+
+    // 上下月
+    document.getElementById('sp-diary-prev-month')?.addEventListener('click', () => {
+      diaryViewMonth--;
+      if (diaryViewMonth < 0) { diaryViewMonth = 11; diaryViewYear--; }
+      renderDiaryCalendar();
+    });
+    document.getElementById('sp-diary-next-month')?.addEventListener('click', () => {
+      diaryViewMonth++;
+      if (diaryViewMonth > 11) { diaryViewMonth = 0; diaryViewYear++; }
+      renderDiaryCalendar();
+    });
+
+    // 点击年月标题 → 展开/收起快速跳转面板
+    document.getElementById('sp-diary-year-month-label')?.addEventListener('click', () => {
+      const panel = document.getElementById('sp-diary-jump-panel');
+      if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    });
+
+    // 跳转按钮
+    document.getElementById('sp-diary-jump-go')?.addEventListener('click', () => {
+      const y = parseInt(document.getElementById('sp-diary-jump-year')?.value);
+      const m = parseInt(document.getElementById('sp-diary-jump-month')?.value);
+      if (!isNaN(y) && !isNaN(m)) {
+        diaryViewYear = y;
+        diaryViewMonth = m;
+        renderDiaryCalendar();
+      }
+    });
+
+    // 回到今天
+    document.getElementById('sp-diary-jump-today')?.addEventListener('click', () => {
+      const now = new Date();
+      diaryViewYear = now.getFullYear();
+      diaryViewMonth = now.getMonth();
+      diarySelectedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      renderDiaryCalendar();
+      renderDiaryContent();
+    });
+
+    // 点击日期
+    container.querySelectorAll('.sp-diary-day[data-date]').forEach(day => {
+      day.addEventListener('click', () => {
+        diarySelectedDate = day.dataset.date;
+        renderDiaryCalendar();
+        renderDiaryContent();
+      });
+    });
+  }
+
+  function renderDiaryContent() {
+    const container = document.getElementById('sp-diary-content');
+    if (!container) return;
+
+    const entries = state.diaryEntries || [];
+
+    if (diarySelectedDate) {
+      const entry = entries.find(e => e.date === diarySelectedDate);
+      if (entry) {
+        container.innerHTML = `
+          <div class="sp-diary-entry">
+            <div class="sp-diary-entry-header">
+              <span class="sp-diary-entry-date">📅 ${entry.date}</span>
+              <div class="sp-diary-entry-actions">
+                <button class="sp-diary-edit-btn" title="编辑">✏️</button>
+                <button class="sp-diary-delete-btn" title="删除">🗑️</button>
+              </div>
+            </div>
+            <div class="sp-diary-entry-content" id="sp-diary-entry-text">${renderMarkdown(entry.content)}</div>
+          </div>
+        `;
+        container.querySelector('.sp-diary-edit-btn')?.addEventListener('click', () => {
+          const textDiv = document.getElementById('sp-diary-entry-text');
+          if (!textDiv) return;
+          textDiv.innerHTML = `<textarea id="sp-diary-edit-textarea">${entry.content}</textarea><div style="display:flex;gap:6px;margin-top:6px;"><button id="sp-diary-save-edit" style="padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid var(--sp-primary-border);background:var(--sp-primary);color:#fff;cursor:pointer;">保存</button><button id="sp-diary-cancel-edit" style="padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid var(--sp-border);background:var(--sp-bg-light);color:var(--sp-text-secondary);cursor:pointer;">取消</button></div>`;
+          document.getElementById('sp-diary-save-edit')?.addEventListener('click', () => {
+            const ta = document.getElementById('sp-diary-edit-textarea');
+            if (ta) { entry.content = ta.value.trim(); saveData(); renderDiaryContent(); showBubble('日记已更新～', 2000); }
+          });
+          document.getElementById('sp-diary-cancel-edit')?.addEventListener('click', () => { renderDiaryContent(); });
+        });
+        container.querySelector('.sp-diary-delete-btn')?.addEventListener('click', () => {
+          if (!confirm(`确定删除 ${entry.date} 的日记吗？`)) return;
+          state.diaryEntries = entries.filter(e => e.date !== diarySelectedDate);
+          saveData();
+          diarySelectedDate = '';
+          renderDiaryCalendar();
+          renderDiaryContent();
+          showBubble('日记已删除', 2000);
+        });
+      } else {
+        container.innerHTML = `<div class="sp-diary-empty">📭 ${diarySelectedDate} 没有日记<br/><span style="font-size:11px;">点下方「✨ 生成今日日记」来写一篇吧</span></div>`;
+      }
+    } else {
+      // 默认显示最近几篇日记
+      const recent = [...entries].sort((a, b) => b.timestamp - a.timestamp).slice(0, 5);
+      if (recent.length === 0) {
+        container.innerHTML = `<div class="sp-diary-empty">📭 还没有日记哦～<br/><span style="font-size:11px;">点日历选个日期，或直接生成今日日记</span></div>`;
+      } else {
+        container.innerHTML = recent.map(entry => `
+          <div class="sp-diary-entry" style="cursor:pointer;" data-diary-date="${entry.date}">
+            <div class="sp-diary-entry-header">
+              <span class="sp-diary-entry-date">📅 ${entry.date}</span>
+            </div>
+            <div class="sp-diary-entry-content" style="max-height:40px;overflow:hidden;position:relative;">
+              ${renderMarkdown(entry.content.slice(0, 80))}${entry.content.length > 80 ? '…' : ''}
+            </div>
+          </div>
+        `).join('');
+        container.querySelectorAll('[data-diary-date]').forEach(el => {
+          el.addEventListener('click', () => {
+            diarySelectedDate = el.dataset.diaryDate;
+            renderDiaryCalendar();
+            renderDiaryContent();
+          });
+        });
+      }
+    }
+  }
+
+  function bindDiaryEvents() {
+    const closeBtn = document.getElementById('sp-diary-close');
+    if (closeBtn) closeBtn.onclick = () => toggleDiary();
+
+    const generateBtn = document.getElementById('sp-diary-generate-btn');
+    const exportBtn = document.getElementById('sp-diary-export-btn');
+    if (exportBtn) {
+      exportBtn.onclick = () => {
+        const entries = state.diaryEntries || [];
+        if (entries.length === 0) { showBubble('还没有日记可以导出', 2000); return; }
+        const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
+        const text = `═══════════════════════════════\n  ${settings.petName || '咪噗'} 的日记本\n  导出时间: ${new Date().toLocaleString()}\n  共 ${sorted.length} 篇日记\n═══════════════════════════════\n\n` +
+          sorted.map(e => `📅 ${e.date}\n${'─'.repeat(20)}\n${e.content}\n`).join('\n\n');
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${settings.petName || '咪噗'}日记_${new Date().toLocaleDateString().replace(/\//g, '-')}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showBubble('📄 日记已导出', 2000);
+      };
+    }
+
+    if (generateBtn) generateBtn.onclick = () => generateDiary();
+
+    // 拖拽
+    const header = document.getElementById('sp-diary-header');
+    const panel = document.getElementById('silly-pet-diary');
+    if (header && panel) {
+      let dragging = false, offX = 0, offY = 0;
+      const down = (e) => {
+        if (e.target.closest('#sp-diary-close')) return;
+        dragging = true;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const rect = panel.getBoundingClientRect();
+        offX = clientX - rect.left;
+        offY = clientY - rect.top;
+      };
+      const move = (e) => {
+        if (!dragging) return;
+        if (e.cancelable) e.preventDefault();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        let x = clientX - offX;
+        let y = clientY - offY;
+        x = Math.max(0, Math.min(window.innerWidth - panel.offsetWidth, x));
+        y = Math.max(0, Math.min(window.innerHeight - panel.offsetHeight, y));
+        panel.style.left = x + 'px';
+        panel.style.top = y + 'px';
+      };
+      const up = () => { dragging = false; };
+      header.addEventListener('mousedown', down);
+      header.addEventListener('touchstart', down, { passive: true });
+      document.addEventListener('mousemove', move);
+      document.addEventListener('touchmove', move, { passive: false });
+      document.addEventListener('mouseup', up);
+      document.addEventListener('touchend', up);
+    }
+  }
+
+  async function generateDiary() {
+    const memFrom = parseInt(document.getElementById('sp-diary-mem-from')?.value || 1);
+    const memTo = parseInt(document.getElementById('sp-diary-mem-to')?.value || state.memories.length);
+    const chatFrom = parseInt(document.getElementById('sp-diary-chat-from')?.value || 1);
+    const chatTo = parseInt(document.getElementById('sp-diary-chat-to')?.value || state.petChatHistory.length);
+
+    // 保存本次范围
+    state.lastDiaryMemoryRange = { from: memFrom, to: memTo };
+    state.lastDiaryChatRange = { from: chatFrom, to: chatTo };
+    saveData();
+
+    // 收集记忆
+    const memSlice = state.memories.slice(Math.max(0, memFrom - 1), memTo);
+    const memText = memSlice.map(m => {
+      const mem = typeof m === 'string' ? { content: m, tag: '' } : m;
+      return mem.tag ? `[${mem.tag}] ${mem.content}` : mem.content;
+    }).filter(Boolean).join('\n');
+
+    // 收集聊天
+    const chatSlice = state.petChatHistory.slice(Math.max(0, chatFrom - 1), chatTo);
+    const chatText = chatSlice.map(m => {
+      const name = m.role === 'user' ? '主人' : '桌宠';
+      return `${name}: ${m.content}`;
+    }).join('\n');
+
+    if (!memText && !chatText) {
+      showBubble('选择的范围内没有内容哦', 2000);
+      return;
+    }
+
+    // 构建 prompt
+    const messages = [];
+
+    // system: 人设 + 世界书 + 日记提示词
+    let sys = settings.systemPrompt + '\n';
+    if (settings.relationshipPrompt) sys += `\n[与主人的关系]\n${settings.relationshipPrompt}\n`;
+    const userPersona = getUserPersona();
+    if (userPersona) sys += `\n[主人人设]\n${userPersona}\n`;
+    const charDesc = getCharacterDescription();
+    if (charDesc) sys += `\n[角色背景参考]\n${charDesc}\n`;
+    let worldInfo = '';
+    try { worldInfo = await getWorldBookContent(); } catch(e) {}
+    if (worldInfo) sys += `\n[世界设定参考]\n${worldInfo}\n`;
+    sys += `\n[日记写作要求]\n${settings.diaryPrompt || '请以桌宠的第一人称视角写一篇简短日记。'}`;
+
+    messages.push({ role: 'system', content: sys });
+
+    // user: 记忆 + 聊天内容
+    let userContent = '';
+    if (memText) userContent += `[参考记忆]\n${memText}\n\n`;
+    if (chatText) userContent += `[参考对话]\n${chatText}\n\n`;
+    userContent += '请根据以上内容，写一篇今天的日记。';
+    messages.push({ role: 'user', content: userContent });
+
+    // 破限
+    if (settings.jailbreak) {
+      messages.push({ role: 'system', content: settings.jailbreak });
+    }
+
+    // 开始生成
+    const btn = document.getElementById('sp-diary-generate-btn');
+    if (btn) { btn.textContent = '⏳ 生成中…'; btn.disabled = true; }
+    if (settings.spriteThink) setSpriteWithLock('think', settings.spriteThink, null);
+    showBubble('正在写日记…📝', 3000);
+
+    let result = null;
+    const estimatedTokens = estimateMessagesTokens(messages);
+    updateTokenDisplay(estimatedTokens);
+
+    if (settings.apiSource === 'tavern') {
+      result = await callViaTavern(messages);
+    } else {
+      result = await callViaCustom(messages);
+    }
+
+    if (spriteStateLock === 'think') clearSpriteLock();
+    if (btn) { btn.textContent = '✨ 生成今日日记'; btn.disabled = false; }
+
+    if (result) {
+      const today = new Date();
+      const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+      if (!state.diaryEntries) state.diaryEntries = [];
+
+      // 如果今天已有日记，追加或覆盖
+      const existIdx = state.diaryEntries.findIndex(e => e.date === dateStr);
+      if (existIdx >= 0) {
+        if (confirm('今天已有日记，要覆盖吗？\n取消则追加到后面。')) {
+          state.diaryEntries[existIdx].content = result;
+          state.diaryEntries[existIdx].timestamp = Date.now();
+        } else {
+          state.diaryEntries[existIdx].content += '\n\n---\n\n' + result;
+          state.diaryEntries[existIdx].timestamp = Date.now();
+        }
+      } else {
+        state.diaryEntries.push({ date: dateStr, content: result, timestamp: Date.now() });
+      }
+
+      saveData();
+      diarySelectedDate = dateStr;
+      renderDiaryCalendar();
+      renderDiaryContent();
+      showBubble('📔 今日日记写好啦！', 3000);
+    } else {
+      showBubble('日记生成失败了…检查API', 3000);
     }
   }
 
@@ -3032,6 +3595,8 @@ async function refreshWorldPreview() {
               <input type="number" id="sp-max-tokens" value="${settings.maxTokens}" min="50" max="30000" />
               <div class="sp-row"><label style="margin:0;"><input type="checkbox" id="sp-enable-streaming" ${settings.enableStreaming ? 'checked' : ''} /> 启用流式输出（逐字显示）</label></div>
               <div class="sp-row"><label style="margin:0;"><input type="checkbox" id="sp-enable-vision" ${settings.enableVision ? 'checked' : ''} /> 启用视觉识别（表情包图片发送给AI看）</label></div>
+              <label>请求超时（秒）</label>
+              <input type="number" id="sp-api-timeout" value="${settings.apiTimeout || 15}" min="5" max="120" />
             </div>
           </div>
 
@@ -3117,6 +3682,11 @@ async function refreshWorldPreview() {
             <div class="sp-section">
               <label>总结提示词</label>
               <textarea id="sp-summary-prompt">${settings.summaryPrompt}</textarea>
+            </div>
+            <div class="sp-section">
+              <div class="sp-section-title">📔 日记提示词</div>
+              <p style="font-size:11px;color:#999;margin-bottom:8px;">生成日记时使用的提示词。桌宠会根据你选择的记忆和聊天范围来写日记。</p>
+              <textarea id="sp-diary-prompt">${settings.diaryPrompt || '请以桌宠的第一人称视角，根据以下信息写一篇简短的日记（100-200字）。记录今天发生的有趣的事、和主人的互动、心情变化等。语气要符合桌宠的性格设定。'}</textarea>
             </div>
             <div class="sp-section">
               <label>AI提取记忆提示词</label>
@@ -3264,6 +3834,12 @@ async function refreshWorldPreview() {
               <p style="font-size:11px;color:#999;margin-bottom:8px;">替换右上角的状态表情，留空用默认 emoji</p>
               <div id="sp-upload-area-moods"></div>
             </div>
+            <div class="sp-section">
+              <div class="sp-section-title">📐 桌宠大小</div>
+              <label>缩放比例: <span id="sp-scale-display">${(settings.petScale || 1.0).toFixed(1)}x</span></label>
+              <input type="range" id="sp-pet-scale" min="0.5" max="2.0" step="0.1" value="${settings.petScale || 1.0}" />
+              <p style="font-size:11px;color:#999;margin:4px 0 0;">0.5x迷你 ─ 1.0x默认 ─ 2.0x巨大</p>
+            </div>
             <div class="sp-row"><label style="margin:0;"><input type="checkbox" id="sp-show-status-bar" ${settings.showStatusBar !== false ? 'checked' : ''} /> 显示状态条（饱食/清洁/精力）</label></div>
           </div>
 
@@ -3344,9 +3920,9 @@ async function refreshWorldPreview() {
                 <summary class="sp-guide-summary">🚀 快速开始</summary>
                 <div class="sp-guide-details-content">
                   <div class="sp-guide-block">
-                    <div class="sp-guide-step"><span class="sp-guide-num">1</span><div><strong>配置 API</strong><br/>点击「🔑 API」标签页，选择使用酒馆当前 API 或填写独立 API Key。推荐新手直接选「使用酒馆当前 API 连接」，零配置开箱即用。</div></div>
-                    <div class="sp-guide-step"><span class="sp-guide-num">2</span><div><strong>选一个预设性格</strong><br/>点击「💬 提示词」→「📋 提示词预设」，从内置的猫咪、傲娇精灵等预设中选一个，点「✅ 应用预设」，再点底部「💾 保存所有设置」。</div></div>
-                    <div class="sp-guide-step"><span class="sp-guide-num">3</span><div><strong>开始互动</strong><br/>点击屏幕上的桌宠，弹出圆形菜单，选「💬 聊天」打开聊天框，就可以和桌宠说话了。</div></div>
+                    <div class="sp-guide-step"><span class="sp-guide-num">1</span><div><strong>配置 API</strong><br/>点击「🔑 API」标签页，选择使用酒馆当前 API 或填写独立 API Key。<br/>推荐新手直接选「使用酒馆当前 API 连接」，零配置开箱即用。<br/><br/>如果选「手动填写独立 API」，你需要：<br/>• 填入 API Key（通常以 sk- 开头）<br/>• 填入 Base URL（如 https://api.openai.com/v1）<br/>• 选择或输入模型名称（可以点「📡 获取」自动拉取列表）</div></div>
+                    <div class="sp-guide-step"><span class="sp-guide-num">2</span><div><strong>选一个预设性格</strong><br/>点击「💬 提示词」→「📋 提示词预设」，从内置的猫咪、傲娇精灵等预设中选一个，点「✅ 应用预设」。<br/><br/>应用后记得点底部「💾 保存所有设置」。预设会自动填充桌宠名字、系统提示词、关系描述等内容。</div></div>
+                    <div class="sp-guide-step"><span class="sp-guide-num">3</span><div><strong>开始互动</strong><br/>点击屏幕上的桌宠（或在手机上双击），弹出圆形菜单。<br/>选「💬 聊天」打开聊天框，就可以和桌宠说话了。<br/><br/>💡 小技巧：输入消息后按 Enter 只会发送消息不生成回复，点「➤」按钮才会让 AI 回复。这样你可以连续发好几条消息后再让桌宠一次性回应。</div></div>
                   </div>
                 </div>
               </details>
@@ -3355,148 +3931,328 @@ async function refreshWorldPreview() {
                 <summary class="sp-guide-summary">🐾 桌宠基础操作</summary>
                 <div class="sp-guide-details-content">
                   <div class="sp-guide-table">
-                    <div class="sp-guide-row"><span class="sp-guide-key">单击桌宠</span><span class="sp-guide-val">打开圆形菜单</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">拖拽桌宠</span><span class="sp-guide-val">移动位置；拖到屏幕边缘会自动吸附挂起</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">🍖 投喂</span><span class="sp-guide-val">补充饱食度 +25%</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">🛁 洗澡</span><span class="sp-guide-val">补充清洁度 +30%</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">🛏️ 睡觉</span><span class="sp-guide-val">补充精力值 +35%</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">💬 聊天</span><span class="sp-guide-val">打开对话窗口</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">单击桌宠</span><span class="sp-guide-val">打开圆形菜单（手机上需要双击）</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">拖拽桌宠</span><span class="sp-guide-val">按住桌宠拖动可以移动位置；拖到屏幕边缘会自动吸附挂起（需要在外观里上传对应的挂起图片）</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">🍖 投喂</span><span class="sp-guide-val">补充饱食度 +25%，触发吃东西动画</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">🛁 洗澡</span><span class="sp-guide-val">补充清洁度 +30%，触发洗澡动画</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">🛏️ 睡觉</span><span class="sp-guide-val">补充精力值 +35%，触发睡觉动画</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">💬 聊天</span><span class="sp-guide-val">打开对话窗口，和桌宠私聊</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">📔 日记</span><span class="sp-guide-val">打开日记面板，查看或生成桌宠的日记</span></div>
                     <div class="sp-guide-row"><span class="sp-guide-key">⚙️ 设置</span><span class="sp-guide-val">打开本设置面板</span></div>
                   </div>
-                  <p style="font-size:11px;color:#999;margin-top:8px;">状态条三个指标（🍖饱食 💧清洁 ⚡精力）会随时间缓慢下降，影响桌宠心情和对话风格。</p>
+                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>状态系统说明：</strong></p>
+                  <p style="font-size:11px;color:#999;margin-top:4px;">状态条三个指标（🍖饱食 💧清洁 ⚡精力）会随时间缓慢下降。当某项低于 20% 时桌宠心情会变化：</p>
+                  <div class="sp-guide-table" style="margin-top:6px;">
+                    <div class="sp-guide-row"><span class="sp-guide-key">精力 < 20%</span><span class="sp-guide-val">😴 犯困状态，走路变慢，说话迷糊</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">饱食 < 20%</span><span class="sp-guide-val">🍽️ 饥饿状态，会时不时提到吃的</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">清洁 < 20%</span><span class="sp-guide-val">💦 脏脏状态，会嚷嚷想洗澡</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">全部 > 60%</span><span class="sp-guide-val">😊 开心状态，正常活跃</span></div>
+                  </div>
+                  <p style="font-size:11px;color:#999;margin-top:6px;">心情会影响桌宠的对话语气和精灵图表现。即使你关闭网页，状态也会按离线衰减率缓慢下降。</p>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">💬 聊天框操作</summary>
+                <summary class="sp-guide-summary">💬 聊天框详细说明</summary>
                 <div class="sp-guide-details-content">
+                  <p style="font-size:12px;color:#ccc;line-height:1.7;margin-bottom:8px;">聊天框是你和桌宠交流的主要界面。</p>
                   <div class="sp-guide-table">
-                    <div class="sp-guide-row"><span class="sp-guide-key">😺 表情按钮</span><span class="sp-guide-val">展开/收起表情包面板</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">📨 发送消息</span><span class="sp-guide-val">将文字/表情包加入记录，<strong>不会立即生成回复</strong></span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">➤ 生成回复</span><span class="sp-guide-val">将输入框内容发出后，立即调用 AI 生成桌宠回复</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">Enter 键</span><span class="sp-guide-val">等同于「📨 发送消息」（不生成回复）</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">🌙 线下模式</span><span class="sp-guide-val">切换到更亲密的线下互动风格</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">─ 最小化</span><span class="sp-guide-val">收缩为小标题栏，不影响聊天</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">😺 表情按钮</span><span class="sp-guide-val">展开/收起表情包面板，可以发送自定义贴图</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">📨 发送消息</span><span class="sp-guide-val">将文字/表情包加入聊天记录，<strong>不会触发 AI 回复</strong>。适合你想连续说几句话的场景</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">➤ 生成回复</span><span class="sp-guide-val">如果输入框有内容先发送，然后调用 AI 生成桌宠回复。这是唯一触发 AI 回复的按钮</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">Enter 键</span><span class="sp-guide-val">等同于「📨 发送消息」，只发送不回复</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">🌙 线下模式</span><span class="sp-guide-val">切换到更亲密的线下互动风格。开启后桌宠会认为你们不在电脑前，而是在现实中相处</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">─ 最小化</span><span class="sp-guide-val">收缩为小标题栏，悬挂在屏幕上不影响操作</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">✕ 关闭</span><span class="sp-guide-val">关闭聊天窗口（不会丢失聊天记录）</span></div>
                   </div>
-                  <p style="font-size:11px;color:#999;margin-top:8px;">表情包需要先在面板里点「＋」上传图片。上传时文件名会作为表情名称，右键点击可编辑/删除。给表情起个描述性的名字（如"委屈脸"），AI 就能理解你发的是什么表情。</p>
+                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>表情包使用方法：</strong></p>
+                  <div class="sp-guide-block" style="margin-top:6px;">
+                    <div class="sp-guide-step"><span class="sp-guide-num">1</span><div>点击「😺」展开表情包面板</div></div>
+                    <div class="sp-guide-step"><span class="sp-guide-num">2</span><div>点击「＋」按钮上传图片（PNG/JPG/GIF/WebP，2MB以内）</div></div>
+                    <div class="sp-guide-step"><span class="sp-guide-num">3</span><div>点击一个表情选中，会在输入框上方出现预览</div></div>
+                    <div class="sp-guide-step"><span class="sp-guide-num">4</span><div>点击「📨」或「➤」发送</div></div>
+                  </div>
+                  <p style="font-size:11px;color:#999;margin-top:8px;">💡 右键点击（手机长按）已有表情可以编辑名称或删除。给表情起描述性名字（如"委屈脸"、"开心跳舞"），AI 就能理解你发了什么表情。<br/><br/>如果在 API 设置中开启了「视觉识别」且模型支持多模态，AI 还能直接看到表情图片内容。</p>
+                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>Token 显示：</strong>聊天框底部会显示当前对话预估消耗的 token 数，帮你控制上下文长度。</p>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🧠 记忆与总结</summary>
+                <summary class="sp-guide-summary">🧠 记忆与总结系统</summary>
                 <div class="sp-guide-details-content">
-                  <p style="font-size:12px;color:#ccc;line-height:1.7;margin-bottom:8px;">桌宠的记忆分三层：</p>
+                  <p style="font-size:12px;color:#ccc;line-height:1.7;margin-bottom:8px;">桌宠的记忆分三层，从短期到长期：</p>
                   <div class="sp-guide-table">
-                    <div class="sp-guide-row"><span class="sp-guide-key">💬 对话记录</span><span class="sp-guide-val">最近的聊天内容，直接塞入上下文</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">📝 对话总结</span><span class="sp-guide-val">用 AI 压缩过的旧对话精华</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">⭐ 记忆条目</span><span class="sp-guide-val">手动或 AI 提取的关键信息，按重要度排序</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">💬 对话记录</span><span class="sp-guide-val">最近的聊天内容（受「聊天读取轮数」限制），每次请求直接塞入上下文</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">📝 对话总结</span><span class="sp-guide-val">用 AI 压缩过的旧对话精华，始终存在于上下文中</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">⭐ 记忆条目</span><span class="sp-guide-val">手动添加或 AI 自动提取的关键信息（喜好、事件等），按重要度（星级）排序后注入上下文</span></div>
                   </div>
-                  <p style="font-size:11px;color:#999;margin-top:8px;">聊天多了之后，去「🧠 记忆」→「手动总结」，选择范围点「🔄 重新生成」，让 AI 压缩旧记录。总结完成后旧记录会自动归档，节省 token。</p>
-                  <p style="font-size:11px;color:#999;margin-top:6px;"><strong>总结策略说明：</strong></p>
+                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>如何使用总结功能：</strong></p>
+                  <div class="sp-guide-block" style="margin-top:6px;">
+                    <div class="sp-guide-step"><span class="sp-guide-num">1</span><div>去「🧠 记忆」标签页 → 点击「手动总结」按钮</div></div>
+                    <div class="sp-guide-step"><span class="sp-guide-num">2</span><div>弹窗中选择要总结的聊天范围（第几条到第几条）</div></div>
+                    <div class="sp-guide-step"><span class="sp-guide-num">3</span><div>点击「🔄 重新生成」，AI 会根据选定范围生成总结</div></div>
+                    <div class="sp-guide-step"><span class="sp-guide-num">4</span><div>你可以手动修改生成的总结内容</div></div>
+                    <div class="sp-guide-step"><span class="sp-guide-num">5</span><div>点「确认保存」，旧记录会自动归档，只保留最近 N 条（可在行为设置中调节）</div></div>
+                  </div>
+                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>总结策略说明：</strong></p>
                   <div class="sp-guide-table" style="margin-top:4px;">
-                    <div class="sp-guide-row"><span class="sp-guide-key">增量合并</span><span class="sp-guide-val">将新对话和已有总结合并为一份完整总结（推荐）</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">完全覆盖</span><span class="sp-guide-val">新总结直接替换旧总结</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">追加</span><span class="sp-guide-val">新总结追加到旧总结后面</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">增量合并</span><span class="sp-guide-val">将新对话和已有总结合并为一份完整总结（推荐，信息不丢失）</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">完全覆盖</span><span class="sp-guide-val">新总结直接替换旧总结（适合想重新开始的场景）</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">追加</span><span class="sp-guide-val">新总结追加到旧总结后面（时间线清晰但会越来越长）</span></div>
+                  </div>
+                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>AI 提取记忆：</strong></p>
+                  <p style="font-size:11px;color:#999;margin-top:4px;">点击「🤖 AI提取记忆」按钮，AI 会从最近 20 条对话中自动提取关键记忆点（你的喜好、重要事件等），以带标签的格式存入记忆池。你可以手动调整星级（1-5星），星级越高越优先注入上下文。</p>
+                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>记忆管理技巧：</strong></p>
+                  <p style="font-size:11px;color:#999;margin-top:4px;">• 重要的事情设为 5 星，日常小事 1-2 星<br/>• 定期清理过时或不准确的记忆<br/>• 记忆池建议控制在 15 条以内，过多会浪费 token<br/>• 总结完成后旧聊天会存入「历史聊天归档」，随时可以查看</p>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">📔 日记系统</summary>
+                <div class="sp-guide-details-content">
+                  <p style="font-size:12px;color:#ccc;line-height:1.7;margin-bottom:8px;">桌宠可以每天写一篇日记，记录你们的互动和它的心情。</p>
+                  <p style="font-size:11px;color:#999;margin-top:6px;"><strong>使用方法：</strong></p>
+                  <div class="sp-guide-block" style="margin-top:6px;">
+                    <div class="sp-guide-step"><span class="sp-guide-num">1</span><div>点击圆形菜单的「📔 日记」打开日记面板</div></div>
+                    <div class="sp-guide-step"><span class="sp-guide-num">2</span><div>日历上有蓝色圆点的日期表示有日记</div></div>
+                    <div class="sp-guide-step"><span class="sp-guide-num">3</span><div>底部选择记忆和聊天的范围作为日记素材</div></div>
+                    <div class="sp-guide-step"><span class="sp-guide-num">4</span><div>点击「✨ 生成今日日记」，AI 会以桌宠第一人称写日记</div></div>
+                  </div>
+                  <div class="sp-guide-table" style="margin-top:10px;">
+                    <div class="sp-guide-row"><span class="sp-guide-key">点击日历日期</span><span class="sp-guide-val">查看或编辑该日的日记</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">年月标题</span><span class="sp-guide-val">点击可快速跳转到指定年月</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">✏️ 编辑</span><span class="sp-guide-val">手动修改日记内容</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">🗑️ 删除</span><span class="sp-guide-val">删除指定日期的日记</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">📄 导出全部</span><span class="sp-guide-val">将所有日记导出为 TXT 文件</span></div>
+                  </div>
+                  <p style="font-size:11px;color:#999;margin-top:8px;">💡 同一天可以多次生成日记，会提示你选择覆盖还是追加。日记的风格由「日记提示词」控制，可以在「💬 提示词」标签页中修改。</p>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">🎨 外观定制详解</summary>
+                <div class="sp-guide-details-content">
+                  <p style="font-size:12px;color:#ccc;line-height:1.7;margin-bottom:8px;">在「🎨 外观」标签页中可以全方位定制桌宠的外观。</p>
+                  <p style="font-size:11px;color:#999;margin-top:6px;"><strong>主题配色：</strong></p>
+                  <div class="sp-guide-table" style="margin-top:4px;">
+                    <div class="sp-guide-row"><span class="sp-guide-key">默认深色</span><span class="sp-guide-val">经典蓝黑配色</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">赛博朋克</span><span class="sp-guide-val">霓虹粉/青色，科幻风格</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">可爱粉</span><span class="sp-guide-val">浅粉色系，适合可爱桌宠</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">深海</span><span class="sp-guide-val">深蓝/青色，沉静风格</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">森林</span><span class="sp-guide-val">深绿色系，自然风格</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">自定义</span><span class="sp-guide-val">自由调配每个颜色，支持导入/导出配色方案</span></div>
+                  </div>
+                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>桌宠形象（精灵图）：</strong></p>
+                  <div class="sp-guide-table" style="margin-top:4px;">
+                    <div class="sp-guide-row"><span class="sp-guide-key">闲置</span><span class="sp-guide-val">默认站立状态，最重要的一张图</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">往左/右/上/下走</span><span class="sp-guide-val">闲逛时的行走图，没设置则用闲置图代替</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">睡觉</span><span class="sp-guide-val">点击「睡觉」或精力很低时显示</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">开心/难过</span><span class="sp-guide-val">对应心情状态时的表情</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">被拎起/晕乎乎</span><span class="sp-guide-val">拖拽过程中和松手后的状态</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">吃东西/洗澡</span><span class="sp-guide-val">投喂/洗澡时的动作图</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">打招呼</span><span class="sp-guide-val">你回来时的欢迎动作</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">思考中</span><span class="sp-guide-val">等待 AI 回复时的思考状态</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">挂左/右/顶</span><span class="sp-guide-val">拖到屏幕边缘吸附时的挂起姿势</span></div>
+                  </div>
+                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>精灵图规格建议：</strong></p>
+                  <p style="font-size:11px;color:#999;margin-top:4px;">• 推荐 PNG 透明背景，尺寸 120×160 像素左右<br/>• GIF 动图会保留动画帧不压缩（适合做走路动画）<br/>• 每张图限制 2MB，超过会被自动压缩为 WebP<br/>• 上传大量图片时注意浏览器存储空间（约 5MB 上限）</p>
+                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>⏱️ 时间滑轨：</strong>每个精灵图下方有时间滑轨，设置该动作播放多久后恢复闲置状态。例如把「吃东西」设为 3 秒，投喂后会显示吃东西图 3 秒再切回闲置。</p>
+                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>其他定制项：</strong></p>
+                  <div class="sp-guide-table" style="margin-top:4px;">
+                    <div class="sp-guide-row"><span class="sp-guide-key">菜单图标</span><span class="sp-guide-val">替换圆形菜单按钮的 emoji 为自定义图片，建议用透明底 PNG</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">互动贴图</span><span class="sp-guide-val">投喂/洗澡/睡觉时飘出的物品图片（食物、浴缸、床）</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">心情图标</span><span class="sp-guide-val">替换右上角的 emoji 心情标识为图片</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">自定义动作</span><span class="sp-guide-val">添加额外精灵图，桌宠闲逛时会随机播放并显示动作名</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">桌宠大小</span><span class="sp-guide-val">0.5x 迷你到 2.0x 巨大，自由缩放</span></div>
                   </div>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🎨 外观定制</summary>
+                <summary class="sp-guide-summary">📖 人设与提示词详解</summary>
                 <div class="sp-guide-details-content">
+                  <p style="font-size:12px;color:#ccc;line-height:1.7;margin-bottom:8px;">提示词决定了桌宠的性格和行为方式。以下是各部分在最终发送给 AI 的消息中的位置和作用：</p>
                   <div class="sp-guide-table">
-                    <div class="sp-guide-row"><span class="sp-guide-key">桌宠形象</span><span class="sp-guide-val">在「🎨 外观」上传各状态的精灵图（闲置/走路/睡觉等），支持 PNG/GIF/WebP</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">菜单图标</span><span class="sp-guide-val">替换圆形菜单五个按钮的图标，建议用透明背景 PNG</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">心情图标</span><span class="sp-guide-val">替换右上角的 emoji 心情标识</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">主题配色</span><span class="sp-guide-val">内置 5 套主题，或选「自定义」自由调色</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">自定义动作</span><span class="sp-guide-val">添加额外精灵图，桌宠闲逛时随机播放</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">互动贴图</span><span class="sp-guide-val">投喂/洗澡/睡觉时飘出的物品图片</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">系统提示词</span><span class="sp-guide-val">桌宠的核心人设（位于 system 消息开头）。描述性格、语气、说话习惯等</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">关系描述</span><span class="sp-guide-val">桌宠和你之间的关系，附在系统提示词后面。描述称呼方式、互动习惯等</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">{{user}} 人设</span><span class="sp-guide-val">你自己的身份信息。可以从酒馆 Persona 自动获取，或手动填写</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">角色卡描述</span><span class="sp-guide-val">从酒馆角色卡读取的背景设定，作为参考信息注入</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">世界书</span><span class="sp-guide-val">从酒馆世界书读取的世界设定，可逐条勾选排除不需要的条目</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">线下提示词</span><span class="sp-guide-val">开启线下模式 🌙 时追加。让桌宠认为你们在现实中互动</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">破限 (Jailbreak)</span><span class="sp-guide-val">放在所有消息的最后面，用于解除模型限制</span></div>
                   </div>
-                  <p style="font-size:11px;color:#999;margin-top:8px;"><strong>精灵图建议：</strong>推荐 PNG 透明背景，尺寸 120×160 左右。GIF 动图会保留动画帧不压缩。每张图限制 2MB，过大的图片会被自动压缩为 WebP 格式。</p>
-                  <p style="font-size:11px;color:#999;margin-top:6px;"><strong>时间滑轨：</strong>每个精灵图下方有⏱️滑轨，可以设置该动作播放多久后恢复闲置状态。</p>
-                </div>
-              </details>
-
-              <details class="sp-guide-details">
-                <summary class="sp-guide-summary">📖 人设与提示词</summary>
-                <div class="sp-guide-details-content">
-                  <p style="font-size:12px;color:#ccc;line-height:1.7;margin-bottom:8px;">提示词决定了桌宠的性格和行为方式，各部分作用如下：</p>
-                  <div class="sp-guide-table">
-                    <div class="sp-guide-row"><span class="sp-guide-key">系统提示词</span><span class="sp-guide-val">桌宠的核心人设，性格、说话风格等</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">关系描述</span><span class="sp-guide-val">桌宠和你之间的关系、称呼方式</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">{{user}} 人设</span><span class="sp-guide-val">你自己的身份信息，让桌宠了解主人</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">线下提示词</span><span class="sp-guide-val">开启线下模式时追加的风格描述</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">破限</span><span class="sp-guide-val">Jailbreak，放在所有消息最后</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">角色卡</span><span class="sp-guide-val">从酒馆读取角色描述作为参考背景</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">世界书</span><span class="sp-guide-val">从酒馆读取世界设定，可逐条勾选排除</span></div>
+                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>消息组装顺序（从上到下）：</strong></p>
+                  <div class="sp-guide-block" style="margin-top:6px;">
+                    <div class="sp-guide-step"><span class="sp-guide-num">1</span><div>[system] 系统提示词 + 心情修饰</div></div>
+                    <div class="sp-guide-step"><span class="sp-guide-num">2</span><div>[system] 关系描述</div></div>
+                    <div class="sp-guide-step"><span class="sp-guide-num">3</span><div>[system] {{user}} 人设</div></div>
+                    <div class="sp-guide-step"><span class="sp-guide-num">4</span><div>[system] 角色卡背景 + 世界书设定</div></div>
+                    <div class="sp-guide-step"><span class="sp-guide-num">5</span><div>[system] 对话总结 + 记忆条目</div></div>
+                    <div class="sp-guide-step"><span class="sp-guide-num">6</span><div>[system] 当前状态值 + 时间（如果开启）</div></div>
+                    <div class="sp-guide-step"><span class="sp-guide-num">7</span><div>[user/assistant] 最近 N 轮聊天记录</div></div>
+                    <div class="sp-guide-step"><span class="sp-guide-num">8</span><div>[system] 破限 Jailbreak（如果有）</div></div>
                   </div>
-                  <p style="font-size:11px;color:#999;margin-top:8px;"><strong>预设系统：</strong>可以保存当前所有提示词为一个预设，方便在不同桌宠人格之间快速切换。内置预设不可删除，自定义预设支持覆盖保存。</p>
+                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>预设系统：</strong></p>
+                  <p style="font-size:11px;color:#999;margin-top:4px;">• 内置 5 套预设人格（猫咪、傲娇精灵、忠犬、狐仙、AI助手）<br/>• 点「✅ 应用预设」会自动填充名字、系统提示词、关系描述、破限<br/>• 点「💾 保存为预设」可以把当前配置存为自定义预设<br/>• 内置预设不可删除，自定义预设支持覆盖保存和删除<br/>• 应用预设后别忘了点底部「💾 保存所有设置」</p>
+                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>角色卡和世界书：</strong></p>
+                  <p style="font-size:11px;color:#999;margin-top:4px;">• 在「📖 人设」标签页的搜索框中输入关键字可筛选<br/>• 选中后下方会出现预览，可以展开查看具体内容<br/>• 世界书支持逐条勾选/取消，被取消的条目不会注入桌宠上下文<br/>• 选「🚫 不选择」可以清除已选的角色卡或世界书</p>
                 </div>
               </details>
 
               <details class="sp-guide-details">
                 <summary class="sp-guide-summary">⚙️ 行为设置详解</summary>
                 <div class="sp-guide-details-content">
-                  <div class="sp-guide-table">
-                    <div class="sp-guide-row"><span class="sp-guide-key">活跃度</span><span class="sp-guide-val">0%完全安静，50%偶尔说话，100%话痨模式</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">自动反应</span><span class="sp-guide-val">监听酒馆主聊天，桌宠可能插嘴评论</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">冷却时间</span><span class="sp-guide-val">两次自动反应之间的最短间隔（秒）</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">窥探轮数</span><span class="sp-guide-val">桌宠偷看主聊天最近几轮作为参考</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">聊天读取轮数</span><span class="sp-guide-val">发送给 AI 的桌宠聊天记录条数</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">走动频率</span><span class="sp-guide-val">桌宠多久走一步（3s频繁～30s几乎不动）</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">时间感知</span><span class="sp-guide-val">开启后桌宠知道当前日期和时间段</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">离线衰减</span><span class="sp-guide-val">关闭网页后状态缓慢下降的速度</span></div>
+                  <p style="font-size:12px;color:#ccc;line-height:1.7;margin-bottom:8px;">「⚙️ 行为」标签页控制桌宠的各种自动行为。</p>
+                  <p style="font-size:11px;color:#999;margin-top:6px;"><strong>基础行为：</strong></p>
+                  <div class="sp-guide-table" style="margin-top:4px;">
+                    <div class="sp-guide-row"><span class="sp-guide-key">活跃度 0-100%</span><span class="sp-guide-val">控制桌宠的话唠程度。0% = 安静待着不说话；50% = 偶尔冒泡；100% = 话痨模式碎碎念不停</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">自动反应</span><span class="sp-guide-val">勾选后桌宠会监听酒馆主聊天窗口，看到有趣的对话可能会插嘴评论（以气泡形式）</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">冷却时间</span><span class="sp-guide-val">两次自动反应之间的最短间隔（秒），防止刷屏</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">窥探轮数</span><span class="sp-guide-val">桌宠偷看主聊天最近几轮对话作为评论参考</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">聊天读取轮数</span><span class="sp-guide-val">每次请求发送给 AI 的桌宠私聊记录条数。越多上下文越丰富但越费 token</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">走动频率</span><span class="sp-guide-val">桌宠多久走一步。3秒 = 频繁走动；15秒 = 偶尔动动；30秒 = 基本不动</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">时间感知</span><span class="sp-guide-val">开启后上下文中会包含当前日期、时间、星期几。桌宠就能说"早上好"之类的话</span></div>
                   </div>
-                  <p style="font-size:11px;color:#999;margin-top:8px;"><strong>反应语言：</strong>用 | 分隔多条语句，桌宠会随机选一条。可以自定义投喂、洗澡、拖拽等各种场景的反应文案。</p>
+                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>总结相关：</strong></p>
+                  <div class="sp-guide-table" style="margin-top:4px;">
+                    <div class="sp-guide-row"><span class="sp-guide-key">自动总结提醒</span><span class="sp-guide-val">勾选后，聊天达到指定轮数会自动触发总结流程</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">自动总结间隔</span><span class="sp-guide-val">多少轮对话后触发自动总结（设为 0 = 关闭）</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">总结策略</span><span class="sp-guide-val">增量合并/完全覆盖/追加（详见记忆与总结章节）</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">总结后保留条数</span><span class="sp-guide-val">总结完成后保留最近几条聊天，其余归档</span></div>
+                  </div>
+                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>离线衰减：</strong></p>
+                  <div class="sp-guide-table" style="margin-top:4px;">
+                    <div class="sp-guide-row"><span class="sp-guide-key">衰减率 0.1~0.5</span><span class="sp-guide-val">关闭网页后状态下降速度。0.1 = 很慢；0.5 = 较快</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">安全阈值 %</span><span class="sp-guide-val">状态不会低于这个值，防止桌宠"饿死"。建议 10-20%</span></div>
+                  </div>
+                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>反应语言自定义：</strong></p>
+                  <p style="font-size:11px;color:#999;margin-top:4px;">每个场景都可以用 | 分隔多条语句，桌宠会随机选一条。例如：<br/><code style="background:rgba(100,180,255,0.1);padding:2px 6px;border-radius:3px;font-size:11px;">好吃！|谢谢主人～|（狼吞虎咽）|嗝～</code><br/><br/>可自定义的场景包括：投喂、洗澡、睡觉、拖拽、闲逛碎碎念、饥饿/脏了/困了时的额外碎碎念、长时间离线回归、短时间离线回归。</p>
                 </div>
               </details>
 
               <details class="sp-guide-details">
                 <summary class="sp-guide-summary">⚡ 斜杠指令</summary>
                 <div class="sp-guide-details-content">
-                  <p style="font-size:11px;color:#999;margin-bottom:8px;">在酒馆聊天输入框中可以直接使用：</p>
+                  <p style="font-size:12px;color:#ccc;line-height:1.7;margin-bottom:8px;">在酒馆主聊天输入框中可以直接输入以下指令控制桌宠：</p>
                   <div class="sp-guide-table">
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet status</span><span class="sp-guide-val">查看桌宠当前状态</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet feed</span><span class="sp-guide-val">投喂食物</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet bath</span><span class="sp-guide-val">给桌宠洗澡</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet sleep</span><span class="sp-guide-val">让桌宠睡觉</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet summon</span><span class="sp-guide-val">把跑飞的桌宠召回屏幕中心</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet toggle</span><span class="sp-guide-val">显示/隐藏桌宠</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet chat 你好</span><span class="sp-guide-val">直接发送消息并立即获得回复</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet</span><span class="sp-guide-val">等同于 /pet status，查看当前状态</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet status</span><span class="sp-guide-val">查看桌宠当前饱食度、清洁度、精力、心情</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet feed</span><span class="sp-guide-val">投喂食物，效果同点击 🍖 按钮</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet bath</span><span class="sp-guide-val">给桌宠洗澡，效果同点击 🛁 按钮</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet sleep</span><span class="sp-guide-val">让桌宠睡觉，效果同点击 🛏️ 按钮</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet summon</span><span class="sp-guide-val">强行将桌宠召唤到屏幕正中心（桌宠跑飞了用这个）</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet toggle</span><span class="sp-guide-val">显示/隐藏桌宠，等同于顶部开关</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet chat 你好</span><span class="sp-guide-val">直接在酒馆输入框发消息给桌宠，会自动打开聊天窗口并触发回复</span></div>
                   </div>
+                  <p style="font-size:11px;color:#999;margin-top:8px;">💡 输入 / 时酒馆的自动补全菜单中会出现 /pet 选项。指令返回的结果只有你自己能看到，不会影响主聊天。</p>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">💾 数据与存档</summary>
+                <summary class="sp-guide-summary">💾 数据与存档管理</summary>
                 <div class="sp-guide-details-content">
-                  <div class="sp-guide-table">
-                    <div class="sp-guide-row"><span class="sp-guide-key">多桌宠存档</span><span class="sp-guide-val">保存当前配置为存档，支持多套桌宠一键切换</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">导出/导入</span><span class="sp-guide-val">将全部数据导出为 JSON 文件备份</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">存储上限</span><span class="sp-guide-val">浏览器 localStorage 约 5MB，大量图片时注意容量</span></div>
+                  <p style="font-size:12px;color:#ccc;line-height:1.7;margin-bottom:8px;">所有数据存储在浏览器本地 localStorage 中。</p>
+                  <p style="font-size:11px;color:#999;margin-top:6px;"><strong>多桌宠存档：</strong></p>
+                  <div class="sp-guide-block" style="margin-top:6px;">
+                    <div class="sp-guide-step"><span class="sp-guide-num">1</span><div>在「💾 数据」→「🐾 桌宠存档」点击「💾 保存当前」</div></div>
+                    <div class="sp-guide-step"><span class="sp-guide-num">2</span><div>输入存档名称（建议用桌宠名字）</div></div>
+                    <div class="sp-guide-step"><span class="sp-guide-num">3</span><div>之后可以在下拉菜单选择不同存档，点「📂 加载存档」一键切换</div></div>
                   </div>
-                  <p style="font-size:11px;color:#999;margin-top:8px;"><strong>重要提醒：</strong>所有数据存储在浏览器本地。换浏览器、清理缓存、卸载酒馆前务必先导出备份！上传了很多精灵图的话建议定期备份。</p>
-                  <p style="font-size:11px;color:#f66;margin-top:6px;">⚠️「重置全部数据」会永久删除所有设置和聊天记录，不可撤销。</p>
+                  <p style="font-size:11px;color:#999;margin-top:6px;">每个存档包含完整的设置+状态+聊天记录，适合养多只不同性格的桌宠。</p>
+                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>导入/导出：</strong></p>
+                  <div class="sp-guide-table" style="margin-top:4px;">
+                    <div class="sp-guide-row"><span class="sp-guide-key">📤 导出</span><span class="sp-guide-val">将全部数据（设置+状态+图片）导出为 JSON 文件</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">📥 导入</span><span class="sp-guide-val">从 JSON 文件恢复数据，会覆盖当前所有配置</span></div>
+                  </div>
+                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>存储空间说明：</strong></p>
+                  <p style="font-size:11px;color:#999;margin-top:4px;">• 浏览器 localStorage 通常限制 5MB<br/>• 在「💾 数据」底部的「状态总览」可以看到当前存储占用<br/>• 上传了大量精灵图/表情包时容易接近上限<br/>• 快满时会自动提醒，建议导出备份后清理旧图片</p>
+                  <p style="font-size:11px;color:#f66;margin-top:10px;"><strong>⚠️ 重要提醒：</strong></p>
+                  <p style="font-size:11px;color:#f66;margin-top:4px;">• 换浏览器/清除缓存/卸载酒馆 = 数据丢失！务必定期导出备份<br/>• 「🗑️ 清空所有聊天数据」会删除聊天记录+归档+总结<br/>• 「💀 重置全部数据」会永久删除一切，包括设置和图片，不可撤销</p>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">🔑 API 设置详解</summary>
+                <div class="sp-guide-details-content">
+                  <p style="font-size:12px;color:#ccc;line-height:1.7;margin-bottom:8px;">桌宠需要调用 AI 模型来生成回复。有两种连接方式：</p>
+                  <p style="font-size:11px;color:#999;margin-top:6px;"><strong>方式一：使用酒馆当前 API（推荐新手）</strong></p>
+                  <p style="font-size:11px;color:#999;margin-top:4px;">直接复用你在酒馆中已经配好的 API 连接。无需额外填写任何信息。桌宠会通过酒馆内部接口（generateQuietPrompt）发送请求，不影响主聊天。</p>
+                  <p style="font-size:11px;color:#999;margin-top:6px;">• 可选填「模型覆盖」，指定桌宠使用不同于主聊天的模型<br/>• 不支持流式输出（由酒馆控制）</p>
+                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>方式二：手动填写独立 API</strong></p>
+                  <p style="font-size:11px;color:#999;margin-top:4px;">适合想让桌宠用不同 API 供应商或独立计费的用户。</p>
+                  <div class="sp-guide-table" style="margin-top:6px;">
+                    <div class="sp-guide-row"><span class="sp-guide-key">API Key</span><span class="sp-guide-val">你的 API 密钥，通常以 sk- 开头</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">Base URL</span><span class="sp-guide-val">API 地址，必须以 /v1 结尾。例：https://api.openai.com/v1</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">模型</span><span class="sp-guide-val">手动输入或点「📡 获取」从 API 拉取可用模型列表</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">最大 Tokens</span><span class="sp-guide-val">AI 单次回复的最大长度。桌宠聊天建议 200-500</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">流式输出</span><span class="sp-guide-val">开启后回复会逐字显示出来，体验更好</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">视觉识别</span><span class="sp-guide-val">开启后表情包图片会以多模态格式发给 AI（需要模型支持，如 gpt-4o）</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">请求超时</span><span class="sp-guide-val">等待多少秒没响应就放弃，建议 15-30 秒</span></div>
+                  </div>
+                  <p style="font-size:11px;color:#999;margin-top:8px;">💡 兼容所有 OpenAI 格式的 API（包括中转站、本地部署的 Ollama 等），只要支持 /v1/chat/completions 接口即可。</p>
                 </div>
               </details>
 
               <details class="sp-guide-details">
                 <summary class="sp-guide-summary">❓ 常见问题 FAQ</summary>
                 <div class="sp-guide-details-content">
-                  <div class="sp-guide-block" style="gap:12px;">
-                    <div><strong style="color:var(--sp-text-primary);">Q: 桌宠跑到屏幕外面看不见了？</strong><br/><span style="font-size:12px;color:#bbb;">使用斜杠指令 <code style="background:rgba(100,180,255,0.1);padding:1px 4px;border-radius:3px;">/pet summon</code> 强行召回屏幕中心。</span></div>
-                    <div><strong style="color:var(--sp-text-primary);">Q: API 报错怎么办？</strong><br/><span style="font-size:12px;color:#bbb;">检查 API Key 是否正确、Base URL 是否以 /v1 结尾、模型名是否存在。可以点「📡 获取」拉取可用模型列表验证连接。</span></div>
-                    <div><strong style="color:var(--sp-text-primary);">Q: 桌宠不说话了？</strong><br/><span style="font-size:12px;color:#bbb;">确认「活跃度」不是 0%，「自动反应」已勾选，且冷却时间没设太长。也可以直接在聊天框主动和它说话。</span></div>
-                    <div><strong style="color:var(--sp-text-primary);">Q: 图片上传失败？</strong><br/><span style="font-size:12px;color:#bbb;">单张图片限制 2MB，支持 PNG/JPG/GIF/WebP 格式。GIF 动图不会被压缩。如果存储空间满了会有提示。</span></div>
-                    <div><strong style="color:var(--sp-text-primary);">Q: 酒馆模式下找不到角色卡/世界书？</strong><br/><span style="font-size:12px;color:#bbb;">确保酒馆中已经加载了角色卡或创建了世界书。搜索框支持模糊匹配，输入关键字即可筛选。</span></div>
-                    <div><strong style="color:var(--sp-text-primary);">Q: 表情包发给 AI 它能看到图片吗？</strong><br/><span style="font-size:12px;color:#bbb;">需要在 API 设置中勾选「启用视觉识别」，且你使用的模型支持多模态（如 gpt-4o）。否则 AI 只能看到表情包的文字名称。</span></div>
-                    <div><strong style="color:var(--sp-text-primary);">Q: 流式输出有什么用？</strong><br/><span style="font-size:12px;color:#bbb;">开启后桌宠的回复会逐字显示出来，体验更好。仅在「手动填写独立 API」模式下有效。</span></div>
+                  <div class="sp-guide-block" style="gap:14px;">
+                    <div><strong style="color:var(--sp-text-primary);">Q: 桌宠跑到屏幕外面看不见了？</strong><br/><span style="font-size:12px;color:#bbb;">在酒馆聊天输入框输入 <code style="background:rgba(100,180,255,0.1);padding:1px 4px;border-radius:3px;">/pet summon</code> 强行召回屏幕中心。或者刷新页面，桌宠会回到上次保存的合法位置。</span></div>
+                    <div><strong style="color:var(--sp-text-primary);">Q: API 报错/桌宠不回复？</strong><br/><span style="font-size:12px;color:#bbb;">检查清单：<br/>① API Key 是否正确且有余额<br/>② Base URL 是否以 /v1 结尾（不是 /v1/chat/completions）<br/>③ 模型名是否拼写正确（点「📡 获取」验证连接）<br/>④ 网络是否正常，有无代理问题<br/>⑤ 超时时间是否设得太短（建议 15s 以上）<br/><br/>气泡会显示错误代码，常见的：401=Key错误，403=无权限，404=模型不存在，429=请求太频繁，500=服务器错误。</span></div>
+                    <div><strong style="color:var(--sp-text-primary);">Q: 桌宠不说话 / 不自动评论？</strong><br/><span style="font-size:12px;color:#bbb;">确认以下设置：<br/>①「活跃度」不是 0%<br/>②「自动反应」已勾选<br/>③ 冷却时间没设太长（如果设了 300 秒那就是 5 分钟才能说一次）<br/>④ 酒馆主聊天窗口有新消息产生（桌宠是监听主聊天来触发反应的）<br/><br/>如果只是想直接和桌宠聊天，不需要等自动反应，直接打开聊天框说话就行。</span></div>
+                    <div><strong style="color:var(--sp-text-primary);">Q: 图片上传失败 / 存储满了？</strong><br/><span style="font-size:12px;color:#bbb;">① 单张图片限制 2MB，超过会报错<br/>② 支持格式：PNG / JPG / GIF / WebP<br/>③ GIF 动图不会被压缩（保留动画帧）<br/>④ 其他格式会被自动压缩为 WebP<br/><br/>如果提示「存储满了」，去「💾 数据」→「状态总览」查看空间占用。解决办法：<br/>• 删除不需要的精灵图<br/>• 减少表情包数量<br/>• 清理旧的聊天归档<br/>• 导出备份后重置数据</span></div>
+                    <div><strong style="color:var(--sp-text-primary);">Q: 酒馆模式下找不到角色卡/世界书？</strong><br/><span style="font-size:12px;color:#bbb;">① 确保酒馆中已经创建/导入了角色卡或世界书<br/>② 搜索框支持模糊匹配，输入部分名字即可<br/>③ 如果列表为空，可能是酒馆版本兼容问题，尝试刷新页面后重试<br/>④ 世界书需要先在酒馆的「世界信息」面板中打开过一次才能被检测到</span></div>
+                    <div><strong style="color:var(--sp-text-primary);">Q: 表情包发给 AI，它能看到图片吗？</strong><br/><span style="font-size:12px;color:#bbb;">取决于两个条件：<br/>① 在 API 设置中勾选了「启用视觉识别」<br/>② 你使用的模型支持多模态（如 gpt-4o、claude-3 等）<br/><br/>如果两个条件都满足，AI 能直接看到图片内容。否则 AI 只能看到表情包的文字名称（如"[发送了表情包: 委屈脸]"），所以给表情起一个描述性的名字很重要。</span></div>
+                    <div><strong style="color:var(--sp-text-primary);">Q: 流式输出有什么好处？</strong><br/><span style="font-size:12px;color:#bbb;">开启后桌宠的回复会像打字一样逐字显示出来，而不是等全部生成完再一次性显示。体验更自然。<br/><br/>注意：仅在「手动填写独立 API」模式下有效，酒馆 API 模式由酒馆控制无法使用流式。</span></div>
+                    <div><strong style="color:var(--sp-text-primary);">Q: 线下模式是什么？</strong><br/><span style="font-size:12px;color:#bbb;">在聊天框右上角点 🌙 图标可以切换线下模式。开启后：<br/>• 线下提示词会追加到系统消息中<br/>• 桌宠会认为你们不在电脑前，而是在现实中相处<br/>• 语气通常更亲密、放松，可以描述动作和场景<br/><br/>适合想和桌宠玩角色扮演或模拟日常互动的场景。图标变绿色表示已开启。</span></div>
+                    <div><strong style="color:var(--sp-text-primary);">Q: 桌宠占的 token 多吗？会不会很费钱？</strong><br/><span style="font-size:12px;color:#bbb;">聊天框底部和「状态总览」都会显示预估 token 数。一般情况：<br/>• 简单闲聊：200-500 tokens/次<br/>• 带记忆+世界书：500-1500 tokens/次<br/>• 建议把「最大 Tokens」设为 200-300 来控制回复长度<br/>• 用小模型（如 gpt-4o-mini）性价比最高<br/><br/>定期总结旧聊天记录可以有效减少每次请求的上下文长度。</span></div>
+                    <div><strong style="color:var(--sp-text-primary);">Q: 如何让桌宠更有个性？</strong><br/><span style="font-size:12px;color:#bbb;">几个建议：<br/>① 系统提示词写具体：不只写"可爱"，而是描述具体行为（"说话喜欢用～结尾，经常打错字，对甜食毫无抵抗力"）<br/>② 关系描述要有细节（"你们已经认识三年了，你记得主人养了一只真猫叫橘子"）<br/>③ 添加记忆条目，让桌宠记住你的喜好和之前发生的事<br/>④ 自定义反应语言，让每句碎碎念都符合人设<br/>⑤ 上传精灵图，视觉形象让角色感更强</span></div>
+                    <div><strong style="color:var(--sp-text-primary);">Q: 桌宠和酒馆主聊天互相影响吗？</strong><br/><span style="font-size:12px;color:#bbb;">不影响。桌宠的聊天完全独立于酒馆主聊天窗口。<br/>• 桌宠可以「偷看」主聊天内容（作为自动反应的参考），但不会修改或插入消息<br/>• 桌宠使用的 API 配额与主聊天分开（如果用独立 API 的话）<br/>• 桌宠的聊天记录单独存储，不会出现在酒馆的对话历史中</span></div>
+                    <div><strong style="color:var(--sp-text-primary);">Q: 手机上操作有什么不同？</strong><br/><span style="font-size:12px;color:#bbb;">主要区别：<br/>• 双击桌宠才能打开菜单（单击是点选）<br/>• 各面板会自动缩小适配手机屏幕<br/>• 精灵图和菜单按钮尺寸会自动缩小<br/>• 建议把桌宠缩放设为 0.8x 以下<br/>• 拖拽操作正常支持，但范围更小</span></div>
+                    <div><strong style="color:var(--sp-text-primary);">Q: 能同时运行多只桌宠吗？</strong><br/><span style="font-size:12px;color:#bbb;">目前只能同时运行一只。但通过「多桌宠存档」功能可以保存多套桌宠配置，一键切换不同的桌宠（切换后前一只会"收起来"）。每只桌宠的聊天记录、记忆、设置都独立保存。</span></div>
+                  </div>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">💡 进阶技巧</summary>
+                <div class="sp-guide-details-content">
+                  <div class="sp-guide-block" style="gap:10px;">
+                    <div style="font-size:12px;color:#ccc;line-height:1.7;">
+                      <strong style="color:var(--sp-text-primary);">1. 用小模型省钱</strong><br/>
+                      桌宠聊天不需要太强的模型。gpt-4o-mini、claude-3-haiku 这类小模型足够应付日常对话，便宜很多。把「最大 Tokens」设为 200-300 即可。
+                    </div>
+                    <div style="font-size:12px;color:#ccc;line-height:1.7;">
+                      <strong style="color:var(--sp-text-primary);">2. 善用发送+生成分离</strong><br/>
+                      「📨 发送」和「➤ 生成」分开，意味着你可以连续发好几条消息描述一个场景，最后再点一次生成让桌宠统一回应。这样桌宠的回复会更连贯。
+                    </div>
+                    <div style="font-size:12px;color:#ccc;line-height:1.7;">
+                      <strong style="color:var(--sp-text-primary);">3. 记忆池精细管理</strong><br/>
+                      记忆不在多在精。5 条高质量的 5 星记忆比 20 条碎片记忆效果好得多。定期审查记忆，删掉过时的，合并相似的。
+                    </div>
+                    <div style="font-size:12px;color:#ccc;line-height:1.7;">
+                      <strong style="color:var(--sp-text-primary);">4. GIF 动图做精灵图</strong><br/>
+                      上传 GIF 格式的图片不会被压缩，动画帧完整保留。你可以用像素画工具做简单的行走动画 GIF，让桌宠走路时真的在"走"。
+                    </div>
+                    <div style="font-size:12px;color:#ccc;line-height:1.7;">
+                      <strong style="color:var(--sp-text-primary);">5. 世界书精确控制</strong><br/>
+                      如果你的世界书很大，没必要全部注入桌宠上下文。在「📖 人设」里选中世界书后，可以逐条勾选/取消，只保留和桌宠相关的条目。
+                    </div>
+                    <div style="font-size:12px;color:#ccc;line-height:1.7;">
+                      <strong style="color:var(--sp-text-primary);">6. 定期总结保持记忆新鲜</strong><br/>
+                      建议每聊 20-30 轮做一次总结。总结后旧记录归档，上下文变短，AI 回复速度更快、费用更低、而且重要信息不会被挤出上下文窗口。
+                    </div>
+                    <div style="font-size:12px;color:#ccc;line-height:1.7;">
+                      <strong style="color:var(--sp-text-primary);">7. 导出备份要养成习惯</strong><br/>
+                      每次做了大量修改（上传新图、调了很久的提示词）之后，去「💾 数据」点一下「📤 导出」。万一浏览器出问题，至少不会从头来过。
+                    </div>
                   </div>
                 </div>
               </details>
 
             </div>
           </div>
+
 
         </div>
         <div class="sp-settings-footer">
@@ -3524,6 +4280,33 @@ async function refreshWorldPreview() {
     bindSettingsEvents(); // 👈 新增：让设置面板渲染完后，立刻自动绑定它里面的所有按钮和输入框事件
   }
 
+  // ============================================================
+  // 存储容量计算
+  // ============================================================
+  function getStorageUsage() {
+    try {
+      let total = 0;
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        const value = localStorage.getItem(key);
+        total += (key.length + value.length) * 2; // UTF-16 每字符 2 字节
+      }
+      const myData = localStorage.getItem(STORAGE_KEY) || '';
+      const mySize = (STORAGE_KEY.length + myData.length) * 2;
+      return {
+        totalBytes: total,
+        myBytes: mySize,
+        maxBytes: 5 * 1024 * 1024, // 浏览器通常限制 5MB
+        totalKB: (total / 1024).toFixed(1),
+        myKB: (mySize / 1024).toFixed(1),
+        maxKB: (5 * 1024).toFixed(0),
+        percent: Math.min(100, (total / (5 * 1024 * 1024) * 100)).toFixed(1),
+        myPercent: Math.min(100, (mySize / (5 * 1024 * 1024) * 100)).toFixed(1),
+      };
+    } catch (e) {
+      return { totalBytes: 0, myBytes: 0, maxBytes: 5242880, totalKB: '0', myKB: '0', maxKB: '5120', percent: '0', myPercent: '0' };
+    }
+  }
 
   // ============================================================
   // 状态概览
@@ -3532,14 +4315,30 @@ async function refreshWorldPreview() {
     const el = document.getElementById('sp-status-overview');
     if (!el) return;
     el.style.cssText = 'font-size:12px;line-height:1.8;color:var(--sp-text-primary);';
+    const storage = getStorageUsage();
+    const barColor = parseFloat(storage.percent) > 80 ? '#f66' : parseFloat(storage.percent) > 60 ? '#ffb347' : 'rgba(100,180,255,0.7)';
     el.innerHTML = `
       🍖 饱食: ${Math.round(state.hunger)}% ｜ 💧 清洁: ${Math.round(state.cleanliness)}% ｜ ⚡ 精力: ${Math.round(state.energy)}%<br/>
       ${getMoodEmoji()} 心情: ${state.mood} ｜ 💬 互动: ${state.totalInteractions}次<br/>
       📝 记忆: ${state.memories.length}条 ｜ 💭 对话: ${state.petChatHistory.length}条<br/>
       🕐 上次在线: ${new Date(state.lastOnlineTimestamp).toLocaleString()}<br/>
       🔢 上次请求: <span id="sp-token-overview">未发送</span>
+      <div style="margin-top:10px;padding:8px 10px;background:rgba(255,255,255,0.05);border-radius:8px;border:1px solid rgba(255,255,255,0.08);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <span style="font-size:11px;color:var(--sp-text-secondary);">💾 存储空间</span>
+          <span style="font-size:11px;color:var(--sp-text-muted);">${storage.totalKB} KB / ${storage.maxKB} KB (${storage.percent}%)</span>
+        </div>
+        <div style="width:100%;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;">
+          <div style="width:${storage.percent}%;height:100%;background:${barColor};border-radius:3px;transition:width 0.3s;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px;">
+          <span style="font-size:10px;color:var(--sp-text-muted);">本插件: ${storage.myKB} KB (${storage.myPercent}%)</span>
+          <span style="font-size:10px;color:${parseFloat(storage.percent) > 80 ? '#f66' : 'var(--sp-text-muted)'};">${parseFloat(storage.percent) > 80 ? '⚠️ 空间紧张' : '状态正常'}</span>
+        </div>
+      </div>
     `;
   }
+
 
   // ============================================================
   // 图片上传
@@ -3610,6 +4409,7 @@ async function refreshWorldPreview() {
       ['menuIconBath', '洗澡 🛁'],
       ['menuIconSleep', '睡觉 🛏️'],
       ['menuIconChat', '聊天 💬'],
+      ['menuIconDiary', '日记 📔'],
       ['menuIconSettings', '设置 ⚙️']
     ];
     if (menuArea) {
@@ -3857,6 +4657,18 @@ async function refreshWorldPreview() {
     const wanderDisplay = document.getElementById('sp-wander-display');
     if (wanderSlider && wanderDisplay) wanderSlider.oninput = () => { wanderDisplay.textContent = wanderSlider.value + 's'; };
 
+    // 缩放滑轨
+    const scaleSlider = document.getElementById('sp-pet-scale');
+    const scaleDisplay = document.getElementById('sp-scale-display');
+    if (scaleSlider && scaleDisplay) {
+      scaleSlider.oninput = () => {
+        const val = parseFloat(scaleSlider.value);
+        scaleDisplay.textContent = val.toFixed(1) + 'x';
+        settings.petScale = val;
+        applyPetScale();
+        saveDataDebounced('缩放调整');
+      };
+    }
 
     // 保存
     document.getElementById('sp-save-settings')?.addEventListener('click', saveAllSettings);
@@ -4251,6 +5063,7 @@ async function refreshWorldPreview() {
     settings.summaryPrompt = v('sp-summary-prompt');
     settings.extractPrompt = v('sp-extract-prompt');
     settings.offlinePrompt = v('sp-offline-prompt');
+    settings.diaryPrompt = v('sp-diary-prompt');
     settings.summaryMode = v('sp-summary-mode') || 'incremental';
     settings.summaryTrigger = document.getElementById('sp-summary-auto')?.checked ? 'auto' : 'manual';
     settings.summaryKeepRecent = n('sp-summary-keep', 10);
@@ -4270,6 +5083,8 @@ async function refreshWorldPreview() {
     settings.autoSummaryRounds = n('sp-auto-summary', 20);
 
     settings.displayMode = v('sp-display-mode');
+    settings.petScale = n('sp-pet-scale', 1.0);
+    settings.apiTimeout = n('sp-api-timeout', 15);
     settings.offlineDecayRate = n('sp-decay-rate', 0.15);
     settings.safetyThreshold = n('sp-safety-threshold', 10);
 

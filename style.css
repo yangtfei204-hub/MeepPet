@@ -151,6 +151,7 @@
 .sp-menu-btn:nth-child(3) { animation-delay: 0.6s; }
 .sp-menu-btn:nth-child(4) { animation-delay: 0.9s; }
 .sp-menu-btn:nth-child(5) { animation-delay: 1.2s; }
+.sp-menu-btn:nth-child(6) { animation-delay: 1.5s; }
 
 #silly-pet-menu.visible .sp-menu-btn {
   opacity: 1;
@@ -204,36 +205,43 @@
   height: 44px;
 }
 
-/* 按钮位置（舒适的圆形布局，半径约85px） */
+/* 按钮位置（6按钮上半圆弧布局，半径108px，180°均匀分布） */
 .sp-menu-btn[data-action="feed"] {
-  top: -70px;
-  left: -75px;
+  top: -37px;
+  left: -108px;
   transition-delay: 0.05s;
 }
 
 .sp-menu-btn[data-action="bath"] {
-  top: -70px;
-  left: 75px;
+  top: -88px;
+  left: -86px;
   transition-delay: 0.1s;
 }
 
 .sp-menu-btn[data-action="sleep"] {
-  top: -20px;
-  left: -90px;
+  top: -112px;
+  left: -37px;
   transition-delay: 0.15s;
 }
 
 .sp-menu-btn[data-action="chat"] {
-  top: -20px;
-  left: 90px;
+  top: -112px;
+  left: 37px;
   transition-delay: 0.2s;
 }
 
-.sp-menu-btn[data-action="settings"] {
-  top: -112px;
-  left: 0;
+.sp-menu-btn[data-action="diary"] {
+  top: -88px;
+  left: 86px;
   transition-delay: 0.25s;
 }
+
+.sp-menu-btn[data-action="settings"] {
+  top: -37px;
+  left: 108px;
+  transition-delay: 0.3s;
+}
+
 
 /* 移动端适配 */
 @media (max-width: 768px) {
@@ -244,29 +252,35 @@
   }
 
   .sp-menu-btn[data-action="feed"] {
-    top: -58px;
-    left: -60px;
+    top: -29px;
+    left: -85px;
   }
 
   .sp-menu-btn[data-action="bath"] {
-    top: -58px;
-    left: 60px;
+    top: -70px;
+    left: -68px;
   }
 
   .sp-menu-btn[data-action="sleep"] {
-    top: -16px;
-    left: -72px;
+    top: -88px;
+    left: -29px;
   }
 
   .sp-menu-btn[data-action="chat"] {
-    top: -16px;
-    left: 72px;
+    top: -88px;
+    left: 29px;
+  }
+
+  .sp-menu-btn[data-action="diary"] {
+    top: -70px;
+    left: 68px;
   }
 
   .sp-menu-btn[data-action="settings"] {
-    top: -90px;
-    left: 0;
+    top: -29px;
+    left: 85px;
   }
+
 }
 
 @media (max-width: 480px) {
@@ -277,29 +291,35 @@
   }
 
   .sp-menu-btn[data-action="feed"] {
-    top: -48px;
-    left: -50px;
+    top: -23px;
+    left: -68px;
   }
 
   .sp-menu-btn[data-action="bath"] {
-    top: -48px;
-    left: 50px;
+    top: -56px;
+    left: -54px;
   }
 
   .sp-menu-btn[data-action="sleep"] {
-    top: -10px;
-    left: -60px;
+    top: -70px;
+    left: -23px;
   }
 
   .sp-menu-btn[data-action="chat"] {
-    top: -10px;
-    left: 60px;
+    top: -70px;
+    left: 23px;
+  }
+
+  .sp-menu-btn[data-action="diary"] {
+    top: -56px;
+    left: 54px;
   }
 
   .sp-menu-btn[data-action="settings"] {
-    top: -75px;
-    left: 0;
+    top: -23px;
+    left: 68px;
   }
+
 }
 
 
@@ -1536,4 +1556,330 @@
   padding: 8px 14px 14px;
   border-top: 1px solid rgba(255,255,255,0.06);
   animation: sp-fade-in 0.2s ease;
+}
+
+/* ===== 聊天 Markdown 渲染 ===== */
+.sp-chat-msg em {
+  font-style: italic;
+  color: rgba(255,255,255,0.7);
+}
+
+.sp-chat-msg strong {
+  font-weight: 700;
+  color: var(--sp-text-primary);
+}
+
+.sp-chat-msg code {
+  background: rgba(100,180,255,0.1);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
+/* ===== 缩放后桌宠容器修正 ===== */
+#silly-pet-container {
+  transform-origin: center bottom;
+}
+
+/* ===== 日记悬浮窗 ===== */
+#silly-pet-diary {
+  position: fixed;
+  width: 360px;
+  max-width: 90vw;
+  max-height: 80vh;
+  background: var(--sp-bg-main);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--sp-border);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  display: none;
+  flex-direction: column;
+  z-index: 2147483646;
+  overflow: hidden;
+}
+
+#silly-pet-diary.visible {
+  display: flex;
+}
+
+#sp-diary-header {
+  padding: 10px 14px;
+  background: var(--sp-bg-light);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sp-text-primary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  cursor: grab;
+}
+
+#sp-diary-header:active {
+  cursor: grabbing;
+}
+
+#sp-diary-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  max-height: 500px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.2) transparent;
+}
+
+#sp-diary-body::-webkit-scrollbar {
+  width: 5px;
+}
+
+#sp-diary-body::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.2);
+  border-radius: 3px;
+}
+
+/* 日历网格 */
+.sp-diary-calendar {
+  margin-bottom: 12px;
+}
+
+.sp-diary-calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.sp-diary-calendar-header span {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sp-text-primary);
+}
+
+.sp-diary-calendar-header button {
+  background: none;
+  border: none;
+  color: var(--sp-text-secondary);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.sp-diary-calendar-header button:hover {
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+}
+
+.sp-diary-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 4px;
+}
+
+.sp-diary-weekday {
+  font-size: 10px;
+  color: var(--sp-text-muted);
+  text-align: center;
+  padding: 2px 0;
+}
+
+.sp-diary-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.sp-diary-day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--sp-text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  position: relative;
+}
+
+.sp-diary-day:hover {
+  background: rgba(255,255,255,0.08);
+}
+
+.sp-diary-day.today {
+  border: 1px solid var(--sp-primary-border);
+  color: var(--sp-text-primary);
+  font-weight: 600;
+}
+
+.sp-diary-day.has-diary {
+  background: rgba(100,180,255,0.15);
+  color: var(--sp-text-primary);
+  font-weight: 600;
+}
+
+.sp-diary-day.has-diary::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--sp-primary);
+}
+
+.sp-diary-day.selected {
+  background: var(--sp-primary);
+  color: #fff;
+}
+
+.sp-diary-day.other-month {
+  opacity: 0.3;
+}
+
+.sp-diary-day.empty {
+  cursor: default;
+}
+
+/* 日记内容区 */
+.sp-diary-entry {
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.sp-diary-entry-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.sp-diary-entry-date {
+  font-size: 11px;
+  color: var(--sp-text-muted);
+}
+
+.sp-diary-entry-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.sp-diary-entry-actions button {
+  background: none;
+  border: none;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--sp-text-muted);
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.sp-diary-entry-actions button:hover {
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+}
+
+.sp-diary-entry-content {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--sp-text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.sp-diary-entry-content textarea {
+  width: 100%;
+  min-height: 60px;
+  background: var(--sp-bg-light);
+  border: 1px solid var(--sp-border);
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 12px;
+  color: var(--sp-text-primary);
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+/* 生成控制区 */
+#sp-diary-generate-section {
+  padding: 10px 12px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+}
+
+.sp-diary-range-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 11px;
+  color: var(--sp-text-secondary);
+  flex-wrap: wrap;
+}
+
+.sp-diary-range-row label {
+  margin: 0;
+  font-size: 11px;
+  color: var(--sp-text-secondary);
+  white-space: nowrap;
+}
+
+.sp-diary-range-row input[type="number"] {
+  width: 50px;
+  padding: 3px 6px;
+  font-size: 11px;
+  margin: 0;
+  border-radius: 4px;
+  border: 1px solid var(--sp-border);
+  background: var(--sp-bg-light);
+  color: var(--sp-text-primary);
+}
+
+.sp-diary-range-hint {
+  font-size: 10px;
+  color: var(--sp-text-muted);
+  margin-bottom: 8px;
+}
+
+#sp-diary-generate-btn {
+  width: 100%;
+  padding: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--sp-primary);
+  color: #fff;
+  border: 1px solid var(--sp-primary-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#sp-diary-generate-btn:hover {
+  background: var(--sp-primary-hover);
+}
+
+/* 空状态 */
+.sp-diary-empty {
+  text-align: center;
+  padding: 20px;
+  color: var(--sp-text-muted);
+  font-size: 12px;
+}
+
+@media (max-width: 768px) {
+  #silly-pet-diary {
+    width: calc(100vw - 20px);
+    max-width: 360px;
+    max-height: 70vh;
+  }
 }
