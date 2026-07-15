@@ -1111,6 +1111,61 @@ function clearSpriteLock() {
   updateSpriteImage();
 }
 
+  // ============================================================
+  // 统一确认弹窗工具
+  // ============================================================
+  function showConfirmDialog({ title, desc, confirmText, cancelText, onConfirm, onCancel }) {
+    // 移除旧弹窗
+    document.getElementById('sp-confirm-dialog-overlay')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-confirm-dialog-overlay';
+    overlay.className = 'sp-confirm-overlay';
+    overlay.innerHTML = `
+      <div class="sp-confirm-box" id="sp-confirm-dialog-box">
+        <div class="sp-confirm-title">${title || '确认'}</div>
+        <div class="sp-confirm-desc">${desc || ''}</div>
+        <div class="sp-confirm-actions">
+          <button class="sp-confirm-btn sp-confirm-btn-cancel" id="sp-confirm-dialog-cancel">${cancelText || '取消'}</button>
+          <button class="sp-confirm-btn sp-confirm-btn-primary" id="sp-confirm-dialog-ok">${confirmText || '确认'}</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    // 居中定位（和体力背包一致的方式）
+    requestAnimationFrame(() => {
+      const box = document.getElementById('sp-confirm-dialog-box');
+      if (box) {
+        const boxH = box.offsetHeight || 180;
+        const boxW = box.offsetWidth || 280;
+        box.style.position = 'fixed';
+        box.style.top = Math.max(20, Math.floor((window.innerHeight - boxH) / 2)) + 'px';
+        box.style.left = Math.floor((window.innerWidth - boxW) / 2) + 'px';
+        box.style.margin = '0';
+      }
+    });
+
+    const cleanup = () => { overlay.remove(); };
+
+    document.getElementById('sp-confirm-dialog-ok').onclick = () => {
+      cleanup();
+      if (onConfirm) onConfirm();
+    };
+
+    document.getElementById('sp-confirm-dialog-cancel').onclick = () => {
+      cleanup();
+      if (onCancel) onCancel();
+    };
+
+    // 点遮罩关闭 = 取消
+    overlay.onclick = (e) => {
+      if (e.target === overlay) {
+        cleanup();
+        if (onCancel) onCancel();
+      }
+    };
+  }
 
   // ============================================================
   // 气泡
@@ -2600,50 +2655,20 @@ function toggleChat() {
   }
 
   function showRegenConfirm(msgIdx) {
-    // 移除旧弹窗（如果有）
-    document.getElementById('sp-regen-confirm')?.remove();
-
-    const overlay = document.createElement('div');
-    overlay.id = 'sp-regen-confirm';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:2147483649;';
-    overlay.innerHTML = `
-      <div id="sp-regen-confirm-box" style="background:var(--sp-bg-secondary);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--sp-border);border-radius:14px;padding:20px 24px;max-width:280px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.4);animation:sp-fade-in 0.15s ease;">
-        <div style="font-size:14px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">🔄 重新生成</div>
-        <div style="font-size:12px;color:var(--sp-text-secondary);margin-bottom:16px;line-height:1.5;">删除这条及之后的回复，重新让桌宠回答？</div>
-        <div style="display:flex;gap:10px;justify-content:flex-end;">
-          <button id="sp-regen-cancel" style="padding:6px 16px;border-radius:8px;border:1px solid var(--sp-border);background:var(--sp-bg-light);color:var(--sp-text-secondary);cursor:pointer;font-size:12px;transition:all 0.2s;">取消</button>
-          <button id="sp-regen-ok" style="padding:6px 16px;border-radius:8px;border:1px solid var(--sp-primary-border);background:var(--sp-primary);color:#fff;cursor:pointer;font-size:12px;transition:all 0.2s;">确认重新生成</button>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(overlay);
-
-    // 手动居中定位（兼容移动端，和表情包弹窗同款逻辑）
-    requestAnimationFrame(() => {
-      const box = document.getElementById('sp-regen-confirm-box');
-      if (box) {
-        const boxH = box.offsetHeight || 160;
-        const boxW = box.offsetWidth || 280;
-        box.style.position = 'fixed';
-        box.style.top = Math.max(20, Math.floor((window.innerHeight - boxH) / 2)) + 'px';
-        box.style.left = Math.floor((window.innerWidth - boxW) / 2) + 'px';
-        box.style.margin = '0';
+    showConfirmDialog({
+      title: '🔄 重新生成',
+      desc: '删除这条及之后的回复，重新让桌宠回答？',
+      confirmText: '确认重新生成',
+      cancelText: '取消',
+      onConfirm: () => {
+        state.petChatHistory = state.petChatHistory.slice(0, msgIdx);
+        saveDataImmediate('聊天重新生成');
+        renderChatHistory();
+        generateReply();
       }
     });
-
-    const cleanup = () => { overlay.remove(); };
-
-    document.getElementById('sp-regen-cancel').onclick = cleanup;
-    overlay.onclick = (e) => { if (e.target === overlay) cleanup(); };
-
-    document.getElementById('sp-regen-ok').onclick = () => {
-      cleanup();
-      state.petChatHistory = state.petChatHistory.slice(0, msgIdx);
-      saveDataImmediate('聊天重新生成');
-      renderChatHistory();
-      generateReply();
-    };
   }
+
 
   function renderChatHistory() {
     const container = document.getElementById('silly-pet-chat-messages');
@@ -7636,50 +7661,64 @@ function refreshCharPreview() {
         gameShowNotice(`重置冷却中！还需等待 ${hours}小时${mins}分钟`);
         return;
       }
-      if (!confirm('确定重置所有游戏数据？\n包括：合成工坊、消消看、连连看、抽奖\n金币、棋盘、图鉴、道具背包都会清空！\n（每24小时只能重置一次）')) return;
-      if (!confirm('真的确定吗？所有游戏进度都会丢失！')) return;
-      // 合成工坊
-      state.gameGold = 0;
-      state.gameStamina = state.gameStaminaMax || 80;
-      state.gameLastStaminaRecover = Date.now();
-      state.gameBoard = new Array(GAME_BOARD_CELLS).fill(null);
-      state.gameOrders = gameGenerateOrders(3);
-      state.gameCollection = [];
-      state.gameCustomImages = {};
-      state.gameBgImage = '';
-      state.gameGeneratorPos = 0;
-      state.gameSellPos = 35;
-      state.gameInventory = [];
-      state.quickFeed = null;
-      state.quickClean = null;
-      state.quickEnergy = null;
-      state.gameShopBuyLog = {};
-      state.gameOrderRefreshCD = 0;
-      // 消消看
-      state.match3Inventory = { expand: 0, sweep: 0, shuffle: 0 };
-      state.match3ItemPurchaseLog = {};
-      // 连连看
-      state.linkInventory = { hint: 0, shuffle: 0, bomb: 0, compass: 0 };
-      state.linkItemPurchaseLog = {};
-      // 抽奖
-      state.lotteryLog = {};
-      // 体力道具
-      state.gameStaminaInventory = { stamina30: 0, stamina50: 0, stamina100: 0 };
-      state.gameStaminaShopLog = {};
-      // 重置运行时状态
-      match3State.active = false;
-      match3State.cards = [];
-      match3State.slots = [];
-      linkState.active = false;
-      linkState.board = [];
-      // 记录重置冷却时间
-      state.gameResetCooldown = Date.now();
-      saveDataImmediate('全部游戏重置');
-      gameRenderBoard();
-      gameRenderStatus();
-      gameRenderOrders();
-      gameApplyBackground();
-      gameShowNotice('所有游戏数据已重置！体力已恢复满');
+      showConfirmDialog({
+        title: '⚠️ 重置所有游戏数据？',
+        desc: '包括：合成工坊、消消看、连连看、抽奖<br/>金币、棋盘、图鉴、道具背包都会清空！<br/><span style="color:#f66;font-weight:600;">每24小时只能重置一次</span>',
+        confirmText: '确认重置',
+        cancelText: '算了',
+        onConfirm: () => {
+          showConfirmDialog({
+            title: '💀 最后确认',
+            desc: '真的确定吗？所有游戏进度都会丢失！',
+            confirmText: '我确定',
+            cancelText: '取消',
+            onConfirm: () => {
+              // 合成工坊
+              state.gameGold = 0;
+              state.gameStamina = state.gameStaminaMax || 80;
+              state.gameLastStaminaRecover = Date.now();
+              state.gameBoard = new Array(GAME_BOARD_CELLS).fill(null);
+              state.gameOrders = gameGenerateOrders(3);
+              state.gameCollection = [];
+              state.gameCustomImages = {};
+              state.gameBgImage = '';
+              state.gameGeneratorPos = 0;
+              state.gameSellPos = 35;
+              state.gameInventory = [];
+              state.quickFeed = null;
+              state.quickClean = null;
+              state.quickEnergy = null;
+              state.gameShopBuyLog = {};
+              state.gameOrderRefreshCD = 0;
+              // 消消看
+              state.match3Inventory = { expand: 0, sweep: 0, shuffle: 0 };
+              state.match3ItemPurchaseLog = {};
+              // 连连看
+              state.linkInventory = { hint: 0, shuffle: 0, bomb: 0, compass: 0 };
+              state.linkItemPurchaseLog = {};
+              // 抽奖
+              state.lotteryLog = {};
+              // 体力道具
+              state.gameStaminaInventory = { stamina30: 0, stamina50: 0, stamina100: 0 };
+              state.gameStaminaShopLog = {};
+              // 重置运行时状态
+              match3State.active = false;
+              match3State.cards = [];
+              match3State.slots = [];
+              linkState.active = false;
+              linkState.board = [];
+              // 记录重置冷却时间
+              state.gameResetCooldown = Date.now();
+              saveDataImmediate('全部游戏重置');
+              gameRenderBoard();
+              gameRenderStatus();
+              gameRenderOrders();
+              gameApplyBackground();
+              gameShowNotice('所有游戏数据已重置！体力已恢复满');
+            }
+          });
+        }
+      });
     });
     // 面板拖拽
     gameBindPanelDrag();
@@ -8266,9 +8305,9 @@ function refreshCharPreview() {
 
     document.getElementById('sp-match3-restart')?.addEventListener('click', () => {
       resultOverlay.remove();
-      match3GenerateLevel();
-      match3Render();
+      match3ConfirmNewGame();
     });
+
     document.getElementById('sp-match3-quit')?.addEventListener('click', () => {
       resultOverlay.remove();
       // 不关闭面板，而是回到游戏选择界面
@@ -8470,43 +8509,48 @@ function refreshCharPreview() {
 
     // 重开按钮
     document.getElementById('sp-match3-restart-btn').addEventListener('click', () => {
-      if (state.gameStamina < 5) {
-        match3ShowNotice('体力不足！开一局需要 5 点体力');
-        return;
-      }
-      if (!confirm('重开本局？将消耗 5 点体力，当前进度清零。')) return;
-      state.gameStamina -= 5;
-      saveDataDebounced('消消看重开扣体力');
-      match3GenerateLevel();
-      match3Render();
-      match3ShowNotice('🔄 新的一局开始了！（-5⚡）');
-      if (isGameOpen) gameRenderStatus();
+      showConfirmDialog({
+        title: '🔄 重开本局？',
+        desc: '当前进度将清零，重新开始新的一局。<br/>将消耗一定体力。',
+        confirmText: '重开',
+        cancelText: '继续玩',
+        onConfirm: () => {
+          if (state.gameStamina < 5) {
+            match3ShowNotice('体力不足！开一局需要 5 点体力');
+            return;
+          }
+          state.gameStamina -= 5;
+          saveDataDebounced('消消看重开扣体力');
+          match3GenerateLevel();
+          match3Render();
+          match3ShowNotice(`🔄 新的一局开始了！（-5⚡）| 难度: ${match3State.difficulty?.name || '未知'}`);
+          if (isGameOpen) gameRenderStatus();
+        }
+      });
     });
+
 
     // 结束按钮
     document.getElementById('sp-match3-end-btn').addEventListener('click', () => {
-      if (!confirm('确定结束游戏？将按当前已消除组数结算金币。')) return;
-      // 直接结算，不通过 match3GameOver 弹窗，结算后留在面板内
-      match3State.active = false;
-      const baseReward = match3State.eliminatedGroups * (1 + Math.floor(Math.random() * 2));
-      state.gameGold += baseReward;
-      saveDataImmediate('消消看手动结束');
-      match3ShowNotice(`结算完成！消除 ${match3State.eliminatedGroups} 组，获得 +${baseReward} 🪙`);
-      // 自动开启新局
-      setTimeout(() => {
-        if (state.gameStamina < 5) {
-          match3ShowNotice('体力不足，无法自动开新局');
-          return;
+      showConfirmDialog({
+        title: '❌ 结束本局？',
+        desc: `将按当前已消除组数结算金币。<br/>已消除: ${match3State.eliminatedGroups} 组`,
+        confirmText: '结算退出',
+        cancelText: '继续玩',
+        onConfirm: () => {
+          match3State.active = false;
+          const baseReward = match3State.eliminatedGroups * (1 + Math.floor(Math.random() * 2));
+          state.gameGold += baseReward;
+          saveDataImmediate('消消看手动结束');
+          match3ShowNotice(`结算完成！消除 ${match3State.eliminatedGroups} 组，获得 +${baseReward} 🪙`);
+          // 延迟后弹出新局确认
+          setTimeout(() => {
+            match3ConfirmNewGame();
+          }, 1500);
         }
-        state.gameStamina -= 5;
-        saveDataDebounced('消消看自动新局扣体力');
-        match3GenerateLevel();
-        match3Render();
-        match3ShowNotice('新局开始！（-5⚡）');
-        if (isGameOpen) gameRenderStatus();
-      }, 1500);
-
+      });
     });
+
 
     // 标签页切换
     const m3Tabs = ['play', 'bag', 'shop', 'collection'];
@@ -8687,23 +8731,46 @@ function refreshCharPreview() {
         panel.style.top = Math.max(10, Math.min(centerTop, maxTop)) + 'px';
       });
 
-      // 如果没有活跃游戏，开新局（扣5体力）
+      // 如果没有活跃游戏，弹窗确认后开新局
       if (!match3State.active) {
-        if (state.gameStamina < 5) {
-          match3ShowNotice('体力不足！开一局需要 5 点体力');
-          match3Render();
-        } else {
-          state.gameStamina -= 5;
-          saveDataDebounced('消消看开局扣体力');
-          match3GenerateLevel();
-          match3ShowNotice('开局消耗 5 点体力⚡');
-        }
+        match3Render(); // 先渲染空面板
+        match3ConfirmNewGame();
+      } else {
+        match3Render();
       }
 
       match3Render();
     } else {
       if (panel) panel.classList.remove('visible');
     }
+  }
+
+  // ===== 消消看开局确认弹窗 =====
+  function match3ConfirmNewGame() {
+    showConfirmDialog({
+      title: '🃏 开始新一局消消看？',
+      desc: '开局将消耗一定体力，难度随机分配。<br/>准备好了吗？',
+      confirmText: '✨ 开始',
+      cancelText: '算了',
+      onConfirm: () => {
+        if (state.gameStamina < 5) {
+          match3ShowNotice('体力不足！开一局需要 5 点体力');
+          return;
+        }
+        state.gameStamina -= 5;
+        saveDataDebounced('消消看开局扣体力');
+        match3GenerateLevel();
+        match3Render();
+        match3ShowNotice(`开局消耗 5 点体力⚡ | 难度: ${match3State.difficulty?.name || '未知'}`);
+        if (isGameOpen) gameRenderStatus();
+      },
+      onCancel: () => {
+        // 不开局，关闭面板
+        isMatch3Open = false;
+        const panel = document.getElementById('sp-match3-panel');
+        if (panel) panel.classList.remove('visible');
+      }
+    });
   }
 
   // ============================================================
@@ -9917,9 +9984,9 @@ function refreshCharPreview() {
 
     document.getElementById('sp-link-restart')?.addEventListener('click', () => {
       overlay.remove();
-      const ok = linkGenerateLevel();
-      if (ok) linkRender();
+      linkConfirmNewGame();
     });
+
     document.getElementById('sp-link-quit')?.addEventListener('click', () => {
       overlay.remove();
       isLinkOpen = false;
@@ -10265,45 +10332,45 @@ function refreshCharPreview() {
     document.getElementById('sp-link-prop-compass').addEventListener('click', () => linkUseProp('compass'));
 
     // 重开按钮
-    // 重开按钮
     document.getElementById('sp-link-restart-btn').addEventListener('click', () => {
-      const cost = linkState.difficulty?.energyCost || 5;
-      if (state.gameStamina < cost) {
-        linkShowNotice(`体力不足！开一局需要 ${cost} 点体力`);
-        return;
-      }
-      if (!confirm(`重开本局？将消耗 ${cost} 点体力，当前进度清零。`)) return;
-      const ok = linkGenerateLevel();
-      if (ok) {
-        linkRender();
-        linkShowNotice(`🔄 新的一局开始了！（-${cost}⚡）`);
-        if (isGameOpen) gameRenderStatus();
-      }
+      showConfirmDialog({
+        title: '🔄 重开本局？',
+        desc: '当前进度将清零，重新开始新的一局。<br/>将消耗一定体力。',
+        confirmText: '重开',
+        cancelText: '继续玩',
+        onConfirm: () => {
+          const ok = linkGenerateLevel();
+          if (ok) {
+            linkRender();
+            linkShowNotice(`🔄 新的一局开始了！（-${linkState.difficulty.energyCost}⚡）| 棋盘: ${linkState.difficulty.name}`);
+            if (isGameOpen) gameRenderStatus();
+          }
+        }
+      });
     });
 
     // 结束按钮
     document.getElementById('sp-link-end-btn').addEventListener('click', () => {
-      if (!confirm('确定结束游戏？将按当前已消除对数结算金币。')) return;
-      linkState.active = false;
-      if (linkState.compassTimer) { clearTimeout(linkState.compassTimer); linkState.compassTimer = null; }
-      const baseReward = Math.floor(linkState.pairsEliminated * 0.3);
-      state.gameGold += baseReward;
-      saveDataImmediate('连连看手动结束');
-      linkShowNotice(`结算完成！消除 ${linkState.pairsEliminated} 对，获得 +${baseReward} 🪙`);
-      setTimeout(() => {
-        const cost = LINK_DIFFICULTIES[0].energyCost || 5;
-        if (state.gameStamina < cost) {
-          linkShowNotice('体力不足，无法自动开新局');
-          return;
+      showConfirmDialog({
+        title: '❌ 结束本局？',
+        desc: `将按当前已消除对数结算金币。<br/>已消除: ${linkState.pairsEliminated} 对`,
+        confirmText: '结算退出',
+        cancelText: '继续玩',
+        onConfirm: () => {
+          linkState.active = false;
+          if (linkState.compassTimer) { clearTimeout(linkState.compassTimer); linkState.compassTimer = null; }
+          linkState.compassActive = false;
+          linkState.bombMode = false;
+          const baseReward = Math.floor(linkState.pairsEliminated * 0.3);
+          state.gameGold += baseReward;
+          saveDataImmediate('连连看手动结束');
+          linkShowNotice(`结算完成！消除 ${linkState.pairsEliminated} 对，获得 +${baseReward} 🪙`);
+          // 延迟后弹出新局确认
+          setTimeout(() => {
+            linkConfirmNewGame();
+          }, 1500);
         }
-        const ok = linkGenerateLevel();
-        if (ok) {
-          linkRender();
-          linkShowNotice(`新局开始！（-${cost}⚡）`);
-          if (isGameOpen) gameRenderStatus();
-        }
-      }, 1500);
-
+      });
     });
 
     // 标签页切换
@@ -10399,16 +10466,13 @@ function refreshCharPreview() {
         panel.style.top = Math.max(10, Math.min(centerTop, maxTop)) + 'px';
       });
 
-      // 如果没有活跃游戏，开新局
+      // 如果没有活跃游戏，弹窗确认后开新局
       if (!linkState.active) {
-        const ok = linkGenerateLevel();
-        if (!ok) {
-          // 精力不足，仍显示面板但不开局
-          linkRender();
-          return;
-        }
+        linkRender(); // 先渲染空面板
+        linkConfirmNewGame();
+      } else {
+        linkRender();
       }
-      linkRender();
     } else {
       if (panel) panel.classList.remove('visible');
       // 退出炸弹/罗盘模式
@@ -10417,6 +10481,32 @@ function refreshCharPreview() {
       if (linkState.compassTimer) { clearTimeout(linkState.compassTimer); linkState.compassTimer = null; }
       linkState.compassActive = false;
     }
+  }
+
+  // ===== 连连看开局确认弹窗 =====
+  function linkConfirmNewGame() {
+    showConfirmDialog({
+      title: '🔗 开始新一局连连看？',
+      desc: '开局将消耗一定体力，棋盘大小随机分配。<br/>准备好了吗？',
+      confirmText: '✨ 开始',
+      cancelText: '算了',
+      onConfirm: () => {
+        const ok = linkGenerateLevel();
+        if (!ok) {
+          // linkGenerateLevel 内部已经显示了体力不足通知
+          return;
+        }
+        linkRender();
+        linkShowNotice(`开局消耗 ${linkState.difficulty.energyCost} 点体力⚡ | 棋盘: ${linkState.difficulty.name}`);
+        if (isGameOpen) gameRenderStatus();
+      },
+      onCancel: () => {
+        // 不开局，关闭面板
+        isLinkOpen = false;
+        const panel = document.getElementById('sp-link-panel');
+        if (panel) panel.classList.remove('visible');
+      }
+    });
   }
 
 })();
