@@ -2800,3 +2800,545 @@
   color: var(--sp-text-muted);
   font-size: 10px;
 }
+
+/* ============================================================ */
+/* 🎮 游戏选择弹窗样式                                          */
+/* ============================================================ */
+
+.sp-game-selector-box {
+  background: var(--sp-bg-secondary);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--sp-border);
+  border-radius: 16px;
+  width: 280px;
+  max-width: 90vw;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  overflow: hidden;
+  animation: sp-fade-in 0.2s ease;
+}
+
+.sp-game-selector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sp-text-primary);
+  border-bottom: 1px solid var(--sp-border-light);
+  background: var(--sp-bg-light);
+}
+
+.sp-game-selector-close {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: var(--sp-text-muted);
+  padding: 2px 6px;
+}
+
+.sp-game-selector-close:hover {
+  color: #fff;
+}
+
+.sp-game-selector-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sp-game-selector-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--sp-border-light);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sp-game-selector-card:hover {
+  background: rgba(100,180,255,0.1);
+  border-color: var(--sp-primary-border);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.sp-game-selector-icon {
+  font-size: 28px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.06);
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.sp-game-selector-info {
+  flex: 1;
+}
+
+.sp-game-selector-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sp-text-primary);
+  margin-bottom: 2px;
+}
+
+.sp-game-selector-desc {
+  font-size: 11px;
+  color: var(--sp-text-muted);
+  line-height: 1.4;
+}
+
+/* ============================================================ */
+/* 🃏 消消看游戏样式 - MeepMatch3                               */
+/* ============================================================ */
+
+#sp-match3-panel {
+  position: fixed;
+  width: 380px;
+  max-width: 95vw;
+  max-height: 90vh;
+  background: var(--sp-bg-main);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--sp-border);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  display: none;
+  flex-direction: column;
+  z-index: 2147483646;
+  overflow: hidden;
+}
+
+#sp-match3-panel.visible {
+  display: flex;
+}
+
+#sp-match3-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--sp-bg-light);
+  border-bottom: 1px solid var(--sp-border-light);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--sp-text-primary);
+  cursor: grab;
+  user-select: none;
+}
+
+#sp-match3-header:active {
+  cursor: grabbing;
+}
+
+.sp-match3-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sp-match3-gold-display {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffb347;
+}
+
+#sp-match3-close {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: var(--sp-text-muted);
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 0.2s;
+}
+
+#sp-match3-close:hover {
+  color: #fff;
+}
+
+#sp-match3-notice {
+  position: absolute;
+  top: 50px;
+  left: 14px;
+  right: 14px;
+  padding: 6px 14px;
+  font-size: 12px;
+  color: #fff;
+  background: rgba(30,30,40,0.92);
+  border: 1px solid var(--sp-primary-border);
+  border-radius: 8px;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 10;
+}
+
+#sp-match3-notice.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+#sp-match3-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#sp-match3-info {
+  display: flex;
+  justify-content: space-around;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--sp-text-secondary);
+  background: rgba(255,255,255,0.03);
+  border-radius: 6px;
+}
+
+#sp-match3-info span {
+  font-weight: 600;
+}
+
+/* 消消看棋盘 */
+#sp-match3-board {
+  position: relative;
+  width: 100%;
+  height: 360px;
+  background: rgba(0,0,0,0.2);
+  border-radius: 12px;
+  border: 1px solid var(--sp-border-light);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.sp-match3-card {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  transition: transform 0.15s ease, opacity 0.2s ease, box-shadow 0.15s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.sp-match3-clickable {
+  background: rgba(255,255,255,0.12);
+  border: 2px solid rgba(255,255,255,0.25);
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.sp-match3-clickable:hover {
+  transform: scale(1.1);
+  border-color: rgba(100,220,100,0.7);
+  box-shadow: 0 0 12px rgba(100,220,100,0.4);
+  z-index: 999 !important;
+}
+
+.sp-match3-clickable:active {
+  transform: scale(0.95);
+}
+
+.sp-match3-blocked {
+  background: rgba(80,80,80,0.4);
+  border: 2px solid rgba(255,255,255,0.08);
+  cursor: not-allowed;
+  opacity: 0.5;
+  filter: grayscale(0.7) brightness(0.6);
+}
+
+/* 暂存栏 */
+#sp-match3-slots-wrapper {
+  padding: 6px 0;
+}
+
+#sp-match3-slots {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 8px;
+  background: rgba(0,0,0,0.15);
+  border-radius: 10px;
+  border: 1px solid var(--sp-border-light);
+  min-height: 50px;
+}
+
+.sp-match3-slot {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  transition: all 0.2s ease;
+}
+
+.sp-match3-slot-empty {
+  background: rgba(255,255,255,0.05);
+  border: 2px dashed rgba(255,255,255,0.15);
+}
+
+.sp-match3-slot-filled {
+  background: rgba(100,180,255,0.15);
+  border: 2px solid rgba(100,180,255,0.4);
+  animation: sp-match3-slot-pop 0.3s ease;
+}
+
+@keyframes sp-match3-slot-pop {
+  0% { transform: scale(0.5); opacity: 0; }
+  60% { transform: scale(1.15); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* 道具栏 */
+#sp-match3-props {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.sp-match3-prop-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--sp-border-light);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex: 1;
+  max-width: 100px;
+}
+
+.sp-match3-prop-btn:hover {
+  background: rgba(100,180,255,0.1);
+  border-color: var(--sp-primary-border);
+  transform: translateY(-2px);
+}
+
+.sp-match3-prop-btn:active {
+  transform: translateY(0) scale(0.97);
+}
+
+.sp-match3-prop-icon {
+  font-size: 20px;
+}
+
+.sp-match3-prop-price {
+  font-size: 10px;
+  color: #ffb347;
+  font-weight: 600;
+}
+
+.sp-match3-prop-count {
+  font-size: 9px;
+  color: var(--sp-text-muted);
+}
+
+/* 控制按钮 */
+#sp-match3-controls {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.sp-match3-ctrl-btn {
+  padding: 7px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--sp-border);
+  background: var(--sp-bg-light);
+  color: var(--sp-text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sp-match3-ctrl-btn:hover {
+  background: rgba(255,255,255,0.1);
+  color: var(--sp-text-primary);
+}
+
+.sp-match3-ctrl-quit {
+  border-color: rgba(239,83,80,0.4);
+  color: #f66;
+}
+
+.sp-match3-ctrl-quit:hover {
+  background: rgba(239,83,80,0.15);
+}
+
+/* 结算弹窗 */
+.sp-match3-result-box {
+  background: var(--sp-bg-secondary);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--sp-border);
+  border-radius: 16px;
+  padding: 24px;
+  width: 260px;
+  max-width: 85%;
+  text-align: center;
+  animation: sp-fade-in 0.3s ease;
+}
+
+.sp-match3-result-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--sp-text-primary);
+  margin-bottom: 12px;
+}
+
+.sp-match3-result-info {
+  font-size: 13px;
+  color: var(--sp-text-secondary);
+  line-height: 1.8;
+  margin-bottom: 16px;
+}
+
+.sp-match3-result-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.sp-match3-result-btn {
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--sp-primary-border);
+  background: var(--sp-primary);
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sp-match3-result-btn:hover {
+  background: var(--sp-primary-hover);
+}
+
+.sp-match3-result-close {
+  background: var(--sp-bg-light);
+  color: var(--sp-text-secondary);
+  border-color: var(--sp-border);
+}
+
+.sp-match3-result-close:hover {
+  background: rgba(255,255,255,0.1);
+  color: var(--sp-text-primary);
+}
+
+/* 消消看移动端适配 */
+@media (max-width: 768px) {
+  #sp-match3-panel {
+    width: calc(100vw - 16px);
+    max-width: 380px;
+    max-height: 80vh;
+  }
+
+  #sp-match3-board {
+    height: 300px;
+  }
+
+  .sp-match3-card {
+    width: 38px;
+    height: 38px;
+    font-size: 18px;
+  }
+
+  .sp-match3-slot {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+
+  .sp-match3-prop-btn {
+    padding: 6px 8px;
+  }
+
+  .sp-match3-prop-icon {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  #sp-match3-board {
+    height: 260px;
+  }
+
+  .sp-match3-card {
+    width: 34px;
+    height: 34px;
+    font-size: 16px;
+  }
+
+  .sp-match3-slot {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+  }
+}
+
+
+/* ===== 合成工坊 & 消消看 最小化状态 ===== */
+#sp-game-panel.sp-game-minimized {
+  width: 160px !important;
+  min-width: 160px !important;
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
+  resize: none;
+}
+#sp-game-panel.sp-game-minimized #sp-game-status-bar,
+#sp-game-panel.sp-game-minimized #sp-game-notice,
+#sp-game-panel.sp-game-minimized #sp-game-content {
+  display: none;
+}
+#sp-game-panel.sp-game-minimized #sp-game-header {
+  border-bottom: none;
+  border-radius: 16px;
+}
+
+#sp-match3-panel.sp-match3-minimized {
+  width: 160px !important;
+  min-width: 160px !important;
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
+  resize: none;
+}
+#sp-match3-panel.sp-match3-minimized #sp-match3-notice,
+#sp-match3-panel.sp-match3-minimized #sp-match3-body {
+  display: none;
+}
+#sp-match3-panel.sp-match3-minimized #sp-match3-header {
+  border-bottom: none;
+  border-radius: 16px;
+}

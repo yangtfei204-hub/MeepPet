@@ -339,6 +339,7 @@
     quickEnergy: null,        // {category:'energy', idx:0} 快捷精力物品
     gameShopBuyLog: {},       // {'2026-07-15': {'food_1': 2, 'clean_2': 1, ...}}
     gameOrderRefreshCD: 0,    // 订单刷新冷却时间戳
+    match3ItemPurchaseLog: {},   // {'2026-07-15': {'expand': 2, 'sweep': 1, 'shuffle': 3}}
   };
 
   // ============================================================
@@ -1720,7 +1721,7 @@ function sleepPet() {
     showInventoryPopup(category, quickKey, onUse);
   }
 
-  function showInventoryPopup(category, quickKey, onUse) {
+function showInventoryPopup(category, quickKey, onUse) {
     // 移除旧弹窗
     document.getElementById('sp-inventory-popup')?.remove();
 
@@ -1764,6 +1765,19 @@ function sleepPet() {
 
     document.body.appendChild(overlay);
 
+    // 手动居中定位（兼容移动端，防止弹窗靠顶）
+    requestAnimationFrame(() => {
+      const box = overlay.querySelector('.sp-inv-popup-box');
+      if (box) {
+        const boxH = box.offsetHeight || 300;
+        const boxW = box.offsetWidth || 300;
+        box.style.position = 'fixed';
+        box.style.top = Math.max(20, Math.floor((window.innerHeight - boxH) / 2)) + 'px';
+        box.style.left = Math.floor((window.innerWidth - boxW) / 2) + 'px';
+        box.style.margin = '0';
+      }
+    });
+
     // 关闭
     overlay.querySelector('.sp-inv-popup-close').onclick = () => overlay.remove();
     overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
@@ -1778,7 +1792,6 @@ function sleepPet() {
         inv.count--;
         if (inv.count <= 0) {
           state.gameInventory = state.gameInventory.filter(i => i.count > 0);
-          // 如果是快捷物品，清除
           if (state[quickKey] && state[quickKey].category === cat && state[quickKey].idx === idx) {
             state[quickKey] = null;
           }
@@ -1803,7 +1816,6 @@ function sleepPet() {
           showBubble('已取消快捷', 1500);
         } else {
           state[quickKey] = { category: cat, idx: idx };
-          // 取消其他的
           overlay.querySelectorAll('.sp-inv-quick-btn').forEach(b => { b.textContent = '☆'; b.classList.remove('active'); });
           btn.textContent = '⭐';
           btn.classList.add('active');
@@ -1901,10 +1913,77 @@ function sleepPet() {
       case 'sleep': sleepPet(); break;
       case 'chat': toggleChat(); break;
       case 'diary': toggleDiary(); break;
-      case 'game': toggleMergeGame(); break;
+      case 'game': showGameSelector(); break;
       case 'settings': toggleSettings(); break;
     }
     toggleMenu();
+  }
+
+  // ============================================================
+  // 游戏选择弹窗
+  // ============================================================
+  function showGameSelector() {
+    // 移除旧弹窗
+    document.getElementById('sp-game-selector-overlay')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-game-selector-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:2147483649;';
+    overlay.innerHTML = `
+      <div class="sp-game-selector-box">
+        <div class="sp-game-selector-header">
+          <span>🎮 选择游戏</span>
+          <button class="sp-game-selector-close" title="关闭">✕</button>
+        </div>
+        <div class="sp-game-selector-body">
+          <div class="sp-game-selector-card" data-game="merge">
+            <div class="sp-game-selector-icon">🧶</div>
+            <div class="sp-game-selector-info">
+              <div class="sp-game-selector-name">合成工坊</div>
+              <div class="sp-game-selector-desc">合成物品、完成订单、赚取金币</div>
+            </div>
+          </div>
+          <div class="sp-game-selector-card" data-game="match3">
+            <div class="sp-game-selector-icon">🃏</div>
+            <div class="sp-game-selector-info">
+              <div class="sp-game-selector-name">消消看</div>
+              <div class="sp-game-selector-desc">点击图案收集到暂存栏，三消通关</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    // 居中定位
+    requestAnimationFrame(() => {
+      const box = overlay.querySelector('.sp-game-selector-box');
+      if (box) {
+        const boxH = box.offsetHeight || 200;
+        const boxW = box.offsetWidth || 280;
+        box.style.position = 'fixed';
+        box.style.top = Math.max(20, Math.floor((window.innerHeight - boxH) / 2)) + 'px';
+        box.style.left = Math.floor((window.innerWidth - boxW) / 2) + 'px';
+        box.style.margin = '0';
+      }
+    });
+
+    // 关闭
+    overlay.querySelector('.sp-game-selector-close').onclick = () => overlay.remove();
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+    // 选择游戏
+    overlay.querySelectorAll('.sp-game-selector-card').forEach(card => {
+      card.onclick = () => {
+        const game = card.dataset.game;
+        overlay.remove();
+        if (game === 'merge') {
+          toggleMergeGame();
+        } else if (game === 'match3') {
+          toggleMatch3Game();
+        }
+      };
+    });
   }
 
   function showEmojiEditModal(idx) {
@@ -7082,6 +7161,7 @@ function refreshCharPreview() {
           <button id="sp-game-tab-shop" class="sp-game-tab" data-tab="shop">商店</button>
           <button id="sp-game-tab-collection" class="sp-game-tab" data-tab="collection">图鉴</button>
           <button id="sp-game-tab-settings" class="sp-game-tab" data-tab="gsettings">⚙️</button>
+          <button id="sp-game-minimize" title="缩小悬挂" style="background:none;border:none;font-size:14px;cursor:pointer;color:var(--sp-text-muted);padding:2px 6px;">─</button>
           <button id="sp-game-close" title="关闭">✕</button>
         </div>
       </div>
@@ -7135,6 +7215,22 @@ function refreshCharPreview() {
         if (target === 'shop') gameRenderShop();
         if (target === 'collection') gameRenderCollection();
       });
+    });
+
+    // 最小化
+    document.getElementById('sp-game-minimize').addEventListener('click', () => {
+      const gamePanel = document.getElementById('sp-game-panel');
+      const minBtn = document.getElementById('sp-game-minimize');
+      if (!gamePanel || !minBtn) return;
+      if (gamePanel.classList.contains('sp-game-minimized')) {
+        gamePanel.classList.remove('sp-game-minimized');
+        minBtn.textContent = '─';
+        minBtn.title = '缩小悬挂';
+      } else {
+        gamePanel.classList.add('sp-game-minimized');
+        minBtn.textContent = '□';
+        minBtn.title = '恢复窗口';
+      }
     });
 
     // 关闭
@@ -7259,6 +7355,789 @@ function refreshCharPreview() {
       if (isGameOpen) gameRenderStatus();
     }
   }, 120000); // 每2分钟检查一次
+
+  // ============================================================
+  // 🃏 消消看游戏模块 - MeepMatch3
+  // ============================================================
+
+  // ===== 消消看常量 =====
+  const MATCH3_BASE_SLOTS = 7;        // 默认暂存格数量
+  const MATCH3_MAX_EXPAND = 3;        // 每局最多扩充次数
+  const MATCH3_MAX_SLOTS = 10;        // 暂存格上限
+  const MATCH3_MATCH_COUNT = 3;       // 三消
+
+  // 默认图案 Emoji 池
+  const MATCH3_DEFAULT_ICONS = [
+    '🦊', '🍇', '🔔', '🌲', '🍰', '🎈', '🌸', '🐳',
+    '🍬', '🎯', '🌙', '🍄', '⭐', '🎀', '🐝', '🌈'
+  ];
+
+  // 道具定义
+  const MATCH3_PROPS = {
+    expand: {
+      name: '🪜 扩充神架',
+      desc: '临时增加1个暂存格',
+      price: 100,
+      dailyLimit: 3,
+      perGameLimit: 3
+    },
+    sweep: {
+      name: '🧹 魔法扫帚',
+      desc: '随机消除场景中3个相同图案',
+      price: 150,
+      dailyLimit: 2,
+      perGameLimit: 3
+    },
+    shuffle: {
+      name: '🌀 混沌风暴',
+      desc: '将场景中所有图案打乱重组',
+      price: 80,
+      dailyLimit: 5,
+      perGameLimit: 3
+    }
+  };
+
+  // 难度配置（随机选取）
+  const MATCH3_DIFFICULTIES = [
+    { name: '简单', layers: 3, density: 0.6, iconCount: 6, cardsPerIcon: 6 },
+    { name: '普通', layers: 4, density: 0.65, iconCount: 8, cardsPerIcon: 6 },
+    { name: '困难', layers: 5, density: 0.7, iconCount: 10, cardsPerIcon: 6 },
+    { name: '噩梦', layers: 6, density: 0.75, iconCount: 12, cardsPerIcon: 6 },
+  ];
+
+  // 游戏运行时状态
+  let match3State = {
+    active: false,
+    cards: [],            // [{id, type, x, y, z, state:'visible'|'blocked'|'collected'|'eliminated'}]
+    slots: [],            // 暂存栏 [{type, id}]
+    maxSlots: MATCH3_BASE_SLOTS,
+    expandUsed: 0,        // 本局已使用扩充次数
+    sweepUsed: 0,
+    shuffleUsed: 0,
+    eliminatedGroups: 0,  // 本局已消除组数
+    difficulty: null,
+    totalCards: 0,
+    bgImage: '',
+  };
+
+  let isMatch3Open = false;
+
+  // ===== 关卡生成算法 =====
+  function match3GenerateLevel() {
+    // 随机选择难度
+    const diff = MATCH3_DIFFICULTIES[Math.floor(Math.random() * MATCH3_DIFFICULTIES.length)];
+    match3State.difficulty = diff;
+
+    // 选择图案
+    const availableIcons = [...MATCH3_DEFAULT_ICONS];
+    const selectedIcons = [];
+    for (let i = 0; i < diff.iconCount && availableIcons.length > 0; i++) {
+      const idx = Math.floor(Math.random() * availableIcons.length);
+      selectedIcons.push(availableIcons.splice(idx, 1)[0]);
+    }
+
+    // 生成牌（保证总数是3的倍数）
+    const cards = [];
+    let cardId = 0;
+    for (const icon of selectedIcons) {
+      for (let j = 0; j < diff.cardsPerIcon; j++) {
+        cards.push({
+          id: cardId++,
+          type: icon,
+          x: 0,
+          y: 0,
+          z: 0,
+          state: 'visible'
+        });
+      }
+    }
+
+    // 随机分配坐标和层级 - 根据实际棋盘尺寸动态计算
+    const boardEl = document.getElementById('sp-match3-board');
+    const isMobile = window.innerWidth <= 768;
+    const cardWidth = isMobile ? 38 : 44;
+    const cardHeight = isMobile ? 38 : 44;
+    const boardWidth = boardEl ? boardEl.clientWidth : (isMobile ? 280 : 340);
+    const boardHeight = boardEl ? boardEl.clientHeight : (isMobile ? 300 : 360);
+    const padding = 8;
+    const usableW = boardWidth - padding * 2 - cardWidth;
+    const usableH = boardHeight - padding * 2 - cardHeight;
+
+    cards.forEach(card => {
+      card.z = Math.floor(Math.random() * diff.layers);
+      card.x = padding + Math.floor(Math.random() * usableW);
+      card.y = padding + Math.floor(Math.random() * usableH);
+    });
+
+    // 按层级排序（低层在前）
+    cards.sort((a, b) => a.z - b.z);
+
+    match3State.cards = cards;
+    match3State.totalCards = cards.length;
+    match3State.slots = [];
+    match3State.maxSlots = MATCH3_BASE_SLOTS;
+    match3State.expandUsed = 0;
+    match3State.sweepUsed = 0;
+    match3State.shuffleUsed = 0;
+    match3State.eliminatedGroups = 0;
+    match3State.active = true;
+
+    // 计算遮挡关系
+    match3UpdateBlockState();
+  }
+
+  // ===== 遮挡判定 =====
+  function match3UpdateBlockState() {
+    const cards = match3State.cards;
+    const cardW = 44;
+    const cardH = 44;
+    const overlapThreshold = 20; // 重叠判定阈值
+
+    cards.forEach(card => {
+      if (card.state === 'collected' || card.state === 'eliminated') return;
+
+      let blocked = false;
+      for (const other of cards) {
+        if (other.id === card.id) continue;
+        if (other.state === 'collected' || other.state === 'eliminated') continue;
+        if (other.z <= card.z) continue; // 只有上层才能遮挡下层
+
+        // 检查 x,y 投影是否重叠
+        const overlapX = Math.abs(other.x - card.x) < (cardW - overlapThreshold);
+        const overlapY = Math.abs(other.y - card.y) < (cardH - overlapThreshold);
+        if (overlapX && overlapY) {
+          blocked = true;
+          break;
+        }
+      }
+
+      card.state = blocked ? 'blocked' : 'visible';
+    });
+  }
+
+  // ===== 点击收集牌 =====
+  function match3CollectCard(cardId) {
+    if (!match3State.active) return;
+
+    const card = match3State.cards.find(c => c.id === cardId);
+    if (!card || card.state !== 'visible') return;
+
+    // 检查暂存栏是否满
+    if (match3State.slots.length >= match3State.maxSlots) {
+      match3ShowNotice('暂存栏已满！使用道具或消除三个相同图案');
+      return;
+    }
+
+    // 收集到暂存栏
+    card.state = 'collected';
+    match3State.slots.push({ type: card.type, id: card.id });
+
+    // 暂存栏排序（相同类型聚集）
+    match3State.slots.sort((a, b) => a.type.localeCompare(b.type));
+
+    // 检查三消
+    match3CheckEliminate();
+
+    // 更新遮挡
+    match3UpdateBlockState();
+
+    // 检查失败
+    if (match3State.slots.length >= match3State.maxSlots) {
+      // 检查是否有可消除的
+      const typeCount = {};
+      match3State.slots.forEach(s => { typeCount[s.type] = (typeCount[s.type] || 0) + 1; });
+      const hasMatch = Object.values(typeCount).some(c => c >= MATCH3_MATCH_COUNT);
+      if (!hasMatch) {
+        match3State.active = false;
+        setTimeout(() => match3GameOver(false), 300);
+      }
+    }
+
+    // 检查胜利
+    const remaining = match3State.cards.filter(c => c.state !== 'collected' && c.state !== 'eliminated');
+    if (remaining.length === 0 && match3State.slots.length === 0) {
+      match3State.active = false;
+      setTimeout(() => match3GameOver(true), 500);
+    }
+
+    match3Render();
+  }
+
+  // ===== 三消检查 =====
+  function match3CheckEliminate() {
+    let eliminated = false;
+
+    while (true) {
+      // 查找连续三个相同
+      let foundIdx = -1;
+      for (let i = 0; i <= match3State.slots.length - MATCH3_MATCH_COUNT; i++) {
+        const type = match3State.slots[i].type;
+        let count = 1;
+        for (let j = i + 1; j < match3State.slots.length && match3State.slots[j].type === type; j++) {
+          count++;
+        }
+        if (count >= MATCH3_MATCH_COUNT) {
+          foundIdx = i;
+          break;
+        }
+      }
+
+      if (foundIdx === -1) break;
+
+      // 消除
+      const removed = match3State.slots.splice(foundIdx, MATCH3_MATCH_COUNT);
+      removed.forEach(s => {
+        const card = match3State.cards.find(c => c.id === s.id);
+        if (card) card.state = 'eliminated';
+      });
+      match3State.eliminatedGroups++;
+      eliminated = true;
+    }
+
+    if (eliminated) {
+      // 检查胜利
+      const remaining = match3State.cards.filter(c => c.state !== 'collected' && c.state !== 'eliminated');
+      if (remaining.length === 0 && match3State.slots.length === 0) {
+        match3State.active = false;
+        setTimeout(() => match3GameOver(true), 500);
+      }
+    }
+  }
+
+  // ===== 道具使用 =====
+  function match3UseProp(propKey) {
+    if (!match3State.active) return;
+
+    const prop = MATCH3_PROPS[propKey];
+    if (!prop) return;
+
+    // 检查每局次数限制
+    if (propKey === 'expand' && match3State.expandUsed >= prop.perGameLimit) {
+      match3ShowNotice('本局扩充次数已用完！');
+      return;
+    }
+    if (propKey === 'sweep' && match3State.sweepUsed >= prop.perGameLimit) {
+      match3ShowNotice('本局扫帚次数已用完！');
+      return;
+    }
+    if (propKey === 'shuffle' && match3State.shuffleUsed >= prop.perGameLimit) {
+      match3ShowNotice('本局风暴次数已用完！');
+      return;
+    }
+
+    // 检查每日购买限制
+    const today = new Date().toISOString().slice(0, 10);
+    if (!state.match3ItemPurchaseLog) state.match3ItemPurchaseLog = {};
+    if (!state.match3ItemPurchaseLog[today]) state.match3ItemPurchaseLog[today] = {};
+    const bought = state.match3ItemPurchaseLog[today][propKey] || 0;
+    if (bought >= prop.dailyLimit) {
+      match3ShowNotice(`${prop.name} 今日购买次数已用完！`);
+      return;
+    }
+
+    // 检查金币
+    if (state.gameGold < prop.price) {
+      match3ShowNotice(`金币不足！需要 ${prop.price} 🪙`);
+      return;
+    }
+
+    // 扣金币
+    state.gameGold -= prop.price;
+    state.match3ItemPurchaseLog[today][propKey] = bought + 1;
+
+    // 执行效果
+    switch (propKey) {
+      case 'expand':
+        if (match3State.maxSlots >= MATCH3_MAX_SLOTS) {
+          match3ShowNotice('暂存栏已达上限（10格）！');
+          state.gameGold += prop.price; // 退款
+          state.match3ItemPurchaseLog[today][propKey]--;
+          return;
+        }
+        match3State.maxSlots++;
+        match3State.expandUsed++;
+        match3ShowNotice(`暂存栏扩充为 ${match3State.maxSlots} 格！`);
+        break;
+
+      case 'sweep':
+        const visibleCards = match3State.cards.filter(c => c.state === 'visible');
+        const typeMap = {};
+        visibleCards.forEach(c => {
+          if (!typeMap[c.type]) typeMap[c.type] = [];
+          typeMap[c.type].push(c);
+        });
+        // 找到有3个及以上的类型
+        const sweepTypes = Object.keys(typeMap).filter(t => typeMap[t].length >= 3);
+        if (sweepTypes.length === 0) {
+          match3ShowNotice('场景中没有3个相同且可见的图案！');
+          state.gameGold += prop.price; // 退款
+          state.match3ItemPurchaseLog[today][propKey]--;
+          return;
+        }
+        const chosenType = sweepTypes[Math.floor(Math.random() * sweepTypes.length)];
+        const toSweep = typeMap[chosenType].slice(0, 3);
+        toSweep.forEach(c => { c.state = 'eliminated'; });
+        match3State.sweepUsed++;
+        match3State.eliminatedGroups++;
+        match3UpdateBlockState();
+        match3ShowNotice(`🧹 消除了 3 个 ${chosenType}！`);
+        // 检查胜利
+        const remaining = match3State.cards.filter(c => c.state !== 'collected' && c.state !== 'eliminated');
+        if (remaining.length === 0 && match3State.slots.length === 0) {
+          match3State.active = false;
+          setTimeout(() => match3GameOver(true), 500);
+        }
+        break;
+
+      case 'shuffle':
+        const activeCards = match3State.cards.filter(c => c.state === 'visible' || c.state === 'blocked');
+        if (activeCards.length < 2) {
+          match3ShowNotice('场景中牌太少，无法打乱！');
+          state.gameGold += prop.price;
+          state.match3ItemPurchaseLog[today][propKey]--;
+          return;
+        }
+        // 收集所有活跃牌的类型
+        const types = activeCards.map(c => c.type);
+        // Fisher-Yates 洗牌
+        for (let i = types.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [types[i], types[j]] = [types[j], types[i]];
+        }
+        // 重新分配类型（坐标不变）
+        activeCards.forEach((c, i) => { c.type = types[i]; });
+        match3State.shuffleUsed++;
+        match3UpdateBlockState();
+        match3ShowNotice('🌀 图案已打乱重组！');
+        break;
+    }
+
+    saveDataDebounced('消消看使用道具');
+    match3Render();
+  }
+
+  // ===== 游戏结算 =====
+  function match3GameOver(victory) {
+    match3State.active = false;
+
+    // 计算金币奖励
+    const baseReward = match3State.eliminatedGroups * (2 + Math.floor(Math.random() * 4)); // 每组2~5金币
+    let bonusReward = 0;
+    let bonusMsg = '';
+
+    if (victory) {
+      bonusReward = 100 + Math.floor(Math.random() * 101); // 100~200
+      bonusMsg = `\n🏆 通关奖励: +${bonusReward} 🪙`;
+      // 增加桌宠属性
+      state.energy = Math.min(100, state.energy + 10);
+      state.hunger = Math.min(100, state.hunger + 5);
+      updateMood();
+      updateStatusBars();
+    }
+
+    const totalGold = baseReward + bonusReward;
+    state.gameGold += totalGold;
+    saveDataImmediate('消消看结算');
+
+    // 弹出结算面板
+    const resultOverlay = document.createElement('div');
+    resultOverlay.id = 'sp-match3-result-overlay';
+    resultOverlay.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:10;border-radius:16px;';
+    resultOverlay.innerHTML = `
+      <div class="sp-match3-result-box">
+        <div class="sp-match3-result-title">${victory ? '🎉 恭喜通关！' : '😿 游戏结束'}</div>
+        <div class="sp-match3-result-info">
+          <div>难度: ${match3State.difficulty?.name || '未知'}</div>
+          <div>消除组数: ${match3State.eliminatedGroups}</div>
+          <div>消除奖励: +${baseReward} 🪙${bonusMsg}</div>
+          <div style="font-weight:700;margin-top:6px;">总获得: +${totalGold} 🪙</div>
+        </div>
+        <div class="sp-match3-result-actions">
+          <button class="sp-match3-result-btn" id="sp-match3-restart">🔄 再来一局</button>
+          <button class="sp-match3-result-btn sp-match3-result-close" id="sp-match3-quit">❌ 退出</button>
+        </div>
+      </div>
+    `;
+
+    const panel = document.getElementById('sp-match3-panel');
+    if (panel) {
+      panel.style.position = 'relative';
+      panel.appendChild(resultOverlay);
+    }
+
+    document.getElementById('sp-match3-restart')?.addEventListener('click', () => {
+      resultOverlay.remove();
+      match3GenerateLevel();
+      match3Render();
+    });
+    document.getElementById('sp-match3-quit')?.addEventListener('click', () => {
+      resultOverlay.remove();
+      toggleMatch3Game();
+    });
+  }
+
+  // ===== 消消看通知 =====
+  function match3ShowNotice(text) {
+    const notice = document.getElementById('sp-match3-notice');
+    if (!notice) return;
+    notice.textContent = text;
+    notice.classList.add('visible');
+    clearTimeout(notice._timer);
+    notice._timer = setTimeout(() => notice.classList.remove('visible'), 3000);
+  }
+
+  // ===== 渲染消消看面板 =====
+  function match3Render() {
+    const boardEl = document.getElementById('sp-match3-board');
+    const slotsEl = document.getElementById('sp-match3-slots');
+    const infoEl = document.getElementById('sp-match3-info');
+    if (!boardEl || !slotsEl) return;
+
+    // 渲染棋盘（多层堆叠）
+    boardEl.innerHTML = '';
+    const sortedCards = [...match3State.cards]
+      .filter(c => c.state === 'visible' || c.state === 'blocked')
+      .sort((a, b) => a.z - b.z || a.y - b.y || a.x - b.x);
+
+    sortedCards.forEach(card => {
+      const div = document.createElement('div');
+      div.className = `sp-match3-card ${card.state === 'blocked' ? 'sp-match3-blocked' : 'sp-match3-clickable'}`;
+      div.dataset.cardId = card.id;
+      div.style.left = card.x + 'px';
+      div.style.top = card.y + 'px';
+      div.style.zIndex = card.z + 1;
+      // 检查是否有自定义图片
+      const iconIdx = MATCH3_DEFAULT_ICONS.indexOf(card.type);
+      const customImg = iconIdx >= 0 ? state.gameCustomImages?.[`match3_icon_${iconIdx}`] : null;
+      if (customImg) {
+        div.innerHTML = `<img src="${customImg}" style="width:28px;height:28px;object-fit:contain;border-radius:4px;pointer-events:none;" />`;
+      } else {
+        div.textContent = card.type;
+      }
+
+      if (card.state === 'visible') {
+        div.addEventListener('click', () => match3CollectCard(card.id));
+      }
+
+      boardEl.appendChild(div);
+    });
+
+    // 渲染暂存栏
+    slotsEl.innerHTML = '';
+    for (let i = 0; i < match3State.maxSlots; i++) {
+      const slot = document.createElement('div');
+      slot.className = 'sp-match3-slot';
+      if (match3State.slots[i]) {
+        slot.classList.add('sp-match3-slot-filled');
+        const slotType = match3State.slots[i].type;
+        const slotIconIdx = MATCH3_DEFAULT_ICONS.indexOf(slotType);
+        const slotCustomImg = slotIconIdx >= 0 ? state.gameCustomImages?.[`match3_icon_${slotIconIdx}`] : null;
+        if (slotCustomImg) {
+          slot.innerHTML = `<img src="${slotCustomImg}" style="width:24px;height:24px;object-fit:contain;border-radius:3px;pointer-events:none;" />`;
+        } else {
+          slot.textContent = slotType;
+        }
+      } else {
+        slot.classList.add('sp-match3-slot-empty');
+      }
+      slotsEl.appendChild(slot);
+    }
+
+    // 渲染信息
+    if (infoEl) {
+      const remaining = match3State.cards.filter(c => c.state !== 'collected' && c.state !== 'eliminated').length;
+      infoEl.innerHTML = `
+        <span>剩余: ${remaining}</span>
+        <span>已消: ${match3State.eliminatedGroups}组</span>
+        <span>难度: ${match3State.difficulty?.name || '-'}</span>
+      `;
+    }
+
+    // 渲染道具按钮状态
+    const expandBtn = document.getElementById('sp-match3-prop-expand');
+    const sweepBtn = document.getElementById('sp-match3-prop-sweep');
+    const shuffleBtn = document.getElementById('sp-match3-prop-shuffle');
+    if (expandBtn) expandBtn.querySelector('.sp-match3-prop-count').textContent = `${match3State.expandUsed}/${MATCH3_PROPS.expand.perGameLimit}`;
+    if (sweepBtn) sweepBtn.querySelector('.sp-match3-prop-count').textContent = `${match3State.sweepUsed}/${MATCH3_PROPS.sweep.perGameLimit}`;
+    if (shuffleBtn) shuffleBtn.querySelector('.sp-match3-prop-count').textContent = `${match3State.shuffleUsed}/${MATCH3_PROPS.shuffle.perGameLimit}`;
+
+    // 更新金币显示
+    const goldEl = document.getElementById('sp-match3-gold');
+    if (goldEl) goldEl.textContent = state.gameGold;
+  }
+
+  // ===== 消消看面板 =====
+  function match3RenderPanel() {
+    let panel = document.getElementById('sp-match3-panel');
+    if (panel) panel.remove();
+
+    panel = document.createElement('div');
+    panel.id = 'sp-match3-panel';
+    panel.innerHTML = `
+      <div id="sp-match3-header">
+        <span>🃏 消消看</span>
+        <div class="sp-match3-header-right">
+          <button id="sp-match3-minimize" title="缩小悬挂" style="background:none;border:none;font-size:14px;cursor:pointer;color:var(--sp-text-muted);padding:2px 6px;">─</button>
+          <button id="sp-match3-close" title="关闭">✕</button>
+        </div>
+      </div>
+      <div id="sp-match3-notice"></div>
+      <div style="display:flex;gap:4px;padding:6px 10px;background:rgba(255,255,255,0.03);border-bottom:1px solid var(--sp-border-light);align-items:center;">
+        <button class="sp-game-tab active" data-m3tab="play" id="sp-match3-tab-play">🎮 游戏</button>
+        <button class="sp-game-tab" data-m3tab="collection" id="sp-match3-tab-collection">📖 图鉴</button>
+        <span class="sp-match3-gold-display" style="margin-left:auto;">🪙 <span id="sp-match3-gold">${state.gameGold}</span></span>
+      </div>
+      <div id="sp-match3-body">
+        <div id="sp-match3-tab-content-play">
+          <div id="sp-match3-info"></div>
+          <div id="sp-match3-board"></div>
+          <div id="sp-match3-slots-wrapper">
+            <div id="sp-match3-slots"></div>
+          </div>
+          <div id="sp-match3-props">
+            <button class="sp-match3-prop-btn" id="sp-match3-prop-expand" title="${MATCH3_PROPS.expand.desc}">
+              <span class="sp-match3-prop-icon">🪜</span>
+              <span class="sp-match3-prop-price">🪙${MATCH3_PROPS.expand.price}</span>
+              <span class="sp-match3-prop-count">0/${MATCH3_PROPS.expand.perGameLimit}</span>
+            </button>
+            <button class="sp-match3-prop-btn" id="sp-match3-prop-sweep" title="${MATCH3_PROPS.sweep.desc}">
+              <span class="sp-match3-prop-icon">🧹</span>
+              <span class="sp-match3-prop-price">🪙${MATCH3_PROPS.sweep.price}</span>
+              <span class="sp-match3-prop-count">0/${MATCH3_PROPS.sweep.perGameLimit}</span>
+            </button>
+            <button class="sp-match3-prop-btn" id="sp-match3-prop-shuffle" title="${MATCH3_PROPS.shuffle.desc}">
+              <span class="sp-match3-prop-icon">🌀</span>
+              <span class="sp-match3-prop-price">🪙${MATCH3_PROPS.shuffle.price}</span>
+              <span class="sp-match3-prop-count">0/${MATCH3_PROPS.shuffle.perGameLimit}</span>
+            </button>
+          </div>
+          <div style="height:8px;"></div>
+          <div id="sp-match3-controls">
+            <button class="sp-match3-ctrl-btn" id="sp-match3-restart-btn">🔄 重开</button>
+            <button class="sp-match3-ctrl-btn sp-match3-ctrl-quit" id="sp-match3-end-btn">❌ 结束</button>
+          </div>
+        </div>
+        <div id="sp-match3-tab-content-collection" style="display:none;">
+          <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">📖 图案图鉴 <span style="font-size:10px;color:var(--sp-text-muted);font-weight:400;">（点击 📷 上传自定义图片）</span></div>
+          <div id="sp-match3-collection-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;"></div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(panel);
+
+    // 最小化
+    document.getElementById('sp-match3-minimize').addEventListener('click', () => {
+      const m3Panel = document.getElementById('sp-match3-panel');
+      const minBtn = document.getElementById('sp-match3-minimize');
+      if (!m3Panel || !minBtn) return;
+      if (m3Panel.classList.contains('sp-match3-minimized')) {
+        m3Panel.classList.remove('sp-match3-minimized');
+        minBtn.textContent = '─';
+        minBtn.title = '缩小悬挂';
+      } else {
+        m3Panel.classList.add('sp-match3-minimized');
+        minBtn.textContent = '□';
+        minBtn.title = '恢复窗口';
+      }
+    });
+
+    // 关闭按钮
+    document.getElementById('sp-match3-close').addEventListener('click', () => toggleMatch3Game());
+
+    // 道具按钮
+    document.getElementById('sp-match3-prop-expand').addEventListener('click', () => match3UseProp('expand'));
+    document.getElementById('sp-match3-prop-sweep').addEventListener('click', () => match3UseProp('sweep'));
+    document.getElementById('sp-match3-prop-shuffle').addEventListener('click', () => match3UseProp('shuffle'));
+
+    // 重开按钮
+    document.getElementById('sp-match3-restart-btn').addEventListener('click', () => {
+      if (!confirm('重开本局？当前进度清零，重新发牌。')) return;
+      match3GenerateLevel();
+      match3Render();
+      match3ShowNotice('🔄 新的一局开始了！');
+    });
+
+    // 结束按钮
+    document.getElementById('sp-match3-end-btn').addEventListener('click', () => {
+      if (!confirm('确定结束游戏？将按当前已消除组数结算金币。')) return;
+      match3GameOver(false);
+    });
+
+    // 标签页切换
+    document.getElementById('sp-match3-tab-play').addEventListener('click', () => {
+      document.getElementById('sp-match3-tab-play').classList.add('active');
+      document.getElementById('sp-match3-tab-collection').classList.remove('active');
+      document.getElementById('sp-match3-tab-content-play').style.display = '';
+      document.getElementById('sp-match3-tab-content-collection').style.display = 'none';
+    });
+    document.getElementById('sp-match3-tab-collection').addEventListener('click', () => {
+      document.getElementById('sp-match3-tab-collection').classList.add('active');
+      document.getElementById('sp-match3-tab-play').classList.remove('active');
+      document.getElementById('sp-match3-tab-content-play').style.display = 'none';
+      document.getElementById('sp-match3-tab-content-collection').style.display = '';
+      match3RenderCollection();
+    });
+
+    // 面板拖拽
+    match3BindPanelDrag();
+  }
+
+  // ===== 消消看图鉴渲染 =====
+  function match3RenderCollection() {
+    const grid = document.getElementById('sp-match3-collection-grid');
+    if (!grid) return;
+
+    if (!state.gameCustomImages) state.gameCustomImages = {};
+
+    grid.innerHTML = MATCH3_DEFAULT_ICONS.map((icon, idx) => {
+      const key = `match3_icon_${idx}`;
+      const custom = state.gameCustomImages[key];
+      const display = custom
+        ? `<img src="${custom}" style="width:28px;height:28px;object-fit:contain;border-radius:4px;" />`
+        : `<span style="font-size:22px;">${icon}</span>`;
+      return `
+        <div style="aspect-ratio:1;border-radius:8px;border:2px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;position:relative;cursor:pointer;overflow:hidden;transition:all 0.15s;" data-match3-icon-idx="${idx}">
+          ${display}
+          <span style="font-size:8px;color:var(--sp-text-muted);">${icon}</span>
+          <div class="sp-match3-icon-upload" data-idx="${idx}" style="position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;font-size:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity 0.2s;">📷</div>
+        </div>
+      `;
+    }).join('');
+
+    // hover 显示上传按钮
+    grid.querySelectorAll('[data-match3-icon-idx]').forEach(item => {
+      item.addEventListener('mouseenter', () => {
+        const btn = item.querySelector('.sp-match3-icon-upload');
+        if (btn) btn.style.opacity = '1';
+      });
+      item.addEventListener('mouseleave', () => {
+        const btn = item.querySelector('.sp-match3-icon-upload');
+        if (btn) btn.style.opacity = '0';
+      });
+    });
+
+    // 上传按钮
+    grid.querySelectorAll('.sp-match3-icon-upload').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.dataset.idx);
+        match3PromptIconUpload(idx);
+      });
+    });
+  }
+
+  // ===== 消消看图案上传 =====
+  function match3PromptIconUpload(idx) {
+    const key = `match3_icon_${idx}`;
+    const choice = confirm(`设置图案 ${MATCH3_DEFAULT_ICONS[idx]} 的自定义图片\n\n点「确定」→ 输入图片链接\n点「取消」→ 选择本地文件上传`);
+
+    if (choice) {
+      const url = prompt('输入图片链接：');
+      if (url && url.trim().startsWith('http')) {
+        if (!state.gameCustomImages) state.gameCustomImages = {};
+        state.gameCustomImages[key] = url.trim();
+        saveDataImmediate('消消看图案链接');
+        match3RenderCollection();
+        match3ShowNotice('图案图片已设置！');
+      }
+    } else {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) {
+          match3ShowNotice('图片不能超过2MB');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          const compressed = await compressImage(ev.target.result, 80, 0.7);
+          if (!state.gameCustomImages) state.gameCustomImages = {};
+          state.gameCustomImages[key] = compressed;
+          saveDataImmediate('消消看图案上传');
+          match3RenderCollection();
+          match3ShowNotice('图案图片已设置！');
+        };
+        reader.readAsDataURL(file);
+      };
+      input.click();
+    }
+  }
+
+  // ===== 面板拖拽 =====
+  function match3BindPanelDrag() {
+    const header = document.getElementById('sp-match3-header');
+    const panel = document.getElementById('sp-match3-panel');
+    if (!header || !panel) return;
+
+    let dragging = false, offX = 0, offY = 0;
+
+    const down = (e) => {
+      if (e.target.closest('#sp-match3-close')) return;
+      dragging = true;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const rect = panel.getBoundingClientRect();
+      offX = clientX - rect.left;
+      offY = clientY - rect.top;
+    };
+    const move = (e) => {
+      if (!dragging) return;
+      if (e.cancelable) e.preventDefault();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      let x = clientX - offX;
+      let y = clientY - offY;
+      x = Math.max(0, Math.min(window.innerWidth - panel.offsetWidth, x));
+      y = Math.max(0, Math.min(window.innerHeight - panel.offsetHeight, y));
+      panel.style.left = x + 'px';
+      panel.style.top = y + 'px';
+    };
+    const up = () => { dragging = false; };
+
+    header.addEventListener('mousedown', down);
+    header.addEventListener('touchstart', down, { passive: true });
+    document.addEventListener('mousemove', move);
+    document.addEventListener('touchmove', move, { passive: false });
+    document.addEventListener('mouseup', up);
+    document.addEventListener('touchend', up);
+  }
+
+  // ===== 开关消消看面板 =====
+  function toggleMatch3Game() {
+    isMatch3Open = !isMatch3Open;
+    let panel = document.getElementById('sp-match3-panel');
+
+    if (isMatch3Open) {
+      if (!panel) {
+        match3RenderPanel();
+        panel = document.getElementById('sp-match3-panel');
+      }
+
+      panel.classList.add('visible');
+
+      // 居中
+      const w = Math.min(380, window.innerWidth - 20);
+      panel.style.width = w + 'px';
+      requestAnimationFrame(() => {
+        const h = panel.offsetHeight;
+        const maxTop = window.innerHeight - h - 20;
+        const centerTop = Math.floor((window.innerHeight - h) / 2);
+        panel.style.left = Math.floor((window.innerWidth - w) / 2) + 'px';
+        panel.style.top = Math.max(10, Math.min(centerTop, maxTop)) + 'px';
+      });
+
+      // 如果没有活跃游戏，开新局
+      if (!match3State.active) {
+        match3GenerateLevel();
+      }
+      match3Render();
+    } else {
+      if (panel) panel.classList.remove('visible');
+    }
+  }
 
 })();
 
