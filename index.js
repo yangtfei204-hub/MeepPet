@@ -189,6 +189,7 @@
     maxTokens: 300,
     enableStreaming: false,   // 是否启用流式输出
     enableTimeAwareness: false, // 是否启用时间感知
+    enableVision: false,        // 是否启用多模态图片识别
 
     // 角色卡 & 世界书
     characterId: '',
@@ -271,6 +272,9 @@
      settings: ''
    }, 
 
+    // 表情包贴纸
+    emojiStickers: [],            // [{image: 'base64...', name: ''}]
+
     // 在 DEFAULT_SETTINGS 里加入这段（放在 offlineDecayRate 前面就行）
 
     // 反应语言
@@ -308,6 +312,7 @@
     lastBathed: 0,
     lastSlept: 0,
     petChatArchive: [],       // 已总结归档的聊天记录
+    isOfflineMode: false,
   };
 
   // ============================================================
@@ -329,6 +334,8 @@
   let spriteStateLock = null;  // 当前锁定的状态名
   let spriteStateLockTimer = null; // 对应的恢复定时器
   let isOfflineMode = false;       // 线下模式开关
+  let selectedEmoji = null;        // 当前选中的表情包 (base64 或 URL)
+  let emojiStickers = [];          // 用户上传的表情包列表
 
   // ============================================================
   // 主题系统
@@ -498,6 +505,8 @@
         settings.reactions = { ...DEFAULT_SETTINGS.reactions, ...(parsed.settings?.reactions || {}) };
         settings.moodImages = { ...DEFAULT_SETTINGS.moodImages, ...(parsed.settings?.moodImages || {}) };
         state = { ...DEFAULT_STATE, ...parsed.state };
+        emojiStickers = settings.emojiStickers || [];
+        isOfflineMode = state.isOfflineMode || false;
       } catch (e) {
         settings = { ...DEFAULT_SETTINGS };
         state = { ...DEFAULT_STATE };
@@ -505,6 +514,8 @@
     } else {
       settings = { ...DEFAULT_SETTINGS };
       state = { ...DEFAULT_STATE };
+      emojiStickers = [];
+      isOfflineMode = false;
     }
   }
 
@@ -783,8 +794,18 @@
       <div id="silly-pet-chat-messages"></div>
       <div id="sp-chat-token-bar" style="padding:2px 12px;font-size:10px;color:#666;text-align:right;border-top:1px solid rgba(255,255,255,0.05);"><span id="sp-token-display">~0 tokens</span></div>
       <div id="silly-pet-chat-input">
-        <input type="text" placeholder="跟咪噗说点什么..." id="sp-chat-input-field" />
-        <button id="sp-chat-send-btn">➤</button>
+        <div id="sp-emoji-preview-bar">
+          <span>📎 表情:</span>
+          <img id="sp-emoji-preview-img" src="" alt="" />
+          <span class="sp-emoji-preview-remove" id="sp-emoji-preview-remove" title="移除">✕</span>
+        </div>
+        <div id="sp-emoji-panel"></div>
+        <div id="silly-pet-chat-input-row">
+          <button id="sp-chat-emoji-toggle" title="表情包">😺</button>
+          <input type="text" placeholder="跟咪噗说点什么..." id="sp-chat-input-field" />
+          <button id="sp-chat-send-msg-btn" title="发送消息（不生成回复）">📨</button>
+          <button id="sp-chat-generate-btn" title="生成回复">➤</button>
+        </div>
       </div>
     `;
     document.body.appendChild(chat);
@@ -812,6 +833,25 @@
       </div>
     `;
     document.body.appendChild(modal);
+    // 表情包管理弹窗
+    const emojiModal = document.createElement('div');
+    emojiModal.id = 'sp-emoji-modal-overlay';
+    emojiModal.innerHTML = `
+      <div id="sp-emoji-modal">
+        <h4 id="sp-emoji-modal-title">✏️ 编辑表情包</h4>
+        <div class="sp-emoji-modal-preview">
+          <img id="sp-emoji-modal-img" src="" alt="" />
+          <span id="sp-emoji-modal-name-display" style="font-size:12px;color:#999;"></span>
+        </div>
+        <input type="text" id="sp-emoji-modal-input" placeholder="给表情包起个名字（如：委屈脸）" />
+        <div class="sp-emoji-modal-actions">
+          <button class="sp-emoji-modal-delete" id="sp-emoji-modal-delete">🗑️ 删除</button>
+          <button id="sp-emoji-modal-cancel">取消</button>
+          <button class="sp-emoji-modal-confirm" id="sp-emoji-modal-save">✓ 保存</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(emojiModal);
 
     updateStatusBars();
     updateSpriteImage();
@@ -1533,7 +1573,268 @@ function sleepPet() {
     toggleMenu();
   }
 
-    // ============================================================
+  function showEmojiEditModal(idx) {
+    const overlay = document.getElementById('sp-emoji-modal-overlay');
+    const img = document.getElementById('sp-emoji-modal-img');
+    const input = document.getElementById('sp-emoji-modal-input');
+    const nameDisplay = document.getElementById('sp-emoji-modal-name-display');
+    if (!overlay || !img || !input) return;
+
+    const sticker = emojiStickers[idx];
+    if (!sticker) return;
+
+    img.src = sticker.image;
+    input.value = sticker.name || '';
+    nameDisplay.textContent = sticker.name ? `当前: ${sticker.name}` : '未命名';
+    overlay.classList.add('visible');
+
+    // 手动居中定位（兼容移动端）
+    const modal = document.getElementById('sp-emoji-modal');
+    if (modal) {
+      requestAnimationFrame(() => {
+        const modalH = modal.offsetHeight || 200;
+        const modalW = modal.offsetWidth || 280;
+        modal.style.top = Math.max(20, Math.floor((window.innerHeight - modalH) / 2)) + 'px';
+        modal.style.left = Math.floor((window.innerWidth - modalW) / 2) + 'px';
+        modal.style.transform = 'none';
+      });
+    }
+
+    // 保存
+    document.getElementById('sp-emoji-modal-save').onclick = () => {
+      emojiStickers[idx].name = input.value.trim();
+      settings.emojiStickers = emojiStickers;
+      saveData();
+      overlay.classList.remove('visible');
+      renderEmojiPanel();
+      if (input.value.trim()) showBubble(`表情已命名为「${input.value.trim()}」`, 2000);
+    };
+
+    // 删除
+    document.getElementById('sp-emoji-modal-delete').onclick = () => {
+      if (selectedEmoji === sticker.image) {
+        selectedEmoji = null;
+        updateEmojiPreviewBar();
+      }
+      emojiStickers.splice(idx, 1);
+      settings.emojiStickers = emojiStickers;
+      saveData();
+      overlay.classList.remove('visible');
+      renderEmojiPanel();
+      showBubble('表情包已删除', 2000);
+    };
+
+    // 取消
+    document.getElementById('sp-emoji-modal-cancel').onclick = () => {
+      overlay.classList.remove('visible');
+    };
+
+    // 点遮罩关闭
+    overlay.onclick = (e) => {
+      if (e.target === overlay) overlay.classList.remove('visible');
+    };
+
+    // 聚焦输入框，并监听键盘弹出后重新定位
+    setTimeout(() => {
+      input.focus();
+      // 移动端键盘弹出时重新定位弹窗到可见区域顶部
+      if (window.visualViewport) {
+        const reposition = () => {
+          const modal = document.getElementById('sp-emoji-modal');
+          if (!modal || !overlay.classList.contains('visible')) {
+            window.visualViewport.removeEventListener('resize', reposition);
+            return;
+          }
+          const vh = window.visualViewport.height;
+          const modalH = modal.offsetHeight || 200;
+          modal.style.top = Math.max(10, Math.floor((vh - modalH) / 2) + window.visualViewport.offsetTop) + 'px';
+        };
+        window.visualViewport.addEventListener('resize', reposition);
+        // 弹窗关闭时清理
+        const origClose = overlay.onclick;
+        const cleanup = () => {
+          window.visualViewport.removeEventListener('resize', reposition);
+        };
+        document.getElementById('sp-emoji-modal-save').addEventListener('click', cleanup, { once: true });
+        document.getElementById('sp-emoji-modal-delete').addEventListener('click', cleanup, { once: true });
+        document.getElementById('sp-emoji-modal-cancel').addEventListener('click', cleanup, { once: true });
+      }
+    }, 100);
+
+  }
+
+  // ============================================================
+  // 表情包系统
+  // ============================================================
+  function renderEmojiPanel() {
+    const panel = document.getElementById('sp-emoji-panel');
+    if (!panel) return;
+
+    let html = '';
+    emojiStickers.forEach((sticker, idx) => {
+      const selectedClass = (selectedEmoji && selectedEmoji === sticker.image) ? ' selected' : '';
+      html += `<div class="sp-emoji-item${selectedClass}" data-emoji-idx="${idx}" title="${sticker.name || '表情' + (idx + 1)}"><img src="${sticker.image}" alt="" /></div>`;
+    });
+    html += `<div class="sp-emoji-add-btn" id="sp-emoji-add-btn" title="添加表情包">＋</div>`;
+    html += `<input type="file" id="sp-emoji-file-input" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none;" />`;
+    panel.innerHTML = html;
+
+    // 绑定点击选中
+    panel.querySelectorAll('.sp-emoji-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const idx = parseInt(item.dataset.emojiIdx);
+        const sticker = emojiStickers[idx];
+        if (!sticker) return;
+
+        // 如果已经选中同一个，取消选中
+        if (selectedEmoji === sticker.image) {
+          selectedEmoji = null;
+          item.classList.remove('selected');
+          updateEmojiPreviewBar();
+          return;
+        }
+
+        // 取消其他选中
+        panel.querySelectorAll('.sp-emoji-item').forEach(el => el.classList.remove('selected'));
+        item.classList.add('selected');
+        selectedEmoji = sticker.image;
+        updateEmojiPreviewBar();
+      });
+
+      // 长按/右键 → 打开编辑弹窗
+      item.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const idx = parseInt(item.dataset.emojiIdx);
+        showEmojiEditModal(idx);
+      });
+
+    });
+
+    // 添加按钮
+    const addBtn = document.getElementById('sp-emoji-add-btn');
+    const fileInput = document.getElementById('sp-emoji-file-input');
+    if (addBtn && fileInput) {
+      addBtn.onclick = () => fileInput.click();
+      fileInput.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) {
+          showBubble('表情包图片不能超过2MB哦', 3000);
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          const compressed = await compressImage(ev.target.result, 120, 0.8);
+          emojiStickers.push({ image: compressed, name: file.name.replace(/\.[^.]+$/, '') });
+          settings.emojiStickers = emojiStickers;
+          saveData();
+          renderEmojiPanel();
+          showBubble('表情包添加成功！', 2000);
+        };
+        reader.readAsDataURL(file);
+        fileInput.value = '';
+      };
+    }
+  }
+
+  function updateEmojiPreviewBar() {
+    const bar = document.getElementById('sp-emoji-preview-bar');
+    const img = document.getElementById('sp-emoji-preview-img');
+    if (!bar || !img) return;
+
+    if (selectedEmoji) {
+      img.src = selectedEmoji;
+      bar.classList.add('visible');
+    } else {
+      bar.classList.remove('visible');
+      img.src = '';
+    }
+  }
+
+  function sendMessageOnly(text) {
+    const hasText = text && text.trim();
+    const hasEmoji = !!selectedEmoji;
+
+    if (!hasText && !hasEmoji) return;
+
+    // 如果有表情包，把它作为一条图片消息加入聊天记录
+if (hasEmoji) {
+    // 找到对应表情的名字
+    const sticker = emojiStickers.find(s => s.image === selectedEmoji);
+    const emojiName = sticker?.name || '表情包';
+    const emojiMsg = `[发送了表情包: ${emojiName}]`;
+    state.petChatHistory.push({ role: 'user', content: emojiMsg, image: selectedEmoji });
+      // 清除选中
+      selectedEmoji = null;
+      updateEmojiPreviewBar();
+      const panel = document.getElementById('sp-emoji-panel');
+      if (panel) panel.querySelectorAll('.sp-emoji-item').forEach(el => el.classList.remove('selected'));
+    }
+
+    // 如果有文字，也加入
+    if (hasText) {
+      state.petChatHistory.push({ role: 'user', content: text.trim() });
+    }
+
+    renderChatHistory();
+    saveData();
+
+    // 更新 token 估算
+    buildPromptMessages('chat', '').then(messages => {
+      const tokens = estimateMessagesTokens(messages);
+      updateTokenDisplay(tokens);
+    });
+  }
+
+  async function generateReply() {
+    if (state.petChatHistory.length === 0) {
+      showBubble('先发点消息再生成回复吧～', 2000);
+      return;
+    }
+
+    // 显示思考中
+    const msgContainer = document.getElementById('silly-pet-chat-messages');
+    const thinkingDiv = document.createElement('div');
+    thinkingDiv.className = 'sp-chat-msg pet sp-thinking';
+    thinkingDiv.innerHTML = '<span class="sp-thinking-dots">●●●</span>';
+    if (msgContainer) {
+      msgContainer.appendChild(thinkingDiv);
+      msgContainer.scrollTop = msgContainer.scrollHeight;
+    }
+
+    if (settings.spriteThink) {
+      setSpriteWithLock('think', settings.spriteThink, null);
+    }
+
+    try {
+      const reply = await callPetAPI('chat', '');
+
+      if (thinkingDiv.parentNode) thinkingDiv.remove();
+      if (spriteStateLock === 'think') clearSpriteLock();
+
+      if (reply) {
+        state.petChatHistory.push({ role: 'assistant', content: reply });
+        renderChatHistory();
+        showBubble(reply.slice(0, 50) + (reply.length > 50 ? '…' : ''), 4000);
+        saveData();
+
+        petUnsummarizedCount++;
+        if (settings.summaryTrigger === 'auto' && settings.autoSummaryRounds > 0 && petUnsummarizedCount >= settings.autoSummaryRounds) {
+          showBubble('💭 记忆有点满了，帮我整理一下？', 5000);
+          setTimeout(() => triggerSummary(), 3000);
+        }
+      } else {
+        showBubble('呜…没听到回应…检查一下API？', 4000);
+      }
+    } catch (err) {
+      console.error(`[${PLUGIN_NAME}] generateReply 异常:`, err);
+      if (thinkingDiv.parentNode) thinkingDiv.remove();
+      if (spriteStateLock === 'think') clearSpriteLock();
+      showBubble(`出错了: ${err.message}`, 4000);
+    }
+  }
+
+  // ============================================================
   // 桌宠聊天
   // ============================================================
 function toggleChat() {
@@ -1571,23 +1872,72 @@ function toggleChat() {
     });
 
     // 确保事件绑定（每次打开重新绑，防止丢失）
-    const sendBtn = document.getElementById('sp-chat-send-btn');
     const inputField = document.getElementById('sp-chat-input-field');
-    if (sendBtn) {
-      sendBtn.onclick = () => {
+    const sendMsgBtn = document.getElementById('sp-chat-send-msg-btn');
+    const generateBtn = document.getElementById('sp-chat-generate-btn');
+    const emojiToggle = document.getElementById('sp-chat-emoji-toggle');
+    const emojiPreviewRemove = document.getElementById('sp-emoji-preview-remove');
+
+    // 发送消息按钮（不生成回复）
+    if (sendMsgBtn) {
+      sendMsgBtn.onclick = () => {
         const val = inputField?.value || '';
-        if (val.trim()) { sendChatMessage(val); inputField.value = ''; }
+        sendMessageOnly(val);
+        if (inputField) inputField.value = '';
       };
     }
+
+    // 生成回复按钮
+    if (generateBtn) {
+      generateBtn.onclick = () => {
+        const val = inputField?.value || '';
+        // 如果输入框有内容或有表情，先发送
+        if (val.trim() || selectedEmoji) {
+          sendMessageOnly(val);
+          if (inputField) inputField.value = '';
+        }
+        // 然后生成回复
+        generateReply();
+      };
+    }
+
+    // Enter 键 = 发送消息（不生成回复）
     if (inputField) {
       inputField.onkeydown = (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
           const val = inputField.value;
-          if (val.trim()) { sendChatMessage(val); inputField.value = ''; }
+          sendMessageOnly(val);
+          inputField.value = '';
         }
       };
     }
+
+    // 表情包面板切换
+    if (emojiToggle) {
+      emojiToggle.onclick = () => {
+        const panel = document.getElementById('sp-emoji-panel');
+        if (panel) {
+          const isVisible = panel.classList.contains('visible');
+          panel.classList.toggle('visible', !isVisible);
+          if (!isVisible) renderEmojiPanel();
+        }
+      };
+    }
+
+    // 移除已选表情
+    if (emojiPreviewRemove) {
+      emojiPreviewRemove.onclick = () => {
+        selectedEmoji = null;
+        updateEmojiPreviewBar();
+        const panel = document.getElementById('sp-emoji-panel');
+        if (panel) panel.querySelectorAll('.sp-emoji-item').forEach(el => el.classList.remove('selected'));
+      };
+    }
+
+    // 渲染表情包面板
+    renderEmojiPanel();
+
     if (window.innerWidth > 768) {
       setTimeout(() => {
         inputField?.focus({ preventScroll: true });
@@ -1682,13 +2032,26 @@ function toggleChat() {
     state.petChatHistory.slice(-30).forEach(msg => {
       const div = document.createElement('div');
       div.className = `sp-chat-msg ${msg.role === 'assistant' ? 'pet' : 'user'}`;
-      // 转义 HTML 防 XSS，再把换行转成 <br>
-      const escaped = msg.content
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/\n/g, '<br>');
-      div.innerHTML = escaped;
+
+      // 如果有图片（表情包）
+      if (msg.image) {
+        div.innerHTML = `<img src="${msg.image}" style="max-width:60px;max-height:60px;border-radius:6px;display:block;margin-bottom:4px;" alt="表情" />`;
+        if (msg.content && msg.content !== '[表情包]') {
+          const escaped = msg.content
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/\n/g, '<br>');
+          div.innerHTML += `<span>${escaped}</span>`;
+        }
+      } else {
+        const escaped = msg.content
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/\n/g, '<br>');
+        div.innerHTML = escaped;
+      }
       container.appendChild(div);
     });
     container.scrollTop = container.scrollHeight;
@@ -2068,7 +2431,18 @@ function toggleChat() {
       }
     } else if (mode === 'chat') {
       state.petChatHistory.slice(-(settings.petChatRounds || 20)).forEach(msg => {
-        messages.push({ role: msg.role, content: msg.content });
+        if (msg.image && settings.enableVision) {
+          // 多模态格式：图片 + 文字
+          messages.push({
+            role: msg.role,
+            content: [
+              { type: 'image_url', image_url: { url: msg.image, detail: 'low' } },
+              { type: 'text', text: msg.content || '（发送了一张表情包）' }
+            ]
+          });
+        } else {
+          messages.push({ role: msg.role, content: msg.content });
+        }
       });
     } else if (mode === 'summary') {
       messages.push({ role: 'user', content: userMessage });
@@ -2621,6 +2995,7 @@ async function refreshWorldPreview() {
           <div class="sp-tab" data-tab="display">🎨 外观</div>
           <div class="sp-tab" data-tab="memory">🧠 记忆</div>
           <div class="sp-tab" data-tab="data">💾 数据</div>
+          <div class="sp-tab" data-tab="guide">📖 使用说明</div>
         </div>
         <div class="sp-tab-panels">
 
@@ -2656,6 +3031,7 @@ async function refreshWorldPreview() {
               <label>最大 Tokens</label>
               <input type="number" id="sp-max-tokens" value="${settings.maxTokens}" min="50" max="30000" />
               <div class="sp-row"><label style="margin:0;"><input type="checkbox" id="sp-enable-streaming" ${settings.enableStreaming ? 'checked' : ''} /> 启用流式输出（逐字显示）</label></div>
+              <div class="sp-row"><label style="margin:0;"><input type="checkbox" id="sp-enable-vision" ${settings.enableVision ? 'checked' : ''} /> 启用视觉识别（表情包图片发送给AI看）</label></div>
             </div>
           </div>
 
@@ -2958,6 +3334,169 @@ async function refreshWorldPreview() {
               <div id="sp-status-overview"></div>
             </div>
           </div>
+          <!-- 使用说明 -->
+          <div class="sp-tab-panel" data-panel="guide">
+            <div class="sp-section">
+              <div class="sp-section-title">📖 使用说明</div>
+              <p style="font-size:12px;color:#999;margin-bottom:12px;">点击各项展开查看详细说明</p>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">🚀 快速开始</summary>
+                <div class="sp-guide-details-content">
+                  <div class="sp-guide-block">
+                    <div class="sp-guide-step"><span class="sp-guide-num">1</span><div><strong>配置 API</strong><br/>点击「🔑 API」标签页，选择使用酒馆当前 API 或填写独立 API Key。推荐新手直接选「使用酒馆当前 API 连接」，零配置开箱即用。</div></div>
+                    <div class="sp-guide-step"><span class="sp-guide-num">2</span><div><strong>选一个预设性格</strong><br/>点击「💬 提示词」→「📋 提示词预设」，从内置的猫咪、傲娇精灵等预设中选一个，点「✅ 应用预设」，再点底部「💾 保存所有设置」。</div></div>
+                    <div class="sp-guide-step"><span class="sp-guide-num">3</span><div><strong>开始互动</strong><br/>点击屏幕上的桌宠，弹出圆形菜单，选「💬 聊天」打开聊天框，就可以和桌宠说话了。</div></div>
+                  </div>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">🐾 桌宠基础操作</summary>
+                <div class="sp-guide-details-content">
+                  <div class="sp-guide-table">
+                    <div class="sp-guide-row"><span class="sp-guide-key">单击桌宠</span><span class="sp-guide-val">打开圆形菜单</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">拖拽桌宠</span><span class="sp-guide-val">移动位置；拖到屏幕边缘会自动吸附挂起</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">🍖 投喂</span><span class="sp-guide-val">补充饱食度 +25%</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">🛁 洗澡</span><span class="sp-guide-val">补充清洁度 +30%</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">🛏️ 睡觉</span><span class="sp-guide-val">补充精力值 +35%</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">💬 聊天</span><span class="sp-guide-val">打开对话窗口</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">⚙️ 设置</span><span class="sp-guide-val">打开本设置面板</span></div>
+                  </div>
+                  <p style="font-size:11px;color:#999;margin-top:8px;">状态条三个指标（🍖饱食 💧清洁 ⚡精力）会随时间缓慢下降，影响桌宠心情和对话风格。</p>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">💬 聊天框操作</summary>
+                <div class="sp-guide-details-content">
+                  <div class="sp-guide-table">
+                    <div class="sp-guide-row"><span class="sp-guide-key">😺 表情按钮</span><span class="sp-guide-val">展开/收起表情包面板</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">📨 发送消息</span><span class="sp-guide-val">将文字/表情包加入记录，<strong>不会立即生成回复</strong></span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">➤ 生成回复</span><span class="sp-guide-val">将输入框内容发出后，立即调用 AI 生成桌宠回复</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">Enter 键</span><span class="sp-guide-val">等同于「📨 发送消息」（不生成回复）</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">🌙 线下模式</span><span class="sp-guide-val">切换到更亲密的线下互动风格</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">─ 最小化</span><span class="sp-guide-val">收缩为小标题栏，不影响聊天</span></div>
+                  </div>
+                  <p style="font-size:11px;color:#999;margin-top:8px;">表情包需要先在面板里点「＋」上传图片。上传时文件名会作为表情名称，右键点击可编辑/删除。给表情起个描述性的名字（如"委屈脸"），AI 就能理解你发的是什么表情。</p>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">🧠 记忆与总结</summary>
+                <div class="sp-guide-details-content">
+                  <p style="font-size:12px;color:#ccc;line-height:1.7;margin-bottom:8px;">桌宠的记忆分三层：</p>
+                  <div class="sp-guide-table">
+                    <div class="sp-guide-row"><span class="sp-guide-key">💬 对话记录</span><span class="sp-guide-val">最近的聊天内容，直接塞入上下文</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">📝 对话总结</span><span class="sp-guide-val">用 AI 压缩过的旧对话精华</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">⭐ 记忆条目</span><span class="sp-guide-val">手动或 AI 提取的关键信息，按重要度排序</span></div>
+                  </div>
+                  <p style="font-size:11px;color:#999;margin-top:8px;">聊天多了之后，去「🧠 记忆」→「手动总结」，选择范围点「🔄 重新生成」，让 AI 压缩旧记录。总结完成后旧记录会自动归档，节省 token。</p>
+                  <p style="font-size:11px;color:#999;margin-top:6px;"><strong>总结策略说明：</strong></p>
+                  <div class="sp-guide-table" style="margin-top:4px;">
+                    <div class="sp-guide-row"><span class="sp-guide-key">增量合并</span><span class="sp-guide-val">将新对话和已有总结合并为一份完整总结（推荐）</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">完全覆盖</span><span class="sp-guide-val">新总结直接替换旧总结</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">追加</span><span class="sp-guide-val">新总结追加到旧总结后面</span></div>
+                  </div>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">🎨 外观定制</summary>
+                <div class="sp-guide-details-content">
+                  <div class="sp-guide-table">
+                    <div class="sp-guide-row"><span class="sp-guide-key">桌宠形象</span><span class="sp-guide-val">在「🎨 外观」上传各状态的精灵图（闲置/走路/睡觉等），支持 PNG/GIF/WebP</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">菜单图标</span><span class="sp-guide-val">替换圆形菜单五个按钮的图标，建议用透明背景 PNG</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">心情图标</span><span class="sp-guide-val">替换右上角的 emoji 心情标识</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">主题配色</span><span class="sp-guide-val">内置 5 套主题，或选「自定义」自由调色</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">自定义动作</span><span class="sp-guide-val">添加额外精灵图，桌宠闲逛时随机播放</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">互动贴图</span><span class="sp-guide-val">投喂/洗澡/睡觉时飘出的物品图片</span></div>
+                  </div>
+                  <p style="font-size:11px;color:#999;margin-top:8px;"><strong>精灵图建议：</strong>推荐 PNG 透明背景，尺寸 120×160 左右。GIF 动图会保留动画帧不压缩。每张图限制 2MB，过大的图片会被自动压缩为 WebP 格式。</p>
+                  <p style="font-size:11px;color:#999;margin-top:6px;"><strong>时间滑轨：</strong>每个精灵图下方有⏱️滑轨，可以设置该动作播放多久后恢复闲置状态。</p>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">📖 人设与提示词</summary>
+                <div class="sp-guide-details-content">
+                  <p style="font-size:12px;color:#ccc;line-height:1.7;margin-bottom:8px;">提示词决定了桌宠的性格和行为方式，各部分作用如下：</p>
+                  <div class="sp-guide-table">
+                    <div class="sp-guide-row"><span class="sp-guide-key">系统提示词</span><span class="sp-guide-val">桌宠的核心人设，性格、说话风格等</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">关系描述</span><span class="sp-guide-val">桌宠和你之间的关系、称呼方式</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">{{user}} 人设</span><span class="sp-guide-val">你自己的身份信息，让桌宠了解主人</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">线下提示词</span><span class="sp-guide-val">开启线下模式时追加的风格描述</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">破限</span><span class="sp-guide-val">Jailbreak，放在所有消息最后</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">角色卡</span><span class="sp-guide-val">从酒馆读取角色描述作为参考背景</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">世界书</span><span class="sp-guide-val">从酒馆读取世界设定，可逐条勾选排除</span></div>
+                  </div>
+                  <p style="font-size:11px;color:#999;margin-top:8px;"><strong>预设系统：</strong>可以保存当前所有提示词为一个预设，方便在不同桌宠人格之间快速切换。内置预设不可删除，自定义预设支持覆盖保存。</p>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">⚙️ 行为设置详解</summary>
+                <div class="sp-guide-details-content">
+                  <div class="sp-guide-table">
+                    <div class="sp-guide-row"><span class="sp-guide-key">活跃度</span><span class="sp-guide-val">0%完全安静，50%偶尔说话，100%话痨模式</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">自动反应</span><span class="sp-guide-val">监听酒馆主聊天，桌宠可能插嘴评论</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">冷却时间</span><span class="sp-guide-val">两次自动反应之间的最短间隔（秒）</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">窥探轮数</span><span class="sp-guide-val">桌宠偷看主聊天最近几轮作为参考</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">聊天读取轮数</span><span class="sp-guide-val">发送给 AI 的桌宠聊天记录条数</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">走动频率</span><span class="sp-guide-val">桌宠多久走一步（3s频繁～30s几乎不动）</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">时间感知</span><span class="sp-guide-val">开启后桌宠知道当前日期和时间段</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">离线衰减</span><span class="sp-guide-val">关闭网页后状态缓慢下降的速度</span></div>
+                  </div>
+                  <p style="font-size:11px;color:#999;margin-top:8px;"><strong>反应语言：</strong>用 | 分隔多条语句，桌宠会随机选一条。可以自定义投喂、洗澡、拖拽等各种场景的反应文案。</p>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">⚡ 斜杠指令</summary>
+                <div class="sp-guide-details-content">
+                  <p style="font-size:11px;color:#999;margin-bottom:8px;">在酒馆聊天输入框中可以直接使用：</p>
+                  <div class="sp-guide-table">
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet status</span><span class="sp-guide-val">查看桌宠当前状态</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet feed</span><span class="sp-guide-val">投喂食物</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet bath</span><span class="sp-guide-val">给桌宠洗澡</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet sleep</span><span class="sp-guide-val">让桌宠睡觉</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet summon</span><span class="sp-guide-val">把跑飞的桌宠召回屏幕中心</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet toggle</span><span class="sp-guide-val">显示/隐藏桌宠</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet chat 你好</span><span class="sp-guide-val">直接发送消息并立即获得回复</span></div>
+                  </div>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">💾 数据与存档</summary>
+                <div class="sp-guide-details-content">
+                  <div class="sp-guide-table">
+                    <div class="sp-guide-row"><span class="sp-guide-key">多桌宠存档</span><span class="sp-guide-val">保存当前配置为存档，支持多套桌宠一键切换</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">导出/导入</span><span class="sp-guide-val">将全部数据导出为 JSON 文件备份</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">存储上限</span><span class="sp-guide-val">浏览器 localStorage 约 5MB，大量图片时注意容量</span></div>
+                  </div>
+                  <p style="font-size:11px;color:#999;margin-top:8px;"><strong>重要提醒：</strong>所有数据存储在浏览器本地。换浏览器、清理缓存、卸载酒馆前务必先导出备份！上传了很多精灵图的话建议定期备份。</p>
+                  <p style="font-size:11px;color:#f66;margin-top:6px;">⚠️「重置全部数据」会永久删除所有设置和聊天记录，不可撤销。</p>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">❓ 常见问题 FAQ</summary>
+                <div class="sp-guide-details-content">
+                  <div class="sp-guide-block" style="gap:12px;">
+                    <div><strong style="color:var(--sp-text-primary);">Q: 桌宠跑到屏幕外面看不见了？</strong><br/><span style="font-size:12px;color:#bbb;">使用斜杠指令 <code style="background:rgba(100,180,255,0.1);padding:1px 4px;border-radius:3px;">/pet summon</code> 强行召回屏幕中心。</span></div>
+                    <div><strong style="color:var(--sp-text-primary);">Q: API 报错怎么办？</strong><br/><span style="font-size:12px;color:#bbb;">检查 API Key 是否正确、Base URL 是否以 /v1 结尾、模型名是否存在。可以点「📡 获取」拉取可用模型列表验证连接。</span></div>
+                    <div><strong style="color:var(--sp-text-primary);">Q: 桌宠不说话了？</strong><br/><span style="font-size:12px;color:#bbb;">确认「活跃度」不是 0%，「自动反应」已勾选，且冷却时间没设太长。也可以直接在聊天框主动和它说话。</span></div>
+                    <div><strong style="color:var(--sp-text-primary);">Q: 图片上传失败？</strong><br/><span style="font-size:12px;color:#bbb;">单张图片限制 2MB，支持 PNG/JPG/GIF/WebP 格式。GIF 动图不会被压缩。如果存储空间满了会有提示。</span></div>
+                    <div><strong style="color:var(--sp-text-primary);">Q: 酒馆模式下找不到角色卡/世界书？</strong><br/><span style="font-size:12px;color:#bbb;">确保酒馆中已经加载了角色卡或创建了世界书。搜索框支持模糊匹配，输入关键字即可筛选。</span></div>
+                    <div><strong style="color:var(--sp-text-primary);">Q: 表情包发给 AI 它能看到图片吗？</strong><br/><span style="font-size:12px;color:#bbb;">需要在 API 设置中勾选「启用视觉识别」，且你使用的模型支持多模态（如 gpt-4o）。否则 AI 只能看到表情包的文字名称。</span></div>
+                    <div><strong style="color:var(--sp-text-primary);">Q: 流式输出有什么用？</strong><br/><span style="font-size:12px;color:#bbb;">开启后桌宠的回复会逐字显示出来，体验更好。仅在「手动填写独立 API」模式下有效。</span></div>
+                  </div>
+                </div>
+              </details>
+
+            </div>
+          </div>
 
         </div>
         <div class="sp-settings-footer">
@@ -3181,15 +3720,9 @@ async function refreshWorldPreview() {
       btn.addEventListener('touchend', (e) => { e.stopPropagation(); e.preventDefault(); handleMenuAction(btn.dataset.action); });
     });
 
-    // 聊天
-    const sendBtn = document.getElementById('sp-chat-send-btn');
-    const inputField = document.getElementById('sp-chat-input-field');
+    // 聊天（初始化绑定，toggleChat 内会重新绑定最新逻辑）
     const closeBtn = document.getElementById('sp-chat-close');
 
-    if (sendBtn && inputField) {
-      sendBtn.onclick = () => { sendChatMessage(inputField.value); inputField.value = ''; };
-      inputField.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(inputField.value); inputField.value = ''; } };
-    }
     if (closeBtn) closeBtn.onclick = () => toggleChat();
     const minimizeBtn = document.getElementById('sp-chat-minimize');
     if (minimizeBtn) {
@@ -3210,6 +3743,11 @@ async function refreshWorldPreview() {
       };
     }
     const offlineToggle = document.getElementById('sp-chat-offline-toggle');
+    if (offlineToggle && isOfflineMode) {
+      offlineToggle.style.opacity = '1';
+      offlineToggle.style.color = '#90ee90';
+      offlineToggle.title = '线下模式（已开启）';
+    }
     if (offlineToggle) {
       offlineToggle.onclick = () => {
         isOfflineMode = !isOfflineMode;
@@ -3217,6 +3755,8 @@ async function refreshWorldPreview() {
         offlineToggle.style.color = isOfflineMode ? '#90ee90' : '#aaa';
         offlineToggle.title = isOfflineMode ? '线下模式（已开启）' : '线下模式';
         showBubble(isOfflineMode ? '🌙 进入线下模式～' : '💻 回到线上模式', 2000);
+        state.isOfflineMode = isOfflineMode;
+        saveData();
       };
     }
 
@@ -3714,6 +4254,7 @@ async function refreshWorldPreview() {
     settings.summaryMode = v('sp-summary-mode') || 'incremental';
     settings.summaryTrigger = document.getElementById('sp-summary-auto')?.checked ? 'auto' : 'manual';
     settings.summaryKeepRecent = n('sp-summary-keep', 10);
+    settings.enableVision = document.getElementById('sp-enable-vision')?.checked || false;
 
     settings.wanderInterval = n('sp-wander-interval', 8);
 
