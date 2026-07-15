@@ -206,43 +206,30 @@
   height: 44px;
 }
 
-/* 按钮位置（6按钮上半圆弧布局，半径108px，180°均匀分布） */
+/* 按钮位置由 JS 动态计算，这里只设置 transition-delay */
 .sp-menu-btn[data-action="feed"] {
-  top: -37px;
-  left: -108px;
   transition-delay: 0.05s;
 }
 
 .sp-menu-btn[data-action="bath"] {
-  top: -88px;
-  left: -86px;
   transition-delay: 0.1s;
 }
 
 .sp-menu-btn[data-action="sleep"] {
-  top: -112px;
-  left: -37px;
   transition-delay: 0.15s;
 }
 
 .sp-menu-btn[data-action="chat"] {
-  top: -112px;
-  left: 37px;
   transition-delay: 0.2s;
 }
 
 .sp-menu-btn[data-action="diary"] {
-  top: -88px;
-  left: 86px;
   transition-delay: 0.25s;
 }
 
 .sp-menu-btn[data-action="settings"] {
-  top: -37px;
-  left: 108px;
   transition-delay: 0.3s;
 }
-
 
 /* 移动端适配 */
 @media (max-width: 768px) {
