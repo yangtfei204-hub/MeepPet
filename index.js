@@ -346,6 +346,7 @@
     linkItemPurchaseLog: {},  // {'2026-07-15': {'hint': 2, 'shuffle': 1, ...}}
     gameStaminaInventory: { stamina30: 0, stamina50: 0, stamina100: 0 },  // 体力道具背包
     gameStaminaShopLog: {},  // {'2026-07-15': {'stamina30': 2, ...}}
+    gameResetCooldown: 0,  // 上次重置全部游戏数据的时间戳
   };
 
   // ============================================================
@@ -7575,22 +7576,61 @@ function refreshCharPreview() {
       gameRefreshOrders();
     });
     document.getElementById('sp-game-reset')?.addEventListener('click', () => {
-      if (!confirm('确定重置游戏？金币、棋盘、图鉴都会清空！')) return;
+      // 检查24小时冷却
+      const lastReset = state.gameResetCooldown || 0;
+      const now = Date.now();
+      const cdRemain = lastReset + 24 * 60 * 60 * 1000 - now;
+      if (cdRemain > 0) {
+        const hours = Math.floor(cdRemain / 3600000);
+        const mins = Math.ceil((cdRemain % 3600000) / 60000);
+        gameShowNotice(`重置冷却中！还需等待 ${hours}小时${mins}分钟`);
+        return;
+      }
+      if (!confirm('确定重置所有游戏数据？\n包括：合成工坊、消消看、连连看、抽奖\n金币、棋盘、图鉴、道具背包都会清空！\n（每24小时只能重置一次）')) return;
+      if (!confirm('真的确定吗？所有游戏进度都会丢失！')) return;
+      // 合成工坊
       state.gameGold = 0;
-      state.gameStamina = 100;
+      state.gameStamina = state.gameStaminaMax || 80;
+      state.gameLastStaminaRecover = Date.now();
       state.gameBoard = new Array(GAME_BOARD_CELLS).fill(null);
       state.gameOrders = gameGenerateOrders(3);
       state.gameCollection = [];
       state.gameCustomImages = {};
       state.gameBgImage = '';
-      saveDataImmediate('游戏重置');
+      state.gameGeneratorPos = 0;
+      state.gameSellPos = 35;
+      state.gameInventory = [];
+      state.quickFeed = null;
+      state.quickClean = null;
+      state.quickEnergy = null;
+      state.gameShopBuyLog = {};
+      state.gameOrderRefreshCD = 0;
+      // 消消看
+      state.match3Inventory = { expand: 0, sweep: 0, shuffle: 0 };
+      state.match3ItemPurchaseLog = {};
+      // 连连看
+      state.linkInventory = { hint: 0, shuffle: 0, bomb: 0, compass: 0 };
+      state.linkItemPurchaseLog = {};
+      // 抽奖
+      state.lotteryLog = {};
+      // 体力道具
+      state.gameStaminaInventory = { stamina30: 0, stamina50: 0, stamina100: 0 };
+      state.gameStaminaShopLog = {};
+      // 重置运行时状态
+      match3State.active = false;
+      match3State.cards = [];
+      match3State.slots = [];
+      linkState.active = false;
+      linkState.board = [];
+      // 记录重置冷却时间
+      state.gameResetCooldown = Date.now();
+      saveDataImmediate('全部游戏重置');
       gameRenderBoard();
       gameRenderStatus();
       gameRenderOrders();
       gameApplyBackground();
-      gameShowNotice('游戏已重置');
+      gameShowNotice('所有游戏数据已重置！体力已恢复满');
     });
-
     // 面板拖拽
     gameBindPanelDrag();
   }
