@@ -342,6 +342,10 @@
     match3ItemPurchaseLog: {},   // {'2026-07-15': {'expand': 2, 'sweep': 1, 'shuffle': 3}}
     match3Inventory: { expand: 0, sweep: 0, shuffle: 0 },  // 消消看道具背包库存
     lotteryLog: {},  // {'2026-07-15': {'small': 2, 'medium': 1, 'large': 0}} 按奖池分别计数
+    linkInventory: { hint: 0, shuffle: 0, bomb: 0, compass: 0 },  // 连连看道具背包
+    linkItemPurchaseLog: {},  // {'2026-07-15': {'hint': 2, 'shuffle': 1, ...}}
+    gameStaminaInventory: { stamina30: 0, stamina50: 0, stamina100: 0 },  // 体力道具背包
+    gameStaminaShopLog: {},  // {'2026-07-15': {'stamina30': 2, ...}}
   };
 
   // ============================================================
@@ -1959,6 +1963,20 @@ function showInventoryPopup(category, quickKey, onUse) {
               <div class="sp-game-selector-desc">消耗金币抽取道具、物品和金币奖励</div>
             </div>
           </div>
+          <div class="sp-game-selector-card" data-game="link">
+            <div class="sp-game-selector-icon">🔗</div>
+            <div class="sp-game-selector-info">
+              <div class="sp-game-selector-name">连连看</div>
+              <div class="sp-game-selector-desc">找到相同图案，两折连线消除</div>
+            </div>
+          </div>
+          <div class="sp-game-selector-card" data-game="inventory">
+            <div class="sp-game-selector-icon">🎒</div>
+            <div class="sp-game-selector-info">
+              <div class="sp-game-selector-name">总背包</div>
+              <div class="sp-game-selector-desc">查看所有道具、体力和物资</div>
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -1992,10 +2010,141 @@ function showInventoryPopup(category, quickKey, onUse) {
           toggleMatch3Game();
         } else if (game === 'lottery') {
           toggleLottery();
+        } else if (game === 'link') {
+          toggleLinkGame();
+        } else if (game === 'inventory') {
+          showTotalInventory();
         }
       };
     });
 
+  }
+
+  // ============================================================
+  // 🎒 总背包弹窗
+  // ============================================================
+  function showTotalInventory() {
+    document.getElementById('sp-total-inventory-overlay')?.remove();
+
+    // 汇总数据
+    const inventory = state.gameInventory || [];
+    const match3Inv = state.match3Inventory || { expand: 0, sweep: 0, shuffle: 0 };
+    const linkInv = state.linkInventory || { hint: 0, shuffle: 0, bomb: 0, compass: 0 };
+    const staminaInv = state.gameStaminaInventory || { stamina30: 0, stamina50: 0, stamina100: 0 };
+
+    // 喂食道具
+    const foodItems = inventory.filter(i => i.category === 'food' && i.count > 0);
+    // 洗澡道具
+    const cleanItems = inventory.filter(i => i.category === 'clean' && i.count > 0);
+    // 睡觉道具
+    const energyItems = inventory.filter(i => i.category === 'energy' && i.count > 0);
+
+    function renderShopItems(items, category) {
+      if (items.length === 0) return '<div class="sp-total-inv-empty">暂无</div>';
+      return items.map(inv => {
+        const data = GAME_SHOP_ITEMS[category][inv.idx];
+        if (!data) return '';
+        return `<div class="sp-total-inv-row"><span class="sp-total-inv-emoji">${data.emoji}</span><span class="sp-total-inv-name">${data.name}</span><span class="sp-total-inv-detail">+${data.restore}</span><span class="sp-total-inv-count">×${inv.count}</span></div>`;
+      }).join('');
+    }
+
+    // 体力道具
+    function renderStaminaItems() {
+      const hasAny = GAME_STAMINA_ITEMS.some(item => (staminaInv[item.key] || 0) > 0);
+      if (!hasAny) return '<div class="sp-total-inv-empty">暂无</div>';
+      return GAME_STAMINA_ITEMS.filter(item => (staminaInv[item.key] || 0) > 0).map(item => {
+        return `<div class="sp-total-inv-row"><span class="sp-total-inv-emoji">${item.emoji}</span><span class="sp-total-inv-name">${item.name}</span><span class="sp-total-inv-detail">+${item.restore}⚡</span><span class="sp-total-inv-count">×${staminaInv[item.key]}</span></div>`;
+      }).join('');
+    }
+
+    // 消消看道具
+    function renderMatch3Items() {
+      const items = [
+        { key: 'expand', emoji: '🪜', name: '扩充神架', count: match3Inv.expand || 0 },
+        { key: 'sweep', emoji: '🧹', name: '魔法扫帚', count: match3Inv.sweep || 0 },
+        { key: 'shuffle', emoji: '🌀', name: '混沌风暴', count: match3Inv.shuffle || 0 },
+      ];
+      const hasAny = items.some(i => i.count > 0);
+      if (!hasAny) return '<div class="sp-total-inv-empty">暂无</div>';
+      return items.filter(i => i.count > 0).map(i => {
+        return `<div class="sp-total-inv-row"><span class="sp-total-inv-emoji">${i.emoji}</span><span class="sp-total-inv-name">${i.name}</span><span class="sp-total-inv-detail"></span><span class="sp-total-inv-count">×${i.count}</span></div>`;
+      }).join('');
+    }
+
+    // 连连看道具
+    function renderLinkItems() {
+      const items = [
+        { key: 'hint', emoji: '🔍', name: '寻路放大镜', count: linkInv.hint || 0 },
+        { key: 'shuffle', emoji: '🌀', name: '重组旋风', count: linkInv.shuffle || 0 },
+        { key: 'bomb', emoji: '💣', name: '友情炸弹', count: linkInv.bomb || 0 },
+        { key: 'compass', emoji: '🧭', name: '罗盘透视', count: linkInv.compass || 0 },
+      ];
+      const hasAny = items.some(i => i.count > 0);
+      if (!hasAny) return '<div class="sp-total-inv-empty">暂无</div>';
+      return items.filter(i => i.count > 0).map(i => {
+        return `<div class="sp-total-inv-row"><span class="sp-total-inv-emoji">${i.emoji}</span><span class="sp-total-inv-name">${i.name}</span><span class="sp-total-inv-detail"></span><span class="sp-total-inv-count">×${i.count}</span></div>`;
+      }).join('');
+    }
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-total-inventory-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:2147483649;';
+    overlay.innerHTML = `
+      <div class="sp-total-inv-box">
+        <div class="sp-total-inv-header">
+          <span>🎒 总背包</span>
+          <div class="sp-total-inv-header-right">
+            <span class="sp-total-inv-gold">🪙 ${state.gameGold || 0}</span>
+            <span class="sp-total-inv-stamina">⚡ ${Math.floor(state.gameStamina || 0)}/${state.gameStaminaMax || 80}</span>
+            <button class="sp-total-inv-close" title="关闭">✕</button>
+          </div>
+        </div>
+        <div class="sp-total-inv-body">
+          <div class="sp-total-inv-section">
+            <div class="sp-total-inv-section-title">🍖 喂食道具</div>
+            <div class="sp-total-inv-section-content">${renderShopItems(foodItems, 'food')}</div>
+          </div>
+          <div class="sp-total-inv-section">
+            <div class="sp-total-inv-section-title">🧴 洗澡道具</div>
+            <div class="sp-total-inv-section-content">${renderShopItems(cleanItems, 'clean')}</div>
+          </div>
+          <div class="sp-total-inv-section">
+            <div class="sp-total-inv-section-title">🛏️ 睡觉道具</div>
+            <div class="sp-total-inv-section-content">${renderShopItems(energyItems, 'energy')}</div>
+          </div>
+          <div class="sp-total-inv-section">
+            <div class="sp-total-inv-section-title">⚡ 体力道具</div>
+            <div class="sp-total-inv-section-content">${renderStaminaItems()}</div>
+          </div>
+          <div class="sp-total-inv-section">
+            <div class="sp-total-inv-section-title">🃏 消消看道具</div>
+            <div class="sp-total-inv-section-content">${renderMatch3Items()}</div>
+          </div>
+          <div class="sp-total-inv-section">
+            <div class="sp-total-inv-section-title">🔗 连连看道具</div>
+            <div class="sp-total-inv-section-content">${renderLinkItems()}</div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    // 居中定位
+    requestAnimationFrame(() => {
+      const box = overlay.querySelector('.sp-total-inv-box');
+      if (box) {
+        const boxH = box.offsetHeight || 400;
+        const boxW = box.offsetWidth || 320;
+        box.style.position = 'fixed';
+        box.style.top = Math.max(20, Math.floor((window.innerHeight - boxH) / 2)) + 'px';
+        box.style.left = Math.floor((window.innerWidth - boxW) / 2) + 'px';
+        box.style.margin = '0';
+      }
+    });
+
+    // 关闭
+    overlay.querySelector('.sp-total-inv-close').onclick = () => overlay.remove();
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
   }
 
   function showEmojiEditModal(idx) {
@@ -6337,6 +6486,13 @@ function refreshCharPreview() {
     ]
   };
 
+  // 体力道具商店定义
+  const GAME_STAMINA_ITEMS = [
+    { key: 'stamina30', name: '小能量瓶', price: 100, restore: 30, emoji: '🧃', dailyLimit: 3 },
+    { key: 'stamina50', name: '中能量罐', price: 200, restore: 50, emoji: '🥤', dailyLimit: 2 },
+    { key: 'stamina100', name: '满能量桶', price: 300, restore: 100, emoji: '🪫', dailyLimit: 1 },
+  ];
+
   // 生成器产出权重（等级越高概率越低）
   const GAME_SPAWN_WEIGHTS = [
     { level: 1, weight: 55 },
@@ -6902,7 +7058,15 @@ function refreshCharPreview() {
     const goldEl = document.getElementById('sp-game-gold');
     const staminaEl = document.getElementById('sp-game-stamina');
     if (goldEl) goldEl.textContent = state.gameGold;
-    if (staminaEl) staminaEl.textContent = `${Math.floor(state.gameStamina)} / ${state.gameStaminaMax}`;
+    if (staminaEl) staminaEl.innerHTML = `${Math.floor(state.gameStamina)} / ${state.gameStaminaMax} <span id="sp-game-stamina-add" style="cursor:pointer;margin-left:2px;font-size:14px;color:rgba(100,220,100,0.8);" title="使用体力道具">⊕</span>`;
+    // 绑定体力加号按钮
+    const staminaAddBtn = document.getElementById('sp-game-stamina-add');
+    if (staminaAddBtn) {
+      staminaAddBtn.onclick = (e) => {
+        e.stopPropagation();
+        showStaminaInventoryPopup();
+      };
+    }
 
     // 同步刷新按钮状态
     const btn = document.getElementById('sp-game-order-refresh-btn');
@@ -6924,6 +7088,117 @@ function refreshCharPreview() {
         gameStartOrderCDTimer();
       }
     }
+  }
+
+  // ===== 体力背包弹窗 =====
+  function showStaminaInventoryPopup() {
+    document.getElementById('sp-stamina-inv-popup')?.remove();
+
+    if (!state.gameStaminaInventory) state.gameStaminaInventory = { stamina30: 0, stamina50: 0, stamina100: 0 };
+
+    const hasAny = GAME_STAMINA_ITEMS.some(item => (state.gameStaminaInventory[item.key] || 0) > 0);
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-stamina-inv-popup';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:2147483649;';
+
+    let itemsHtml = GAME_STAMINA_ITEMS.map(item => {
+      const count = state.gameStaminaInventory[item.key] || 0;
+      const isEmpty = count <= 0;
+      return `
+        <div class="sp-inv-item ${isEmpty ? '' : ''}" style="${isEmpty ? 'opacity:0.4;' : ''}">
+          <span class="sp-inv-item-emoji">${item.emoji}</span>
+          <div class="sp-inv-item-info">
+            <span class="sp-inv-item-name">${item.name}</span>
+            <span class="sp-inv-item-detail">+${item.restore} 体力 | 库存: ${count}</span>
+          </div>
+          <div class="sp-inv-item-actions">
+            ${isEmpty ? '' : `<button class="sp-inv-use-btn" data-stamina-key="${item.key}">使用</button>`}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    if (!hasAny) {
+      itemsHtml = '<div class="sp-inv-empty">体力背包空空如也～<br/><span style="font-size:11px;">去合成工坊商店购买体力道具吧！</span></div>';
+    }
+
+    overlay.innerHTML = `
+      <div class="sp-inv-popup-box">
+        <div class="sp-inv-popup-header">
+          <span>⚡ 体力背包</span>
+          <button class="sp-inv-popup-close" title="关闭">✕</button>
+        </div>
+        <div class="sp-inv-popup-body">
+          ${itemsHtml}
+        </div>
+        <div class="sp-inv-popup-hint">💡 体力道具可在合成工坊商店购买，或通过抽奖获得</div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    requestAnimationFrame(() => {
+      const box = overlay.querySelector('.sp-inv-popup-box');
+      if (box) {
+        const boxH = box.offsetHeight || 250;
+        const boxW = box.offsetWidth || 300;
+        box.style.position = 'fixed';
+        box.style.top = Math.max(20, Math.floor((window.innerHeight - boxH) / 2)) + 'px';
+        box.style.left = Math.floor((window.innerWidth - boxW) / 2) + 'px';
+        box.style.margin = '0';
+      }
+    });
+
+    overlay.querySelector('.sp-inv-popup-close').onclick = () => overlay.remove();
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+    overlay.querySelectorAll('.sp-inv-use-btn[data-stamina-key]').forEach(btn => {
+      btn.onclick = () => {
+        const key = btn.dataset.staminaKey;
+        const item = GAME_STAMINA_ITEMS.find(i => i.key === key);
+        if (!item) return;
+        if ((state.gameStaminaInventory[key] || 0) <= 0) {
+          gameShowNotice('库存不足！'); return;
+        }
+        state.gameStaminaInventory[key]--;
+        state.gameStamina = Math.min(state.gameStaminaMax, state.gameStamina + item.restore);
+        saveDataDebounced('使用体力道具');
+        gameShowNotice(`使用了 ${item.emoji} ${item.name}，体力 +${item.restore}！`);
+        gameRenderStatus();
+        overlay.remove();
+      };
+    });
+  }
+
+  // ===== 购买体力道具 =====
+  function gameBuyStaminaItem(key) {
+    const item = GAME_STAMINA_ITEMS.find(i => i.key === key);
+    if (!item) return;
+
+    if (state.gameGold < item.price) {
+      gameShowNotice('金币不够！');
+      return;
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    if (!state.gameStaminaShopLog) state.gameStaminaShopLog = {};
+    if (!state.gameStaminaShopLog[today]) state.gameStaminaShopLog[today] = {};
+    const bought = state.gameStaminaShopLog[today][key] || 0;
+    if (bought >= item.dailyLimit) {
+      gameShowNotice(`${item.emoji} ${item.name} 今日已售罄（限${item.dailyLimit}次/天）`);
+      return;
+    }
+
+    state.gameGold -= item.price;
+    state.gameStaminaShopLog[today][key] = bought + 1;
+    if (!state.gameStaminaInventory) state.gameStaminaInventory = { stamina30: 0, stamina50: 0, stamina100: 0 };
+    state.gameStaminaInventory[key] = (state.gameStaminaInventory[key] || 0) + 1;
+
+    gameShowNotice(`购买了 ${item.emoji} ${item.name}，已放入体力背包！`);
+    saveDataDebounced('购买体力道具');
+    gameRenderStatus();
+    gameRenderShop();
   }
 
   let gameOrderCDTimer = null;
@@ -6979,6 +7254,34 @@ function refreshCharPreview() {
       { key: 'energy', label: '🛏️ 睡眠用品（恢复精力）', items: GAME_SHOP_ITEMS.energy },
     ];
 
+    // 体力道具分类
+    const todayStaminaLog = (state.gameStaminaShopLog && state.gameStaminaShopLog[today]) || {};
+    const staminaCategoryHtml = `
+      <div class="sp-game-shop-category">
+        <div class="sp-game-shop-cat-title">⚡ 体力道具（恢复游戏体力）</div>
+        <div class="sp-game-shop-items">
+          ${GAME_STAMINA_ITEMS.map(item => {
+            const bought = todayStaminaLog[item.key] || 0;
+            const soldOut = bought >= item.dailyLimit;
+            const cantAfford = state.gameGold < item.price;
+            const disabled = soldOut || cantAfford;
+            const stock = (state.gameStaminaInventory && state.gameStaminaInventory[item.key]) || 0;
+            const limitText = `<span class="sp-game-shop-limit ${soldOut ? 'sold-out' : ''}">${soldOut ? '已售罄' : `剩${item.dailyLimit - bought}次`}</span>`;
+            return `
+              <div class="sp-game-shop-item ${disabled ? 'sp-game-shop-disabled' : ''}">
+                <span class="sp-game-shop-item-emoji">${item.emoji}</span>
+                <span class="sp-game-shop-item-name">${item.name}</span>
+                <span class="sp-game-shop-item-info">+${item.restore}⚡</span>
+                ${limitText}
+                <span class="sp-game-shop-limit">库存:${stock}</span>
+                <button class="sp-game-shop-buy sp-stamina-buy-btn" data-stamina-key="${item.key}" ${disabled ? 'disabled' : ''}>🪙${item.price}</button>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+
     container.innerHTML = categories.map(cat => `
       <div class="sp-game-shop-category">
         <div class="sp-game-shop-cat-title">${cat.label}</div>
@@ -7004,7 +7307,7 @@ function refreshCharPreview() {
           }).join('')}
         </div>
       </div>
-    `).join('');
+    `).join('') + staminaCategoryHtml;
 
     container.querySelectorAll('.sp-game-shop-buy').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -7014,6 +7317,14 @@ function refreshCharPreview() {
         gameBuyShopItem(cat, idx);
       });
     });
+
+    container.querySelectorAll('.sp-stamina-buy-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        gameBuyStaminaItem(btn.dataset.staminaKey);
+      });
+    });
+
   }
 
   // ===== 渲染图鉴 =====
@@ -8054,10 +8365,17 @@ function refreshCharPreview() {
 
     // 重开按钮
     document.getElementById('sp-match3-restart-btn').addEventListener('click', () => {
-      if (!confirm('重开本局？当前进度清零，重新发牌。')) return;
+      if (state.gameStamina < 5) {
+        match3ShowNotice('体力不足！开一局需要 5 点体力');
+        return;
+      }
+      if (!confirm('重开本局？将消耗 5 点体力，当前进度清零。')) return;
+      state.gameStamina -= 5;
+      saveDataDebounced('消消看重开扣体力');
       match3GenerateLevel();
       match3Render();
-      match3ShowNotice('🔄 新的一局开始了！');
+      match3ShowNotice('🔄 新的一局开始了！（-5⚡）');
+      if (isGameOpen) gameRenderStatus();
     });
 
     // 结束按钮
@@ -8071,9 +8389,18 @@ function refreshCharPreview() {
       match3ShowNotice(`结算完成！消除 ${match3State.eliminatedGroups} 组，获得 +${baseReward} 🪙`);
       // 自动开启新局
       setTimeout(() => {
+        if (state.gameStamina < 5) {
+          match3ShowNotice('体力不足，无法自动开新局');
+          return;
+        }
+        state.gameStamina -= 5;
+        saveDataDebounced('消消看自动新局扣体力');
         match3GenerateLevel();
         match3Render();
+        match3ShowNotice('新局开始！（-5⚡）');
+        if (isGameOpen) gameRenderStatus();
       }, 1500);
+
     });
 
     // 标签页切换
@@ -8255,10 +8582,19 @@ function refreshCharPreview() {
         panel.style.top = Math.max(10, Math.min(centerTop, maxTop)) + 'px';
       });
 
-      // 如果没有活跃游戏，开新局
+      // 如果没有活跃游戏，开新局（扣5体力）
       if (!match3State.active) {
-        match3GenerateLevel();
+        if (state.gameStamina < 5) {
+          match3ShowNotice('体力不足！开一局需要 5 点体力');
+          match3Render();
+        } else {
+          state.gameStamina -= 5;
+          saveDataDebounced('消消看开局扣体力');
+          match3GenerateLevel();
+          match3ShowNotice('开局消耗 5 点体力⚡');
+        }
       }
+
       match3Render();
     } else {
       if (panel) panel.classList.remove('visible');
@@ -8296,6 +8632,13 @@ function refreshCharPreview() {
         { type: 'shopitem', category: 'food',   idx: 0, label: '🐟 小鱼干 ×1',  weight: 20 },
         { type: 'shopitem', category: 'clean',  idx: 0, label: '🧻 湿纸巾 ×1',  weight: 20 },
         { type: 'shopitem', category: 'energy', idx: 0, label: '🌿 猫薄荷枕 ×1', weight: 20 },
+        // 连连看道具
+        { type: 'linkprop', key: 'hint', label: '🔍 寻路放大镜 ×1', weight: 20 },
+        { type: 'linkprop', key: 'shuffle', label: '🌀 重组旋风 ×1', weight: 15 },
+        { type: 'linkprop', key: 'bomb', label: '💣 友情炸弹 ×1', weight: 8 },
+        { type: 'linkprop', key: 'compass', label: '🧭 罗盘透视 ×1', weight: 10 },
+        // 体力道具
+        { type: 'staminaitem', key: 'stamina30', label: '🧃 小能量瓶 ×1', weight: 15 },
       ]
     },
     {
@@ -8327,6 +8670,8 @@ function refreshCharPreview() {
         { type: 'boarditem', chain: 'toy',  level: 3, label: '🧸 毛绒小熊 (Lv3)',   weight: 8  },
         { type: 'boarditem', chain: 'food', level: 3, label: '🍰 草莓蛋糕 (Lv3)',   weight: 8  },
         { type: 'boarditem', chain: 'gem',  level: 3, label: '💍 灵力戒指 (Lv3)',   weight: 8  },
+        // 体力道具
+        { type: 'staminaitem', key: 'stamina50', label: '🥤 中能量罐 ×1', weight: 20 },
       ]
     },
     {
@@ -8363,6 +8708,9 @@ function refreshCharPreview() {
         { type: 'boarditem', chain: 'toy',  level: 5, label: '🏰 黄金猫爬架 (Lv5)', weight: 3 },
         { type: 'boarditem', chain: 'food', level: 5, label: '🧪 极品猫薄荷 (Lv5)', weight: 3 },
         { type: 'boarditem', chain: 'gem',  level: 5, label: '🐉 龙之心宝石 (Lv5)', weight: 3 },
+        // 体力道具
+        { type: 'staminaitem', key: 'stamina100', label: '🪫 满能量桶 ×1', weight: 10 },
+        { type: 'staminaitem', key: 'stamina50', label: '🥤 中能量罐 ×2', count: 2, weight: 20 },
       ]
     }
   ];
@@ -8415,6 +8763,20 @@ function refreshCharPreview() {
         const count = result.count || 1;
         state.match3Inventory[result.key] = (state.match3Inventory[result.key] || 0) + count;
         rewardMsg = `获得 ${result.label}（已存入消消看背包）`;
+        break;
+
+      case 'linkprop':
+        if (!state.linkInventory) state.linkInventory = { hint: 0, shuffle: 0, bomb: 0, compass: 0 };
+        const linkCount = result.count || 1;
+        state.linkInventory[result.key] = (state.linkInventory[result.key] || 0) + linkCount;
+        rewardMsg = `获得 ${result.label}（已存入连连看背包）`;
+        break;
+
+      case 'staminaitem':
+        if (!state.gameStaminaInventory) state.gameStaminaInventory = { stamina30: 0, stamina50: 0, stamina100: 0 };
+        const staminaCount = result.count || 1;
+        state.gameStaminaInventory[result.key] = (state.gameStaminaInventory[result.key] || 0) + staminaCount;
+        rewardMsg = `获得 ${result.label}（已存入体力背包）`;
         break;
 
       case 'shopitem':
@@ -8714,6 +9076,1194 @@ function refreshCharPreview() {
       lotteryRenderPools();
     } else {
       if (panel) panel.classList.remove('visible');
+    }
+  }
+
+  // ============================================================
+  // 🔗 连连看游戏模块 - MeepLinkMatch
+  // ============================================================
+
+  // ===== 连连看常量 =====
+  const LINK_DEFAULT_ICONS = [
+    '🐱', '🐶', '🐰', '🦊', '🐻', '🐼', '🐨', '🦁',
+    '🐸', '🐧', '🐝', '🦋', '🌸', '🍎', '🍰', '⭐',
+    '🎀', '🌙', '🔔', '💎', '🍬', '🎯', '🌈', '🐳',
+    '🦄', '🍩', '🎵', '🔥', '🍀', '🐞', '🦢', '🎲'
+  ];
+
+  // 难度配置：随机选取
+  const LINK_DIFFICULTIES = [
+    { name: '8×8', rows: 8, cols: 8, iconCount: 12, energyCost: 5, clearReward: 40 },
+    { name: '10×10', rows: 10, cols: 10, iconCount: 16, energyCost: 5, clearReward: 70 },
+    { name: '12×12', rows: 12, cols: 12, iconCount: 20, energyCost: 8, clearReward: 120 },
+    { name: '14×14', rows: 14, cols: 14, iconCount: 24, energyCost: 10, clearReward: 200 },
+  ];
+
+  // 道具定义
+  const LINK_PROPS = {
+    hint: {
+      name: '🔍 寻路放大镜',
+      desc: '高亮一对可连通消除的方块',
+      price: 30,
+      perGameLimit: 3,
+      dailyLimit: 10
+    },
+    shuffle: {
+      name: '🌀 重组旋风',
+      desc: '打乱所有剩余方块位置',
+      price: 60,
+      perGameLimit: 3,
+      dailyLimit: 10
+    },
+    bomb: {
+      name: '💣 友情炸弹',
+      desc: '无视通路强制消除两个相同方块',
+      price: 120,
+      perGameLimit: 2,
+      dailyLimit: 10
+    },
+    compass: {
+      name: '🧭 罗盘透视',
+      desc: '10秒内点击方块显示可消同伴',
+      price: 50,
+      perGameLimit: 1,
+      dailyLimit: 10
+    }
+  };
+
+  // 运行时状态
+  let linkState = {
+    active: false,
+    board: [],       // 2D数组 [row][col]，0=空，>0=图案类型
+    rows: 0,
+    cols: 0,
+    difficulty: null,
+    selected: null,  // {row, col}
+    pairsEliminated: 0,
+    totalPairs: 0,
+    propsUsedThisRound: { hint: 0, shuffle: 0, bomb: 0, compass: 0 },
+    bombMode: false,
+    bombFirst: null, // 炸弹选中的第一个方块
+    compassActive: false,
+    compassTimer: null,
+  };
+
+  let isLinkOpen = false;
+
+  // ===== 路径查找算法（BFS，最多2次转折）=====
+  // 棋盘外围留一圈虚空通道（index -1 和 rows/cols）
+  function linkFindPath(board, r1, c1, r2, c2, rows, cols) {
+    // 方向：上下左右
+    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+
+    // 检查位置是否可通行（空格或棋盘外圈）
+    function isPassable(r, c) {
+      // 外圈虚空通道
+      if (r < 0 || r > rows + 1 || c < 0 || c > cols + 1) return false;
+      if (r === 0 || r === rows + 1 || c === 0 || c === cols + 1) return true;
+      // 棋盘内部：空格可通行
+      const boardR = r - 1;
+      const boardC = c - 1;
+      if (boardR < 0 || boardR >= rows || boardC < 0 || boardC >= cols) return true;
+      return board[boardR][boardC] === 0;
+    }
+
+    // BFS状态: {r, c, dir, turns}
+    // 起点和终点在带外圈的坐标系中：实际棋盘(0,0)对应(1,1)
+    const sr = r1 + 1, sc = c1 + 1;
+    const er = r2 + 1, ec = c2 + 1;
+
+    // visited[r][c][dir] = 最少转弯数
+    const totalRows = rows + 2;
+    const totalCols = cols + 2;
+    const visited = Array.from({length: totalRows}, () =>
+      Array.from({length: totalCols}, () => [Infinity, Infinity, Infinity, Infinity])
+    );
+
+    // BFS队列
+    const queue = [];
+
+    // 从起点向四个方向出发
+    for (let d = 0; d < 4; d++) {
+      const nr = sr + dirs[d][0];
+      const nc = sc + dirs[d][1];
+      if (nr < 0 || nr >= totalRows || nc < 0 || nc >= totalCols) continue;
+      if (nr === er && nc === ec) {
+        // 直接相邻
+        return [{r: r1, c: c1}, {r: r2, c: c2}];
+      }
+      if (!isPassable(nr, nc)) continue;
+      if (visited[nr][nc][d] <= 0) continue;
+      visited[nr][nc][d] = 0;
+      queue.push({r: nr, c: nc, dir: d, turns: 0, path: [{r: sr, c: sc}, {r: nr, c: nc}]});
+    }
+
+    let head = 0;
+    while (head < queue.length) {
+      const {r, c, dir, turns, path} = queue[head++];
+
+      // 尝试从当前位置继续
+      for (let d = 0; d < 4; d++) {
+        const newTurns = (d === dir) ? turns : turns + 1;
+        if (newTurns > 2) continue;
+
+        const nr = r + dirs[d][0];
+        const nc = c + dirs[d][1];
+        if (nr < 0 || nr >= totalRows || nc < 0 || nc >= totalCols) continue;
+
+        // 到达终点
+        if (nr === er && nc === ec) {
+          const fullPath = [...path, {r: nr, c: nc}];
+          // 转换回棋盘坐标
+          return fullPath.map(p => ({r: p.r - 1, c: p.c - 1}));
+        }
+
+        if (!isPassable(nr, nc)) continue;
+        if (visited[nr][nc][d] <= newTurns) continue;
+        visited[nr][nc][d] = newTurns;
+        queue.push({r: nr, c: nc, dir: d, turns: newTurns, path: [...path, {r: nr, c: nc}]});
+      }
+    }
+
+    return null; // 无路径
+  }
+
+  // ===== 检查是否存在可消除对 =====
+  function linkFindAnyPair() {
+    const {board, rows, cols} = linkState;
+    const positions = {};
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (board[r][c] === 0) continue;
+        const type = board[r][c];
+        if (!positions[type]) positions[type] = [];
+        positions[type].push({r, c});
+      }
+    }
+
+    for (const type of Object.keys(positions)) {
+      const arr = positions[type];
+      for (let i = 0; i < arr.length; i++) {
+        for (let j = i + 1; j < arr.length; j++) {
+          const path = linkFindPath(board, arr[i].r, arr[i].c, arr[j].r, arr[j].c, rows, cols);
+          if (path) return {a: arr[i], b: arr[j], path};
+        }
+      }
+    }
+    return null;
+  }
+
+  // ===== 生成关卡 =====
+  function linkGenerateLevel() {
+    const diff = LINK_DIFFICULTIES[Math.floor(Math.random() * LINK_DIFFICULTIES.length)];
+    linkState.difficulty = diff;
+    linkState.rows = diff.rows;
+    linkState.cols = diff.cols;
+
+    // 消耗精力
+    if (state.gameStamina < diff.energyCost) {
+      linkShowNotice(`精力不足！需要 ${diff.energyCost} 点`);
+      linkState.active = false;
+      return false;
+    }
+    state.gameStamina -= diff.energyCost;
+
+    // 选择图案
+    const icons = [];
+    const available = [...LINK_DEFAULT_ICONS];
+    for (let i = 0; i < diff.iconCount && available.length > 0; i++) {
+      const idx = Math.floor(Math.random() * available.length);
+      icons.push(available.splice(idx, 1)[0]);
+    }
+
+    // 生成配对（总格子数必须是偶数）
+    const totalCells = diff.rows * diff.cols;
+    const pairCount = Math.floor(totalCells / 2);
+    linkState.totalPairs = pairCount;
+    linkState.pairsEliminated = 0;
+
+    // 生成图案序列（每种图案出现偶数次）
+    const tiles = [];
+    const pairsPerIcon = Math.floor(pairCount / diff.iconCount);
+    const remainder = pairCount % diff.iconCount;
+
+    for (let i = 0; i < diff.iconCount; i++) {
+      const count = pairsPerIcon + (i < remainder ? 1 : 0);
+      for (let j = 0; j < count * 2; j++) {
+        tiles.push(i + 1); // 类型从1开始
+      }
+    }
+
+    // 如果总格子是奇数，补一个空格（不应该发生，8×8和10×10都是偶数）
+    while (tiles.length < totalCells) {
+      tiles.push(0);
+    }
+
+    // 洗牌
+    for (let i = tiles.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
+    }
+
+    // 填入棋盘
+    linkState.board = [];
+    let idx = 0;
+    for (let r = 0; r < diff.rows; r++) {
+      const row = [];
+      for (let c = 0; c < diff.cols; c++) {
+        row.push(tiles[idx++]);
+      }
+      linkState.board.push(row);
+    }
+
+    // 确保初始局面有解
+    const pair = linkFindAnyPair();
+    if (!pair) {
+      // 极端情况：重新洗牌
+      linkShuffleBoard();
+    }
+
+    linkState.active = true;
+    linkState.selected = null;
+    linkState.propsUsedThisRound = { hint: 0, shuffle: 0, bomb: 0, compass: 0 };
+    linkState.bombMode = false;
+    linkState.bombFirst = null;
+    linkState.compassActive = false;
+    if (linkState.compassTimer) { clearTimeout(linkState.compassTimer); linkState.compassTimer = null; }
+
+    saveDataDebounced('连连看开局');
+    return true;
+  }
+
+  // ===== 洗牌（保持位置不变，打乱图案）=====
+  function linkShuffleBoard() {
+    const {board, rows, cols} = linkState;
+    const tiles = [];
+
+    // 收集所有非空方块
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (board[r][c] !== 0) tiles.push(board[r][c]);
+      }
+    }
+
+    // 洗牌
+    for (let i = tiles.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
+    }
+
+    // 放回
+    let idx = 0;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (board[r][c] !== 0) {
+          board[r][c] = tiles[idx++];
+        }
+      }
+    }
+
+    // 洗牌后确保有解，如果没有就微调
+    let attempts = 0;
+    while (!linkFindAnyPair() && attempts < 20) {
+      attempts++;
+      // 随机交换两个非空方块
+      const nonEmpty = [];
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          if (board[r][c] !== 0) nonEmpty.push({r, c});
+        }
+      }
+      if (nonEmpty.length < 2) break;
+      const a = nonEmpty[Math.floor(Math.random() * nonEmpty.length)];
+      const b = nonEmpty[Math.floor(Math.random() * nonEmpty.length)];
+      const tmp = board[a.r][a.c];
+      board[a.r][a.c] = board[b.r][b.c];
+      board[b.r][b.c] = tmp;
+    }
+  }
+
+  // ===== 点击方块处理 =====
+  function linkClickCell(row, col) {
+    if (!linkState.active) return;
+    const {board} = linkState;
+
+    if (board[row][col] === 0) return;
+
+    // 罗盘透视模式
+    if (linkState.compassActive) {
+      linkHighlightCompassTargets(row, col);
+      return;
+    }
+
+    // 炸弹模式
+    if (linkState.bombMode) {
+      if (!linkState.bombFirst) {
+        linkState.bombFirst = {r: row, c: col};
+        linkState.selected = {r: row, c: col};
+        linkRender();
+        return;
+      } else {
+        const first = linkState.bombFirst;
+        if (first.r === row && first.c === col) {
+          // 取消选择
+          linkState.bombFirst = null;
+          linkState.selected = null;
+          linkRender();
+          return;
+        }
+        // 检查是否同类型
+        if (board[first.r][first.c] === board[row][col]) {
+          // 强制消除
+          linkEliminatePair(first.r, first.c, row, col, null);
+          linkState.bombMode = false;
+          linkState.bombFirst = null;
+          linkState.selected = null;
+          linkShowNotice('💣 炸弹消除成功！');
+        } else {
+          linkShowNotice('💣 需要选择两个相同图案的方块！');
+          linkState.bombFirst = null;
+          linkState.selected = null;
+        }
+        linkRender();
+        return;
+      }
+    }
+
+    // 普通模式
+    if (!linkState.selected) {
+      linkState.selected = {r: row, c: col};
+      linkRender();
+      return;
+    }
+
+    const sel = linkState.selected;
+
+    // 点击同一个方块取消选择
+    if (sel.r === row && sel.c === col) {
+      linkState.selected = null;
+      linkRender();
+      return;
+    }
+
+    // 检查是否同类型
+    if (board[sel.r][sel.c] !== board[row][col]) {
+      // 不同类型，切换选择
+      linkState.selected = {r: row, c: col};
+      linkRender();
+      return;
+    }
+
+    // 同类型，检查路径
+    const path = linkFindPath(board, sel.r, sel.c, row, col, linkState.rows, linkState.cols);
+    if (path) {
+      // 显示连线动画然后消除
+      linkShowPath(path, () => {
+        linkEliminatePair(sel.r, sel.c, row, col, path);
+      });
+    } else {
+      // 无路径，取消选择
+      linkShowNotice('这两个方块之间无法连接！');
+      linkState.selected = null;
+      linkRender();
+    }
+  }
+
+  // ===== 消除一对 =====
+  function linkEliminatePair(r1, c1, r2, c2, path) {
+    const {board} = linkState;
+    board[r1][c1] = 0;
+    board[r2][c2] = 0;
+    linkState.pairsEliminated++;
+    linkState.selected = null;
+
+    // 金币奖励 1~3
+    const goldReward = Math.floor(Math.random() * 2);
+    state.gameGold += goldReward;
+
+    // 检查胜利
+    let remaining = 0;
+    for (let r = 0; r < linkState.rows; r++) {
+      for (let c = 0; c < linkState.cols; c++) {
+        if (board[r][c] !== 0) remaining++;
+      }
+    }
+
+    if (remaining === 0) {
+      linkState.active = false;
+      saveDataImmediate('连连看通关');
+      setTimeout(() => linkGameOver(true), 500);
+      linkRender();
+      return;
+    }
+
+    // 死局检测
+    const anyPair = linkFindAnyPair();
+    if (!anyPair) {
+      linkShowNotice('呜哇，好像已经没有可以连接的方块了！要不要用个「重组旋风」？🌀');
+    }
+
+    saveDataDebounced('连连看消除');
+    linkRender();
+  }
+
+  // ===== 显示连线路径 =====
+  function linkShowPath(path, callback) {
+    const boardEl = document.getElementById('sp-link-board');
+    if (!boardEl) { callback(); return; }
+
+    // 移除旧的SVG
+    boardEl.querySelector('#sp-link-path-svg')?.remove();
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.id = 'sp-link-path-svg';
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '100%');
+    boardEl.appendChild(svg);
+
+    const cellWidth = boardEl.clientWidth / linkState.cols;
+    const cellHeight = boardEl.clientHeight / linkState.rows;
+
+    // 简化路径点（拐点）
+    const keyPoints = [path[0]];
+    for (let i = 1; i < path.length - 1; i++) {
+      const prev = path[i - 1];
+      const curr = path[i];
+      const next = path[i + 1];
+      const dirBefore = {r: curr.r - prev.r, c: curr.c - prev.c};
+      const dirAfter = {r: next.r - curr.r, c: next.c - curr.c};
+      if (dirBefore.r !== dirAfter.r || dirBefore.c !== dirAfter.c) {
+        keyPoints.push(curr);
+      }
+    }
+    keyPoints.push(path[path.length - 1]);
+
+    // 画线
+    for (let i = 0; i < keyPoints.length - 1; i++) {
+      const from = keyPoints[i];
+      const to = keyPoints[i + 1];
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', (from.c + 0.5) * cellWidth);
+      line.setAttribute('y1', (from.r + 0.5) * cellHeight);
+      line.setAttribute('x2', (to.c + 0.5) * cellWidth);
+      line.setAttribute('y2', (to.r + 0.5) * cellHeight);
+      svg.appendChild(line);
+    }
+
+    // 动画结束后回调
+    setTimeout(() => {
+      svg.remove();
+      callback();
+    }, 500);
+  }
+
+  // ===== 罗盘透视：高亮可连同伴 =====
+  function linkHighlightCompassTargets(row, col) {
+    const {board, rows, cols} = linkState;
+    const type = board[row][col];
+    if (type === 0) return;
+
+    // 找所有同类型且可连通的方块
+    const targets = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (r === row && c === col) continue;
+        if (board[r][c] !== type) continue;
+        const path = linkFindPath(board, row, col, r, c, rows, cols);
+        if (path) targets.push({r, c});
+      }
+    }
+
+    // 高亮显示
+    const cells = document.querySelectorAll('.sp-link-cell-tile');
+    cells.forEach(cell => cell.classList.remove('sp-link-compass-highlight'));
+
+    targets.forEach(t => {
+      const cellEl = document.querySelector(`.sp-link-cell[data-row="${t.r}"][data-col="${t.c}"]`);
+      if (cellEl) cellEl.classList.add('sp-link-compass-highlight');
+    });
+
+    if (targets.length === 0) {
+      linkShowNotice('这个图案当前没有可连通的同伴');
+    } else {
+      linkShowNotice(`找到 ${targets.length} 个可连通的同伴！`);
+    }
+
+    // 1.5秒后清除高亮
+    setTimeout(() => {
+      document.querySelectorAll('.sp-link-compass-highlight').forEach(el => {
+        el.classList.remove('sp-link-compass-highlight');
+      });
+    }, 1500);
+  }
+
+  // ===== 道具使用 =====
+  function linkUseProp(propKey) {
+    if (!linkState.active) return;
+
+    const prop = LINK_PROPS[propKey];
+    if (!prop) return;
+
+    // 检查本局使用次数
+    if (linkState.propsUsedThisRound[propKey] >= prop.perGameLimit) {
+      linkShowNotice(`${prop.name} 本局已用完（限${prop.perGameLimit}次）！`);
+      return;
+    }
+
+    // 检查背包库存
+    if (!state.linkInventory) state.linkInventory = { hint: 0, shuffle: 0, bomb: 0, compass: 0 };
+    if ((state.linkInventory[propKey] || 0) <= 0) {
+      linkShowNotice(`${prop.name} 库存不足！去商店购买吧`);
+      return;
+    }
+
+    // 扣除库存
+    state.linkInventory[propKey]--;
+    linkState.propsUsedThisRound[propKey]++;
+
+    // 执行效果
+    switch (propKey) {
+      case 'hint': {
+        const pair = linkFindAnyPair();
+        if (!pair) {
+          linkShowNotice('当前没有可消除的方块，建议使用「重组旋风」！');
+          // 退还
+          state.linkInventory[propKey]++;
+          linkState.propsUsedThisRound[propKey]--;
+          return;
+        }
+        // 高亮提示
+        const cellA = document.querySelector(`.sp-link-cell[data-row="${pair.a.r}"][data-col="${pair.a.c}"]`);
+        const cellB = document.querySelector(`.sp-link-cell[data-row="${pair.b.r}"][data-col="${pair.b.c}"]`);
+        if (cellA) cellA.classList.add('sp-link-hint');
+        if (cellB) cellB.classList.add('sp-link-hint');
+        linkShowNotice('🔍 高亮了一对可消除的方块！');
+        setTimeout(() => {
+          if (cellA) cellA.classList.remove('sp-link-hint');
+          if (cellB) cellB.classList.remove('sp-link-hint');
+        }, 3000);
+        break;
+      }
+
+      case 'shuffle': {
+        linkShuffleBoard();
+        linkShowNotice('🌀 方块已重新洗牌！');
+        linkState.selected = null;
+        linkRender();
+        break;
+      }
+
+      case 'bomb': {
+        linkState.bombMode = true;
+        linkState.bombFirst = null;
+        linkState.selected = null;
+        linkShowNotice('💣 炸弹模式！请选择两个相同图案的方块');
+        linkRender();
+        break;
+      }
+
+      case 'compass': {
+        linkState.compassActive = true;
+        linkShowNotice('🧭 罗盘透视！10秒内点击任意方块查看可连同伴');
+        if (linkState.compassTimer) clearTimeout(linkState.compassTimer);
+        linkState.compassTimer = setTimeout(() => {
+          linkState.compassActive = false;
+          linkState.compassTimer = null;
+          linkShowNotice('🧭 罗盘透视已结束');
+          document.querySelectorAll('.sp-link-compass-highlight').forEach(el => {
+            el.classList.remove('sp-link-compass-highlight');
+          });
+        }, 10000);
+        break;
+      }
+    }
+
+    saveDataDebounced('连连看使用道具');
+    linkRenderProps();
+  }
+
+  // ===== 商店购买 =====
+  function linkBuyProp(propKey) {
+    const prop = LINK_PROPS[propKey];
+    if (!prop) return;
+
+    if (state.gameGold < prop.price) {
+      linkShowNotice(`金币不足！需要 ${prop.price} 🪙`);
+      return;
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    if (!state.linkItemPurchaseLog) state.linkItemPurchaseLog = {};
+    if (!state.linkItemPurchaseLog[today]) state.linkItemPurchaseLog[today] = {};
+    const bought = state.linkItemPurchaseLog[today][propKey] || 0;
+    if (bought >= prop.dailyLimit) {
+      linkShowNotice(`${prop.name} 今日已售罄（限${prop.dailyLimit}个/天）`);
+      return;
+    }
+
+    state.gameGold -= prop.price;
+    state.linkItemPurchaseLog[today][propKey] = bought + 1;
+    if (!state.linkInventory) state.linkInventory = { hint: 0, shuffle: 0, bomb: 0, compass: 0 };
+    state.linkInventory[propKey] = (state.linkInventory[propKey] || 0) + 1;
+
+    linkShowNotice(`购买了 ${prop.name}，已放入背包！`);
+    saveDataDebounced('连连看商店购买');
+    linkRenderShop();
+    linkRenderBag();
+    const goldEl = document.getElementById('sp-link-gold');
+    if (goldEl) goldEl.textContent = state.gameGold;
+  }
+
+  // ===== 游戏结算 =====
+  function linkGameOver(victory) {
+    linkState.active = false;
+    if (linkState.compassTimer) { clearTimeout(linkState.compassTimer); linkState.compassTimer = null; }
+    linkState.compassActive = false;
+    linkState.bombMode = false;
+
+    const baseReward = Math.floor(linkState.pairsEliminated * 0.3);
+    let bonusReward = 0;
+    let bonusMsg = '';
+
+    if (victory) {
+      bonusReward = linkState.difficulty.clearReward;
+      bonusMsg = `\n🏆 通关奖励: +${bonusReward} 🪙`;
+      state.energy = Math.min(100, state.energy + 10);
+      updateMood();
+      updateStatusBars();
+    }
+
+    const totalGold = baseReward + bonusReward;
+    state.gameGold += totalGold;
+    saveDataImmediate('连连看结算');
+
+    const panel = document.getElementById('sp-link-panel');
+    if (!panel) return;
+
+    panel.querySelector('#sp-link-result-overlay')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-link-result-overlay';
+    overlay.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:10;border-radius:16px;';
+    overlay.innerHTML = `
+      <div class="sp-link-result-box">
+        <div class="sp-link-result-title">${victory ? '🎉 恭喜通关！' : '😿 游戏结束'}</div>
+        <div class="sp-link-result-info">
+          <div>难度: ${linkState.difficulty?.name || '未知'}</div>
+          <div>消除: ${linkState.pairsEliminated} 对</div>
+          <div>消除奖励: +${baseReward} 🪙${bonusMsg}</div>
+          <div style="font-weight:700;margin-top:6px;">总获得: +${totalGold} 🪙</div>
+        </div>
+        <div class="sp-link-result-actions">
+          <button class="sp-link-result-btn" id="sp-link-restart">🔄 再来一局</button>
+          <button class="sp-link-result-btn sp-link-result-close" id="sp-link-quit">❌ 退出</button>
+        </div>
+      </div>
+    `;
+    panel.appendChild(overlay);
+
+    document.getElementById('sp-link-restart')?.addEventListener('click', () => {
+      overlay.remove();
+      const ok = linkGenerateLevel();
+      if (ok) linkRender();
+    });
+    document.getElementById('sp-link-quit')?.addEventListener('click', () => {
+      overlay.remove();
+      isLinkOpen = false;
+      panel.classList.remove('visible');
+    });
+  }
+
+  // ===== 通知 =====
+  function linkShowNotice(text) {
+    const notice = document.getElementById('sp-link-notice');
+    if (!notice) return;
+    notice.textContent = text;
+    notice.classList.add('visible');
+    clearTimeout(notice._timer);
+    notice._timer = setTimeout(() => notice.classList.remove('visible'), 3500);
+  }
+
+  // ===== 渲染棋盘 =====
+  function linkRender() {
+    const boardEl = document.getElementById('sp-link-board');
+    const infoEl = document.getElementById('sp-link-info');
+    if (!boardEl) return;
+
+    const {board, rows, cols, selected} = linkState;
+
+    // 设置grid
+    boardEl.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    boardEl.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+
+    let html = '';
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const type = board[r][c];
+        const isSelected = selected && selected.r === r && selected.c === c;
+        const isBombSelected = linkState.bombFirst && linkState.bombFirst.r === r && linkState.bombFirst.c === c;
+
+        if (type === 0) {
+          html += `<div class="sp-link-cell sp-link-cell-empty" data-row="${r}" data-col="${c}"></div>`;
+        } else {
+          const selectedClass = (isSelected || isBombSelected) ? ' sp-link-selected' : '';
+          const iconIdx = type - 1;
+          const customImg = state.gameCustomImages?.[`link_icon_${iconIdx}`];
+          const display = customImg
+            ? `<img src="${customImg}" class="sp-link-cell-img" />`
+            : LINK_DEFAULT_ICONS[iconIdx] || '?';
+          html += `<div class="sp-link-cell sp-link-cell-tile${selectedClass}" data-row="${r}" data-col="${c}">${display}</div>`;
+        }
+      }
+    }
+    boardEl.innerHTML = html;
+
+    // 绑定点击
+    boardEl.querySelectorAll('.sp-link-cell-tile').forEach(cell => {
+      cell.addEventListener('click', () => {
+        const row = parseInt(cell.dataset.row);
+        const col = parseInt(cell.dataset.col);
+        linkClickCell(row, col);
+      });
+    });
+
+    // 信息栏
+    if (infoEl) {
+      let remaining = 0;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          if (board[r][c] !== 0) remaining++;
+        }
+      }
+      const modeText = linkState.bombMode ? ' | 💣炸弹模式' : (linkState.compassActive ? ' | 🧭透视中' : '');
+      infoEl.innerHTML = `
+        <span>剩余: ${remaining}</span>
+        <span>已消: ${linkState.pairsEliminated} 对</span>
+        <span>难度: ${linkState.difficulty?.name || '-'}${modeText}</span>
+      `;
+    }
+
+    linkRenderProps();
+
+    // 更新金币
+    const goldEl = document.getElementById('sp-link-gold');
+    if (goldEl) goldEl.textContent = state.gameGold;
+  }
+
+  // ===== 渲染道具按钮 =====
+  function linkRenderProps() {
+    if (!state.linkInventory) state.linkInventory = { hint: 0, shuffle: 0, bomb: 0, compass: 0 };
+    const propEls = {
+      hint: document.getElementById('sp-link-prop-hint-count'),
+      shuffle: document.getElementById('sp-link-prop-shuffle-count'),
+      bomb: document.getElementById('sp-link-prop-bomb-count'),
+      compass: document.getElementById('sp-link-prop-compass-count'),
+    };
+    Object.keys(propEls).forEach(key => {
+      const el = propEls[key];
+      if (el) {
+        const stock = state.linkInventory[key] || 0;
+        const used = linkState.propsUsedThisRound[key] || 0;
+        const limit = LINK_PROPS[key].perGameLimit;
+        el.textContent = `×${stock} (${used}/${limit})`;
+      }
+    });
+  }
+
+  // ===== 渲染背包 =====
+  function linkRenderBag() {
+    const container = document.getElementById('sp-link-bag-content');
+    if (!container) return;
+    if (!state.linkInventory) state.linkInventory = { hint: 0, shuffle: 0, bomb: 0, compass: 0 };
+
+    const items = Object.entries(LINK_PROPS).map(([key, prop]) => ({
+      key, ...prop, count: state.linkInventory[key] || 0
+    }));
+
+    const hasAny = items.some(i => i.count > 0);
+
+    container.innerHTML = hasAny ? items.map(item => `
+      <div class="sp-link-bag-item ${item.count <= 0 ? 'sp-link-bag-empty' : ''}">
+        <span class="sp-link-bag-icon">${item.name.split(' ')[0]}</span>
+        <div class="sp-link-bag-info">
+          <span class="sp-link-bag-name">${item.name.split(' ').slice(1).join(' ')}</span>
+          <span class="sp-link-bag-desc">${item.desc}</span>
+        </div>
+        <span class="sp-link-bag-count">×${item.count}</span>
+      </div>
+    `).join('') : '<div style="text-align:center;padding:20px;color:var(--sp-text-muted);font-size:12px;">背包空空如也～去商店买点道具吧</div>';
+  }
+
+  // ===== 渲染商店 =====
+  function linkRenderShop() {
+    const container = document.getElementById('sp-link-shop-content');
+    if (!container) return;
+
+    const today = new Date().toISOString().slice(0, 10);
+    const todayLog = (state.linkItemPurchaseLog && state.linkItemPurchaseLog[today]) || {};
+
+    const items = Object.entries(LINK_PROPS).map(([key, prop]) => {
+      const bought = todayLog[key] || 0;
+      const soldOut = bought >= prop.dailyLimit;
+      const cantAfford = state.gameGold < prop.price;
+      const disabled = soldOut || cantAfford;
+      const stock = state.linkInventory?.[key] || 0;
+      return { key, ...prop, bought, soldOut, cantAfford, disabled, stock };
+    });
+
+    container.innerHTML = items.map(item => `
+      <div class="sp-link-shop-item ${item.disabled ? 'sp-link-shop-disabled' : ''}">
+        <span class="sp-link-shop-icon">${item.name.split(' ')[0]}</span>
+        <div class="sp-link-shop-info">
+          <span class="sp-link-shop-name">${item.name.split(' ').slice(1).join(' ')}</span>
+          <span class="sp-link-shop-desc">${item.desc} | 每局限${item.perGameLimit}次</span>
+          <span style="font-size:9px;color:var(--sp-text-muted);">${item.soldOut ? '今日售罄' : `今日剩 ${item.dailyLimit - item.bought}`} | 背包: ${item.stock}</span>
+        </div>
+        <button class="sp-link-shop-buy" data-prop="${item.key}" ${item.disabled ? 'disabled' : ''}>🪙${item.price}</button>
+      </div>
+    `).join('');
+
+    container.querySelectorAll('.sp-link-shop-buy').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        linkBuyProp(btn.dataset.prop);
+      });
+    });
+  }
+
+  // ===== 渲染图鉴 =====
+  function linkRenderCollection() {
+    const grid = document.getElementById('sp-link-collection-grid');
+    if (!grid) return;
+
+    if (!state.gameCustomImages) state.gameCustomImages = {};
+
+    grid.innerHTML = LINK_DEFAULT_ICONS.map((icon, idx) => {
+      const key = `link_icon_${idx}`;
+      const custom = state.gameCustomImages[key];
+      const display = custom
+        ? `<img src="${custom}" style="width:28px;height:28px;object-fit:contain;border-radius:4px;" />`
+        : `<span style="font-size:22px;">${icon}</span>`;
+      return `
+        <div style="aspect-ratio:1;border-radius:8px;border:2px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;position:relative;cursor:pointer;overflow:hidden;transition:all 0.15s;" data-link-icon-idx="${idx}">
+          ${display}
+          <span style="font-size:8px;color:var(--sp-text-muted);">${icon}</span>
+          <div class="sp-link-icon-upload" data-idx="${idx}" style="position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;font-size:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity 0.2s;">📷</div>
+        </div>
+      `;
+    }).join('');
+
+    // hover显示上传按钮
+    grid.querySelectorAll('[data-link-icon-idx]').forEach(item => {
+      item.addEventListener('mouseenter', () => {
+        const btn = item.querySelector('.sp-link-icon-upload');
+        if (btn) btn.style.opacity = '1';
+      });
+      item.addEventListener('mouseleave', () => {
+        const btn = item.querySelector('.sp-link-icon-upload');
+        if (btn) btn.style.opacity = '0';
+      });
+    });
+
+    // 上传按钮
+    grid.querySelectorAll('.sp-link-icon-upload').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.dataset.idx);
+        linkPromptIconUpload(idx);
+      });
+    });
+  }
+
+  // ===== 图案图片上传 =====
+  function linkPromptIconUpload(idx) {
+    const key = `link_icon_${idx}`;
+    const choice = confirm(`设置图案 ${LINK_DEFAULT_ICONS[idx]} 的自定义图片\n\n点「确定」→ 输入图片链接\n点「取消」→ 选择本地文件上传`);
+
+    if (choice) {
+      const url = prompt('输入图片链接：');
+      if (url && url.trim().startsWith('http')) {
+        if (!state.gameCustomImages) state.gameCustomImages = {};
+        state.gameCustomImages[key] = url.trim();
+        saveDataImmediate('连连看图案链接');
+        linkRenderCollection();
+        linkShowNotice('图案图片已设置！');
+      }
+    } else {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) {
+          linkShowNotice('图片不能超过2MB');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          const compressed = await compressImage(ev.target.result, 80, 0.7);
+          if (!state.gameCustomImages) state.gameCustomImages = {};
+          state.gameCustomImages[key] = compressed;
+          saveDataImmediate('连连看图案上传');
+          linkRenderCollection();
+          linkShowNotice('图案图片已设置！');
+        };
+        reader.readAsDataURL(file);
+      };
+      input.click();
+    }
+  }
+
+  // ===== 渲染主面板 =====
+  function linkRenderPanel() {
+    let panel = document.getElementById('sp-link-panel');
+    if (panel) panel.remove();
+
+    panel = document.createElement('div');
+    panel.id = 'sp-link-panel';
+    panel.innerHTML = `
+      <div id="sp-link-header">
+        <span>🔗 连连看</span>
+        <div class="sp-link-header-right">
+          <button id="sp-link-minimize" title="缩小悬挂" style="background:none;border:none;font-size:14px;cursor:pointer;color:var(--sp-text-muted);padding:2px 6px;">─</button>
+          <button id="sp-link-close" title="关闭">✕</button>
+        </div>
+      </div>
+      <div id="sp-link-notice"></div>
+      <div style="display:flex;gap:4px;padding:6px 10px;background:rgba(255,255,255,0.03);border-bottom:1px solid var(--sp-border-light);align-items:center;">
+        <button class="sp-game-tab active" data-linktab="play" id="sp-link-tab-play">🎮 游戏</button>
+        <button class="sp-game-tab" data-linktab="bag" id="sp-link-tab-bag">🎒 背包</button>
+        <button class="sp-game-tab" data-linktab="shop" id="sp-link-tab-shop">🛒 商店</button>
+        <button class="sp-game-tab" data-linktab="collection" id="sp-link-tab-collection">📖 图鉴</button>
+        <span class="sp-link-gold-display" style="margin-left:auto;">🪙 <span id="sp-link-gold">${state.gameGold}</span></span>
+      </div>
+      <div id="sp-link-body">
+        <div id="sp-link-tab-content-play">
+          <div id="sp-link-info"></div>
+          <div id="sp-link-board"></div>
+          <div id="sp-link-props">
+            <button class="sp-link-prop-btn" id="sp-link-prop-hint" title="${LINK_PROPS.hint.desc}">
+              <span class="sp-link-prop-icon">🔍</span>
+              <span class="sp-link-prop-name">放大镜</span>
+              <span class="sp-link-prop-count" id="sp-link-prop-hint-count">×0</span>
+            </button>
+            <button class="sp-link-prop-btn" id="sp-link-prop-shuffle" title="${LINK_PROPS.shuffle.desc}">
+              <span class="sp-link-prop-icon">🌀</span>
+              <span class="sp-link-prop-name">重组旋风</span>
+              <span class="sp-link-prop-count" id="sp-link-prop-shuffle-count">×0</span>
+            </button>
+            <button class="sp-link-prop-btn" id="sp-link-prop-bomb" title="${LINK_PROPS.bomb.desc}">
+              <span class="sp-link-prop-icon">💣</span>
+              <span class="sp-link-prop-name">友情炸弹</span>
+              <span class="sp-link-prop-count" id="sp-link-prop-bomb-count">×0</span>
+            </button>
+            <button class="sp-link-prop-btn" id="sp-link-prop-compass" title="${LINK_PROPS.compass.desc}">
+              <span class="sp-link-prop-icon">🧭</span>
+              <span class="sp-link-prop-name">罗盘透视</span>
+              <span class="sp-link-prop-count" id="sp-link-prop-compass-count">×0</span>
+            </button>
+          </div>
+          <div style="height:8px;"></div>
+          <div id="sp-link-controls">
+            <button class="sp-link-ctrl-btn" id="sp-link-restart-btn">🔄 重开</button>
+            <button class="sp-link-ctrl-btn sp-link-ctrl-quit" id="sp-link-end-btn">❌ 结束</button>
+          </div>
+        </div>
+        <div id="sp-link-tab-content-bag" style="display:none;padding:8px;">
+          <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">🎒 道具背包</div>
+          <div id="sp-link-bag-content"></div>
+        </div>
+        <div id="sp-link-tab-content-shop" style="display:none;padding:8px;">
+          <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">🛒 道具商店</div>
+          <div id="sp-link-shop-content"></div>
+        </div>
+        <div id="sp-link-tab-content-collection" style="display:none;padding:8px;">
+          <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">📖 图案图鉴 <span style="font-size:10px;color:var(--sp-text-muted);font-weight:400;">（点击 📷 上传自定义图片）</span></div>
+          <div id="sp-link-collection-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;"></div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(panel);
+
+    // 最小化
+    document.getElementById('sp-link-minimize').addEventListener('click', () => {
+      const linkPanel = document.getElementById('sp-link-panel');
+      const minBtn = document.getElementById('sp-link-minimize');
+      if (!linkPanel || !minBtn) return;
+      if (linkPanel.classList.contains('sp-link-minimized')) {
+        linkPanel.classList.remove('sp-link-minimized');
+        minBtn.textContent = '─';
+        minBtn.title = '缩小悬挂';
+      } else {
+        linkPanel.classList.add('sp-link-minimized');
+        minBtn.textContent = '□';
+        minBtn.title = '恢复窗口';
+      }
+    });
+
+    // 关闭
+    document.getElementById('sp-link-close').addEventListener('click', () => toggleLinkGame());
+
+    // 道具按钮
+    document.getElementById('sp-link-prop-hint').addEventListener('click', () => linkUseProp('hint'));
+    document.getElementById('sp-link-prop-shuffle').addEventListener('click', () => linkUseProp('shuffle'));
+    document.getElementById('sp-link-prop-bomb').addEventListener('click', () => linkUseProp('bomb'));
+    document.getElementById('sp-link-prop-compass').addEventListener('click', () => linkUseProp('compass'));
+
+    // 重开按钮
+    // 重开按钮
+    document.getElementById('sp-link-restart-btn').addEventListener('click', () => {
+      const cost = linkState.difficulty?.energyCost || 5;
+      if (state.gameStamina < cost) {
+        linkShowNotice(`体力不足！开一局需要 ${cost} 点体力`);
+        return;
+      }
+      if (!confirm(`重开本局？将消耗 ${cost} 点体力，当前进度清零。`)) return;
+      const ok = linkGenerateLevel();
+      if (ok) {
+        linkRender();
+        linkShowNotice(`🔄 新的一局开始了！（-${cost}⚡）`);
+        if (isGameOpen) gameRenderStatus();
+      }
+    });
+
+    // 结束按钮
+    document.getElementById('sp-link-end-btn').addEventListener('click', () => {
+      if (!confirm('确定结束游戏？将按当前已消除对数结算金币。')) return;
+      linkState.active = false;
+      if (linkState.compassTimer) { clearTimeout(linkState.compassTimer); linkState.compassTimer = null; }
+      const baseReward = Math.floor(linkState.pairsEliminated * 0.3);
+      state.gameGold += baseReward;
+      saveDataImmediate('连连看手动结束');
+      linkShowNotice(`结算完成！消除 ${linkState.pairsEliminated} 对，获得 +${baseReward} 🪙`);
+      setTimeout(() => {
+        const cost = LINK_DIFFICULTIES[0].energyCost || 5;
+        if (state.gameStamina < cost) {
+          linkShowNotice('体力不足，无法自动开新局');
+          return;
+        }
+        const ok = linkGenerateLevel();
+        if (ok) {
+          linkRender();
+          linkShowNotice(`新局开始！（-${cost}⚡）`);
+          if (isGameOpen) gameRenderStatus();
+        }
+      }, 1500);
+
+    });
+
+    // 标签页切换
+    const linkTabs = ['play', 'bag', 'shop', 'collection'];
+    linkTabs.forEach(tabName => {
+      const tabBtn = document.getElementById(`sp-link-tab-${tabName}`);
+      if (tabBtn) {
+        tabBtn.addEventListener('click', () => {
+          linkTabs.forEach(t => {
+            const b = document.getElementById(`sp-link-tab-${t}`);
+            if (b) b.classList.toggle('active', t === tabName);
+          });
+          document.getElementById('sp-link-tab-content-play').style.display = tabName === 'play' ? '' : 'none';
+          document.getElementById('sp-link-tab-content-bag').style.display = tabName === 'bag' ? '' : 'none';
+          document.getElementById('sp-link-tab-content-shop').style.display = tabName === 'shop' ? '' : 'none';
+          document.getElementById('sp-link-tab-content-collection').style.display = tabName === 'collection' ? '' : 'none';
+          if (tabName === 'bag') linkRenderBag();
+          if (tabName === 'shop') linkRenderShop();
+          if (tabName === 'collection') linkRenderCollection();
+        });
+      }
+    });
+
+    // 面板拖拽
+    linkBindPanelDrag();
+  }
+
+  // ===== 面板拖拽 =====
+  function linkBindPanelDrag() {
+    const header = document.getElementById('sp-link-header');
+    const panel = document.getElementById('sp-link-panel');
+    if (!header || !panel) return;
+
+    let dragging = false, offX = 0, offY = 0;
+
+    const down = (e) => {
+      if (e.target.closest('#sp-link-close') || e.target.closest('#sp-link-minimize')) return;
+      dragging = true;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const rect = panel.getBoundingClientRect();
+      offX = clientX - rect.left;
+      offY = clientY - rect.top;
+    };
+    const move = (e) => {
+      if (!dragging) return;
+      if (e.cancelable) e.preventDefault();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      let x = clientX - offX;
+      let y = clientY - offY;
+      x = Math.max(0, Math.min(window.innerWidth - panel.offsetWidth, x));
+      y = Math.max(0, Math.min(window.innerHeight - panel.offsetHeight, y));
+      panel.style.left = x + 'px';
+      panel.style.top = y + 'px';
+    };
+    const up = () => { dragging = false; };
+
+    header.addEventListener('mousedown', down);
+    header.addEventListener('touchstart', down, { passive: true });
+    document.addEventListener('mousemove', move);
+    document.addEventListener('touchmove', move, { passive: false });
+    document.addEventListener('mouseup', up);
+    document.addEventListener('touchend', up);
+  }
+
+  // ===== 开关连连看面板 =====
+  function toggleLinkGame() {
+    isLinkOpen = !isLinkOpen;
+    let panel = document.getElementById('sp-link-panel');
+
+    if (isLinkOpen) {
+      gameRecoverStamina(); // 恢复体力
+
+      if (!panel) {
+        linkRenderPanel();
+        panel = document.getElementById('sp-link-panel');
+      }
+
+      // 清理残留弹窗
+      panel.querySelector('#sp-link-result-overlay')?.remove();
+
+      panel.classList.add('visible');
+
+      // 居中
+      const w = Math.min(420, window.innerWidth - 20);
+      panel.style.width = w + 'px';
+      requestAnimationFrame(() => {
+        const h = panel.offsetHeight;
+        const maxTop = window.innerHeight - h - 20;
+        const centerTop = Math.floor((window.innerHeight - h) / 2);
+        panel.style.left = Math.floor((window.innerWidth - w) / 2) + 'px';
+        panel.style.top = Math.max(10, Math.min(centerTop, maxTop)) + 'px';
+      });
+
+      // 如果没有活跃游戏，开新局
+      if (!linkState.active) {
+        const ok = linkGenerateLevel();
+        if (!ok) {
+          // 精力不足，仍显示面板但不开局
+          linkRender();
+          return;
+        }
+      }
+      linkRender();
+    } else {
+      if (panel) panel.classList.remove('visible');
+      // 退出炸弹/罗盘模式
+      linkState.bombMode = false;
+      linkState.bombFirst = null;
+      if (linkState.compassTimer) { clearTimeout(linkState.compassTimer); linkState.compassTimer = null; }
+      linkState.compassActive = false;
     }
   }
 
