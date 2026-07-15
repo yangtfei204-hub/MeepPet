@@ -1981,6 +1981,8 @@
   border-radius: 12px;
   border: 1px solid var(--sp-border-light);
   position: relative;
+  contain: layout style paint;
+  will-change: contents;
 }
 
 .sp-game-cell {
@@ -1992,11 +1994,12 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
   position: relative;
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
+  contain: layout style;
 }
 
 .sp-game-cell:hover {
@@ -3027,6 +3030,8 @@
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
+  contain: layout style paint;
+  will-change: contents;
 }
 
 .sp-match3-card {
@@ -3920,6 +3925,8 @@
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
+  contain: layout style paint;
+  will-change: contents;
 }
 
 .sp-link-cell {
@@ -3946,6 +3953,13 @@
   background: rgba(255,255,255,0.1);
   border: 2px solid rgba(255,255,255,0.2);
   box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+.sp-link-cell-tile {
+  background: rgba(255,255,255,0.1);
+  border: 2px solid rgba(255,255,255,0.2);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  contain: layout style;
 }
 
 .sp-link-cell-tile:hover {

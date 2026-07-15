@@ -6842,6 +6842,56 @@ function refreshCharPreview() {
     const boardEl = document.getElementById('sp-game-board');
     if (!boardEl) return;
 
+    // 如果格子数量没变，尝试增量更新而非全量重写
+    const existingCells = boardEl.querySelectorAll('.sp-game-cell');
+    if (existingCells.length === GAME_BOARD_CELLS) {
+      // 增量更新模式
+      for (let i = 0; i < GAME_BOARD_CELLS; i++) {
+        const cell = existingCells[i];
+        let cellClass = 'sp-game-cell';
+        let content = '';
+        let title = '';
+
+        if (i === state.gameGeneratorPos) {
+          cellClass += ' sp-game-generator';
+          const customGen = state.gameCustomImages?.generator;
+          content = customGen
+            ? `<img src="${customGen}" class="sp-game-cell-img" alt="生成器" />`
+            : '<span class="sp-game-cell-emoji">🐾</span>';
+          title = '魔法猫爪生成器（点击消耗1体力）';
+        } else if (i === state.gameSellPos) {
+          cellClass += ' sp-game-sell';
+          content = '<span class="sp-game-cell-emoji">💰</span>';
+          title = '售卖区（拖入或轻触选中后点击此处售卖）';
+        } else {
+          const cellData = state.gameBoard[i];
+          if (cellData) {
+            cellClass += ' sp-game-has-item';
+            content = gameGetItemDisplay(cellData.chain, cellData.level);
+            const info = gameGetItemInfo(cellData.chain, cellData.level);
+            title = `${info.emoji} ${info.name} (Lv${cellData.level}) - 售价:${info.sell}金币`;
+            cellClass += ` sp-game-chain-${cellData.chain}`;
+          }
+        }
+
+        if (gameSelectedCell === i) {
+          cellClass += ' sp-game-selected';
+        }
+
+        const levelBadge = state.gameBoard[i] ? 'L' + state.gameBoard[i].level : '';
+
+        // 只在内容实际变化时更新 DOM
+        if (cell.className !== cellClass) cell.className = cellClass;
+        if (cell.title !== title) cell.title = title;
+
+        const newInner = content + `<span class="sp-game-level-badge">${levelBadge}</span>`;
+        if (cell.innerHTML !== newInner) cell.innerHTML = newInner;
+      }
+      gameBindCellEvents();
+      return;
+    }
+
+    // 全量渲染（首次或格子数变化时）
     let html = '';
     for (let i = 0; i < GAME_BOARD_CELLS; i++) {
       let cellClass = 'sp-game-cell';
@@ -6860,13 +6910,13 @@ function refreshCharPreview() {
         content = '<span class="sp-game-cell-emoji">💰</span>';
         title = '售卖区（拖入或轻触选中后点击此处售卖）';
       } else {
-        const cell = state.gameBoard[i];
-        if (cell) {
+        const cellData = state.gameBoard[i];
+        if (cellData) {
           cellClass += ' sp-game-has-item';
-          content = gameGetItemDisplay(cell.chain, cell.level);
-          const info = gameGetItemInfo(cell.chain, cell.level);
-          title = `${info.emoji} ${info.name} (Lv${cell.level}) - 售价:${info.sell}金币`;
-          cellClass += ` sp-game-chain-${cell.chain}`;
+          content = gameGetItemDisplay(cellData.chain, cellData.level);
+          const info = gameGetItemInfo(cellData.chain, cellData.level);
+          title = `${info.emoji} ${info.name} (Lv${cellData.level}) - 售价:${info.sell}金币`;
+          cellClass += ` sp-game-chain-${cellData.chain}`;
         }
       }
 
@@ -7842,33 +7892,48 @@ function refreshCharPreview() {
     match3UpdateBlockState();
   }
 
-  // ===== 遮挡判定 =====
+  // ===== 遮挡判定（优化版：按层分组，只检查上层）=====
   function match3UpdateBlockState() {
     const cards = match3State.cards;
     const cardW = 44;
     const cardH = 44;
-    const overlapThreshold = 20; // 重叠判定阈值
+    const overlapThreshold = 20;
 
-    cards.forEach(card => {
-      if (card.state === 'collected' || card.state === 'eliminated') return;
+    // 按层分组，只需要拿上层的牌来检查遮挡
+    const activeLayers = {};
+    for (let i = 0; i < cards.length; i++) {
+      const card = cards[i];
+      if (card.state === 'collected' || card.state === 'eliminated') continue;
+      if (!activeLayers[card.z]) activeLayers[card.z] = [];
+      activeLayers[card.z].push(card);
+    }
 
-      let blocked = false;
-      for (const other of cards) {
-        if (other.id === card.id) continue;
-        if (other.state === 'collected' || other.state === 'eliminated') continue;
-        if (other.z <= card.z) continue; // 只有上层才能遮挡下层
+    const layerKeys = Object.keys(activeLayers).map(Number).sort((a, b) => a - b);
 
-        // 检查 x,y 投影是否重叠
-        const overlapX = Math.abs(other.x - card.x) < (cardW - overlapThreshold);
-        const overlapY = Math.abs(other.y - card.y) < (cardH - overlapThreshold);
-        if (overlapX && overlapY) {
-          blocked = true;
-          break;
+    // 对每个牌，只需要检查比它层级高的牌是否遮挡
+    for (let li = 0; li < layerKeys.length; li++) {
+      const layer = activeLayers[layerKeys[li]];
+      for (let ci = 0; ci < layer.length; ci++) {
+        const card = layer[ci];
+        let blocked = false;
+
+        // 只检查上层（li+1 到最高层）
+        for (let hi = li + 1; hi < layerKeys.length && !blocked; hi++) {
+          const upperLayer = activeLayers[layerKeys[hi]];
+          for (let ui = 0; ui < upperLayer.length; ui++) {
+            const other = upperLayer[ui];
+            const overlapX = Math.abs(other.x - card.x) < (cardW - overlapThreshold);
+            const overlapY = Math.abs(other.y - card.y) < (cardH - overlapThreshold);
+            if (overlapX && overlapY) {
+              blocked = true;
+              break;
+            }
+          }
         }
-      }
 
-      card.state = blocked ? 'blocked' : 'visible';
-    });
+        card.state = blocked ? 'blocked' : 'visible';
+      }
+    }
   }
 
   // ===== 点击收集牌 =====
@@ -9190,38 +9255,67 @@ function refreshCharPreview() {
 
   let isLinkOpen = false;
 
-  // ===== 路径查找算法（BFS，最多2次转折）=====
-  // 棋盘外围留一圈虚空通道（index -1 和 rows/cols）
-  function linkFindPath(board, r1, c1, r2, c2, rows, cols) {
-    // 方向：上下左右
-    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+  // ===== 路径查找算法（BFS，最多2次转折）- 性能优化版 =====
+  // 预分配缓冲区，避免每次调用都创建大数组
+  let _linkVisitedBuf = null;
+  let _linkVisitedRows = 0;
+  let _linkVisitedCols = 0;
+  let _linkBfsQueue = null;
+  let _linkBfsQueueSize = 0;
 
-    // 检查位置是否可通行（空格或棋盘外圈）
+  function linkFindPath(board, r1, c1, r2, c2, rows, cols) {
+    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+    const totalRows = rows + 2;
+    const totalCols = cols + 2;
+
+    // 复用 visited 缓冲区（避免每次分配新数组）
+    if (_linkVisitedRows !== totalRows || _linkVisitedCols !== totalCols) {
+      _linkVisitedBuf = new Uint8Array(totalRows * totalCols * 4);
+      _linkVisitedRows = totalRows;
+      _linkVisitedCols = totalCols;
+    }
+    _linkVisitedBuf.fill(255); // 255 = Infinity
+
+    // 复用 BFS 队列（环形缓冲）
+    const maxQueueSize = totalRows * totalCols * 4;
+    if (!_linkBfsQueue || _linkBfsQueueSize < maxQueueSize) {
+      _linkBfsQueue = new Int16Array(maxQueueSize * 5); // r, c, dir, turns, parentIdx
+      _linkBfsQueueSize = maxQueueSize;
+    }
+
+    function visitedIdx(r, c, d) {
+      return (r * totalCols + c) * 4 + d;
+    }
+
     function isPassable(r, c) {
-      // 外圈虚空通道
-      if (r < 0 || r > rows + 1 || c < 0 || c > cols + 1) return false;
-      if (r === 0 || r === rows + 1 || c === 0 || c === cols + 1) return true;
-      // 棋盘内部：空格可通行
+      if (r < 0 || r >= totalRows || c < 0 || c >= totalCols) return false;
+      if (r === 0 || r === totalRows - 1 || c === 0 || c === totalCols - 1) return true;
       const boardR = r - 1;
       const boardC = c - 1;
       if (boardR < 0 || boardR >= rows || boardC < 0 || boardC >= cols) return true;
       return board[boardR][boardC] === 0;
     }
 
-    // BFS状态: {r, c, dir, turns}
-    // 起点和终点在带外圈的坐标系中：实际棋盘(0,0)对应(1,1)
     const sr = r1 + 1, sc = c1 + 1;
     const er = r2 + 1, ec = c2 + 1;
 
-    // visited[r][c][dir] = 最少转弯数
-    const totalRows = rows + 2;
-    const totalCols = cols + 2;
-    const visited = Array.from({length: totalRows}, () =>
-      Array.from({length: totalCols}, () => [Infinity, Infinity, Infinity, Infinity])
-    );
+    let qHead = 0, qTail = 0;
 
-    // BFS队列
-    const queue = [];
+    function enqueue(r, c, dir, turns, parentIdx) {
+      const base = qTail * 5;
+      _linkBfsQueue[base] = r;
+      _linkBfsQueue[base + 1] = c;
+      _linkBfsQueue[base + 2] = dir;
+      _linkBfsQueue[base + 3] = turns;
+      _linkBfsQueue[base + 4] = parentIdx;
+      qTail++;
+    }
+
+    function dequeue() {
+      const base = qHead * 5;
+      qHead++;
+      return { r: _linkBfsQueue[base], c: _linkBfsQueue[base+1], dir: _linkBfsQueue[base+2], turns: _linkBfsQueue[base+3], parent: _linkBfsQueue[base+4] };
+    }
 
     // 从起点向四个方向出发
     for (let d = 0; d < 4; d++) {
@@ -9229,46 +9323,56 @@ function refreshCharPreview() {
       const nc = sc + dirs[d][1];
       if (nr < 0 || nr >= totalRows || nc < 0 || nc >= totalCols) continue;
       if (nr === er && nc === ec) {
-        // 直接相邻
         return [{r: r1, c: c1}, {r: r2, c: c2}];
       }
       if (!isPassable(nr, nc)) continue;
-      if (visited[nr][nc][d] <= 0) continue;
-      visited[nr][nc][d] = 0;
-      queue.push({r: nr, c: nc, dir: d, turns: 0, path: [{r: sr, c: sc}, {r: nr, c: nc}]});
+      const vi = visitedIdx(nr, nc, d);
+      if (_linkVisitedBuf[vi] <= 0) continue;
+      _linkVisitedBuf[vi] = 0;
+      enqueue(nr, nc, d, 0, -1);
     }
 
-    let head = 0;
-    while (head < queue.length) {
-      const {r, c, dir, turns, path} = queue[head++];
+    let foundIdx = -1;
 
-      // 尝试从当前位置继续
+    while (qHead < qTail) {
+      const cur = dequeue();
+      const curIdx = qHead - 1;
+
       for (let d = 0; d < 4; d++) {
-        const newTurns = (d === dir) ? turns : turns + 1;
+        const newTurns = (d === cur.dir) ? cur.turns : cur.turns + 1;
         if (newTurns > 2) continue;
 
-        const nr = r + dirs[d][0];
-        const nc = c + dirs[d][1];
+        const nr = cur.r + dirs[d][0];
+        const nc = cur.c + dirs[d][1];
         if (nr < 0 || nr >= totalRows || nc < 0 || nc >= totalCols) continue;
 
-        // 到达终点
         if (nr === er && nc === ec) {
-          const fullPath = [...path, {r: nr, c: nc}];
-          // 转换回棋盘坐标
-          return fullPath.map(p => ({r: p.r - 1, c: p.c - 1}));
+          foundIdx = curIdx;
+          // 回溯路径
+          const path = [{r: r2, c: c2}];
+          let backIdx = foundIdx;
+          while (backIdx >= 0) {
+            const base = backIdx * 5;
+            path.push({r: _linkBfsQueue[base] - 1, c: _linkBfsQueue[base+1] - 1});
+            backIdx = _linkBfsQueue[base + 4];
+          }
+          path.push({r: r1, c: c1});
+          path.reverse();
+          return path;
         }
 
         if (!isPassable(nr, nc)) continue;
-        if (visited[nr][nc][d] <= newTurns) continue;
-        visited[nr][nc][d] = newTurns;
-        queue.push({r: nr, c: nc, dir: d, turns: newTurns, path: [...path, {r: nr, c: nc}]});
+        const vi = visitedIdx(nr, nc, d);
+        if (_linkVisitedBuf[vi] <= newTurns) continue;
+        _linkVisitedBuf[vi] = newTurns;
+        enqueue(nr, nc, d, newTurns, curIdx);
       }
     }
 
-    return null; // 无路径
+    return null;
   }
 
-  // ===== 检查是否存在可消除对 =====
+  // ===== 检查是否存在可消除对（优化版：减少不必要的路径计算）=====
   function linkFindAnyPair() {
     const {board, rows, cols} = linkState;
     const positions = {};
@@ -9282,9 +9386,13 @@ function refreshCharPreview() {
       }
     }
 
-    for (const type of Object.keys(positions)) {
+    // 按类型数量从少到多排序，少的更容易快速找到结果
+    const typeKeys = Object.keys(positions).sort((a, b) => positions[a].length - positions[b].length);
+
+    for (const type of typeKeys) {
       const arr = positions[type];
-      for (let i = 0; i < arr.length; i++) {
+      if (arr.length < 2) continue;
+      for (let i = 0; i < arr.length - 1; i++) {
         for (let j = i + 1; j < arr.length; j++) {
           const path = linkFindPath(board, arr[i].r, arr[i].c, arr[j].r, arr[j].c, rows, cols);
           if (path) return {a: arr[i], b: arr[j], path};
@@ -9538,14 +9646,18 @@ function refreshCharPreview() {
       return;
     }
 
-    // 死局检测
-    const anyPair = linkFindAnyPair();
-    if (!anyPair) {
-      linkShowNotice('呜哇，好像已经没有可以连接的方块了！要不要用个「重组旋风」？🌀');
-    }
-
     saveDataDebounced('连连看消除');
     linkRender();
+
+    // 死局检测延迟到下一帧，避免阻塞渲染
+    requestAnimationFrame(() => {
+      if (!linkState.active) return;
+      const anyPair = linkFindAnyPair();
+      if (!anyPair) {
+        linkShowNotice('呜哇，好像已经没有可以连接的方块了！要不要用个「重组旋风」？🌀');
+      }
+    });
+
   }
 
   // ===== 显示连线路径 =====
