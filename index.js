@@ -2477,6 +2477,22 @@ function toggleChat() {
   // ============================================================
   function estimateTokens(text) {
     if (!text) return 0;
+    // 如果 content 是多模态数组格式，提取其中的文字部分
+    if (Array.isArray(text)) {
+      let total = 0;
+      for (const part of text) {
+        if (part.type === 'text' && part.text) {
+          total += estimateTokens(part.text);
+        } else if (part.type === 'image_url') {
+          total += 85; // 图片 token 粗略估算
+        }
+      }
+      return total;
+    }
+    // 如果不是字符串，尝试转为字符串
+    if (typeof text !== 'string') {
+      text = String(text);
+    }
     let count = 0;
     for (let i = 0; i < text.length; i++) {
       const code = text.charCodeAt(i);
@@ -2833,7 +2849,7 @@ async function refreshWorldPreview() {
     
     if (reply) {
       showBubble(reply, 6000);
-      state.petChatHistory.push({ role: 'assistant', content: `[旁观] ${reply}` });
+      state.petChatHistory.push({ role: 'assistant', content: `[旁观] ${reply}`, timestamp: Date.now() });
       saveData();
     }
   }
@@ -3210,6 +3226,20 @@ async function refreshWorldPreview() {
     try { worldInfo = await getWorldBookContent(); } catch(e) {}
     if (worldInfo) sys += `\n[世界设定参考]\n${worldInfo}\n`;
     sys += `\n[日记写作要求]\n${settings.diaryPrompt || '请以桌宠的第一人称视角写一篇简短日记。'}`;
+    sys += `\n[状态] 饱食:${Math.round(state.hunger)}% 清洁:${Math.round(state.cleanliness)}% 精力:${Math.round(state.energy)}% 心情:${state.mood}`;
+    if (settings.enableTimeAwareness) {
+      const now = new Date();
+      const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
+      const hour = now.getHours();
+      let timeOfDay = '深夜';
+      if (hour >= 5 && hour < 9) timeOfDay = '早晨';
+      else if (hour >= 9 && hour < 12) timeOfDay = '上午';
+      else if (hour >= 12 && hour < 14) timeOfDay = '中午';
+      else if (hour >= 14 && hour < 18) timeOfDay = '下午';
+      else if (hour >= 18 && hour < 22) timeOfDay = '晚上';
+      else if (hour >= 22 || hour < 5) timeOfDay = '深夜';
+      sys += `\n[时间] ${now.getMonth()+1}月${now.getDate()}日 星期${weekDays[now.getDay()]} ${hour}:${String(now.getMinutes()).padStart(2,'0')} (${timeOfDay})`;
+    }
 
     messages.push({ role: 'system', content: sys });
 
@@ -4497,7 +4527,7 @@ async function refreshWorldPreview() {
         const reply = await callPetAPI('chat', '');
         if (spriteStateLock === 'think') clearSpriteLock();
         if (reply) {
-          state.petChatHistory.push({ role: 'assistant', content: reply });
+          state.petChatHistory.push({ role: 'assistant', content: reply, timestamp: Date.now() });
           saveData();
           renderChatHistoryList();
           renderChatHistory();
@@ -4516,8 +4546,8 @@ async function refreshWorldPreview() {
 
     // 菜单按钮（同时支持 click 和 touchend）
     document.querySelectorAll('.sp-menu-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => { e.stopPropagation(); handleMenuAction(btn.dataset.action); });
-      btn.addEventListener('touchend', (e) => { e.stopPropagation(); e.preventDefault(); handleMenuAction(btn.dataset.action); });
+      btn.addEventListener('click', (e) => { e.stopPropagation(); if (!isMenuOpen) return; handleMenuAction(btn.dataset.action); });
+      btn.addEventListener('touchend', (e) => { e.stopPropagation(); e.preventDefault(); if (!isMenuOpen) return; handleMenuAction(btn.dataset.action); });
     });
 
     // 聊天（初始化绑定，toggleChat 内会重新绑定最新逻辑）

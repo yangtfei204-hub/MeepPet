@@ -140,7 +140,7 @@
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
   opacity: 0;
   transform: translate(-50%, -50%) scale(0);
-  pointer-events: auto;
+  pointer-events: none;
   animation: sp-menu-float 2.5s ease-in-out infinite;
   will-change: transform, opacity;
   backface-visibility: hidden;
@@ -156,6 +156,7 @@
 #silly-pet-menu.visible .sp-menu-btn {
   opacity: 1;
   transform: translate(-50%, -50%) scale(1);
+  pointer-events: auto;
 }
 
 .sp-menu-btn:hover {
