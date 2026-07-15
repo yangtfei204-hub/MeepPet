@@ -1636,11 +1636,82 @@ function sleepPet() {
   updateMood(); updateStatusBars(); saveData();
 }
 
+  // ============================================================
+  // 菜单按钮位置动态计算（根据桌宠所处屏幕边缘决定展开方向）
+  // ============================================================
+  function updateMenuPositions() {
+    const container = document.getElementById('silly-pet-container');
+    const menu = document.getElementById('silly-pet-menu');
+    if (!container || !menu) return;
+
+    const rect = container.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    const isMobile = window.innerWidth <= 768;
+    const isSmall = window.innerWidth <= 480;
+    let radius = isSmall ? 76 : (isMobile ? 95 : 120);
+
+    // 判断桌宠靠哪边
+    const threshold = 80; // 判定阈值像素
+    const isLeft = centerX < threshold;
+    const isRight = centerX > window.innerWidth - threshold;
+    const isTop = centerY < threshold;
+
+    // 根据位置决定半圆展开的起始角度和结束角度（单位：度）
+    // 默认：向上展开（上半圆），startAngle=180, endAngle=360
+    let startAngle, endAngle;
+
+    if (isLeft) {
+      // 挂在左边 → 向右展开半圆
+      startAngle = -90;
+      endAngle = 90;
+    } else if (isRight) {
+      // 挂在右边 → 向左展开半圆
+      startAngle = 90;
+      endAngle = 270;
+    } else if (isTop) {
+      // 挂在上边 → 向下展开半圆
+      startAngle = 0;
+      endAngle = 180;
+    } else {
+      // 默认情况（屏幕中间或底部）→ 向上展开半圆
+      startAngle = 180;
+      endAngle = 360;
+    }
+
+    const buttons = menu.querySelectorAll('.sp-menu-btn');
+    const count = buttons.length;
+    const angleStep = (endAngle - startAngle) / (count + 1);
+
+    buttons.forEach((btn, i) => {
+      const angle = startAngle + angleStep * (i + 1);
+      const rad = angle * (Math.PI / 180);
+      const x = Math.round(Math.cos(rad) * radius);
+      const y = Math.round(Math.sin(rad) * radius);
+
+      // 如果按钮还没有设置过位置（第一次打开），先归零再展开
+      if (!btn.style.left || btn.style.left === 'auto') {
+        btn.style.transition = 'none';
+        btn.style.left = '0px';
+        btn.style.top = '0px';
+        btn.offsetHeight; // 强制重绘
+        btn.style.transition = '';
+      }
+
+      btn.style.left = x + 'px';
+      btn.style.top = y + 'px';
+    });
+
+  }
 
   function toggleMenu() {
     const menu = document.getElementById('silly-pet-menu');
     if (!menu) return;
     isMenuOpen = !isMenuOpen;
+    if (isMenuOpen) {
+      updateMenuPositions();
+    }
     menu.classList.toggle('visible', isMenuOpen);
   }
 
