@@ -340,6 +340,8 @@
     gameShopBuyLog: {},       // {'2026-07-15': {'food_1': 2, 'clean_2': 1, ...}}
     gameOrderRefreshCD: 0,    // 订单刷新冷却时间戳
     match3ItemPurchaseLog: {},   // {'2026-07-15': {'expand': 2, 'sweep': 1, 'shuffle': 3}}
+    match3Inventory: { expand: 0, sweep: 0, shuffle: 0 },  // 消消看道具背包库存
+    lotteryLog: {},  // {'2026-07-15': {'small': 2, 'medium': 1, 'large': 0}} 按奖池分别计数
   };
 
   // ============================================================
@@ -1950,6 +1952,13 @@ function showInventoryPopup(category, quickKey, onUse) {
               <div class="sp-game-selector-desc">点击图案收集到暂存栏，三消通关</div>
             </div>
           </div>
+          <div class="sp-game-selector-card" data-game="lottery">
+            <div class="sp-game-selector-icon">🎰</div>
+            <div class="sp-game-selector-info">
+              <div class="sp-game-selector-name">幸运抽奖</div>
+              <div class="sp-game-selector-desc">消耗金币抽取道具、物品和金币奖励</div>
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -1981,9 +1990,12 @@ function showInventoryPopup(category, quickKey, onUse) {
           toggleMergeGame();
         } else if (game === 'match3') {
           toggleMatch3Game();
+        } else if (game === 'lottery') {
+          toggleLottery();
         }
       };
     });
+
   }
 
   function showEmojiEditModal(idx) {
@@ -7378,31 +7390,28 @@ function refreshCharPreview() {
       name: '🪜 扩充神架',
       desc: '临时增加1个暂存格',
       price: 100,
-      dailyLimit: 3,
-      perGameLimit: 3
+      dailyLimit: 10
     },
     sweep: {
       name: '🧹 魔法扫帚',
       desc: '随机消除场景中3个相同图案',
       price: 150,
-      dailyLimit: 2,
-      perGameLimit: 3
+      dailyLimit: 10
     },
     shuffle: {
       name: '🌀 混沌风暴',
       desc: '将场景中所有图案打乱重组',
       price: 80,
-      dailyLimit: 5,
-      perGameLimit: 3
+      dailyLimit: 10
     }
   };
 
   // 难度配置（随机选取）
   const MATCH3_DIFFICULTIES = [
-    { name: '简单', layers: 3, density: 0.6, iconCount: 6, cardsPerIcon: 6 },
-    { name: '普通', layers: 4, density: 0.65, iconCount: 8, cardsPerIcon: 6 },
-    { name: '困难', layers: 5, density: 0.7, iconCount: 10, cardsPerIcon: 6 },
-    { name: '噩梦', layers: 6, density: 0.75, iconCount: 12, cardsPerIcon: 6 },
+    { name: '简单', layers: 4, density: 0.65, iconCount: 8, cardsPerIcon: 6 },
+    { name: '普通', layers: 5, density: 0.7, iconCount: 10, cardsPerIcon: 6 },
+    { name: '困难', layers: 6, density: 0.75, iconCount: 12, cardsPerIcon: 6 },
+    { name: '噩梦', layers: 7, density: 0.8, iconCount: 14, cardsPerIcon: 6 },
   ];
 
   // 游戏运行时状态
@@ -7411,9 +7420,7 @@ function refreshCharPreview() {
     cards: [],            // [{id, type, x, y, z, state:'visible'|'blocked'|'collected'|'eliminated'}]
     slots: [],            // 暂存栏 [{type, id}]
     maxSlots: MATCH3_BASE_SLOTS,
-    expandUsed: 0,        // 本局已使用扩充次数
-    sweepUsed: 0,
-    shuffleUsed: 0,
+    propsUsedThisRound: 0,  // 本局已使用道具总数（上限3）
     eliminatedGroups: 0,  // 本局已消除组数
     difficulty: null,
     totalCards: 0,
@@ -7476,9 +7483,7 @@ function refreshCharPreview() {
     match3State.totalCards = cards.length;
     match3State.slots = [];
     match3State.maxSlots = MATCH3_BASE_SLOTS;
-    match3State.expandUsed = 0;
-    match3State.sweepUsed = 0;
-    match3State.shuffleUsed = 0;
+    match3State.propsUsedThisRound = 0;
     match3State.eliminatedGroups = 0;
     match3State.active = true;
 
@@ -7611,51 +7616,34 @@ function refreshCharPreview() {
     const prop = MATCH3_PROPS[propKey];
     if (!prop) return;
 
-    // 检查每局次数限制
-    if (propKey === 'expand' && match3State.expandUsed >= prop.perGameLimit) {
-      match3ShowNotice('本局扩充次数已用完！');
-      return;
-    }
-    if (propKey === 'sweep' && match3State.sweepUsed >= prop.perGameLimit) {
-      match3ShowNotice('本局扫帚次数已用完！');
-      return;
-    }
-    if (propKey === 'shuffle' && match3State.shuffleUsed >= prop.perGameLimit) {
-      match3ShowNotice('本局风暴次数已用完！');
+    // 检查本局道具总用量（上限3）
+    if (match3State.propsUsedThisRound >= 3) {
+      match3ShowNotice('本局道具已用完（上限3个）！');
       return;
     }
 
-    // 检查每日购买限制
-    const today = new Date().toISOString().slice(0, 10);
-    if (!state.match3ItemPurchaseLog) state.match3ItemPurchaseLog = {};
-    if (!state.match3ItemPurchaseLog[today]) state.match3ItemPurchaseLog[today] = {};
-    const bought = state.match3ItemPurchaseLog[today][propKey] || 0;
-    if (bought >= prop.dailyLimit) {
-      match3ShowNotice(`${prop.name} 今日购买次数已用完！`);
+    // 检查背包库存
+    if (!state.match3Inventory) state.match3Inventory = { expand: 0, sweep: 0, shuffle: 0 };
+    if ((state.match3Inventory[propKey] || 0) <= 0) {
+      match3ShowNotice(`${prop.name} 库存不足！去商店购买吧`);
       return;
     }
 
-    // 检查金币
-    if (state.gameGold < prop.price) {
-      match3ShowNotice(`金币不足！需要 ${prop.price} 🪙`);
-      return;
-    }
-
-    // 扣金币
-    state.gameGold -= prop.price;
-    state.match3ItemPurchaseLog[today][propKey] = bought + 1;
+    // 扣除背包库存
+    state.match3Inventory[propKey]--;
+    match3State.propsUsedThisRound++;
 
     // 执行效果
     switch (propKey) {
       case 'expand':
         if (match3State.maxSlots >= MATCH3_MAX_SLOTS) {
           match3ShowNotice('暂存栏已达上限（10格）！');
-          state.gameGold += prop.price; // 退款
-          state.match3ItemPurchaseLog[today][propKey]--;
+          // 退还
+          state.match3Inventory[propKey]++;
+          match3State.propsUsedThisRound--;
           return;
         }
         match3State.maxSlots++;
-        match3State.expandUsed++;
         match3ShowNotice(`暂存栏扩充为 ${match3State.maxSlots} 格！`);
         break;
 
@@ -7666,22 +7654,20 @@ function refreshCharPreview() {
           if (!typeMap[c.type]) typeMap[c.type] = [];
           typeMap[c.type].push(c);
         });
-        // 找到有3个及以上的类型
         const sweepTypes = Object.keys(typeMap).filter(t => typeMap[t].length >= 3);
         if (sweepTypes.length === 0) {
           match3ShowNotice('场景中没有3个相同且可见的图案！');
-          state.gameGold += prop.price; // 退款
-          state.match3ItemPurchaseLog[today][propKey]--;
+          // 退还
+          state.match3Inventory[propKey]++;
+          match3State.propsUsedThisRound--;
           return;
         }
         const chosenType = sweepTypes[Math.floor(Math.random() * sweepTypes.length)];
         const toSweep = typeMap[chosenType].slice(0, 3);
         toSweep.forEach(c => { c.state = 'eliminated'; });
-        match3State.sweepUsed++;
         match3State.eliminatedGroups++;
         match3UpdateBlockState();
         match3ShowNotice(`🧹 消除了 3 个 ${chosenType}！`);
-        // 检查胜利
         const remaining = match3State.cards.filter(c => c.state !== 'collected' && c.state !== 'eliminated');
         if (remaining.length === 0 && match3State.slots.length === 0) {
           match3State.active = false;
@@ -7693,20 +7679,17 @@ function refreshCharPreview() {
         const activeCards = match3State.cards.filter(c => c.state === 'visible' || c.state === 'blocked');
         if (activeCards.length < 2) {
           match3ShowNotice('场景中牌太少，无法打乱！');
-          state.gameGold += prop.price;
-          state.match3ItemPurchaseLog[today][propKey]--;
+          // 退还
+          state.match3Inventory[propKey]++;
+          match3State.propsUsedThisRound--;
           return;
         }
-        // 收集所有活跃牌的类型
         const types = activeCards.map(c => c.type);
-        // Fisher-Yates 洗牌
         for (let i = types.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
           [types[i], types[j]] = [types[j], types[i]];
         }
-        // 重新分配类型（坐标不变）
         activeCards.forEach((c, i) => { c.type = types[i]; });
-        match3State.shuffleUsed++;
         match3UpdateBlockState();
         match3ShowNotice('🌀 图案已打乱重组！');
         break;
@@ -7716,17 +7699,117 @@ function refreshCharPreview() {
     match3Render();
   }
 
+  // ===== 消消看商店购买道具 =====
+  function match3BuyProp(propKey) {
+    const prop = MATCH3_PROPS[propKey];
+    if (!prop) return;
+
+    // 检查金币
+    if (state.gameGold < prop.price) {
+      match3ShowNotice(`金币不足！需要 ${prop.price} 🪙`);
+      return;
+    }
+
+    // 检查每日限购
+    const today = new Date().toISOString().slice(0, 10);
+    if (!state.match3ItemPurchaseLog) state.match3ItemPurchaseLog = {};
+    if (!state.match3ItemPurchaseLog[today]) state.match3ItemPurchaseLog[today] = {};
+    const bought = state.match3ItemPurchaseLog[today][propKey] || 0;
+    if (bought >= prop.dailyLimit) {
+      match3ShowNotice(`${prop.name} 今日已售罄（限${prop.dailyLimit}个/天）`);
+      return;
+    }
+
+    // 扣金币，加库存
+    state.gameGold -= prop.price;
+    state.match3ItemPurchaseLog[today][propKey] = bought + 1;
+    if (!state.match3Inventory) state.match3Inventory = { expand: 0, sweep: 0, shuffle: 0 };
+    state.match3Inventory[propKey] = (state.match3Inventory[propKey] || 0) + 1;
+
+    match3ShowNotice(`购买了 ${prop.name}，已放入背包！`);
+    saveDataDebounced('消消看商店购买');
+    match3RenderShop();
+    match3RenderBag();
+    // 更新金币显示
+    const goldEl = document.getElementById('sp-match3-gold');
+    if (goldEl) goldEl.textContent = state.gameGold;
+  }
+
+  // ===== 消消看背包渲染 =====
+  function match3RenderBag() {
+    const container = document.getElementById('sp-match3-bag-content');
+    if (!container) return;
+    if (!state.match3Inventory) state.match3Inventory = { expand: 0, sweep: 0, shuffle: 0 };
+
+    const items = [
+      { key: 'expand', ...MATCH3_PROPS.expand, count: state.match3Inventory.expand || 0 },
+      { key: 'sweep', ...MATCH3_PROPS.sweep, count: state.match3Inventory.sweep || 0 },
+      { key: 'shuffle', ...MATCH3_PROPS.shuffle, count: state.match3Inventory.shuffle || 0 },
+    ];
+
+    const hasAny = items.some(i => i.count > 0);
+
+    container.innerHTML = hasAny ? items.map(item => `
+      <div class="sp-match3-bag-item ${item.count <= 0 ? 'sp-match3-bag-empty' : ''}">
+        <span class="sp-match3-bag-icon">${item.name.split(' ')[0]}</span>
+        <div class="sp-match3-bag-info">
+          <span class="sp-match3-bag-name">${item.name.split(' ').slice(1).join(' ')}</span>
+          <span class="sp-match3-bag-desc">${item.desc}</span>
+        </div>
+        <span class="sp-match3-bag-count">×${item.count}</span>
+      </div>
+    `).join('') : '<div style="text-align:center;padding:20px;color:var(--sp-text-muted);font-size:12px;">背包空空如也～去商店买点道具吧</div>';
+  }
+
+  // ===== 消消看商店渲染 =====
+  function match3RenderShop() {
+    const container = document.getElementById('sp-match3-shop-content');
+    if (!container) return;
+
+    const today = new Date().toISOString().slice(0, 10);
+    const todayLog = (state.match3ItemPurchaseLog && state.match3ItemPurchaseLog[today]) || {};
+
+    const items = Object.entries(MATCH3_PROPS).map(([key, prop]) => {
+      const bought = todayLog[key] || 0;
+      const soldOut = bought >= prop.dailyLimit;
+      const cantAfford = state.gameGold < prop.price;
+      const disabled = soldOut || cantAfford;
+      const stock = state.match3Inventory?.[key] || 0;
+      return { key, ...prop, bought, soldOut, cantAfford, disabled, stock };
+    });
+
+    container.innerHTML = items.map(item => `
+      <div class="sp-match3-shop-item ${item.disabled ? 'sp-match3-shop-disabled' : ''}">
+        <span class="sp-match3-shop-icon">${item.name.split(' ')[0]}</span>
+        <div class="sp-match3-shop-info">
+          <span class="sp-match3-shop-name">${item.name.split(' ').slice(1).join(' ')}</span>
+          <span class="sp-match3-shop-desc">${item.desc}</span>
+          <span class="sp-match3-shop-limit">${item.soldOut ? '今日售罄' : `今日剩 ${item.dailyLimit - item.bought} 个`} | 背包: ${item.stock}</span>
+        </div>
+        <button class="sp-match3-shop-buy" data-prop="${item.key}" ${item.disabled ? 'disabled' : ''}>🪙${item.price}</button>
+      </div>
+    `).join('');
+
+    container.querySelectorAll('.sp-match3-shop-buy').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        match3BuyProp(btn.dataset.prop);
+      });
+    });
+  }
+
   // ===== 游戏结算 =====
   function match3GameOver(victory) {
     match3State.active = false;
 
     // 计算金币奖励
-    const baseReward = match3State.eliminatedGroups * (2 + Math.floor(Math.random() * 4)); // 每组2~5金币
+    // 计算金币奖励
+    const baseReward = match3State.eliminatedGroups * (1 + Math.floor(Math.random() * 2)); // 每组1~2金币
     let bonusReward = 0;
     let bonusMsg = '';
 
     if (victory) {
-      bonusReward = 100 + Math.floor(Math.random() * 101); // 100~200
+      bonusReward = 30 + Math.floor(Math.random() * 31); // 30~60
       bonusMsg = `\n🏆 通关奖励: +${bonusReward} 🪙`;
       // 增加桌宠属性
       state.energy = Math.min(100, state.energy + 10);
@@ -7772,7 +7855,11 @@ function refreshCharPreview() {
     });
     document.getElementById('sp-match3-quit')?.addEventListener('click', () => {
       resultOverlay.remove();
-      toggleMatch3Game();
+      // 不关闭面板，而是回到游戏选择界面
+      isMatch3Open = false;
+      const panel = document.getElementById('sp-match3-panel');
+      if (panel) panel.classList.remove('visible');
+      showGameSelector();
     });
   }
 
@@ -7853,13 +7940,18 @@ function refreshCharPreview() {
       `;
     }
 
-    // 渲染道具按钮状态
+    // 渲染道具按钮状态（显示背包库存 + 本局已用/上限）
+    if (!state.match3Inventory) state.match3Inventory = { expand: 0, sweep: 0, shuffle: 0 };
     const expandBtn = document.getElementById('sp-match3-prop-expand');
     const sweepBtn = document.getElementById('sp-match3-prop-sweep');
     const shuffleBtn = document.getElementById('sp-match3-prop-shuffle');
-    if (expandBtn) expandBtn.querySelector('.sp-match3-prop-count').textContent = `${match3State.expandUsed}/${MATCH3_PROPS.expand.perGameLimit}`;
-    if (sweepBtn) sweepBtn.querySelector('.sp-match3-prop-count').textContent = `${match3State.sweepUsed}/${MATCH3_PROPS.sweep.perGameLimit}`;
-    if (shuffleBtn) shuffleBtn.querySelector('.sp-match3-prop-count').textContent = `${match3State.shuffleUsed}/${MATCH3_PROPS.shuffle.perGameLimit}`;
+    if (expandBtn) expandBtn.querySelector('.sp-match3-prop-count').textContent = `×${state.match3Inventory.expand || 0}`;
+    if (sweepBtn) sweepBtn.querySelector('.sp-match3-prop-count').textContent = `×${state.match3Inventory.sweep || 0}`;
+    if (shuffleBtn) shuffleBtn.querySelector('.sp-match3-prop-count').textContent = `×${state.match3Inventory.shuffle || 0}`;
+
+    // 更新本局道具用量显示
+    const propsUsedEl = document.getElementById('sp-match3-props-used');
+    if (propsUsedEl) propsUsedEl.textContent = `本局已用: ${match3State.propsUsedThisRound}/3`;
 
     // 更新金币显示
     const goldEl = document.getElementById('sp-match3-gold');
@@ -7884,6 +7976,8 @@ function refreshCharPreview() {
       <div id="sp-match3-notice"></div>
       <div style="display:flex;gap:4px;padding:6px 10px;background:rgba(255,255,255,0.03);border-bottom:1px solid var(--sp-border-light);align-items:center;">
         <button class="sp-game-tab active" data-m3tab="play" id="sp-match3-tab-play">🎮 游戏</button>
+        <button class="sp-game-tab" data-m3tab="bag" id="sp-match3-tab-bag">🎒 背包</button>
+        <button class="sp-game-tab" data-m3tab="shop" id="sp-match3-tab-shop">🛒 商店</button>
         <button class="sp-game-tab" data-m3tab="collection" id="sp-match3-tab-collection">📖 图鉴</button>
         <span class="sp-match3-gold-display" style="margin-left:auto;">🪙 <span id="sp-match3-gold">${state.gameGold}</span></span>
       </div>
@@ -7897,25 +7991,34 @@ function refreshCharPreview() {
           <div id="sp-match3-props">
             <button class="sp-match3-prop-btn" id="sp-match3-prop-expand" title="${MATCH3_PROPS.expand.desc}">
               <span class="sp-match3-prop-icon">🪜</span>
-              <span class="sp-match3-prop-price">🪙${MATCH3_PROPS.expand.price}</span>
+              <span class="sp-match3-prop-price">背包使用</span>
               <span class="sp-match3-prop-count">0/${MATCH3_PROPS.expand.perGameLimit}</span>
             </button>
             <button class="sp-match3-prop-btn" id="sp-match3-prop-sweep" title="${MATCH3_PROPS.sweep.desc}">
               <span class="sp-match3-prop-icon">🧹</span>
-              <span class="sp-match3-prop-price">🪙${MATCH3_PROPS.sweep.price}</span>
+              <span class="sp-match3-prop-price">背包使用</span>
               <span class="sp-match3-prop-count">0/${MATCH3_PROPS.sweep.perGameLimit}</span>
             </button>
             <button class="sp-match3-prop-btn" id="sp-match3-prop-shuffle" title="${MATCH3_PROPS.shuffle.desc}">
               <span class="sp-match3-prop-icon">🌀</span>
-              <span class="sp-match3-prop-price">🪙${MATCH3_PROPS.shuffle.price}</span>
+              <span class="sp-match3-prop-price">背包使用</span>
               <span class="sp-match3-prop-count">0/${MATCH3_PROPS.shuffle.perGameLimit}</span>
             </button>
           </div>
+          <div id="sp-match3-props-used" style="text-align:center;font-size:10px;color:var(--sp-text-muted);margin-top:4px;">本局已用: 0/3</div>
           <div style="height:8px;"></div>
           <div id="sp-match3-controls">
             <button class="sp-match3-ctrl-btn" id="sp-match3-restart-btn">🔄 重开</button>
             <button class="sp-match3-ctrl-btn sp-match3-ctrl-quit" id="sp-match3-end-btn">❌ 结束</button>
           </div>
+        </div>
+        <div id="sp-match3-tab-content-bag" style="display:none;padding:8px;">
+          <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">🎒 道具背包</div>
+          <div id="sp-match3-bag-content"></div>
+        </div>
+        <div id="sp-match3-tab-content-shop" style="display:none;padding:8px;">
+          <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">🛒 道具商店 <span style="font-size:10px;color:var(--sp-text-muted);font-weight:400;">（每种每天限购10个）</span></div>
+          <div id="sp-match3-shop-content"></div>
         </div>
         <div id="sp-match3-tab-content-collection" style="display:none;">
           <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">📖 图案图鉴 <span style="font-size:10px;color:var(--sp-text-muted);font-weight:400;">（点击 📷 上传自定义图片）</span></div>
@@ -7960,22 +8063,41 @@ function refreshCharPreview() {
     // 结束按钮
     document.getElementById('sp-match3-end-btn').addEventListener('click', () => {
       if (!confirm('确定结束游戏？将按当前已消除组数结算金币。')) return;
-      match3GameOver(false);
+      // 直接结算，不通过 match3GameOver 弹窗，结算后留在面板内
+      match3State.active = false;
+      const baseReward = match3State.eliminatedGroups * (1 + Math.floor(Math.random() * 2));
+      state.gameGold += baseReward;
+      saveDataImmediate('消消看手动结束');
+      match3ShowNotice(`结算完成！消除 ${match3State.eliminatedGroups} 组，获得 +${baseReward} 🪙`);
+      // 自动开启新局
+      setTimeout(() => {
+        match3GenerateLevel();
+        match3Render();
+      }, 1500);
     });
 
     // 标签页切换
-    document.getElementById('sp-match3-tab-play').addEventListener('click', () => {
-      document.getElementById('sp-match3-tab-play').classList.add('active');
-      document.getElementById('sp-match3-tab-collection').classList.remove('active');
-      document.getElementById('sp-match3-tab-content-play').style.display = '';
-      document.getElementById('sp-match3-tab-content-collection').style.display = 'none';
-    });
-    document.getElementById('sp-match3-tab-collection').addEventListener('click', () => {
-      document.getElementById('sp-match3-tab-collection').classList.add('active');
-      document.getElementById('sp-match3-tab-play').classList.remove('active');
-      document.getElementById('sp-match3-tab-content-play').style.display = 'none';
-      document.getElementById('sp-match3-tab-content-collection').style.display = '';
-      match3RenderCollection();
+    const m3Tabs = ['play', 'bag', 'shop', 'collection'];
+    m3Tabs.forEach(tabName => {
+      const tabBtn = document.getElementById(`sp-match3-tab-${tabName}`);
+      if (tabBtn) {
+        tabBtn.addEventListener('click', () => {
+          // 切换按钮高亮
+          m3Tabs.forEach(t => {
+            const b = document.getElementById(`sp-match3-tab-${t}`);
+            if (b) b.classList.toggle('active', t === tabName);
+          });
+          // 切换内容面板
+          document.getElementById('sp-match3-tab-content-play').style.display = tabName === 'play' ? '' : 'none';
+          document.getElementById('sp-match3-tab-content-bag').style.display = tabName === 'bag' ? '' : 'none';
+          document.getElementById('sp-match3-tab-content-shop').style.display = tabName === 'shop' ? '' : 'none';
+          document.getElementById('sp-match3-tab-content-collection').style.display = tabName === 'collection' ? '' : 'none';
+          // 切换时渲染对应内容
+          if (tabName === 'bag') match3RenderBag();
+          if (tabName === 'shop') match3RenderShop();
+          if (tabName === 'collection') match3RenderCollection();
+        });
+      }
     });
 
     // 面板拖拽
@@ -8116,6 +8238,10 @@ function refreshCharPreview() {
         panel = document.getElementById('sp-match3-panel');
       }
 
+      // 清理可能残留的结算弹窗
+      const oldResult = panel.querySelector('#sp-match3-result-overlay');
+      if (oldResult) oldResult.remove();
+
       panel.classList.add('visible');
 
       // 居中
@@ -8134,6 +8260,458 @@ function refreshCharPreview() {
         match3GenerateLevel();
       }
       match3Render();
+    } else {
+      if (panel) panel.classList.remove('visible');
+    }
+  }
+
+  // ============================================================
+  // 🎰 幸运抽奖模块
+  // ============================================================
+
+  // ===== 奖池定义 =====
+  // 每个奖池有 cost（花费金币）和 items（奖励池）
+  // weight 越小越难抽中
+  const LOTTERY_POOLS = [
+    {
+      id: 'small',
+      id: 'small',
+      name: '🎲 小试牛刀',
+      cost: 10,
+      dailyLimit: 10,
+      desc: '10金币一抽，适合日常（每日限10次）',
+      items: [
+        // 金币奖励
+        { type: 'gold', value: 1,  label: '1 🪙',     weight: 300 },
+        { type: 'gold', value: 2,  label: '2 🪙',     weight: 200 },
+        { type: 'gold', value: 3,  label: '3 🪙',     weight: 150 },
+        { type: 'gold', value: 5,  label: '5 🪙',     weight: 100 },
+        { type: 'gold', value: 8,  label: '8 🪙',     weight: 60  },
+        { type: 'gold', value: 10, label: '10 🪙',    weight: 30  },
+        // 消消看道具
+        { type: 'match3prop', key: 'shuffle', label: '🌀 混沌风暴 ×1', weight: 25 },
+        { type: 'match3prop', key: 'expand',  label: '🪜 扩充神架 ×1', weight: 15 },
+        { type: 'match3prop', key: 'sweep',   label: '🧹 魔法扫帚 ×1', weight: 10 },
+        // 工坊道具（低级）
+        { type: 'shopitem', category: 'food',   idx: 0, label: '🐟 小鱼干 ×1',  weight: 20 },
+        { type: 'shopitem', category: 'clean',  idx: 0, label: '🧻 湿纸巾 ×1',  weight: 20 },
+        { type: 'shopitem', category: 'energy', idx: 0, label: '🌿 猫薄荷枕 ×1', weight: 20 },
+      ]
+    },
+    {
+      id: 'medium',
+      id: 'medium',
+      name: '✨ 锦鲤附体',
+      cost: 30,
+      dailyLimit: 5,
+      desc: '30金币一抽，中等奖励（每日限5次）',
+      items: [
+        // 金币
+        { type: 'gold', value: 5,  label: '5 🪙',     weight: 200 },
+        { type: 'gold', value: 8,  label: '8 🪙',     weight: 150 },
+        { type: 'gold', value: 10, label: '10 🪙',    weight: 100 },
+        { type: 'gold', value: 15, label: '15 🪙',    weight: 60  },
+        { type: 'gold', value: 20, label: '20 🪙',    weight: 30  },
+        // 消消看道具
+        { type: 'match3prop', key: 'shuffle', label: '🌀 混沌风暴 ×2', count: 2, weight: 40 },
+        { type: 'match3prop', key: 'expand',  label: '🪜 扩充神架 ×2', count: 2, weight: 25 },
+        { type: 'match3prop', key: 'sweep',   label: '🧹 魔法扫帚 ×2', count: 2, weight: 15 },
+        // 工坊道具（中级）
+        { type: 'shopitem', category: 'food',   idx: 1, label: '🥫 猫罐头 ×1',       weight: 30 },
+        { type: 'shopitem', category: 'clean',  idx: 1, label: '🧴 猫咪沐浴露 ×1',   weight: 30 },
+        { type: 'shopitem', category: 'energy', idx: 1, label: '🧣 温暖毛毯 ×1',     weight: 30 },
+        // 合成棋盘物品
+        { type: 'boarditem', chain: 'toy',  level: 2, label: '🐭 逗猫棒 (Lv2)',     weight: 20 },
+        { type: 'boarditem', chain: 'food', level: 2, label: '🍞 面包 (Lv2)',        weight: 20 },
+        { type: 'boarditem', chain: 'gem',  level: 2, label: '🔮 魔法水晶 (Lv2)',   weight: 20 },
+        { type: 'boarditem', chain: 'toy',  level: 3, label: '🧸 毛绒小熊 (Lv3)',   weight: 8  },
+        { type: 'boarditem', chain: 'food', level: 3, label: '🍰 草莓蛋糕 (Lv3)',   weight: 8  },
+        { type: 'boarditem', chain: 'gem',  level: 3, label: '💍 灵力戒指 (Lv3)',   weight: 8  },
+      ]
+    },
+    {
+      id: 'large',
+      name: '💫 欧皇时刻',
+      cost: 50,
+      dailyLimit: 3,
+      desc: '50金币一抽，高价值奖励（每日限3次）',
+      items: [
+        // 金币
+        { type: 'gold', value: 10, label: '10 🪙',   weight: 200 },
+        { type: 'gold', value: 15, label: '15 🪙',   weight: 150 },
+        { type: 'gold', value: 20, label: '20 🪙',   weight: 100 },
+        { type: 'gold', value: 30, label: '30 🪙',   weight: 50  },
+        { type: 'gold', value: 50, label: '50 🪙',   weight: 15  },
+        // 消消看道具大包
+        { type: 'match3prop', key: 'shuffle', label: '🌀 混沌风暴 ×3', count: 3, weight: 50 },
+        { type: 'match3prop', key: 'expand',  label: '🪜 扩充神架 ×3', count: 3, weight: 30 },
+        { type: 'match3prop', key: 'sweep',   label: '🧹 魔法扫帚 ×3', count: 3, weight: 20 },
+        // 工坊道具（高级）
+        { type: 'shopitem', category: 'food',   idx: 2, label: '🍗 豪华猫粮 ×1',    weight: 25 },
+        { type: 'shopitem', category: 'clean',  idx: 2, label: '🫧 自动清洁机 ×1',  weight: 25 },
+        { type: 'shopitem', category: 'energy', idx: 2, label: '🛏️ 舒适猫窝 ×1',   weight: 25 },
+        { type: 'shopitem', category: 'food',   idx: 3, label: '🍱 满汉全席 ×1',    weight: 5  },
+        { type: 'shopitem', category: 'clean',  idx: 3, label: '🛁 SPA豪华套餐 ×1', weight: 5  },
+        { type: 'shopitem', category: 'energy', idx: 3, label: '💊 梦境胶囊 ×1',    weight: 5  },
+        // 合成棋盘物品（高级）
+        { type: 'boarditem', chain: 'toy',  level: 3, label: '🧸 毛绒小熊 (Lv3)',  weight: 30 },
+        { type: 'boarditem', chain: 'food', level: 3, label: '🍰 草莓蛋糕 (Lv3)', weight: 30 },
+        { type: 'boarditem', chain: 'gem',  level: 3, label: '💍 灵力戒指 (Lv3)', weight: 30 },
+        { type: 'boarditem', chain: 'toy',  level: 4, label: '🎮 复古掌机 (Lv4)',  weight: 12 },
+        { type: 'boarditem', chain: 'food', level: 4, label: '🍬 豪华糖果罐 (Lv4)', weight: 12 },
+        { type: 'boarditem', chain: 'gem',  level: 4, label: '👑 璀璨王冠 (Lv4)',  weight: 12 },
+        { type: 'boarditem', chain: 'toy',  level: 5, label: '🏰 黄金猫爬架 (Lv5)', weight: 3 },
+        { type: 'boarditem', chain: 'food', level: 5, label: '🧪 极品猫薄荷 (Lv5)', weight: 3 },
+        { type: 'boarditem', chain: 'gem',  level: 5, label: '🐉 龙之心宝石 (Lv5)', weight: 3 },
+      ]
+    }
+  ];
+
+  let isLotteryOpen = false;
+
+  // ===== 抽奖核心逻辑 =====
+  function lotteryDraw(poolId) {
+    const pool = LOTTERY_POOLS.find(p => p.id === poolId);
+    if (!pool) return;
+
+    // 检查金币
+    if (state.gameGold < pool.cost) {
+      lotteryShowNotice(`金币不足！需要 ${pool.cost} 🪙`);
+      return;
+    }
+
+    // 检查每日限额
+    const today = new Date().toISOString().slice(0, 10);
+    if (!state.lotteryLog) state.lotteryLog = {};
+    if (!state.lotteryLog[today]) state.lotteryLog[today] = {};
+    const todayPoolCount = state.lotteryLog[today][pool.id] || 0;
+    if (pool.dailyLimit > 0 && todayPoolCount >= pool.dailyLimit) {
+      lotteryShowNotice(`${pool.name} 今日已达上限（${pool.dailyLimit}次），明天凌晨12点恢复～`);
+      return;
+    }
+
+    // 加权随机
+    const totalWeight = pool.items.reduce((s, item) => s + item.weight, 0);
+    let roll = Math.random() * totalWeight;
+    let result = pool.items[pool.items.length - 1];
+    for (const item of pool.items) {
+      roll -= item.weight;
+      if (roll <= 0) { result = item; break; }
+    }
+
+    // 扣金币
+    state.gameGold -= pool.cost;
+
+    // 发放奖励
+    let rewardMsg = '';
+    switch (result.type) {
+      case 'gold':
+        state.gameGold += result.value;
+        rewardMsg = `获得 ${result.label}`;
+        break;
+
+      case 'match3prop':
+        if (!state.match3Inventory) state.match3Inventory = { expand: 0, sweep: 0, shuffle: 0 };
+        const count = result.count || 1;
+        state.match3Inventory[result.key] = (state.match3Inventory[result.key] || 0) + count;
+        rewardMsg = `获得 ${result.label}（已存入消消看背包）`;
+        break;
+
+      case 'shopitem':
+        if (!state.gameInventory) state.gameInventory = [];
+        const existing = state.gameInventory.find(i => i.category === result.category && i.idx === result.idx);
+        if (existing) {
+          existing.count++;
+        } else {
+          state.gameInventory.push({ category: result.category, idx: result.idx, count: 1 });
+        }
+        rewardMsg = `获得 ${result.label}（已存入工坊背包）`;
+        break;
+
+      case 'boarditem':
+        // 找棋盘空格放入
+        if (!state.gameBoard || state.gameBoard.length !== GAME_BOARD_CELLS) {
+          gameInitBoard();
+        }
+        const emptySlots = [];
+        for (let i = 0; i < GAME_BOARD_CELLS; i++) {
+          if (i === state.gameGeneratorPos || i === state.gameSellPos) continue;
+          if (!state.gameBoard[i]) emptySlots.push(i);
+        }
+        if (emptySlots.length > 0) {
+          const slot = emptySlots[Math.floor(Math.random() * emptySlots.length)];
+          state.gameBoard[slot] = { chain: result.chain, level: result.level };
+          // 更新图鉴
+          const itemKey = `${result.chain}_${result.level}`;
+          if (!state.gameCollection) state.gameCollection = [];
+          if (!state.gameCollection.includes(itemKey)) state.gameCollection.push(itemKey);
+          rewardMsg = `获得 ${result.label}（已放入合成棋盘）`;
+        } else {
+          // 棋盘满了，转换成金币补偿
+          const chainData = GAME_CHAINS[result.chain];
+          const itemData = chainData?.items[result.level - 1];
+          const goldComp = itemData ? itemData.sell * 2 : 5;
+          state.gameGold += goldComp;
+          rewardMsg = `获得 ${result.label}（棋盘已满，转换为 ${goldComp} 🪙）`;
+        }
+        break;
+    }
+
+    // 记录抽奖日志（按奖池分别计数）
+    state.lotteryLog[today][pool.id] = todayPoolCount + 1;
+
+    // 清理7天前的旧记录，防止数据膨胀
+    Object.keys(state.lotteryLog).forEach(k => {
+      if (k < today) delete state.lotteryLog[k];
+    });
+
+    saveDataDebounced('抽奖');
+
+    // 显示结果
+    lotteryShowResult(pool, result, rewardMsg);
+  }
+
+  // ===== 显示抽奖结果动画 =====
+  function lotteryShowResult(pool, result, rewardMsg) {
+    const panel = document.getElementById('sp-lottery-panel');
+    if (!panel) return;
+
+    // 移除旧的结果层
+    panel.querySelector('#sp-lottery-result-overlay')?.remove();
+
+    // 根据奖励类型决定稀有度样式
+    let rarityClass = 'sp-lottery-rarity-common';
+    let rarityLabel = '普通';
+    if (result.type === 'boarditem' && result.level >= 5) {
+      rarityClass = 'sp-lottery-rarity-legendary';
+      rarityLabel = '传说！';
+    } else if (result.type === 'boarditem' && result.level >= 4) {
+      rarityClass = 'sp-lottery-rarity-epic';
+      rarityLabel = '史诗！';
+    } else if (result.type === 'boarditem' && result.level >= 3) {
+      rarityClass = 'sp-lottery-rarity-rare';
+      rarityLabel = '稀有！';
+    } else if (result.type === 'match3prop' && (result.count || 1) >= 3) {
+      rarityClass = 'sp-lottery-rarity-rare';
+      rarityLabel = '稀有！';
+    } else if (result.type === 'shopitem' && result.idx >= 3) {
+      rarityClass = 'sp-lottery-rarity-epic';
+      rarityLabel = '史诗！';
+    } else if (result.type === 'gold' && result.value >= 30) {
+      rarityClass = 'sp-lottery-rarity-epic';
+      rarityLabel = '史诗！';
+    }
+
+    // 决定显示图标
+    let displayIcon = '🎁';
+    if (result.type === 'gold') displayIcon = '🪙';
+    else if (result.type === 'match3prop') displayIcon = result.key === 'expand' ? '🪜' : result.key === 'sweep' ? '🧹' : '🌀';
+    else if (result.type === 'shopitem') displayIcon = GAME_SHOP_ITEMS[result.category]?.[result.idx]?.emoji || '🎁';
+    else if (result.type === 'boarditem') {
+      const chainData = GAME_CHAINS[result.chain];
+      const custom = state.gameCustomImages?.[`${result.chain}_${result.level}`];
+      displayIcon = custom ? `<img src="${custom}" style="width:48px;height:48px;object-fit:contain;border-radius:8px;" />` : (chainData?.items[result.level - 1]?.emoji || '🎁');
+    }
+
+    const isImgDisplay = result.type === 'boarditem' && state.gameCustomImages?.[`${result.chain}_${result.level}`];
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-lottery-result-overlay';
+    overlay.className = `sp-lottery-result-overlay ${rarityClass}`;
+    overlay.innerHTML = `
+      <div class="sp-lottery-result-box">
+        <div class="sp-lottery-rarity-badge">${rarityLabel}</div>
+        <div class="sp-lottery-result-icon">${isImgDisplay ? displayIcon : `<span style="font-size:52px;">${displayIcon}</span>`}</div>
+        <div class="sp-lottery-result-label">${result.label}</div>
+        <div class="sp-lottery-result-msg">${rewardMsg}</div>
+        <div class="sp-lottery-result-gold">💰 当前金币: ${state.gameGold}</div>
+        <button class="sp-lottery-result-close-btn" id="sp-lottery-result-close">继续抽奖</button>
+      </div>
+    `;
+    panel.appendChild(overlay);
+
+    document.getElementById('sp-lottery-result-close').addEventListener('click', () => {
+      overlay.remove();
+      // 刷新金币显示
+      const goldEl = document.getElementById('sp-lottery-gold');
+      if (goldEl) goldEl.textContent = state.gameGold;
+      // 刷新各奖池按钮状态
+      lotteryRenderPools();
+    });
+  }
+
+  // ===== 显示抽奖通知 =====
+  function lotteryShowNotice(text) {
+    const notice = document.getElementById('sp-lottery-notice');
+    if (!notice) return;
+    notice.textContent = text;
+    notice.classList.add('visible');
+    clearTimeout(notice._timer);
+    notice._timer = setTimeout(() => notice.classList.remove('visible'), 3000);
+  }
+
+  // ===== 渲染奖池列表 =====
+  function lotteryRenderPools() {
+    const container = document.getElementById('sp-lottery-pools');
+    if (!container) return;
+
+    const today = new Date().toISOString().slice(0, 10);
+    const todayLog = (state.lotteryLog && state.lotteryLog[today]) || {};
+    const totalToday = Object.values(todayLog).reduce((s, n) => s + n, 0);
+
+    container.innerHTML = LOTTERY_POOLS.map(pool => {
+      const todayPoolCount = todayLog[pool.id] || 0;
+      const remaining = pool.dailyLimit - todayPoolCount;
+      const soldOut = remaining <= 0;
+      const cantAfford = state.gameGold < pool.cost;
+      const disabled = soldOut || cantAfford;
+
+      let btnText = `抽一次 (${pool.cost} 🪙)`;
+      if (soldOut) btnText = '今日已达上限';
+      else if (cantAfford) btnText = '金币不足';
+
+      const limitColor = remaining <= 1 ? '#f66' : remaining <= 2 ? '#ffb347' : 'rgba(100,180,255,0.8)';
+
+      return `
+        <div class="sp-lottery-pool-card ${disabled ? 'sp-lottery-pool-disabled' : ''}">
+          <div class="sp-lottery-pool-header">
+            <span class="sp-lottery-pool-name">${pool.name}</span>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="sp-lottery-limit-badge" style="color:${limitColor};">剩 ${remaining}/${pool.dailyLimit}</span>
+              <span class="sp-lottery-pool-cost">🪙 ${pool.cost}</span>
+            </div>
+          </div>
+          <div class="sp-lottery-pool-desc">${pool.desc}</div>
+          <div class="sp-lottery-pool-preview">${lotteryGetPoolPreview(pool)}</div>
+          <button class="sp-lottery-draw-btn" data-pool="${pool.id}" ${disabled ? 'disabled' : ''}>
+            ${btnText}
+          </button>
+        </div>
+      `;
+    }).join('');
+
+    // 今日总抽奖次数
+    const countEl = document.getElementById('sp-lottery-today-count');
+    if (countEl) countEl.textContent = totalToday;
+
+    container.querySelectorAll('.sp-lottery-draw-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        lotteryDraw(btn.dataset.pool);
+      });
+    });
+  }
+
+  // ===== 获取奖池预览文字 =====
+  function lotteryGetPoolPreview(pool) {
+    // 显示最高价值的几个奖励作为预览
+    const highlights = pool.items
+      .filter(i => i.weight <= 30)
+      .slice(0, 4)
+      .map(i => `<span class="sp-lottery-preview-tag">${i.label}</span>`)
+      .join('');
+    return highlights || '<span style="font-size:10px;color:var(--sp-text-muted);">各类奖励</span>';
+  }
+
+  // ===== 渲染抽奖面板 =====
+  function lotteryRenderPanel() {
+    let panel = document.getElementById('sp-lottery-panel');
+    if (panel) panel.remove();
+
+    panel = document.createElement('div');
+    panel.id = 'sp-lottery-panel';
+    panel.innerHTML = `
+      <div id="sp-lottery-header">
+        <span>🎰 幸运抽奖</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="sp-lottery-gold-display">🪙 <span id="sp-lottery-gold">${state.gameGold}</span></span>
+          <button id="sp-lottery-close" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--sp-text-muted);padding:2px 6px;">✕</button>
+        </div>
+      </div>
+      <div id="sp-lottery-notice"></div>
+      <div id="sp-lottery-body">
+        <div style="text-align:center;font-size:11px;color:var(--sp-text-muted);padding:4px 0 8px;">
+          今日已抽: <span id="sp-lottery-today-count">0</span> 次
+        </div>
+        <div id="sp-lottery-pools"></div>
+        <details style="margin-top:10px;">
+          <summary style="font-size:11px;color:var(--sp-text-muted);cursor:pointer;padding:4px 0;">📋 奖励说明</summary>
+          <div style="font-size:10px;color:var(--sp-text-muted);line-height:1.8;padding:6px 0;">
+            🪙 金币 → 直接加入金币<br/>
+            🎒 消消看道具 → 自动放入消消看背包<br/>
+            🛍️ 工坊道具 → 自动放入工坊背包<br/>
+            🧶 合成棋盘物品 → 直接放入合成棋盘空格<br/>
+            ⚠️ 若合成棋盘已满，棋盘物品转为金币补偿
+          </div>
+        </details>
+      </div>
+    `;
+    document.body.appendChild(panel);
+
+    // 关闭
+    document.getElementById('sp-lottery-close').addEventListener('click', () => toggleLottery());
+
+    // 面板拖拽
+    const header = document.getElementById('sp-lottery-header');
+    let dragging = false, offX = 0, offY = 0;
+    const down = (e) => {
+      if (e.target.closest('#sp-lottery-close')) return;
+      dragging = true;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const rect = panel.getBoundingClientRect();
+      offX = clientX - rect.left;
+      offY = clientY - rect.top;
+    };
+    const move = (e) => {
+      if (!dragging) return;
+      if (e.cancelable) e.preventDefault();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      let x = clientX - offX;
+      let y = clientY - offY;
+      x = Math.max(0, Math.min(window.innerWidth - panel.offsetWidth, x));
+      y = Math.max(0, Math.min(window.innerHeight - panel.offsetHeight, y));
+      panel.style.left = x + 'px';
+      panel.style.top = y + 'px';
+    };
+    const up = () => { dragging = false; };
+    header.addEventListener('mousedown', down);
+    header.addEventListener('touchstart', down, { passive: true });
+    document.addEventListener('mousemove', move);
+    document.addEventListener('touchmove', move, { passive: false });
+    document.addEventListener('mouseup', up);
+    document.addEventListener('touchend', up);
+
+    lotteryRenderPools();
+  }
+
+  // ===== 开关抽奖面板 =====
+  function toggleLottery() {
+    isLotteryOpen = !isLotteryOpen;
+    let panel = document.getElementById('sp-lottery-panel');
+
+    if (isLotteryOpen) {
+      if (!panel) {
+        lotteryRenderPanel();
+        panel = document.getElementById('sp-lottery-panel');
+      }
+      panel.classList.add('visible');
+
+      const w = Math.min(340, window.innerWidth - 20);
+      panel.style.width = w + 'px';
+      requestAnimationFrame(() => {
+        const h = panel.offsetHeight;
+        const maxTop = window.innerHeight - h - 20;
+        const centerTop = Math.floor((window.innerHeight - h) / 2);
+        panel.style.left = Math.floor((window.innerWidth - w) / 2) + 'px';
+        panel.style.top = Math.max(10, Math.min(centerTop, maxTop)) + 'px';
+      });
+
+      // 刷新金币和奖池
+      const goldEl = document.getElementById('sp-lottery-gold');
+      if (goldEl) goldEl.textContent = state.gameGold;
+      lotteryRenderPools();
     } else {
       if (panel) panel.classList.remove('visible');
     }
