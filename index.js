@@ -273,6 +273,7 @@
      sleep: '',
      chat: '',
      diary: '',
+     game: '',
      settings: ''
    },
 
@@ -320,6 +321,24 @@
     diaryEntries: [],             // [{date: '2024-01-15', content: '...', timestamp: 1705...}]
     lastDiaryMemoryRange: null,   // {from: 1, to: 5}
     lastDiaryChatRange: null,     // {from: 1, to: 20}
+    // ===== 合成游戏状态 =====
+    gameGold: 0,
+    gameStamina: 80,
+    gameStaminaMax: 80,
+    gameLastStaminaRecover: Date.now(),
+    gameBoard: [],          // 6x6 棋盘，每格 null 或 {chain, level}
+    gameOrders: [],         // 当前3个订单
+    gameCollection: [],     // 图鉴已解锁
+    gameCustomImages: {},   // 玩家自定义图片 {key: url}
+    gameBgImage: '',        // 游戏背景图
+    gameGeneratorPos: 0,    // 生成器固定位置（0-35索引）
+    gameSellPos: 35,        // 售卖区固定位置
+    gameInventory: [],        // [{category, idx, count}] 玩家购买的物品库存
+    quickFeed: null,          // {category:'food', idx:0} 快捷投喂物品
+    quickClean: null,         // {category:'clean', idx:0} 快捷清洁物品
+    quickEnergy: null,        // {category:'energy', idx:0} 快捷精力物品
+    gameShopBuyLog: {},       // {'2026-07-15': {'food_1': 2, 'clean_2': 1, ...}}
+    gameOrderRefreshCD: 0,    // 订单刷新冷却时间戳
   };
 
   // ============================================================
@@ -540,13 +559,27 @@
 
   function saveData() {
     state.lastOnlineTimestamp = Date.now();
+    // 自动清理膨胀数据
+    if (state.petChatArchive && state.petChatArchive.length > 10) {
+      state.petChatArchive = state.petChatArchive.slice(-10);
+    }
+    if (state.diaryEntries && state.diaryEntries.length > 60) {
+      state.diaryEntries = state.diaryEntries.slice(-60);
+    }
+    // 清理超过7天的商店购买日志
+    if (state.gameShopBuyLog) {
+      const today = new Date().toISOString().slice(0, 10);
+      Object.keys(state.gameShopBuyLog).forEach(k => {
+        if (k < today.slice(0, 8)) delete state.gameShopBuyLog[k];
+      });
+    }
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings, state }));
     } catch (e) {
       if (e.name === 'QuotaExceededError' || e.code === 22) {
         console.warn(`[${PLUGIN_NAME}] 存储空间不足，尝试压缩...`);
-        if (state.petChatHistory.length > 20) {
-          state.petChatHistory = state.petChatHistory.slice(-20);
+      if (state.petChatHistory.length > 50) {
+          state.petChatHistory = state.petChatHistory.slice(-50);
         }
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings, state }));
@@ -564,7 +597,7 @@
     saveDebounceTimer = setTimeout(() => {
       saveData();
       if (reason) console.log(`[${PLUGIN_NAME}] 防抖保存触发: ${reason}`);
-    }, 800); // 800ms 内的多次调用只执行最后一次
+    }, 1500); // 1500ms 内的多次调用只执行最后一次
   }
 
   // 立即保存（重要操作用这个）
@@ -684,8 +717,8 @@
       state.energy = Math.max(settings.safetyThreshold, state.energy - 0.4);
       updateMood();
       updateStatusBars();
-      saveData();
-    }, 5 * 60 * 1000);
+      saveDataDebounced('状态衰减');
+    }, 8 * 60 * 1000);
   }
 
   // ============================================================
@@ -772,6 +805,7 @@
         { action: 'sleep', emoji: '🛏️', title: '睡觉' },
         { action: 'chat', emoji: '💬', title: '聊天' },
         { action: 'diary', emoji: '📔', title: '日记' },
+        { action: 'game', emoji: '🎮', title: '合成游戏' },
         { action: 'settings', emoji: '⚙️', title: '设置' }
       ];
   
@@ -960,10 +994,14 @@
   // ============================================================
   // 图片压缩工具
   // ============================================================
-  function compressImage(dataUrl, maxWidth = 200, quality = 0.7) {
+  function compressImage(dataUrl, maxWidth = 256, quality = 0.75) {
     return new Promise((resolve) => {
       // GIF 不压缩，保留动画帧
       if (dataUrl.startsWith('data:image/gif')) {
+        // GIF 超过 500KB 时警告但仍保留
+        if (dataUrl.length > 500 * 1024) {
+          console.warn(`[${PLUGIN_NAME}] GIF 较大 (${(dataUrl.length/1024).toFixed(0)}KB)，建议使用更小的动图`);
+        }
         resolve(dataUrl);
         return;
       }
@@ -971,18 +1009,28 @@
       img.onload = () => {
         const canvas = document.createElement('canvas');
         let w = img.width, h = img.height;
-        if (w > maxWidth) { h = h * (maxWidth / w); w = maxWidth; }
-        canvas.width = w;
-        canvas.height = h;
+        // 分级压缩：根据原始尺寸智能选择目标宽度
+        let targetWidth = maxWidth;
+        if (w <= maxWidth) {
+          targetWidth = w; // 原图已经够小，不放大
+        }
+        if (w > targetWidth) { h = h * (targetWidth / w); w = targetWidth; }
+        canvas.width = Math.round(w);
+        canvas.height = Math.round(h);
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/webp', quality));
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        // 先尝试 webp，如果结果反而更大则用原图
+        const compressed = canvas.toDataURL('image/webp', quality);
+        if (compressed.length < dataUrl.length) {
+          resolve(compressed);
+        } else {
+          resolve(dataUrl);
+        }
       };
       img.onerror = () => resolve(dataUrl);
       img.src = dataUrl;
     });
   }
-
 
 
   function updateSpriteImage(override) {
@@ -1581,60 +1629,191 @@ function showInteractionItem(imageSrc) {
   // 互动功能
   // ============================================================
 function feedPet() {
-  // 显示互动贴图
-  if (settings.foodImage) showInteractionItem(settings.foodImage);
-  
-  state.hunger = Math.min(100, state.hunger + 25);
-  state.lastFed = Date.now();
-  state.totalInteractions++;
-
-  // 优先用吃东西的图，没有则用开心图
-  const actionSprite = settings.spriteEat || settings.spriteHappy;
-  if (actionSprite) {
-    updateSpriteImage(actionSprite);
-    const dur = (settings.spriteDurations && settings.spriteDurations.spriteEat) || 2000;
-    setTimeout(() => updateSpriteImage(), dur);
-  }
-
-  showBubble(settings.reactions.feed, 3000);
-  updateMood(); updateStatusBars(); saveData();
+  const quickKey = 'quickFeed';
+  const category = 'food';
+  useInventoryItem(category, quickKey, (item, restoreAmount) => {
+    if (settings.foodImage) showInteractionItem(settings.foodImage);
+    state.hunger = Math.min(100, state.hunger + restoreAmount);
+    state.lastFed = Date.now();
+    state.totalInteractions++;
+    const actionSprite = settings.spriteEat || settings.spriteHappy;
+    if (actionSprite) {
+      const dur = (settings.spriteDurations && settings.spriteDurations.spriteEat) || 2000;
+      setSpriteWithLock('eat', actionSprite, dur);
+    }
+    showBubble(settings.reactions.feed, 3000);
+    updateMood(); updateStatusBars(); saveData();
+  });
 }
 
 function bathPet() {
-  // 显示互动贴图
-  if (settings.bathImage) showInteractionItem(settings.bathImage);
-  
-  state.cleanliness = Math.min(100, state.cleanliness + 30);
-  state.lastBathed = Date.now();
-  state.totalInteractions++;
-
-  if (settings.spriteBath) {
-    updateSpriteImage(settings.spriteBath);
-    const dur = (settings.spriteDurations && settings.spriteDurations.spriteBath) || 2500;
-    setTimeout(() => updateSpriteImage(), dur);
-  }
-
-  showBubble(settings.reactions.bath, 3000);
-  updateMood(); updateStatusBars(); saveData();
+  const quickKey = 'quickClean';
+  const category = 'clean';
+  useInventoryItem(category, quickKey, (item, restoreAmount) => {
+    if (settings.bathImage) showInteractionItem(settings.bathImage);
+    state.cleanliness = Math.min(100, state.cleanliness + restoreAmount);
+    state.lastBathed = Date.now();
+    state.totalInteractions++;
+    if (settings.spriteBath) {
+      const dur = (settings.spriteDurations && settings.spriteDurations.spriteBath) || 2500;
+      setSpriteWithLock('bath', settings.spriteBath, dur);
+    }
+    showBubble(settings.reactions.bath, 3000);
+    updateMood(); updateStatusBars(); saveData();
+  });
 }
 
 function sleepPet() {
-  // 显示互动贴图
-  if (settings.bedImage) showInteractionItem(settings.bedImage);
-  
-  state.energy = Math.min(100, state.energy + 35);
-  state.lastSlept = Date.now();
-  state.totalInteractions++;
+  const quickKey = 'quickEnergy';
+  const category = 'energy';
+  useInventoryItem(category, quickKey, (item, restoreAmount) => {
+    if (settings.bedImage) showInteractionItem(settings.bedImage);
+    state.energy = Math.min(100, state.energy + restoreAmount);
+    state.lastSlept = Date.now();
+    state.totalInteractions++;
+    if (settings.spriteSleep) {
+      const dur = (settings.spriteDurations && settings.spriteDurations.spriteSleep) || 8000;
+      setSpriteWithLock('sleep', settings.spriteSleep, dur);
+    }
+    showBubble(settings.reactions.sleep, 4000);
+    updateMood(); updateStatusBars(); saveData();
+  });
+}
 
-  if (settings.spriteSleep) {
-    updateSpriteImage(settings.spriteSleep);
-    const dur = (settings.spriteDurations && settings.spriteDurations.spriteSleep) || 8000;
-    setTimeout(() => updateSpriteImage(), dur);
+  // ============================================================
+  // 背包使用逻辑
+  // ============================================================
+  function useInventoryItem(category, quickKey, onUse) {
+    if (!state.gameInventory) state.gameInventory = [];
+
+    // 检查快捷物品
+    const quick = state[quickKey];
+    if (quick) {
+      const inv = state.gameInventory.find(i => i.category === quick.category && i.idx === quick.idx && i.count > 0);
+      if (inv) {
+        inv.count--;
+        if (inv.count <= 0) {
+          state.gameInventory = state.gameInventory.filter(i => i.count > 0);
+          // 快捷物品用完了，提示
+          const itemData = GAME_SHOP_ITEMS[quick.category][quick.idx];
+          showBubble(`${itemData.emoji} ${itemData.name} 用完啦！`, 3000);
+          state[quickKey] = null;
+        }
+        const itemData = GAME_SHOP_ITEMS[quick.category][quick.idx];
+        onUse(itemData, itemData.restore);
+        saveDataDebounced('使用快捷物品');
+        return;
+      } else {
+        // 快捷物品库存没了
+        state[quickKey] = null;
+      }
+    }
+
+    // 没有快捷物品，检查背包中该分类是否有物品
+    const available = state.gameInventory.filter(i => i.category === category && i.count > 0);
+    if (available.length === 0) {
+      showBubble('背包里没有可用的物品！去游戏商店买一些吧～', 4000);
+      return;
+    }
+
+    // 弹出背包选择弹窗
+    showInventoryPopup(category, quickKey, onUse);
   }
 
-  showBubble(settings.reactions.sleep, 4000);
-  updateMood(); updateStatusBars(); saveData();
-}
+  function showInventoryPopup(category, quickKey, onUse) {
+    // 移除旧弹窗
+    document.getElementById('sp-inventory-popup')?.remove();
+
+    const available = (state.gameInventory || []).filter(i => i.category === category && i.count > 0);
+    const categoryNames = { food: '🍖 食物', clean: '🧴 洗护用品', energy: '🛏️ 睡眠用品' };
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-inventory-popup';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:2147483649;';
+
+    let itemsHtml = available.map(inv => {
+      const itemData = GAME_SHOP_ITEMS[inv.category][inv.idx];
+      const isQuick = state[quickKey] && state[quickKey].category === inv.category && state[quickKey].idx === inv.idx;
+      return `
+        <div class="sp-inv-item" data-cat="${inv.category}" data-idx="${inv.idx}">
+          <span class="sp-inv-item-emoji">${itemData.emoji}</span>
+          <div class="sp-inv-item-info">
+            <span class="sp-inv-item-name">${itemData.name}</span>
+            <span class="sp-inv-item-detail">+${itemData.restore} | 库存: ${inv.count}</span>
+          </div>
+          <div class="sp-inv-item-actions">
+            <button class="sp-inv-use-btn" data-cat="${inv.category}" data-idx="${inv.idx}">使用</button>
+            <button class="sp-inv-quick-btn ${isQuick ? 'active' : ''}" data-cat="${inv.category}" data-idx="${inv.idx}" title="设为快捷">${isQuick ? '⭐' : '☆'}</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    overlay.innerHTML = `
+      <div class="sp-inv-popup-box">
+        <div class="sp-inv-popup-header">
+          <span>${categoryNames[category] || '背包'}</span>
+          <button class="sp-inv-popup-close" title="关闭">✕</button>
+        </div>
+        <div class="sp-inv-popup-body">
+          ${itemsHtml || '<div class="sp-inv-empty">背包空空如也～</div>'}
+        </div>
+        <div class="sp-inv-popup-hint">💡 点击 ☆ 设为快捷，下次直接使用不弹窗</div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    // 关闭
+    overlay.querySelector('.sp-inv-popup-close').onclick = () => overlay.remove();
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+    // 使用按钮
+    overlay.querySelectorAll('.sp-inv-use-btn').forEach(btn => {
+      btn.onclick = () => {
+        const cat = btn.dataset.cat;
+        const idx = parseInt(btn.dataset.idx);
+        const inv = state.gameInventory.find(i => i.category === cat && i.idx === idx && i.count > 0);
+        if (!inv) { showBubble('物品没了', 2000); overlay.remove(); return; }
+        inv.count--;
+        if (inv.count <= 0) {
+          state.gameInventory = state.gameInventory.filter(i => i.count > 0);
+          // 如果是快捷物品，清除
+          if (state[quickKey] && state[quickKey].category === cat && state[quickKey].idx === idx) {
+            state[quickKey] = null;
+          }
+        }
+        const itemData = GAME_SHOP_ITEMS[cat][idx];
+        overlay.remove();
+        onUse(itemData, itemData.restore);
+        saveDataDebounced('背包使用物品');
+      };
+    });
+
+    // 快捷设置按钮
+    overlay.querySelectorAll('.sp-inv-quick-btn').forEach(btn => {
+      btn.onclick = () => {
+        const cat = btn.dataset.cat;
+        const idx = parseInt(btn.dataset.idx);
+        const isCurrentQuick = state[quickKey] && state[quickKey].category === cat && state[quickKey].idx === idx;
+        if (isCurrentQuick) {
+          state[quickKey] = null;
+          btn.textContent = '☆';
+          btn.classList.remove('active');
+          showBubble('已取消快捷', 1500);
+        } else {
+          state[quickKey] = { category: cat, idx: idx };
+          // 取消其他的
+          overlay.querySelectorAll('.sp-inv-quick-btn').forEach(b => { b.textContent = '☆'; b.classList.remove('active'); });
+          btn.textContent = '⭐';
+          btn.classList.add('active');
+          const itemData = GAME_SHOP_ITEMS[cat][idx];
+          showBubble(`已设 ${itemData.emoji} ${itemData.name} 为快捷！`, 2000);
+        }
+        saveDataDebounced('设置快捷物品');
+      };
+    });
+  }
 
   // ============================================================
   // 菜单按钮位置动态计算（根据桌宠所处屏幕边缘决定展开方向）
@@ -1715,13 +1894,14 @@ function sleepPet() {
     menu.classList.toggle('visible', isMenuOpen);
   }
 
-  function handleMenuAction(action) {
+   function handleMenuAction(action) {
     switch (action) {
       case 'feed': feedPet(); break;
       case 'bath': bathPet(); break;
       case 'sleep': sleepPet(); break;
       case 'chat': toggleChat(); break;
       case 'diary': toggleDiary(); break;
+      case 'game': toggleMergeGame(); break;
       case 'settings': toggleSettings(); break;
     }
     toggleMenu();
@@ -4578,6 +4758,7 @@ async function refreshWorldPreview() {
       ['menuIconSleep', '睡觉 🛏️'],
       ['menuIconChat', '聊天 💬'],
       ['menuIconDiary', '日记 📔'],
+      ['menuIconGame', '游戏 🎮'],
       ['menuIconSettings', '设置 ⚙️']
     ];
     if (menuArea) {
@@ -5988,6 +6169,1096 @@ function refreshCharPreview() {
       updateMenuPositions();
     }
   });
+
+  // ============================================================
+  // 🎮 合成小游戏模块 - MeepMerge
+  // ============================================================
+
+  // ===== 游戏常量 =====
+  const GAME_BOARD_SIZE = 6;
+  const GAME_BOARD_CELLS = 36;
+  const GAME_STAMINA_RECOVER_INTERVAL = 8 * 60 * 1000; // 8分钟恢复1点
+  const GAME_STAMINA_RECOVER_AMOUNT = 1;
+  const GAME_MAX_CHAIN_LEVEL = 8;
+
+  // 三条合成链定义
+  const GAME_CHAINS = {
+    toy: {
+      name: '🧶 玩具链',
+      items: [
+        { level: 1, emoji: '🧶', name: '线团', sell: 1 },
+        { level: 2, emoji: '🐭', name: '逗猫棒', sell: 2 },
+        { level: 3, emoji: '🧸', name: '毛绒小熊', sell: 5 },
+        { level: 4, emoji: '🎮', name: '复古掌机', sell: 11 },
+        { level: 5, emoji: '🏰', name: '黄金猫爬架', sell: 25 },
+        { level: 6, emoji: '⚡', name: '魔法逗猫激光', sell: 55 },
+        { level: 7, emoji: '🎡', name: '猫咪游乐园', sell: 120 },
+        { level: 8, emoji: '🚀', name: '传说喵星飞船', sell: 280 },
+      ]
+    },
+    food: {
+      name: '🍪 零食链',
+      items: [
+        { level: 1, emoji: '🌾', name: '面粉', sell: 1 },
+        { level: 2, emoji: '🍞', name: '面包', sell: 2 },
+        { level: 3, emoji: '🍰', name: '草莓蛋糕', sell: 5 },
+        { level: 4, emoji: '🍬', name: '豪华糖果罐', sell: 11 },
+        { level: 5, emoji: '🧪', name: '极品猫薄荷', sell: 25 },
+        { level: 6, emoji: '🧁', name: '星空马卡龙塔', sell: 55 },
+        { level: 7, emoji: '🍵', name: '梦幻下午茶', sell: 120 },
+        { level: 8, emoji: '🍖', name: '传说永恒盛宴', sell: 280 },
+      ]
+    },
+    gem: {
+      name: '💎 宝石链',
+      items: [
+        { level: 1, emoji: '✨', name: '碎晶', sell: 1 },
+        { level: 2, emoji: '🔮', name: '魔法水晶', sell: 2 },
+        { level: 3, emoji: '💍', name: '灵力戒指', sell: 5 },
+        { level: 4, emoji: '👑', name: '璀璨王冠', sell: 11 },
+        { level: 5, emoji: '🐉', name: '龙之心宝石', sell: 25 },
+        { level: 6, emoji: '📖', name: '星辰宝典', sell: 55 },
+        { level: 7, emoji: '🌀', name: '时空魔法阵', sell: 120 },
+        { level: 8, emoji: '💎', name: '传说哲人之石', sell: 280 },
+      ]
+    }
+  };
+
+  // 商店物品定义
+  const GAME_SHOP_ITEMS = {
+    food: [
+      { name: '小鱼干', price: 8, restore: 8, emoji: '🐟', dailyLimit: 10 },
+      { name: '猫罐头', price: 20, restore: 18, emoji: '🥫', dailyLimit: 4 },
+      { name: '豪华猫粮', price: 40, restore: 35, emoji: '🍗', dailyLimit: 2 },
+      { name: '满汉全席', price: 80, restore: 60, emoji: '🍱', dailyLimit: 1 },
+    ],
+    clean: [
+      { name: '湿纸巾', price: 8, restore: 8, emoji: '🧻', dailyLimit: 10 },
+      { name: '猫咪沐浴露', price: 20, restore: 18, emoji: '🧴', dailyLimit: 4 },
+      { name: '自动清洁机', price: 40, restore: 35, emoji: '🫧', dailyLimit: 2 },
+      { name: 'SPA豪华套餐', price: 80, restore: 60, emoji: '🛁', dailyLimit: 1 },
+    ],
+    energy: [
+      { name: '猫薄荷枕', price: 8, restore: 8, emoji: '🌿', dailyLimit: 10 },
+      { name: '温暖毛毯', price: 20, restore: 18, emoji: '🧣', dailyLimit: 4 },
+      { name: '舒适猫窝', price: 40, restore: 35, emoji: '🛏️', dailyLimit: 2 },
+      { name: '梦境胶囊', price: 80, restore: 60, emoji: '💊', dailyLimit: 1 },
+    ]
+  };
+
+  // 生成器产出权重（等级越高概率越低）
+  const GAME_SPAWN_WEIGHTS = [
+    { level: 1, weight: 55 },
+    { level: 2, weight: 25 },
+    { level: 3, weight: 12 },
+    { level: 4, weight: 6 },
+    { level: 5, weight: 2 },
+  ];
+
+  // 订单模板
+  const GAME_ORDER_TEMPLATES = [
+    { chain: 'toy', minLevel: 2, maxLevel: 5, goldMulti: 2.0 },
+    { chain: 'food', minLevel: 2, maxLevel: 5, goldMulti: 2.0 },
+    { chain: 'gem', minLevel: 2, maxLevel: 5, goldMulti: 2.0 },
+    { chain: 'toy', minLevel: 3, maxLevel: 6, goldMulti: 2.5 },
+    { chain: 'food', minLevel: 3, maxLevel: 6, goldMulti: 2.5 },
+    { chain: 'gem', minLevel: 3, maxLevel: 6, goldMulti: 2.5 },
+    { chain: 'toy', minLevel: 4, maxLevel: 7, goldMulti: 3.0 },
+    { chain: 'food', minLevel: 4, maxLevel: 7, goldMulti: 3.0 },
+    { chain: 'gem', minLevel: 4, maxLevel: 7, goldMulti: 3.0 },
+  ];
+
+  let isGameOpen = false;
+  let gameSelectedCell = null; // 轻触选中模式
+
+  // ===== 游戏体力恢复 =====
+  function gameRecoverStamina() {
+    const now = Date.now();
+    const last = state.gameLastStaminaRecover || now;
+    const elapsed = now - last;
+    const ticks = Math.floor(elapsed / GAME_STAMINA_RECOVER_INTERVAL);
+    if (ticks > 0 && state.gameStamina < state.gameStaminaMax) {
+      state.gameStamina = Math.min(state.gameStaminaMax, state.gameStamina + ticks * GAME_STAMINA_RECOVER_AMOUNT);
+      state.gameLastStaminaRecover = last + ticks * GAME_STAMINA_RECOVER_INTERVAL;
+      saveDataDebounced('游戏体力恢复');
+    }
+  }
+
+  // ===== 初始化游戏棋盘 =====
+  function gameInitBoard() {
+    if (!state.gameBoard || state.gameBoard.length !== GAME_BOARD_CELLS) {
+      state.gameBoard = new Array(GAME_BOARD_CELLS).fill(null);
+    }
+    // 确保生成器和售卖区位置有效
+    if (state.gameGeneratorPos === undefined) state.gameGeneratorPos = 0;
+    if (state.gameSellPos === undefined) state.gameSellPos = GAME_BOARD_CELLS - 1;
+    // 确保订单存在
+    if (!state.gameOrders || state.gameOrders.length === 0) {
+      state.gameOrders = gameGenerateOrders(3);
+    }
+    if (!state.gameCollection) state.gameCollection = [];
+    if (!state.gameCustomImages) state.gameCustomImages = {};
+    if (state.gameGold === undefined) state.gameGold = 0;
+    if (state.gameStamina === undefined) state.gameStamina = 100;
+    if (state.gameStaminaMax === undefined) state.gameStaminaMax = 100;
+    if (!state.gameLastStaminaRecover) state.gameLastStaminaRecover = Date.now();
+  }
+
+  // ===== 生成随机订单 =====
+  function gameGenerateOrders(count) {
+    const orders = [];
+    const usedKeys = new Set(); // 防止同链同级重复
+
+    let attempts = 0;
+    while (orders.length < count && attempts < 50) {
+      attempts++;
+      const template = GAME_ORDER_TEMPLATES[Math.floor(Math.random() * GAME_ORDER_TEMPLATES.length)];
+      const level = template.minLevel + Math.floor(Math.random() * (template.maxLevel - template.minLevel + 1));
+      const chainData = GAME_CHAINS[template.chain];
+      const item = chainData.items[level - 1];
+      if (!item) continue;
+
+      const key = `${template.chain}_${level}`;
+      if (usedKeys.has(key)) continue; // 跳过重复
+      usedKeys.add(key);
+
+      const gold = Math.round(item.sell * template.goldMulti);
+      orders.push({
+        chain: template.chain,
+        level: level,
+        name: item.name,
+        emoji: item.emoji,
+        reward: gold,
+        id: Date.now() + Math.random()
+      });
+    }
+    return orders;
+  }
+
+  // ===== 生成器：产出随机道具 =====
+  function gameSpawnItem() {
+    if (state.gameStamina < 1) {
+      gameShowNotice('体力不足！等待恢复或购买睡眠用品');
+      return;
+    }
+
+    // 找空格子
+    const emptySlots = [];
+    for (let i = 0; i < GAME_BOARD_CELLS; i++) {
+      if (i === state.gameGeneratorPos || i === state.gameSellPos) continue;
+      if (!state.gameBoard[i]) emptySlots.push(i);
+    }
+    if (emptySlots.length === 0) {
+      gameShowNotice('棋盘已满！合成或售卖一些物品');
+      return;
+    }
+
+    state.gameStamina -= 1;
+    state.gameLastStaminaRecover = state.gameLastStaminaRecover || Date.now();
+
+    // 加权随机等级
+    const totalWeight = GAME_SPAWN_WEIGHTS.reduce((s, w) => s + w.weight, 0);
+    let roll = Math.random() * totalWeight;
+    let spawnLevel = 1;
+    for (const w of GAME_SPAWN_WEIGHTS) {
+      roll -= w.weight;
+      if (roll <= 0) { spawnLevel = w.level; break; }
+    }
+
+    // 随机选择链
+    const chains = ['toy', 'food', 'gem'];
+    const chain = chains[Math.floor(Math.random() * chains.length)];
+
+    // 放到随机空格
+    const targetSlot = emptySlots[Math.floor(Math.random() * emptySlots.length)];
+    state.gameBoard[targetSlot] = { chain, level: spawnLevel };
+
+    // 更新图鉴
+    const itemKey = `${chain}_${spawnLevel}`;
+    if (!state.gameCollection.includes(itemKey)) {
+      state.gameCollection.push(itemKey);
+    }
+
+    saveDataDebounced('游戏生成道具');
+    gameRenderBoard();
+    gameRenderStatus();
+  }
+
+  // ===== 合成逻辑 =====
+  function gameTryMerge(fromIdx, toIdx) {
+    if (fromIdx === toIdx) return false;
+    if (fromIdx === state.gameGeneratorPos || fromIdx === state.gameSellPos) return false;
+    if (toIdx === state.gameGeneratorPos) return false;
+
+    const fromItem = state.gameBoard[fromIdx];
+    if (!fromItem) return false;
+
+    // 售卖区
+    if (toIdx === state.gameSellPos) {
+      const chainData = GAME_CHAINS[fromItem.chain];
+      const itemData = chainData.items[fromItem.level - 1];
+      state.gameGold += itemData.sell;
+      state.gameBoard[fromIdx] = null;
+      gameShowNotice(`售出 ${itemData.emoji} ${itemData.name}，获得 ${itemData.sell} 金币！`);
+      saveDataDebounced('游戏售卖');
+      gameRenderBoard();
+      gameRenderStatus();
+      return true;
+    }
+
+    const toItem = state.gameBoard[toIdx];
+
+    // 空格子 → 移动
+    if (!toItem) {
+      state.gameBoard[toIdx] = fromItem;
+      state.gameBoard[fromIdx] = null;
+      saveDataDebounced('游戏移动');
+      gameRenderBoard();
+      return true;
+    }
+
+    // 合成：同链同级
+    if (toItem.chain === fromItem.chain && toItem.level === fromItem.level) {
+      if (fromItem.level >= GAME_MAX_CHAIN_LEVEL) {
+        gameShowNotice('已达最高等级！');
+        return false;
+      }
+      const newLevel = fromItem.level + 1;
+      state.gameBoard[toIdx] = { chain: fromItem.chain, level: newLevel };
+      state.gameBoard[fromIdx] = null;
+
+      // 图鉴
+      const itemKey = `${fromItem.chain}_${newLevel}`;
+      if (!state.gameCollection.includes(itemKey)) {
+        state.gameCollection.push(itemKey);
+      }
+
+      const chainData = GAME_CHAINS[fromItem.chain];
+      const newItem = chainData.items[newLevel - 1];
+      gameShowNotice(`合成成功！获得 ${newItem.emoji} ${newItem.name} (Lv${newLevel})`);
+
+      saveDataDebounced('游戏合成');
+      gameRenderBoard();
+      gameRenderStatus();
+      return true;
+    }
+
+    return false;
+  }
+
+  // ===== 完成订单 =====
+  function gameTryCompleteOrder(orderIdx) {
+    const order = state.gameOrders[orderIdx];
+    if (!order) return;
+
+    // 查找棋盘上是否有对应物品
+    let foundIdx = -1;
+    for (let i = 0; i < GAME_BOARD_CELLS; i++) {
+      const cell = state.gameBoard[i];
+      if (cell && cell.chain === order.chain && cell.level === order.level) {
+        foundIdx = i;
+        break;
+      }
+    }
+
+    if (foundIdx === -1) {
+      gameShowNotice(`棋盘上没有 ${order.emoji} ${order.name}！`);
+      return;
+    }
+
+    // 消耗物品，给金币
+    state.gameBoard[foundIdx] = null;
+    state.gameGold += order.reward;
+    gameShowNotice(`订单完成！${order.emoji} ${order.name} → +${order.reward} 金币`);
+
+    // 替换这个订单
+    const newOrders = gameGenerateOrders(1);
+    state.gameOrders[orderIdx] = newOrders[0];
+
+    saveDataDebounced('游戏订单完成');
+    gameRenderBoard();
+    gameRenderStatus();
+    gameRenderOrders();
+  }
+
+  // ===== 商店购买 =====
+  function gameBuyShopItem(category, idx) {
+    const items = GAME_SHOP_ITEMS[category];
+    if (!items || !items[idx]) return;
+    const item = items[idx];
+
+    if (state.gameGold < item.price) {
+      gameShowNotice('金币不够！');
+      return;
+    }
+
+    // 限购检查
+    if (item.dailyLimit > 0) {
+      const today = new Date().toISOString().slice(0, 10);
+      if (!state.gameShopBuyLog) state.gameShopBuyLog = {};
+      if (!state.gameShopBuyLog[today]) state.gameShopBuyLog[today] = {};
+      const logKey = `${category}_${idx}`;
+      const bought = state.gameShopBuyLog[today][logKey] || 0;
+      if (bought >= item.dailyLimit) {
+        gameShowNotice(`${item.emoji} ${item.name} 今日已售罄（限${item.dailyLimit}次/天）`);
+        return;
+      }
+      state.gameShopBuyLog[today][logKey] = bought + 1;
+      // 清理超过3天的旧记录，防止数据膨胀
+      const keys = Object.keys(state.gameShopBuyLog);
+      keys.forEach(k => { if (k < today.slice(0, 8)) delete state.gameShopBuyLog[k]; });
+    }
+
+    state.gameGold -= item.price;
+
+    // 放入背包
+    if (!state.gameInventory) state.gameInventory = [];
+    const existing = state.gameInventory.find(inv => inv.category === category && inv.idx === idx);
+    if (existing) {
+      existing.count++;
+    } else {
+      state.gameInventory.push({ category, idx, count: 1 });
+    }
+
+    gameShowNotice(`购买了 ${item.emoji} ${item.name}，已放入背包！`);
+    saveDataDebounced('游戏商店购买');
+    gameRenderStatus();
+    gameRenderShop();
+  }
+
+
+  // ===== 游戏通知 =====
+  function gameShowNotice(text) {
+    const notice = document.getElementById('sp-game-notice');
+    if (!notice) return;
+    notice.textContent = text;
+    notice.classList.add('visible');
+    clearTimeout(notice._timer);
+    notice._timer = setTimeout(() => notice.classList.remove('visible'), 3000);
+  }
+
+  // ===== 获取物品显示 =====
+  function gameGetItemDisplay(chain, level) {
+    const custom = state.gameCustomImages?.[`${chain}_${level}`];
+    if (custom) {
+      return `<img src="${custom}" class="sp-game-cell-img" alt="" />`;
+    }
+    const chainData = GAME_CHAINS[chain];
+    if (!chainData || !chainData.items[level - 1]) return '?';
+    return `<span class="sp-game-cell-emoji">${chainData.items[level - 1].emoji}</span>`;
+  }
+
+  function gameGetItemInfo(chain, level) {
+    const chainData = GAME_CHAINS[chain];
+    if (!chainData || !chainData.items[level - 1]) return { name: '?', sell: 0, emoji: '?' };
+    return chainData.items[level - 1];
+  }
+
+  function gameRenderOrders() {
+    const container = document.getElementById('sp-game-orders');
+    if (!container) return;
+
+    if (!state.gameOrders || state.gameOrders.length === 0) {
+      container.innerHTML = '<div class="sp-game-empty">暂无订单</div>';
+      return;
+    }
+
+    container.innerHTML = state.gameOrders.map((order, idx) => {
+      const customImg = state.gameCustomImages?.[`${order.chain}_${order.level}`];
+      const display = customImg
+        ? `<img src="${customImg}" class="sp-game-order-img" />`
+        : `<span class="sp-game-order-emoji">${order.emoji}</span>`;
+      return `
+        <div class="sp-game-order-card" data-order-idx="${idx}">
+          <div class="sp-game-order-item">${display}</div>
+          <div class="sp-game-order-info">
+            <span class="sp-game-order-name">${order.name} (Lv${order.level})</span>
+            <span class="sp-game-order-reward">🪙 ${order.reward}</span>
+          </div>
+          <button class="sp-game-order-btn" data-order-idx="${idx}">交付</button>
+        </div>
+      `;
+    }).join('');
+
+    container.querySelectorAll('.sp-game-order-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const orderIdx = parseInt(btn.dataset.orderIdx);
+        gameTryCompleteOrder(orderIdx);
+      });
+    });
+  }
+
+  // ===== 渲染棋盘 =====
+  function gameRenderBoard() {
+    const boardEl = document.getElementById('sp-game-board');
+    if (!boardEl) return;
+
+    let html = '';
+    for (let i = 0; i < GAME_BOARD_CELLS; i++) {
+      let cellClass = 'sp-game-cell';
+      let content = '';
+      let title = '';
+
+      if (i === state.gameGeneratorPos) {
+        cellClass += ' sp-game-generator';
+        const customGen = state.gameCustomImages?.generator;
+        content = customGen
+          ? `<img src="${customGen}" class="sp-game-cell-img" alt="生成器" />`
+          : '<span class="sp-game-cell-emoji">🐾</span>';
+        title = '魔法猫爪生成器（点击消耗1体力）';
+      } else if (i === state.gameSellPos) {
+        cellClass += ' sp-game-sell';
+        content = '<span class="sp-game-cell-emoji">💰</span>';
+        title = '售卖区（拖入或轻触选中后点击此处售卖）';
+      } else {
+        const cell = state.gameBoard[i];
+        if (cell) {
+          cellClass += ' sp-game-has-item';
+          content = gameGetItemDisplay(cell.chain, cell.level);
+          const info = gameGetItemInfo(cell.chain, cell.level);
+          title = `${info.emoji} ${info.name} (Lv${cell.level}) - 售价:${info.sell}金币`;
+          cellClass += ` sp-game-chain-${cell.chain}`;
+        }
+      }
+
+      if (gameSelectedCell === i) {
+        cellClass += ' sp-game-selected';
+      }
+
+      html += `<div class="${cellClass}" data-cell-idx="${i}" title="${title}">${content}<span class="sp-game-level-badge">${state.gameBoard[i] ? 'L' + state.gameBoard[i].level : ''}</span></div>`;
+    }
+    boardEl.innerHTML = html;
+
+    // 绑定事件
+    gameBindCellEvents();
+  }
+
+  // ===== 绑定棋盘格子事件（拖拽+轻触双模式）=====
+  function gameBindCellEvents() {
+    const cells = document.querySelectorAll('.sp-game-cell');
+    cells.forEach(cell => {
+      const idx = parseInt(cell.dataset.cellIdx);
+
+      // --- 轻触选中模式 ---
+      cell.addEventListener('click', (e) => {
+        e.stopPropagation();
+
+        // 生成器点击
+        if (idx === state.gameGeneratorPos) {
+          gameSpawnItem();
+          return;
+        }
+
+        // 如果已经有选中的格子
+        if (gameSelectedCell !== null && gameSelectedCell !== idx) {
+          // 尝试移动/合成/售卖
+          const success = gameTryMerge(gameSelectedCell, idx);
+          gameSelectedCell = null;
+          gameRenderBoard();
+          return;
+        }
+
+        // 选中当前格子（必须有物品）
+        if (state.gameBoard[idx] && idx !== state.gameSellPos) {
+          gameSelectedCell = (gameSelectedCell === idx) ? null : idx;
+          gameRenderBoard();
+        } else if (idx === state.gameSellPos && gameSelectedCell !== null) {
+          // 点击售卖区
+          gameTryMerge(gameSelectedCell, idx);
+          gameSelectedCell = null;
+          gameRenderBoard();
+        } else {
+          gameSelectedCell = null;
+          gameRenderBoard();
+        }
+      });
+
+      // --- 拖拽模式 ---
+      if (state.gameBoard[idx] && idx !== state.gameGeneratorPos && idx !== state.gameSellPos) {
+        cell.setAttribute('draggable', 'true');
+        cell.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', String(idx));
+          cell.classList.add('sp-game-dragging');
+        });
+        cell.addEventListener('dragend', () => {
+          cell.classList.remove('sp-game-dragging');
+        });
+      }
+
+      cell.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        cell.classList.add('sp-game-dragover');
+      });
+      cell.addEventListener('dragleave', () => {
+        cell.classList.remove('sp-game-dragover');
+      });
+      cell.addEventListener('drop', (e) => {
+        e.preventDefault();
+        cell.classList.remove('sp-game-dragover');
+        const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
+        if (!isNaN(fromIdx)) {
+          gameTryMerge(fromIdx, idx);
+          gameSelectedCell = null;
+          gameRenderBoard();
+          gameRenderStatus();
+        }
+      });
+
+      // --- 拖拽模式 ---
+      if (state.gameBoard[idx] && idx !== state.gameGeneratorPos && idx !== state.gameSellPos) {
+        cell.setAttribute('draggable', 'true');
+        cell.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', String(idx));
+          cell.classList.add('sp-game-dragging');
+        });
+        cell.addEventListener('dragend', () => {
+          cell.classList.remove('sp-game-dragging');
+        });
+      }
+
+      cell.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        cell.classList.add('sp-game-dragover');
+      });
+      cell.addEventListener('dragleave', () => {
+        cell.classList.remove('sp-game-dragover');
+      });
+      cell.addEventListener('drop', (e) => {
+        e.preventDefault();
+        cell.classList.remove('sp-game-dragover');
+        const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
+        if (!isNaN(fromIdx)) {
+          gameTryMerge(fromIdx, idx);
+          gameSelectedCell = null;
+          gameRenderBoard();
+          gameRenderStatus();
+        }
+      });
+
+      // --- 触摸拖拽（移动端）---
+      let touchStartIdx = null;
+      let touchClone = null;
+      let touchMoved = false;
+      let touchStartTime = 0;
+
+      cell.addEventListener('touchstart', (e) => {
+        if (!state.gameBoard[idx] || idx === state.gameGeneratorPos || idx === state.gameSellPos) return;
+        touchStartIdx = idx;
+        touchMoved = false;
+        touchStartTime = Date.now();
+      }, { passive: true });
+
+      cell.addEventListener('touchmove', (e) => {
+        if (touchStartIdx === null) return;
+        if (Date.now() - touchStartTime < 150) return; // 短触不触发拖拽
+        touchMoved = true;
+        if (e.cancelable) e.preventDefault();
+
+        if (!touchClone) {
+          touchClone = cell.cloneNode(true);
+          touchClone.classList.add('sp-game-touch-clone');
+          document.getElementById('sp-game-panel').appendChild(touchClone);
+        }
+
+        const touch = e.touches[0];
+        const panel = document.getElementById('sp-game-panel');
+        const panelRect = panel.getBoundingClientRect();
+        touchClone.style.left = (touch.clientX - panelRect.left - 22) + 'px';
+        touchClone.style.top = (touch.clientY - panelRect.top - 22) + 'px';
+      }, { passive: false });
+
+      cell.addEventListener('touchend', (e) => {
+        if (touchStartIdx === null) {
+          return;
+        }
+
+        // 移除克隆
+        if (touchClone) {
+          touchClone.remove();
+          touchClone = null;
+        }
+
+        if (!touchMoved) {
+          // 没有拖动 → 走轻触选中逻辑（click 事件已处理）
+          touchStartIdx = null;
+          return;
+        }
+
+        // 拖动结束 → 找到落点格子
+        const touch = e.changedTouches[0];
+        const targetEl = document.elementFromPoint(touch.clientX, touch.clientY);
+        const targetCell = targetEl?.closest('.sp-game-cell');
+
+        if (targetCell) {
+          const toIdx = parseInt(targetCell.dataset.cellIdx);
+          if (!isNaN(toIdx) && toIdx !== touchStartIdx) {
+            gameTryMerge(touchStartIdx, toIdx);
+            gameSelectedCell = null;
+            gameRenderBoard();
+            gameRenderStatus();
+          }
+        }
+
+        touchStartIdx = null;
+        touchMoved = false;
+      });
+    });
+  }
+
+  // ===== 渲染状态栏 =====
+  function gameRenderStatus() {
+    const goldEl = document.getElementById('sp-game-gold');
+    const staminaEl = document.getElementById('sp-game-stamina');
+    if (goldEl) goldEl.textContent = state.gameGold;
+    if (staminaEl) staminaEl.textContent = `${Math.floor(state.gameStamina)} / ${state.gameStaminaMax}`;
+
+    // 同步刷新按钮状态
+    const btn = document.getElementById('sp-game-order-refresh-btn');
+    if (btn) {
+      const now = Date.now();
+      const cdRemain = Math.max(0, (state.gameOrderRefreshCD || 0) - now);
+      if (cdRemain <= 0) {
+        btn.textContent = '🔄';
+        btn.disabled = false;
+        btn.classList.remove('sp-game-on-cd');
+        btn.title = '刷新订单';
+      } else {
+        const min = Math.floor(cdRemain / 60000);
+        const sec = Math.ceil((cdRemain % 60000) / 1000);
+        btn.textContent = `${min}:${String(sec).padStart(2, '0')}`;
+        btn.disabled = true;
+        btn.classList.add('sp-game-on-cd');
+        btn.title = '冷却中';
+        gameStartOrderCDTimer();
+      }
+    }
+  }
+
+  let gameOrderCDTimer = null;
+
+  function gameRefreshOrders() {
+    const now = Date.now();
+    const cdRemain = (state.gameOrderRefreshCD || 0) - now;
+    if (cdRemain > 0) {
+      gameShowNotice(`刷新冷却中，还剩 ${Math.ceil(cdRemain / 60000)} 分钟`);
+      return;
+    }
+
+    state.gameOrders = gameGenerateOrders(3);
+    state.gameOrderRefreshCD = now + 10 * 60 * 1000; // 10分钟冷却
+    saveDataDebounced('刷新订单');
+    gameRenderOrders();
+    gameShowNotice('订单已刷新！');
+  }
+
+  function gameStartOrderCDTimer() {
+    if (gameOrderCDTimer) clearInterval(gameOrderCDTimer);
+    gameOrderCDTimer = setInterval(() => {
+      const now = Date.now();
+      const cdRemain = Math.max(0, (state.gameOrderRefreshCD || 0) - now);
+      const btn = document.getElementById('sp-game-order-refresh-btn');
+      if (!btn) { clearInterval(gameOrderCDTimer); gameOrderCDTimer = null; return; }
+
+      if (cdRemain <= 0) {
+        btn.textContent = '🔄 刷新订单';
+        btn.disabled = false;
+        btn.classList.remove('sp-game-on-cd');
+        clearInterval(gameOrderCDTimer);
+        gameOrderCDTimer = null;
+      } else {
+        const min = Math.floor(cdRemain / 60000);
+        const sec = Math.ceil((cdRemain % 60000) / 1000);
+        btn.textContent = `🔄 ${min}:${String(sec).padStart(2, '0')}`;
+      }
+    }, 1000);
+  }
+
+  // ===== 渲染商店 =====
+  function gameRenderShop() {
+    const container = document.getElementById('sp-game-shop-content');
+    if (!container) return;
+
+    const today = new Date().toISOString().slice(0, 10);
+    const todayLog = (state.gameShopBuyLog && state.gameShopBuyLog[today]) || {};
+
+    const categories = [
+      { key: 'food', label: '🍖 食物（恢复饱食）', items: GAME_SHOP_ITEMS.food },
+      { key: 'clean', label: '🧴 洗护用品（恢复清洁）', items: GAME_SHOP_ITEMS.clean },
+      { key: 'energy', label: '🛏️ 睡眠用品（恢复精力）', items: GAME_SHOP_ITEMS.energy },
+    ];
+
+    container.innerHTML = categories.map(cat => `
+      <div class="sp-game-shop-category">
+        <div class="sp-game-shop-cat-title">${cat.label}</div>
+        <div class="sp-game-shop-items">
+          ${cat.items.map((item, idx) => {
+            const logKey = `${cat.key}_${idx}`;
+            const bought = todayLog[logKey] || 0;
+            const soldOut = item.dailyLimit > 0 && bought >= item.dailyLimit;
+            const cantAfford = state.gameGold < item.price;
+            const disabled = soldOut || cantAfford;
+            const limitText = item.dailyLimit > 0
+              ? `<span class="sp-game-shop-limit ${soldOut ? 'sold-out' : ''}">${soldOut ? '已售罄' : `剩${item.dailyLimit - bought}次`}</span>`
+              : '<span class="sp-game-shop-limit">不限量</span>';
+            return `
+              <div class="sp-game-shop-item ${disabled ? 'sp-game-shop-disabled' : ''}">
+                <span class="sp-game-shop-item-emoji">${item.emoji}</span>
+                <span class="sp-game-shop-item-name">${item.name}</span>
+                <span class="sp-game-shop-item-info">+${item.restore}</span>
+                ${limitText}
+                <button class="sp-game-shop-buy" data-cat="${cat.key}" data-idx="${idx}" ${disabled ? 'disabled' : ''}>🪙${item.price}</button>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `).join('');
+
+    container.querySelectorAll('.sp-game-shop-buy').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const cat = btn.dataset.cat;
+        const idx = parseInt(btn.dataset.idx);
+        gameBuyShopItem(cat, idx);
+      });
+    });
+  }
+
+  // ===== 渲染图鉴 =====
+  function gameRenderCollection() {
+    const container = document.getElementById('sp-game-collection-content');
+    if (!container) return;
+
+    const chainKeys = ['toy', 'food', 'gem'];
+    container.innerHTML = chainKeys.map(chainKey => {
+      const chain = GAME_CHAINS[chainKey];
+      return `
+        <div class="sp-game-collection-chain">
+          <div class="sp-game-collection-chain-title">${chain.name}</div>
+          <div class="sp-game-collection-items">
+            ${chain.items.map((item, idx) => {
+              const itemKey = `${chainKey}_${idx + 1}`;
+              const unlocked = state.gameCollection.includes(itemKey);
+              const customImg = state.gameCustomImages?.[itemKey];
+              const display = unlocked
+                ? (customImg ? `<img src="${customImg}" class="sp-game-coll-img" />` : `<span>${item.emoji}</span>`)
+                : '<span class="sp-game-locked">?</span>';
+              return `
+                <div class="sp-game-coll-item ${unlocked ? 'unlocked' : 'locked'}" data-item-key="${itemKey}" title="${unlocked ? item.name + ' (Lv' + (idx+1) + ')' : '未解锁'}">
+                  ${display}
+                  <div class="sp-game-coll-item-name">${unlocked ? item.name : '???'}</div>
+                  <div class="sp-game-coll-upload-overlay" data-item-key="${itemKey}">📷</div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // 点击图鉴项上传图片
+    container.querySelectorAll('.sp-game-coll-upload-overlay').forEach(overlay => {
+      overlay.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const itemKey = overlay.dataset.itemKey;
+        gamePromptImageUpload(itemKey);
+      });
+    });
+  }
+
+  // ===== 图片上传弹窗 =====
+  function gamePromptImageUpload(itemKey) {
+    // 先问用户选哪种方式
+    const choice = confirm('设置物品图片\n\n点「确定」→ 输入图片链接\n点「取消」→ 选择本地文件上传');
+
+    if (choice) {
+      // 链接模式
+      const url = prompt('输入图片链接：');
+      if (url && url.trim().startsWith('http')) {
+        if (!state.gameCustomImages) state.gameCustomImages = {};
+        state.gameCustomImages[itemKey] = url.trim();
+        saveDataImmediate('游戏图片链接');
+        gameRenderCollection();
+        gameRenderBoard();
+        gameShowNotice('图片链接已设置！');
+      }
+    } else {
+      // 文件模式
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) {
+          gameShowNotice('图片不能超过2MB');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          const compressed = await compressImage(ev.target.result, 80, 0.7);
+          if (!state.gameCustomImages) state.gameCustomImages = {};
+          state.gameCustomImages[itemKey] = compressed;
+          saveDataImmediate('游戏图片上传');
+          gameRenderCollection();
+          gameRenderBoard();
+          gameShowNotice('图片已设置！');
+        };
+        reader.readAsDataURL(file);
+      };
+      input.click();
+    }
+  }
+
+  // ===== 背景图上传 =====
+  function gameUploadBackground() {
+    const choice = confirm('设置游戏背景\n\n点「确定」→ 输入图片链接\n点「取消」→ 选择本地文件上传');
+
+    if (choice) {
+      const url = prompt('输入背景图片链接：');
+      if (url && url.trim().startsWith('http')) {
+        state.gameBgImage = url.trim();
+        saveDataImmediate('游戏背景图');
+        gameApplyBackground();
+        gameShowNotice('背景已更新！');
+      }
+    } else {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 3 * 1024 * 1024) {
+          gameShowNotice('背景图不能超过3MB');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          const compressed = await compressImage(ev.target.result, 600, 0.6);
+          state.gameBgImage = compressed;
+          saveDataImmediate('游戏背景图');
+          gameApplyBackground();
+          gameShowNotice('背景已设置！');
+        };
+        reader.readAsDataURL(file);
+      };
+      input.click();
+    }
+  }
+
+  function gameApplyBackground() {
+    const board = document.getElementById('sp-game-board');
+    if (!board) return;
+    if (state.gameBgImage) {
+      board.style.backgroundImage = `url(${state.gameBgImage})`;
+      board.style.backgroundSize = 'cover';
+      board.style.backgroundPosition = 'center';
+    } else {
+      board.style.backgroundImage = 'none';
+    }
+  }
+
+  // ===== 生成器图片上传 =====
+  function gameUploadGenerator() {
+    gamePromptImageUpload('generator');
+  }
+
+  // ===== 主面板渲染 =====
+  function gameRenderPanel() {
+    let panel = document.getElementById('sp-game-panel');
+    if (panel) {
+      panel.remove();
+    }
+
+    panel = document.createElement('div');
+    panel.id = 'sp-game-panel';
+    panel.innerHTML = `
+      <div id="sp-game-header">
+        <span>🎮 喵咪合成工坊</span>
+        <div class="sp-game-header-btns">
+          <button id="sp-game-tab-board" class="sp-game-tab active" data-tab="board">棋盘</button>
+          <button id="sp-game-tab-shop" class="sp-game-tab" data-tab="shop">商店</button>
+          <button id="sp-game-tab-collection" class="sp-game-tab" data-tab="collection">图鉴</button>
+          <button id="sp-game-tab-settings" class="sp-game-tab" data-tab="gsettings">⚙️</button>
+          <button id="sp-game-close" title="关闭">✕</button>
+        </div>
+      </div>
+      <div id="sp-game-status-bar">
+        <span class="sp-game-stat">🪙 <span id="sp-game-gold">0</span></span>
+        <span class="sp-game-stat">⚡ <span id="sp-game-stamina">100/100</span></span>
+        <button class="sp-game-order-refresh-btn" id="sp-game-order-refresh-btn" style="margin-left:auto;">🔄</button>
+      </div>
+      <div id="sp-game-notice"></div>
+      <div id="sp-game-content">
+        <div id="sp-game-tab-content-board" class="sp-game-tab-content active">
+          <div id="sp-game-orders"></div>
+          <div id="sp-game-board"></div>
+          <div class="sp-game-board-hint">💡 轻触选中物品 → 轻触目标格子移动/合成/售卖 ｜ 也支持拖拽操作</div>
+        </div>
+        <div id="sp-game-tab-content-shop" class="sp-game-tab-content">
+          <div id="sp-game-shop-content"></div>
+        </div>
+        <div id="sp-game-tab-content-collection" class="sp-game-tab-content">
+          <div id="sp-game-collection-content"></div>
+        </div>
+        <div id="sp-game-tab-content-gsettings" class="sp-game-tab-content">
+          <div class="sp-game-settings-section">
+            <div class="sp-game-settings-title">🖼️ 自定义外观</div>
+            <button class="sp-game-settings-btn" id="sp-game-upload-bg">上传游戏背景图</button>
+            <button class="sp-game-settings-btn" id="sp-game-upload-gen">上传生成器图片</button>
+            <button class="sp-game-settings-btn" id="sp-game-clear-bg">清除背景图</button>
+            <p class="sp-game-settings-hint">💡 在图鉴中点击物品上的 📷 即可上传/替换物品图片（优先推荐链接）</p>
+          </div>
+          <div class="sp-game-settings-section">
+            <div class="sp-game-settings-title">⚠️ 重置</div>
+            <button class="sp-game-settings-btn sp-game-btn-danger" id="sp-game-reset">重置游戏数据</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(panel);
+
+    // 绑定标签切换
+    panel.querySelectorAll('.sp-game-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const target = tab.dataset.tab;
+        if (!target) return;
+        panel.querySelectorAll('.sp-game-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        panel.querySelectorAll('.sp-game-tab-content').forEach(c => c.classList.remove('active'));
+        const targetContent = document.getElementById(`sp-game-tab-content-${target}`);
+        if (targetContent) targetContent.classList.add('active');
+
+        // 切换到对应tab时渲染
+        if (target === 'shop') gameRenderShop();
+        if (target === 'collection') gameRenderCollection();
+      });
+    });
+
+    // 关闭
+    document.getElementById('sp-game-close').addEventListener('click', () => {
+      toggleMergeGame();
+    });
+
+    // 设置按钮
+    document.getElementById('sp-game-order-refresh-btn')?.addEventListener('click', (e) => { e.stopPropagation(); gameRefreshOrders(); });
+    document.getElementById('sp-game-upload-bg')?.addEventListener('click', gameUploadBackground);
+    document.getElementById('sp-game-upload-gen')?.addEventListener('click', gameUploadGenerator);
+    document.getElementById('sp-game-clear-bg')?.addEventListener('click', () => {
+      state.gameBgImage = '';
+      saveDataImmediate('清除游戏背景');
+      gameApplyBackground();
+      gameShowNotice('背景已清除');
+    });
+    document.getElementById('sp-game-refresh-orders')?.addEventListener('click', () => {
+      gameRefreshOrders();
+    });
+    document.getElementById('sp-game-reset')?.addEventListener('click', () => {
+      if (!confirm('确定重置游戏？金币、棋盘、图鉴都会清空！')) return;
+      state.gameGold = 0;
+      state.gameStamina = 100;
+      state.gameBoard = new Array(GAME_BOARD_CELLS).fill(null);
+      state.gameOrders = gameGenerateOrders(3);
+      state.gameCollection = [];
+      state.gameCustomImages = {};
+      state.gameBgImage = '';
+      saveDataImmediate('游戏重置');
+      gameRenderBoard();
+      gameRenderStatus();
+      gameRenderOrders();
+      gameApplyBackground();
+      gameShowNotice('游戏已重置');
+    });
+
+    // 面板拖拽
+    gameBindPanelDrag();
+  }
+
+  // ===== 面板拖拽 =====
+  function gameBindPanelDrag() {
+    const header = document.getElementById('sp-game-header');
+    const panel = document.getElementById('sp-game-panel');
+    if (!header || !panel) return;
+
+    let dragging = false, offX = 0, offY = 0;
+
+    const down = (e) => {
+      if (e.target.closest('#sp-game-close') || e.target.closest('.sp-game-tab')) return;
+      dragging = true;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const rect = panel.getBoundingClientRect();
+      offX = clientX - rect.left;
+      offY = clientY - rect.top;
+    };
+    const move = (e) => {
+      if (!dragging) return;
+      if (e.cancelable) e.preventDefault();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      let x = clientX - offX;
+      let y = clientY - offY;
+      x = Math.max(0, Math.min(window.innerWidth - panel.offsetWidth, x));
+      y = Math.max(0, Math.min(window.innerHeight - panel.offsetHeight, y));
+      panel.style.left = x + 'px';
+      panel.style.top = y + 'px';
+    };
+    const up = () => { dragging = false; };
+
+    header.addEventListener('mousedown', down);
+    header.addEventListener('touchstart', down, { passive: true });
+    document.addEventListener('mousemove', move);
+    document.addEventListener('touchmove', move, { passive: false });
+    document.addEventListener('mouseup', up);
+    document.addEventListener('touchend', up);
+  }
+
+  // ===== 开关游戏面板 =====
+  function toggleMergeGame() {
+    isGameOpen = !isGameOpen;
+    let panel = document.getElementById('sp-game-panel');
+
+    if (isGameOpen) {
+      gameRecoverStamina();
+      gameInitBoard();
+
+      if (!panel) {
+        gameRenderPanel();
+        panel = document.getElementById('sp-game-panel');
+      }
+
+      panel.classList.add('visible');
+
+      // 居中
+      const w = Math.min(380, window.innerWidth - 20);
+      panel.style.width = w + 'px';
+      requestAnimationFrame(() => {
+        const h = panel.offsetHeight;
+        const maxTop = window.innerHeight - h - 20;
+        const centerTop = Math.floor((window.innerHeight - h) / 2);
+        panel.style.left = Math.floor((window.innerWidth - w) / 2) + 'px';
+        panel.style.top = Math.max(10, Math.min(centerTop, maxTop)) + 'px';
+      });
+
+      gameRenderBoard();
+      gameRenderStatus();
+      gameRenderOrders();
+      gameApplyBackground();
+    } else {
+      if (panel) panel.classList.remove('visible');
+      gameSelectedCell = null;
+    }
+  }
+
+  // ===== 定时恢复体力（加入主循环）=====
+  setInterval(() => {
+    if (state.gameStamina < state.gameStaminaMax) {
+      gameRecoverStamina();
+      if (isGameOpen) gameRenderStatus();
+    }
+  }, 120000); // 每2分钟检查一次
 
 })();
 

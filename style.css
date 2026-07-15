@@ -1811,3 +1811,992 @@
     max-height: 70vh;
   }
 }
+
+/* ============================================================ */
+/* 🎮 合成小游戏样式 - MeepMerge                                */
+/* ============================================================ */
+
+#sp-game-panel {
+  position: fixed;
+  width: 380px;
+  max-width: 95vw;
+  max-height: 85vh;
+  background: var(--sp-bg-main);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--sp-border);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  display: none;
+  flex-direction: column;
+  z-index: 2147483646;
+  overflow: hidden;
+}
+
+#sp-game-panel.visible {
+  display: flex;
+}
+
+/* 顶部栏 */
+#sp-game-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--sp-bg-light);
+  border-bottom: 1px solid var(--sp-border-light);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--sp-text-primary);
+  cursor: grab;
+  user-select: none;
+}
+
+#sp-game-header:active {
+  cursor: grabbing;
+}
+
+.sp-game-header-btns {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.sp-game-tab {
+  padding: 4px 8px;
+  font-size: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--sp-border);
+  background: transparent;
+  color: var(--sp-text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sp-game-tab:hover {
+  background: rgba(255,255,255,0.08);
+  color: var(--sp-text-primary);
+}
+
+.sp-game-tab.active {
+  background: var(--sp-primary);
+  color: #fff;
+  border-color: var(--sp-primary-border);
+}
+
+#sp-game-close {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: var(--sp-text-muted);
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 0.2s;
+}
+
+#sp-game-close:hover {
+  color: #fff;
+}
+
+/* 状态栏 */
+#sp-game-status-bar {
+  display: flex;
+  gap: 16px;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: var(--sp-text-primary);
+  border-bottom: 1px solid var(--sp-border-light);
+  background: rgba(255,255,255,0.03);
+}
+
+.sp-game-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+}
+
+/* 通知 */
+#sp-game-notice {
+  position: absolute;
+  top: 70px;
+  left: 14px;
+  right: 14px;
+  padding: 6px 14px;
+  font-size: 12px;
+  color: #fff;
+  background: rgba(30,30,40,0.92);
+  border: 1px solid var(--sp-primary-border);
+  border-radius: 8px;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 10;
+}
+
+#sp-game-notice.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+/* 内容区 */
+#sp-game-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  position: relative;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.2) transparent;
+}
+
+#sp-game-content::-webkit-scrollbar {
+  width: 5px;
+}
+
+#sp-game-content::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.2);
+  border-radius: 3px;
+}
+
+.sp-game-tab-content {
+  display: none;
+}
+
+.sp-game-tab-content.active {
+  display: block;
+  animation: sp-fade-in 0.2s ease;
+}
+
+/* ===== 棋盘 ===== */
+#sp-game-board {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  padding: 8px;
+  background: rgba(0,0,0,0.2);
+  border-radius: 12px;
+  border: 1px solid var(--sp-border-light);
+  position: relative;
+}
+
+.sp-game-cell {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  border: 2px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.sp-game-cell:hover {
+  border-color: rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.08);
+}
+
+.sp-game-cell.sp-game-selected {
+  border-color: rgba(100,220,100,0.8) !important;
+  box-shadow: 0 0 10px rgba(100,220,100,0.4);
+  transform: scale(1.05);
+}
+
+.sp-game-cell.sp-game-has-item {
+  background: rgba(255,255,255,0.08);
+}
+
+.sp-game-cell.sp-game-chain-toy {
+  border-color: rgba(255,200,100,0.3);
+}
+
+.sp-game-cell.sp-game-chain-food {
+  border-color: rgba(255,150,180,0.3);
+}
+
+.sp-game-cell.sp-game-chain-gem {
+  border-color: rgba(150,100,255,0.3);
+}
+
+.sp-game-cell.sp-game-generator {
+  border-color: rgba(255,215,0,0.5);
+  background: rgba(255,215,0,0.1);
+  animation: sp-game-gen-pulse 2s ease-in-out infinite;
+}
+
+@keyframes sp-game-gen-pulse {
+  0%, 100% { box-shadow: 0 0 4px rgba(255,215,0,0.2); }
+  50% { box-shadow: 0 0 12px rgba(255,215,0,0.4); }
+}
+
+.sp-game-cell.sp-game-sell {
+  border-color: rgba(100,255,100,0.4);
+  background: rgba(100,255,100,0.08);
+  border-style: dashed;
+}
+
+.sp-game-cell.sp-game-dragging {
+  opacity: 0.4;
+  transform: scale(0.9);
+}
+
+.sp-game-cell.sp-game-dragover {
+  border-color: rgba(100,180,255,0.8);
+  background: rgba(100,180,255,0.15);
+  transform: scale(1.05);
+}
+
+.sp-game-cell-emoji {
+  font-size: 20px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.sp-game-cell-img {
+  width: 80%;
+  height: 80%;
+  object-fit: contain;
+  pointer-events: none;
+  border-radius: 4px;
+}
+
+.sp-game-level-badge {
+  position: absolute;
+  bottom: 1px;
+  right: 2px;
+  font-size: 8px;
+  color: var(--sp-text-muted);
+  font-weight: 700;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* 触摸拖拽克隆 */
+.sp-game-touch-clone {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: rgba(100,180,255,0.3);
+  border: 2px solid rgba(100,180,255,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.85;
+  transform: scale(1.1);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+
+.sp-game-touch-clone .sp-game-cell-emoji {
+  font-size: 18px;
+}
+
+.sp-game-touch-clone .sp-game-cell-img {
+  width: 32px;
+  height: 32px;
+}
+
+.sp-game-board-hint {
+  font-size: 10px;
+  color: var(--sp-text-muted);
+  text-align: center;
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+/* ===== 订单 ===== */
+#sp-game-orders {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.sp-game-order-card {
+  flex: 1;
+  min-width: 90px;
+  padding: 8px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--sp-border-light);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transition: border-color 0.2s;
+}
+
+.sp-game-order-card:hover {
+  border-color: rgba(100,180,255,0.4);
+}
+
+.sp-game-order-item {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.sp-game-order-img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+.sp-game-order-emoji {
+  font-size: 22px;
+}
+
+.sp-game-order-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.sp-game-order-name {
+  font-size: 10px;
+  color: var(--sp-text-secondary);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80px;
+}
+
+.sp-game-order-reward {
+  font-size: 11px;
+  color: #ffb347;
+  font-weight: 600;
+}
+
+.sp-game-order-btn {
+  padding: 3px 10px;
+  font-size: 10px;
+  border-radius: 6px;
+  border: 1px solid var(--sp-primary-border);
+  background: var(--sp-primary);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.sp-game-order-btn:hover {
+  background: var(--sp-primary-hover);
+}
+
+/* ===== 商店 ===== */
+#sp-game-shop-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sp-game-shop-category {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--sp-border-light);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.sp-game-shop-cat-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sp-text-primary);
+  margin-bottom: 8px;
+}
+
+.sp-game-shop-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sp-game-shop-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.sp-game-shop-item:hover {
+  background: rgba(255,255,255,0.08);
+}
+
+.sp-game-shop-item.sp-game-shop-disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.sp-game-shop-item-emoji {
+  font-size: 18px;
+  width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.sp-game-shop-item-name {
+  font-size: 12px;
+  color: var(--sp-text-primary);
+  flex: 1;
+}
+
+.sp-game-shop-item-info {
+  font-size: 11px;
+  color: var(--sp-status-energy);
+  font-weight: 600;
+  min-width: 30px;
+  text-align: right;
+}
+
+.sp-game-shop-buy {
+  padding: 3px 8px;
+  font-size: 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,180,50,0.5);
+  background: rgba(255,180,50,0.2);
+  color: #ffb347;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.sp-game-shop-buy:hover {
+  background: rgba(255,180,50,0.4);
+  color: #fff;
+}
+
+/* ===== 图鉴 ===== */
+#sp-game-collection-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sp-game-collection-chain {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--sp-border-light);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.sp-game-collection-chain-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sp-text-primary);
+  margin-bottom: 8px;
+}
+
+.sp-game-collection-items {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.sp-game-coll-item {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  border: 2px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  position: relative;
+  transition: all 0.15s;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.sp-game-coll-item.unlocked {
+  border-color: rgba(100,180,255,0.3);
+  background: rgba(100,180,255,0.06);
+}
+
+.sp-game-coll-item.unlocked:hover {
+  border-color: rgba(100,180,255,0.5);
+  transform: scale(1.05);
+}
+
+.sp-game-coll-item.locked {
+  opacity: 0.5;
+  border-style: dashed;
+}
+
+.sp-game-coll-item span {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.sp-game-locked {
+  font-size: 16px !important;
+  color: var(--sp-text-muted);
+}
+
+.sp-game-coll-img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+.sp-game-coll-item-name {
+  font-size: 8px;
+  color: var(--sp-text-muted);
+  text-align: center;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sp-game-coll-upload-overlay {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  font-size: 9px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.sp-game-coll-item.unlocked:hover .sp-game-coll-upload-overlay {
+  display: flex;
+}
+
+.sp-game-coll-upload-overlay:hover {
+  background: rgba(100,180,255,0.8);
+}
+
+/* ===== 游戏设置 ===== */
+.sp-game-settings-section {
+  margin-bottom: 14px;
+  padding: 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--sp-border-light);
+  border-radius: 10px;
+}
+
+.sp-game-settings-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sp-text-primary);
+  margin-bottom: 8px;
+}
+
+.sp-game-settings-btn {
+  display: block;
+  width: 100%;
+  padding: 7px 12px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--sp-border);
+  background: var(--sp-bg-light);
+  color: var(--sp-text-secondary);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+}
+
+.sp-game-settings-btn:hover {
+  background: rgba(255,255,255,0.1);
+  color: var(--sp-text-primary);
+}
+
+.sp-game-settings-btn:last-of-type {
+  margin-bottom: 0;
+}
+
+.sp-game-btn-danger {
+  border-color: rgba(239,83,80,0.4) !important;
+  color: #f66 !important;
+}
+
+.sp-game-btn-danger:hover {
+  background: rgba(239,83,80,0.2) !important;
+}
+
+.sp-game-settings-hint {
+  font-size: 10px;
+  color: var(--sp-text-muted);
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+.sp-game-empty {
+  text-align: center;
+  padding: 20px;
+  color: var(--sp-text-muted);
+  font-size: 12px;
+}
+
+/* ===== 移动端适配 ===== */
+@media (max-width: 768px) {
+  #sp-game-panel {
+    width: calc(100vw - 16px);
+    max-width: 380px;
+    max-height: 75vh;
+  }
+
+  #sp-game-header {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  .sp-game-tab {
+    padding: 3px 6px;
+    font-size: 9px;
+  }
+
+  #sp-game-status-bar {
+    padding: 5px 10px;
+    font-size: 12px;
+    gap: 12px;
+  }
+
+  #sp-game-content {
+    padding: 8px;
+  }
+
+  #sp-game-board {
+    gap: 3px;
+    padding: 6px;
+  }
+
+  .sp-game-cell-emoji {
+    font-size: 16px;
+  }
+
+  .sp-game-cell-img {
+    width: 75%;
+    height: 75%;
+  }
+
+  .sp-game-level-badge {
+    font-size: 7px;
+  }
+
+  .sp-game-order-card {
+    min-width: 75px;
+    padding: 6px;
+  }
+
+  .sp-game-order-emoji {
+    font-size: 18px;
+  }
+
+  .sp-game-order-name {
+    font-size: 9px;
+    max-width: 65px;
+  }
+
+  .sp-game-collection-items {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+  }
+
+  .sp-game-coll-item span {
+    font-size: 16px;
+  }
+
+  .sp-game-coll-item-name {
+    font-size: 7px;
+  }
+
+  .sp-game-touch-clone {
+    width: 38px;
+    height: 38px;
+  }
+
+  .sp-game-board-hint {
+    font-size: 9px;
+  }
+}
+
+@media (max-width: 480px) {
+  #sp-game-panel {
+    max-height: 70vh;
+  }
+
+  .sp-game-cell-emoji {
+    font-size: 14px;
+  }
+
+  .sp-game-order-card {
+    min-width: 65px;
+    padding: 5px;
+  }
+
+  .sp-game-collection-items {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* ===== 背包弹窗样式 ===== */
+.sp-inv-popup-box {
+  background: var(--sp-bg-secondary);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--sp-border);
+  border-radius: 14px;
+  padding: 0;
+  width: 300px;
+  max-width: 90vw;
+  max-height: 70vh;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: sp-fade-in 0.15s ease;
+}
+
+.sp-inv-popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sp-text-primary);
+  border-bottom: 1px solid var(--sp-border-light);
+  background: var(--sp-bg-light);
+}
+
+.sp-inv-popup-close {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: var(--sp-text-muted);
+  padding: 2px 6px;
+}
+
+.sp-inv-popup-close:hover {
+  color: #fff;
+}
+
+.sp-inv-popup-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sp-inv-popup-body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sp-inv-popup-body::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.2);
+  border-radius: 2px;
+}
+
+.sp-inv-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--sp-border-light);
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+
+.sp-inv-item:hover {
+  background: rgba(255,255,255,0.08);
+}
+
+.sp-inv-item-emoji {
+  font-size: 22px;
+  flex-shrink: 0;
+  width: 30px;
+  text-align: center;
+}
+
+.sp-inv-item-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sp-inv-item-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sp-text-primary);
+}
+
+.sp-inv-item-detail {
+  font-size: 10px;
+  color: var(--sp-text-muted);
+}
+
+.sp-inv-item-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.sp-inv-use-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  border-radius: 6px;
+  border: 1px solid var(--sp-primary-border);
+  background: var(--sp-primary);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.sp-inv-use-btn:hover {
+  background: var(--sp-primary-hover);
+}
+
+.sp-inv-quick-btn {
+  padding: 4px 8px;
+  font-size: 14px;
+  border-radius: 6px;
+  border: 1px solid var(--sp-border);
+  background: transparent;
+  color: var(--sp-text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sp-inv-quick-btn:hover {
+  border-color: rgba(255,200,50,0.5);
+  color: #ffb347;
+}
+
+.sp-inv-quick-btn.active {
+  color: #ffb347;
+  border-color: rgba(255,200,50,0.5);
+  background: rgba(255,200,50,0.1);
+}
+
+.sp-inv-empty {
+  text-align: center;
+  padding: 30px 10px;
+  color: var(--sp-text-muted);
+  font-size: 12px;
+}
+
+.sp-inv-popup-hint {
+  padding: 8px 14px;
+  font-size: 10px;
+  color: var(--sp-text-muted);
+  border-top: 1px solid var(--sp-border-light);
+  background: rgba(255,255,255,0.02);
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .sp-inv-popup-box {
+    width: calc(100vw - 30px);
+    max-width: 300px;
+  }
+}
+
+/* ===== 商店限购标签 ===== */
+.sp-game-shop-limit {
+  font-size: 9px;
+  color: var(--sp-text-muted);
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.05);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.sp-game-shop-limit.sold-out {
+  color: #f66;
+  background: rgba(239,83,80,0.1);
+}
+
+.sp-game-shop-buy:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ===== 订单刷新按钮 ===== */
+.sp-game-order-refresh {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+.sp-game-order-refresh-btn {
+  padding: 4px 12px;
+  font-size: 11px;
+  border-radius: 8px;
+  border: 1px solid var(--sp-border);
+  background: var(--sp-bg-light);
+  color: var(--sp-text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sp-game-order-refresh-btn:hover:not(:disabled) {
+  background: rgba(255,255,255,0.1);
+  color: var(--sp-text-primary);
+  border-color: var(--sp-primary-border);
+}
+
+.sp-game-order-refresh-btn.sp-game-on-cd {
+  opacity: 0.5;
+  cursor: not-allowed;
+  color: var(--sp-text-muted);
+}
+
+.sp-game-order-refresh-btn {
+  padding: 2px 8px;
+  font-size: 11px;
+  border-radius: 6px;
+  border: 1px solid var(--sp-border);
+  background: var(--sp-bg-light);
+  color: var(--sp-text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.sp-game-order-refresh-btn:hover:not(:disabled) {
+  background: rgba(255,255,255,0.1);
+  color: var(--sp-text-primary);
+  border-color: var(--sp-primary-border);
+}
+
+.sp-game-order-refresh-btn.sp-game-on-cd {
+  opacity: 0.5;
+  cursor: not-allowed;
+  color: var(--sp-text-muted);
+  font-size: 10px;
+}
