@@ -4729,3 +4729,702 @@
     max-height: 75vh;
   }
 }
+
+/* ============================================================ */
+/* 🧊 冰箱整理游戏样式 - MeepFridgeOrganize                     */
+/* ============================================================ */
+
+#sp-fridge-panel {
+  position: fixed;
+  width: 420px;
+  max-width: 95vw;
+  max-height: 90vh;
+  background: var(--sp-bg-main);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--sp-border);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  display: none;
+  flex-direction: column;
+  z-index: 2147483646;
+  overflow: hidden;
+}
+
+#sp-fridge-panel.visible {
+  display: flex;
+}
+
+#sp-fridge-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--sp-bg-light);
+  border-bottom: 1px solid var(--sp-border-light);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--sp-text-primary);
+  cursor: grab;
+  user-select: none;
+}
+
+#sp-fridge-header:active {
+  cursor: grabbing;
+}
+
+.sp-fridge-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sp-fridge-gold-display {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffb347;
+}
+
+#sp-fridge-close {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: var(--sp-text-muted);
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 0.2s;
+}
+
+#sp-fridge-close:hover {
+  color: #fff;
+}
+
+#sp-fridge-notice {
+  position: absolute;
+  top: 50px;
+  left: 14px;
+  right: 14px;
+  padding: 6px 14px;
+  font-size: 12px;
+  color: #fff;
+  background: rgba(30,30,40,0.92);
+  border: 1px solid var(--sp-primary-border);
+  border-radius: 8px;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 10;
+}
+
+#sp-fridge-notice.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+#sp-fridge-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* 冰箱网格 */
+.sp-fridge-grid {
+  position: relative;
+  display: grid;
+  gap: 1px;
+  padding: 4px;
+  background: rgba(150,220,255,0.08);
+  border-radius: 12px;
+  border: 2px solid rgba(150,220,255,0.2);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.sp-fridge-cell {
+  aspect-ratio: 1;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  position: relative;
+}
+
+.sp-fridge-cell:hover {
+  background: rgba(100,220,100,0.08);
+  border-color: rgba(100,220,100,0.2);
+}
+
+.sp-fridge-cell-occupied {
+  background: rgba(100,180,255,0.06);
+  border-color: rgba(100,180,255,0.1);
+  cursor: default;
+}
+
+.sp-fridge-cell.sp-fridge-preview-ok {
+  background: rgba(100,220,100,0.25) !important;
+  border-color: rgba(100,220,100,0.5) !important;
+  box-shadow: inset 0 0 6px rgba(100,220,100,0.3);
+}
+
+.sp-fridge-cell.sp-fridge-preview-bad {
+  background: rgba(239,83,80,0.25) !important;
+  border-color: rgba(239,83,80,0.5) !important;
+  box-shadow: inset 0 0 6px rgba(239,83,80,0.3);
+}
+
+/* 已放置的物品 */
+.sp-fridge-placed-item {
+  border-radius: 6px;
+  background: rgba(100,180,255,0.15);
+  border: 2px solid rgba(100,180,255,0.3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  z-index: 2;
+  pointer-events: none;
+  animation: sp-fridge-place-pop 0.3s ease;
+  overflow: hidden;
+}
+
+@keyframes sp-fridge-place-pop {
+  0% { transform: scale(0.7); opacity: 0; }
+  60% { transform: scale(1.05); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.sp-fridge-placed-emoji {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.sp-fridge-placed-name {
+  font-size: 7px;
+  color: var(--sp-text-muted);
+  text-align: center;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  padding: 0 2px;
+}
+
+/* 购物筐 */
+.sp-fridge-basket {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 8px;
+  background: rgba(0,0,0,0.15);
+  border-radius: 10px;
+  border: 1px solid var(--sp-border-light);
+  min-height: 50px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.sp-fridge-basket::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sp-fridge-basket::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.2);
+  border-radius: 2px;
+}
+
+.sp-fridge-basket-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: rgba(255,255,255,0.06);
+  border: 2px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.sp-fridge-basket-item:hover {
+  border-color: rgba(100,220,100,0.4);
+  background: rgba(100,220,100,0.08);
+}
+
+.sp-fridge-basket-item.sp-fridge-basket-selected {
+  border-color: rgba(100,220,100,0.8) !important;
+  box-shadow: 0 0 10px rgba(100,220,100,0.4);
+  background: rgba(100,220,100,0.12);
+}
+
+.sp-fridge-basket-emoji {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.sp-fridge-basket-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sp-fridge-basket-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sp-text-primary);
+  white-space: nowrap;
+}
+
+.sp-fridge-basket-size {
+  font-size: 9px;
+  color: var(--sp-text-muted);
+}
+
+.sp-fridge-basket-empty {
+  text-align: center;
+  padding: 12px;
+  color: var(--sp-text-muted);
+  font-size: 12px;
+  width: 100%;
+}
+
+/* 道具按钮 */
+.sp-fridge-prop-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--sp-border-light);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 12px;
+  color: var(--sp-text-secondary);
+}
+
+.sp-fridge-prop-btn:hover {
+  background: rgba(100,180,255,0.1);
+  border-color: var(--sp-primary-border);
+  color: var(--sp-text-primary);
+}
+
+.sp-fridge-prop-btn:active {
+  transform: scale(0.97);
+}
+
+/* 控制按钮 */
+.sp-fridge-ctrl-btn {
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--sp-primary-border);
+  background: var(--sp-primary);
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sp-fridge-ctrl-btn:hover {
+  background: var(--sp-primary-hover);
+}
+
+.sp-fridge-ctrl-quit {
+  background: var(--sp-bg-light);
+  color: var(--sp-text-secondary);
+  border-color: rgba(239,83,80,0.4);
+  color: #f66;
+}
+
+.sp-fridge-ctrl-quit:hover {
+  background: rgba(239,83,80,0.15);
+}
+
+/* 结算弹窗 */
+.sp-fridge-result-box {
+  background: var(--sp-bg-secondary);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--sp-border);
+  border-radius: 16px;
+  padding: 24px;
+  width: 280px;
+  max-width: 85%;
+  text-align: center;
+  animation: sp-fade-in 0.3s ease;
+}
+
+.sp-fridge-result-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--sp-text-primary);
+  margin-bottom: 12px;
+}
+
+.sp-fridge-result-info {
+  font-size: 13px;
+  color: var(--sp-text-secondary);
+  line-height: 1.8;
+  margin-bottom: 16px;
+}
+
+.sp-fridge-result-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.sp-fridge-result-btn {
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--sp-primary-border);
+  background: var(--sp-primary);
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sp-fridge-result-btn:hover {
+  background: var(--sp-primary-hover);
+}
+
+.sp-fridge-result-close {
+  background: var(--sp-bg-light);
+  color: var(--sp-text-secondary);
+  border-color: var(--sp-border);
+}
+
+.sp-fridge-result-close:hover {
+  background: rgba(255,255,255,0.1);
+  color: var(--sp-text-primary);
+}
+
+/* 库存背包项 */
+.sp-fridge-bag-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--sp-border-light);
+  border-radius: 8px;
+  margin-bottom: 6px;
+}
+
+/* 最小化 */
+#sp-fridge-panel.sp-fridge-minimized {
+  width: 160px !important;
+  min-width: 160px !important;
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
+  resize: none;
+}
+#sp-fridge-panel.sp-fridge-minimized #sp-fridge-notice,
+#sp-fridge-panel.sp-fridge-minimized #sp-fridge-body {
+  display: none;
+}
+#sp-fridge-panel.sp-fridge-minimized #sp-fridge-header {
+  border-bottom: none;
+  border-radius: 16px;
+}
+#sp-fridge-panel.sp-fridge-minimized > div:nth-child(3) {
+  display: none;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  #sp-fridge-panel {
+    width: calc(100vw - 16px);
+    max-width: 420px;
+    max-height: 85vh;
+  }
+
+  .sp-fridge-placed-emoji {
+    font-size: 14px;
+  }
+
+  .sp-fridge-basket-item {
+    padding: 4px 8px;
+  }
+
+  .sp-fridge-basket-emoji {
+    font-size: 15px;
+  }
+
+  .sp-fridge-basket-name {
+    font-size: 10px;
+  }
+
+  .sp-fridge-prop-btn {
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .sp-fridge-placed-emoji {
+    font-size: 12px;
+  }
+
+  .sp-fridge-placed-name {
+    display: none;
+  }
+}
+
+/* ============================================================ */
+/* 🍢 糖葫芦工坊样式 - MeepTanghuluSort                        */
+/* ============================================================ */
+
+#sp-tanghulu-panel {
+  position: fixed;
+  width: 420px;
+  max-width: 95vw;
+  max-height: 90vh;
+  background: var(--sp-bg-main);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--sp-border);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  display: none;
+  flex-direction: column;
+  z-index: 2147483646;
+  overflow: hidden;
+}
+
+#sp-tanghulu-panel.visible {
+  display: flex;
+}
+
+#sp-tanghulu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--sp-bg-light);
+  border-bottom: 1px solid var(--sp-border-light);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--sp-text-primary);
+  cursor: grab;
+  user-select: none;
+}
+
+#sp-tanghulu-header:active {
+  cursor: grabbing;
+}
+
+#sp-tanghulu-notice {
+  position: absolute;
+  top: 50px;
+  left: 14px;
+  right: 14px;
+  padding: 6px 14px;
+  font-size: 12px;
+  color: #fff;
+  background: rgba(30,30,40,0.92);
+  border: 1px solid var(--sp-primary-border);
+  border-radius: 8px;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 10;
+}
+
+#sp-tanghulu-notice.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+/* 竹签棋盘 */
+.sp-tanghulu-board {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 12px 8px;
+  background: rgba(139,90,43,0.15);
+  border-radius: 12px;
+  border: 2px solid rgba(139,90,43,0.3);
+  min-height: 180px;
+  align-items: flex-end;
+}
+
+/* 单根竹签 */
+.sp-tanghulu-stick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  padding: 6px 4px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  min-width: 38px;
+  position: relative;
+}
+
+.sp-tanghulu-stick:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.05);
+}
+
+.sp-tanghulu-stick.sp-tanghulu-stick-selected {
+  border-color: rgba(100,220,100,0.8) !important;
+  box-shadow: 0 0 12px rgba(100,220,100,0.4);
+  transform: translateY(-5px);
+  background: rgba(100,220,100,0.08);
+}
+
+/* 竹签上的水果容器 */
+.sp-tanghulu-stick-fruits {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 120px;
+  justify-content: flex-end;
+}
+
+/* 水果球 */
+.sp-tanghulu-fruit {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3), inset 0 -2px 4px rgba(0,0,0,0.2);
+  transition: transform 0.2s ease;
+  position: relative;
+}
+
+.sp-tanghulu-fruit-top {
+  animation: sp-tanghulu-bounce 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes sp-tanghulu-bounce {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-4px); }
+}
+
+/* 空位 */
+.sp-tanghulu-slot-empty {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px dashed rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.02);
+}
+
+/* 竹签底座 */
+.sp-tanghulu-stick-base {
+  width: 6px;
+  height: 24px;
+  background: linear-gradient(to bottom, #c8915a, #8b5e3c);
+  border-radius: 0 0 3px 3px;
+  margin-top: 2px;
+}
+
+/* 竹签标签 */
+.sp-tanghulu-stick-label {
+  font-size: 9px;
+  color: var(--sp-text-muted);
+  margin-top: 2px;
+}
+
+/* 最小化 */
+#sp-tanghulu-panel.sp-tanghulu-minimized {
+  width: 160px !important;
+  min-width: 160px !important;
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
+  resize: none;
+}
+#sp-tanghulu-panel.sp-tanghulu-minimized #sp-tanghulu-notice,
+#sp-tanghulu-panel.sp-tanghulu-minimized #sp-tanghulu-body {
+  display: none;
+}
+#sp-tanghulu-panel.sp-tanghulu-minimized #sp-tanghulu-header {
+  border-bottom: none;
+  border-radius: 16px;
+}
+#sp-tanghulu-panel.sp-tanghulu-minimized > div:nth-child(3) {
+  display: none;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  #sp-tanghulu-panel {
+    width: calc(100vw - 16px);
+    max-width: 420px;
+    max-height: 85vh;
+  }
+
+  .sp-tanghulu-board {
+    gap: 4px;
+    padding: 8px 4px;
+  }
+
+  .sp-tanghulu-stick {
+    min-width: 32px;
+    padding: 4px 2px;
+  }
+
+  .sp-tanghulu-fruit {
+    width: 26px;
+    height: 26px;
+    font-size: 14px;
+  }
+
+  .sp-tanghulu-slot-empty {
+    width: 26px;
+    height: 26px;
+  }
+
+  .sp-tanghulu-stick-fruits {
+    min-height: 100px;
+  }
+}
+
+@media (max-width: 480px) {
+  .sp-tanghulu-fruit {
+    width: 22px;
+    height: 22px;
+    font-size: 12px;
+  }
+
+  .sp-tanghulu-slot-empty {
+    width: 22px;
+    height: 22px;
+  }
+
+  .sp-tanghulu-stick {
+    min-width: 28px;
+  }
+
+  .sp-tanghulu-stick-fruits {
+    min-height: 80px;
+  }
+}
