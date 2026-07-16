@@ -14818,13 +14818,12 @@ function refreshCharPreview() {
   // backStack: 后排（每个元素是一组3个同类型物品，等前排空出后补充）
   let shelfState = {
     active: false,
-    bays: [],           // 8个隔间（2列×4行）
-    bagSlots: [null, null],  // 底部总背包2格
-    selected: null,     // {source:'bay'|'bag', bayIdx, slotIdx} 当前选中
+    bays: [],
+    bagSlots: [null, null, null],  // 底部总背包3格（默认锁定）
+    bagUnlocked: false,            // 是否已解锁底部背包（使用扩展篮道具后解锁）
+    selected: null,
     difficulty: null,
     propsUsed: { basket: 0, autoMatch: 0, shuffle: 0 },
-    basketActive: false,
-    basketSlots: [null, null, null],  // 扩展篮3格
     eliminatedGroups: 0,
     totalGroups: 0,
     energyCost: 0,
@@ -14853,10 +14852,21 @@ function refreshCharPreview() {
       selectedTypes.push(available.splice(idx, 1)[0]);
     }
 
-    // 每种商品 totalPerType 个（必须是3的倍数）
+    // 根据难度的 rows × cols 计算隔间数量
+    const BAYS = diff.rows * diff.cols;
+
+    // 计算每个隔间需要的总件数 = 前排3件 + 后排 backRows层 × 3件
+    const itemsPerBay = 3 + diff.backRows * 3;
+    const totalItemsNeeded = BAYS * itemsPerBay;
+
+    // 如果所有商品总数不够填满全部隔间，自动扩增商品数量（保证每格都有东西）
+    const minPerType = Math.ceil(totalItemsNeeded / diff.itemTypes);
+    const actualPerType = Math.max(diff.totalPerType, Math.ceil(minPerType / 3) * 3);
+
+    // 生成 allItems，保证总数足够
     const allItems = [];
     selectedTypes.forEach(type => {
-      for (let i = 0; i < diff.totalPerType; i++) {
+      for (let i = 0; i < actualPerType; i++) {
         allItems.push(type.id);
       }
     });
@@ -14867,8 +14877,6 @@ function refreshCharPreview() {
       [allItems[i], allItems[j]] = [allItems[j], allItems[i]];
     }
 
-    // 根据难度的 rows × cols 计算隔间数量
-    const BAYS = diff.rows * diff.cols;
     shelfState.bays = [];
     let itemIdx = 0;
 
@@ -14877,7 +14885,11 @@ function refreshCharPreview() {
         slots: [null, null, null],
         backStack: []
       };
-      // 填充后排
+      // 先填充前排3格
+      for (let s = 0; s < 3; s++) {
+        bay.slots[s] = itemIdx < allItems.length ? allItems[itemIdx++] : null;
+      }
+      // 再填充后排（每层3格）
       for (let layer = 0; layer < diff.backRows; layer++) {
         const row = [];
         for (let s = 0; s < 3; s++) {
@@ -14885,25 +14897,36 @@ function refreshCharPreview() {
         }
         bay.backStack.push(row);
       }
-      // 填充前排
-      for (let s = 0; s < 3; s++) {
-        bay.slots[s] = itemIdx < allItems.length ? allItems[itemIdx++] : null;
-      }
       shelfState.bays.push(bay);
     }
 
-    shelfState.bagSlots = [null, null];
-    shelfState.basketSlots = [null, null, null];
-    shelfState.basketActive = false;
+    shelfState.bagSlots = [null, null, null];
+    shelfState.bagUnlocked = false;
     shelfState.selected = null;
     shelfState.propsUsed = { basket: 0, autoMatch: 0, shuffle: 0 };
     shelfState.eliminatedGroups = 0;
-    shelfState.totalGroups = Math.floor((diff.itemTypes * diff.totalPerType) / 3);
+    shelfState.totalGroups = Math.floor((diff.itemTypes * actualPerType) / 3);
     shelfState.active = true;
+
+    // 随机空出前排格子（数量 = 列数，列越多空越多）
+    const emptyTarget = diff.cols;
+    const filledSlots = [];
+    shelfState.bays.forEach((bay, bayIdx) => {
+      bay.slots.forEach((v, slotIdx) => {
+        if (v !== null) filledSlots.push({ bayIdx, slotIdx });
+      });
+    });
+    const emptyCount = Math.min(emptyTarget, filledSlots.length);
+    for (let i = 0; i < emptyCount; i++) {
+      const randIdx = Math.floor(Math.random() * filledSlots.length);
+      const pos = filledSlots.splice(randIdx, 1)[0];
+      shelfState.bays[pos.bayIdx].slots[pos.slotIdx] = null;
+    }
 
     saveDataDebounced('货架整理开局');
     return true;
   }
+
 
   // ===== 检查隔间/背包是否触发消除 =====
   // source: 'bay' | 'bag' | 'basket'
@@ -15087,11 +15110,8 @@ function refreshCharPreview() {
         if (v !== null) visible[v] = (visible[v] || 0) + 1;
       });
     });
-    shelfState.bagSlots.forEach(v => {
-      if (v !== null) visible[v] = (visible[v] || 0) + 1;
-    });
-    if (shelfState.basketActive) {
-      shelfState.basketSlots.forEach(v => {
+    if (shelfState.bagUnlocked) {
+      shelfState.bagSlots.forEach(v => {
         if (v !== null) visible[v] = (visible[v] || 0) + 1;
       });
     }
@@ -15103,8 +15123,7 @@ function refreshCharPreview() {
     // 检查是否有空格可以移动
     const hasEmpty =
       shelfState.bays.some(bay => bay.slots.some(v => v === null)) ||
-      shelfState.bagSlots.some(v => v === null) ||
-      (shelfState.basketActive && shelfState.basketSlots.some(v => v === null));
+      (shelfState.bagUnlocked && shelfState.bagSlots.some(v => v === null));
 
     if (hasEmpty) return false;
 
@@ -15117,8 +15136,7 @@ function refreshCharPreview() {
       shelfState.bays.every(bay =>
         bay.slots.every(v => v === null) && bay.backStack.length === 0
       ) &&
-      shelfState.bagSlots.every(v => v === null) &&
-      (!shelfState.basketActive || shelfState.basketSlots.every(v => v === null));
+      shelfState.bagSlots.every(v => v === null);
     return allEmpty;
   }
 
@@ -15133,17 +15151,16 @@ function refreshCharPreview() {
       shelfShowNotice('扩展篮库存不足！去商店购买吧');
       return;
     }
-    if (shelfState.basketActive) {
-      shelfShowNotice('扩展篮已经在使用中！');
+    if (shelfState.bagUnlocked) {
+      shelfShowNotice('底部背包已经解锁了！');
       return;
     }
 
     state.shelfPropInventory.basket--;
     shelfState.propsUsed.basket++;
-    shelfState.basketActive = true;
-    shelfState.basketSlots = [null, null, null];
+    shelfState.bagUnlocked = true;
 
-    shelfShowNotice('🪵 扩展篮已激活！获得3个临时格子');
+    shelfShowNotice('🪵 底部背包已解锁！获得3个临时格子');
     saveDataDebounced('货架使用扩展篮');
     shelfRender();
   }
@@ -15619,40 +15636,10 @@ function refreshCharPreview() {
       shelfBindDragOnSlots(areaEl);
     }
 
-    // 渲染扩展篮（如果激活）
-    const basketAreaEl = document.getElementById('sp-shelf-basket-area');
-    if (basketAreaEl) {
-      if (shelfState.basketActive) {
-        basketAreaEl.style.display = '';
-        basketAreaEl.innerHTML = `
-          <div style="font-size:10px;color:rgba(255,215,0,0.7);font-weight:600;margin-bottom:4px;">🪵 临时扩展篮</div>
-          <div style="display:flex;gap:4px;">
-            ${shelfState.basketSlots.map((v, slotIdx) => {
-              const sel = shelfState.selected;
-              const isSelected = sel && sel.source === 'basket' && sel.slotIdx === slotIdx;
-              const filled = v !== null;
-              const itemData = filled ? SHELF_ITEMS.find(it => it.id === v) : null;
-              let cls = 'sp-shelf-slot';
-              if (filled) cls += ' sp-shelf-slot-filled';
-              if (isSelected) cls += ' sp-shelf-slot-selected';
-              return `<div class="${cls}" data-source="basket" data-slot="${slotIdx}" style="width:42px;height:42px;">${filled ? itemData.emoji : ''}</div>`;
-            }).join('')}
-          </div>
-        `;
-        basketAreaEl.querySelectorAll('.sp-shelf-slot').forEach(el => {
-          el.addEventListener('click', (e) => {
-            e.stopPropagation();
-            shelfHandleClick({ source: 'basket', slotIdx: parseInt(el.dataset.slot) });
-          });
-        });
-      } else {
-        basketAreaEl.style.display = 'none';
-      }
-    }
-
-    // 渲染总背包区（底部2格）
+    // 渲染总背包区（底部3格，需道具解锁）
     const bagAreaEl = document.getElementById('sp-shelf-bag-area');
     if (bagAreaEl) {
+      const locked = !shelfState.bagUnlocked;
       bagAreaEl.innerHTML = shelfState.bagSlots.map((v, slotIdx) => {
         const sel = shelfState.selected;
         const isSelected = sel && sel.source === 'bag' && sel.slotIdx === slotIdx;
@@ -15661,12 +15648,17 @@ function refreshCharPreview() {
         let cls = 'sp-shelf-bag-slot';
         if (filled) cls += ' sp-shelf-bag-filled';
         if (isSelected) cls += ' sp-shelf-slot-selected';
-        return `<div class="${cls}" data-source="bag" data-slot="${slotIdx}" title="${itemData ? itemData.name : '总背包格'}">${filled ? itemData.emoji : ''}</div>`;
+        if (locked) cls += ' sp-shelf-bag-locked';
+        return `<div class="${cls}" data-source="bag" data-slot="${slotIdx}" title="${locked ? '🔒 使用扩展篮道具解锁' : (itemData ? itemData.name : '总背包格')}">${filled ? itemData.emoji : (locked ? '🔒' : '')}</div>`;
       }).join('');
 
       bagAreaEl.querySelectorAll('.sp-shelf-bag-slot').forEach(el => {
         el.addEventListener('click', (e) => {
           e.stopPropagation();
+          if (!shelfState.bagUnlocked) {
+            shelfShowNotice('🔒 底部背包未解锁！使用「扩展篮」道具解锁');
+            return;
+          }
           shelfHandleClick({ source: 'bag', slotIdx: parseInt(el.dataset.slot) });
         });
       });
@@ -15886,10 +15878,9 @@ function refreshCharPreview() {
         <div id="sp-shelf-tab-content-play">
           <div id="sp-shelf-info"></div>
           <div id="sp-shelf-area" class="sp-shelf-area"></div>
-          <div id="sp-shelf-basket-area" style="display:none;margin-top:6px;padding:6px 8px;background:rgba(255,215,0,0.06);border-radius:8px;border:1px solid rgba(255,215,0,0.2);"></div>
           <div style="margin-top:6px;">
-            <div style="font-size:10px;color:var(--sp-text-muted);text-align:center;margin-bottom:4px;">🎒 总背包（2格临时存放）</div>
-            <div id="sp-shelf-bag-area" class="sp-shelf-bag-area" style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;padding:6px 8px;background:rgba(255,215,0,0.06);border-radius:10px;border:2px solid rgba(255,215,0,0.22);"></div>
+            <div style="font-size:10px;color:var(--sp-text-muted);text-align:center;margin-bottom:4px;">📦 临时收纳篮（3格，需道具解锁）</div>
+            <div id="sp-shelf-bag-area" class="sp-shelf-bag-area" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:6px 8px;background:rgba(255,215,0,0.06);border-radius:10px;border:2px solid rgba(255,215,0,0.22);"></div>
           </div>
           <div id="sp-shelf-props" style="margin-top:8px;">
             <button class="sp-shelf-prop-btn" id="sp-shelf-prop-basket-btn" title="${SHELF_PROPS.basket.desc}">
