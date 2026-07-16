@@ -12152,8 +12152,8 @@ function refreshCharPreview() {
 
       const toIdx = targets[Math.floor(Math.random() * targets.length)];
       // 移动顶端水果
-      const fruit = fromStick.fruits.pop();
-      sticks[toIdx].fruits.push(fruit);
+      const fruit = fromStick.fruits.shift();
+      sticks[toIdx].fruits.unshift(fruit);
     }
 
     tanghuluState.sticks = sticks;
@@ -12188,14 +12188,14 @@ function refreshCharPreview() {
     if (from.fruits.length === 0) return false;
     if (to.fruits.length >= 4) return false;
 
-    const topFruit = from.fruits[from.fruits.length - 1];
+    const topFruit = from.fruits[0];
 
     // 目标非空时，顶端必须相同
-    if (to.fruits.length > 0 && to.fruits[to.fruits.length - 1] !== topFruit) return false;
+    if (to.fruits.length > 0 && to.fruits[0] !== topFruit) return false;
 
-    // 计算可以连带移动的数量
+    // 计算可以连带移动的数量（从顶端开始连续相同的）
     let moveCount = 1;
-    for (let i = from.fruits.length - 2; i >= 0; i--) {
+    for (let i = 1; i < from.fruits.length; i++) {
       if (from.fruits[i] === topFruit) moveCount++;
       else break;
     }
@@ -12204,9 +12204,9 @@ function refreshCharPreview() {
     const availableSlots = 4 - to.fruits.length;
     moveCount = Math.min(moveCount, availableSlots);
 
-    // 执行移动
-    const moved = from.fruits.splice(from.fruits.length - moveCount, moveCount);
-    to.fruits.push(...moved);
+    // 执行移动（从数组头部取出，插入目标头部）
+    const moved = from.fruits.splice(0, moveCount);
+    to.fruits.unshift(...moved);
 
     // 记录历史
     tanghuluState.historyStack.push({ from: fromIdx, to: toIdx, count: moveCount });
@@ -12224,9 +12224,9 @@ function refreshCharPreview() {
     if (from.fruits.length === 0) return false;
     if (to.fruits.length >= 4) return false;
 
-    // 只移动一颗，无视颜色规则
-    const fruit = from.fruits.pop();
-    to.fruits.push(fruit);
+    // 只移动一颗（顶端），无视颜色规则
+    const fruit = from.fruits.shift();
+    to.fruits.unshift(fruit);
 
     tanghuluState.historyStack.push({ from: fromIdx, to: toIdx, count: 1, forced: true });
     tanghuluState.moveCount++;
@@ -12258,8 +12258,8 @@ function refreshCharPreview() {
     const from = tanghuluState.sticks[last.to];
     const to = tanghuluState.sticks[last.from];
 
-    const moved = from.fruits.splice(from.fruits.length - last.count, last.count);
-    to.fruits.push(...moved);
+    const moved = from.fruits.splice(0, last.count);
+    to.fruits.unshift(...moved);
     tanghuluState.moveCount--;
 
     tanghuluShowNotice('↩️ 已撤销上一步！');
@@ -12488,6 +12488,83 @@ function refreshCharPreview() {
     if (goldEl) goldEl.textContent = state.gameGold;
   }
 
+  // ===== 渲染库存标签页 =====
+  function tanghuluRenderInventory() {
+    const container = document.getElementById('sp-tanghulu-inventory-content');
+    if (!container) return;
+
+    let html = '';
+
+    // 糖葫芦成品库存
+    const tangInv = (state.tanghuluInventory || []).filter(i => i.count > 0);
+    html += `<div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin-bottom:6px;">🍢 糖葫芦成品</div>`;
+    if (tangInv.length === 0) {
+      html += '<div style="text-align:center;padding:10px;color:var(--sp-text-muted);font-size:11px;">还没有做好的糖葫芦～去玩一局吧</div>';
+    } else {
+      tangInv.forEach(inv => {
+        const data = TANGHULU_FRUITS.find(f => f.key === inv.fruitKey);
+        if (!data) return;
+        html += `
+          <div class="sp-link-bag-item">
+            <span class="sp-link-bag-icon">${data.emoji}</span>
+            <div class="sp-link-bag-info">
+              <span class="sp-link-bag-name">${data.name}糖葫芦</span>
+              <span class="sp-link-bag-desc">投喂 +${data.feedAmount} | 售价 ${data.sellPrice}🪙</span>
+            </div>
+            <span class="sp-link-bag-count">×${inv.count}</span>
+          </div>
+        `;
+      });
+    }
+
+    // 完美的亮晶晶糖砂
+    const crystalCount = state.tanghuluSugarCrystal || 0;
+    html += `<div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin:12px 0 6px;">✨ 珍贵收藏</div>`;
+    if (crystalCount > 0) {
+      html += `
+        <div class="sp-link-bag-item">
+          <span class="sp-link-bag-icon">✨</span>
+          <div class="sp-link-bag-info">
+            <span class="sp-link-bag-name">完美的亮晶晶糖砂</span>
+            <span class="sp-link-bag-desc">投喂 +50饱食 +20心情 | 售价 150🪙</span>
+          </div>
+          <span class="sp-link-bag-count">×${crystalCount}</span>
+        </div>
+      `;
+    } else {
+      html += '<div style="text-align:center;padding:10px;color:var(--sp-text-muted);font-size:11px;">暂无（通关后有概率掉落）</div>';
+    }
+
+    // 道具库存
+    if (!state.tanghuluPropInventory) state.tanghuluPropInventory = { extraStick: 0, undo: 0, lubricant: 0 };
+    const propDefs = [
+      { key: 'extraStick', emoji: '🥢', name: '赠送竹签', desc: TANGHULU_PROPS.extraStick.desc },
+      { key: 'undo', emoji: '↩️', name: '悔步撤销', desc: TANGHULU_PROPS.undo.desc },
+      { key: 'lubricant', emoji: '🌀', name: '顺滑剂', desc: TANGHULU_PROPS.lubricant.desc },
+    ];
+    const hasAnyProp = propDefs.some(p => (state.tanghuluPropInventory[p.key] || 0) > 0);
+
+    html += `<div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin:12px 0 6px;">🧰 道具库存</div>`;
+    if (!hasAnyProp) {
+      html += '<div style="text-align:center;padding:10px;color:var(--sp-text-muted);font-size:11px;">道具空空如也～去商城买点吧</div>';
+    } else {
+      propDefs.filter(p => (state.tanghuluPropInventory[p.key] || 0) > 0).forEach(p => {
+        html += `
+          <div class="sp-link-bag-item">
+            <span class="sp-link-bag-icon">${p.emoji}</span>
+            <div class="sp-link-bag-info">
+              <span class="sp-link-bag-name">${p.name}</span>
+              <span class="sp-link-bag-desc">${p.desc}</span>
+            </div>
+            <span class="sp-link-bag-count">×${state.tanghuluPropInventory[p.key]}</span>
+          </div>
+        `;
+      });
+    }
+
+    container.innerHTML = html;
+  }
+
   // ===== 卖糖葫芦 =====
   function tanghuluSellItem(fruitKey) {
     const inv = (state.tanghuluInventory || []).find(i => i.fruitKey === fruitKey && i.count > 0);
@@ -12546,7 +12623,7 @@ function refreshCharPreview() {
 
       const fruitsHtml = stick.fruits.map((fruitKey, fi) => {
         const data = TANGHULU_FRUITS.find(f => f.key === fruitKey);
-        const isTop = fi === stick.fruits.length - 1;
+        const isTop = fi === 0;
         return `<div class="sp-tanghulu-fruit ${isTop && isSelected ? 'sp-tanghulu-fruit-top' : ''}" style="background:${data ? data.color : '#888'};" title="${data ? data.name : '?'}">${data ? data.emoji : '?'}</div>`;
       }).join('');
 
@@ -12690,18 +12767,6 @@ function refreshCharPreview() {
       }
     }
 
-    // 库存展示区
-    html += `<div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin:12px 0 6px;">🍢 糖葫芦库存</div>`;
-    if (tangInv.length === 0) {
-      html += '<div style="text-align:center;padding:10px;color:var(--sp-text-muted);font-size:11px;">还没有做好的糖葫芦～去玩一局吧</div>';
-    } else {
-      tangInv.forEach(inv => {
-        const data = TANGHULU_FRUITS.find(f => f.key === inv.fruitKey);
-        if (!data) return;
-        html += `<div class="sp-link-bag-item"><span class="sp-link-bag-icon">${data.emoji}</span><div class="sp-link-bag-info"><span class="sp-link-bag-name">${data.name}糖葫芦</span><span class="sp-link-bag-desc">投喂 +${data.feedAmount} | 售价 ${data.sellPrice}🪙</span></div><span class="sp-link-bag-count">×${inv.count}</span></div>`;
-      });
-    }
-
     container.innerHTML = html;
 
     // 绑定事件
@@ -12745,6 +12810,7 @@ function refreshCharPreview() {
         <button class="sp-game-tab active" data-thtab="play" id="sp-tanghulu-tab-play">🎮 游戏</button>
         <button class="sp-game-tab" data-thtab="bag" id="sp-tanghulu-tab-bag">🎒 背包</button>
         <button class="sp-game-tab" data-thtab="shop" id="sp-tanghulu-tab-shop">🛒 商城</button>
+        <button class="sp-game-tab" data-thtab="inventory" id="sp-tanghulu-tab-inventory">📦 库存</button>
         <span class="sp-link-gold-display" style="margin-left:auto;">🪙 <span id="sp-tanghulu-gold">${state.gameGold}</span></span>
       </div>
       <div id="sp-tanghulu-body" style="flex:1;overflow-y:auto;padding:10px;">
@@ -12780,6 +12846,10 @@ function refreshCharPreview() {
         </div>
         <div id="sp-tanghulu-tab-content-shop" style="display:none;padding:8px;">
           <div id="sp-tanghulu-shop-content"></div>
+        </div>
+        <div id="sp-tanghulu-tab-content-inventory" style="display:none;padding:8px;">
+          <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">📦 库存一览</div>
+          <div id="sp-tanghulu-inventory-content"></div>
         </div>
       </div>
     `;
@@ -12848,7 +12918,7 @@ function refreshCharPreview() {
     });
 
     // 标签页切换
-    const thTabs = ['play', 'bag', 'shop'];
+    const thTabs = ['play', 'bag', 'shop', 'inventory'];
     thTabs.forEach(tabName => {
       const tabBtn = document.getElementById(`sp-tanghulu-tab-${tabName}`);
       if (tabBtn) {
@@ -12860,8 +12930,10 @@ function refreshCharPreview() {
           document.getElementById('sp-tanghulu-tab-content-play').style.display = tabName === 'play' ? '' : 'none';
           document.getElementById('sp-tanghulu-tab-content-bag').style.display = tabName === 'bag' ? '' : 'none';
           document.getElementById('sp-tanghulu-tab-content-shop').style.display = tabName === 'shop' ? '' : 'none';
+          document.getElementById('sp-tanghulu-tab-content-inventory').style.display = tabName === 'inventory' ? '' : 'none';
           if (tabName === 'bag') tanghuluRenderBag();
           if (tabName === 'shop') tanghuluRenderShop();
+          if (tabName === 'inventory') tanghuluRenderInventory();
         });
       }
     });
