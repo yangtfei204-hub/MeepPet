@@ -8776,12 +8776,9 @@ function refreshCharPreview() {
 
     document.getElementById('sp-match3-quit')?.addEventListener('click', () => {
       resultOverlay.remove();
-      // 不关闭面板，而是回到游戏选择界面
-      isMatch3Open = false;
-      const panel = document.getElementById('sp-match3-panel');
-      if (panel) panel.classList.remove('visible');
-      showGameSelector();
+      toggleMatch3Game();
     });
+
   }
 
   // ===== 消消看通知 =====
@@ -10489,9 +10486,9 @@ function refreshCharPreview() {
 
     document.getElementById('sp-link-quit')?.addEventListener('click', () => {
       overlay.remove();
-      isLinkOpen = false;
-      panel.classList.remove('visible');
+      toggleLinkGame();
     });
+
   }
 
   // ===== 通知 =====
@@ -11537,9 +11534,9 @@ function refreshCharPreview() {
     });
     document.getElementById('sp-fridge-quit')?.addEventListener('click', () => {
       overlay.remove();
-      isFridgeOpen = false;
-      panel.classList.remove('visible');
+      toggleFridgeGame();
     });
+
   }
 
   // ===== 冰箱通知 =====
@@ -12749,9 +12746,9 @@ function refreshCharPreview() {
     });
     document.getElementById('sp-tanghulu-quit')?.addEventListener('click', () => {
       overlay.remove();
-      isTanghuluOpen = false;
-      panel.classList.remove('visible');
+      toggleTanghuluGame();
     });
+
   }
 
   // ===== 商店购买 =====

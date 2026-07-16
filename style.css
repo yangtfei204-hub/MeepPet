@@ -5524,7 +5524,8 @@
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border: 1px solid var(--sp-border);
-  border-radius: 16px;
+  border-radius: 14px;
+  padding: 0;
   width: 320px;
   max-width: 90vw;
   max-height: 70vh;
@@ -5533,8 +5534,8 @@
   flex-direction: column;
   overflow: hidden;
   animation: sp-fade-in 0.2s ease;
+  margin: auto;
 }
-
 
 #sp-restaurant-recipe-modal-header {
   display: flex;
