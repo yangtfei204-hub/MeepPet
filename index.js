@@ -11020,35 +11020,45 @@ function refreshCharPreview() {
 
   // ===== 冰箱食材定义 =====
   const FRIDGE_FOODS = [
-    { id: 'cola',       name: '可乐罐',     emoji: '🥤', w: 1, h: 1, value: 5,  feed: 5  },
+    // 小型 (1格)
+    { id: 'cola',       name: '可乐罐',     emoji: '🥤', w: 1, h: 1, value: 3,  feed: 3  },
     { id: 'apple',      name: '苹果',       emoji: '🍎', w: 1, h: 1, value: 3,  feed: 3  },
     { id: 'tomato',     name: '番茄',       emoji: '🍅', w: 1, h: 1, value: 3,  feed: 3  },
-    { id: 'grape',      name: '葡萄',       emoji: '🍇', w: 1, h: 1, value: 4,  feed: 4  },
-    { id: 'cheese',     name: '芝士块',     emoji: '🧀', w: 2, h: 1, value: 6,  feed: 6  },
-    { id: 'juice',      name: '果汁',       emoji: '🧃', w: 1, h: 2, value: 7,  feed: 7  },
+    { id: 'grape',      name: '葡萄',       emoji: '🍇', w: 1, h: 1, value: 3,  feed: 3  },
+    // 中小型 (2格)
+    { id: 'cheese',     name: '芝士块',     emoji: '🧀', w: 2, h: 1, value: 5,  feed: 5  },
+    { id: 'juice',      name: '果汁',       emoji: '🧃', w: 1, h: 2, value: 5,  feed: 5  },
     { id: 'carrot',     name: '胡萝卜',     emoji: '🥕', w: 1, h: 2, value: 4,  feed: 4  },
-    { id: 'icecream',   name: '冰淇淋',     emoji: '🍦', w: 1, h: 2, value: 6,  feed: 5  },
-    { id: 'bottle',     name: '酱油瓶',     emoji: '🫙', w: 1, h: 2, value: 3,  feed: 2  },
-    { id: 'bread',      name: '切片面包',   emoji: '🍞', w: 2, h: 2, value: 10, feed: 10 },
-    { id: 'chicken',    name: '烤鸡',       emoji: '🍗', w: 2, h: 2, value: 15, feed: 14 },
-    { id: 'milk',       name: '大盒牛奶',   emoji: '🥛', w: 1, h: 3, value: 12, feed: 12 },
-    { id: 'cucumber',   name: '黄瓜',       emoji: '🥒', w: 1, h: 3, value: 4,  feed: 4  },
-    { id: 'fish',       name: '鲜鱼',       emoji: '🐟', w: 3, h: 1, value: 10, feed: 10 },
-    { id: 'eggs',       name: '鸡蛋盒',     emoji: '🥚', w: 4, h: 1, value: 8,  feed: 8  },
-    { id: 'steak',      name: '战斧牛排',   emoji: '🥩', w: 3, h: 2, value: 20, feed: 18 },
-    { id: 'watermelon', name: '大西瓜',     emoji: '🍉', w: 3, h: 2, value: 15, feed: 15 },
-    { id: 'sushi',      name: '寿司拼盘',   emoji: '🍣', w: 4, h: 2, value: 22, feed: 18 },
-    { id: 'cake',       name: '大蛋糕',     emoji: '🎂', w: 3, h: 3, value: 25, feed: 20 },
+    { id: 'icecream',   name: '冰淇淋',     emoji: '🍦', w: 1, h: 2, value: 5,  feed: 5  },
+    { id: 'bottle',     name: '酱油瓶',     emoji: '🫙', w: 1, h: 3, value: 6,  feed: 4  },
+    // 中型 (3~4格)
+    { id: 'milk',       name: '大盒牛奶',   emoji: '🥛', w: 1, h: 3, value: 8,  feed: 8  },
+    { id: 'cucumber',   name: '黄瓜',       emoji: '🥒', w: 1, h: 4, value: 8,  feed: 6, noRotate: true },
+    { id: 'fish',       name: '鲜鱼',       emoji: '🐟', w: 3, h: 1, value: 8,  feed: 8  },
+    { id: 'eggs',       name: '鸡蛋盒',     emoji: '🥚', w: 4, h: 1, value: 7,  feed: 6, noRotate: true },
+    { id: 'bread',      name: '切片面包',   emoji: '🍞', w: 2, h: 2, value: 8,  feed: 8  },
+    // 中大型 (5~6格)
+    { id: 'chicken',    name: '烤鸡',       emoji: '🍗', w: 2, h: 3, value: 12, feed: 12 },
+    { id: 'bento',      name: '便当盒',     emoji: '🍱', w: 3, h: 2, value: 12, feed: 10 },
+    { id: 'steak',      name: '战斧牛排',   emoji: '🥩', w: 3, h: 2, value: 14, feed: 14 },
+    // 大型 (8~9格)
+    { id: 'watermelon', name: '大西瓜',     emoji: '🍉', w: 3, h: 3, value: 18, feed: 16 },
+    { id: 'sushi',      name: '寿司拼盘',   emoji: '🍣', w: 4, h: 2, value: 16, feed: 14 },
     { id: 'pizza',      name: '披萨盒',     emoji: '🍕', w: 3, h: 3, value: 18, feed: 16 },
+    { id: 'cake',       name: '大蛋糕',     emoji: '🎂', w: 3, h: 3, value: 20, feed: 18, noRotate: true },
+    // 超大型 (10~12格) - 新增难度食材
+    { id: 'turkey',     name: '整只火鸡',   emoji: '🦃', w: 4, h: 3, value: 24, feed: 22, noRotate: true },
+    { id: 'pot',        name: '火锅底料',   emoji: '🫕', w: 4, h: 2, value: 16, feed: 12 },
+    { id: 'platter',    name: '海鲜拼盘',   emoji: '🦞', w: 5, h: 2, value: 22, feed: 20, noRotate: true },
   ];
 
   // ===== 冰箱类型定义 =====
   const FRIDGE_TYPES = [
-    { name: '小单门冰箱', rows: 5,  cols: 5,  energyCost: 10, emoji: '🧊', itemRange: [4, 6]  },
-    { name: '中型冰箱',   rows: 6,  cols: 6,  energyCost: 12, emoji: '❄️', itemRange: [5, 8]  },
-    { name: '双开门冰箱', rows: 8,  cols: 8,  energyCost: 15, emoji: '🏔️', itemRange: [7, 12] },
-    { name: '超大冰箱',   rows: 10, cols: 10, energyCost: 18, emoji: '🌨️', itemRange: [10, 16] },
-    { name: '豪华巨无霸', rows: 12, cols: 12, energyCost: 20, emoji: '🎪', itemRange: [14, 22] },
+    { name: '小单门冰箱', rows: 5,  cols: 5,  energyCost: 5,  emoji: '🧊', itemRange: [7, 10]  },
+    { name: '中型冰箱',   rows: 6,  cols: 6,  energyCost: 8,  emoji: '❄️', itemRange: [9, 14]  },
+    { name: '双开门冰箱', rows: 7,  cols: 7,  energyCost: 12, emoji: '🏔️', itemRange: [12, 18] },
+    { name: '超大冰箱',   rows: 8,  cols: 8,  energyCost: 15, emoji: '🌨️', itemRange: [16, 24] },
+    { name: '豪华巨无霸', rows: 10, cols: 10, energyCost: 18, emoji: '🎪', itemRange: [22, 32] },
   ];
 
   // ===== 冰箱游戏运行时状态 =====
@@ -11078,28 +11088,48 @@ function refreshCharPreview() {
     let id = fridgeState.nextInstanceId;
 
     // 按尺寸分类食物
-    const small = FRIDGE_FOODS.filter(f => f.w * f.h <= 2);   // 1×1, 1×2, 2×1
-    const medium = FRIDGE_FOODS.filter(f => f.w * f.h >= 3 && f.w * f.h <= 6); // 2×2, 3×1, 1×3, 3×2, 2×3
-    const large = FRIDGE_FOODS.filter(f => f.w * f.h >= 8);   // 3×3, 4×1, 4×2
+    const small = FRIDGE_FOODS.filter(f => f.w * f.h <= 2);
+    const medium = FRIDGE_FOODS.filter(f => f.w * f.h >= 3 && f.w * f.h <= 6);
+    const large = FRIDGE_FOODS.filter(f => f.w * f.h >= 8 && f.w * f.h <= 9);
+    const xlarge = FRIDGE_FOODS.filter(f => f.w * f.h >= 10);
+
+    // 目标填充率：85%~110% 的冰箱面积（超过100%意味着必然放不下所有东西）
+    const targetFill = gridArea * (0.85 + Math.random() * 0.25);
 
     for (let i = 0; i < itemCount; i++) {
-      // 动态选择食材，避免总面积远超冰箱容量
       let pool;
-      const remainingRatio = totalArea / gridArea;
-      if (remainingRatio > 0.7) {
-        pool = small; // 快满了只选小的
+      const remainingRatio = totalArea / targetFill;
+
+      if (remainingRatio > 0.9) {
+        pool = small;
+      } else if (remainingRatio > 0.7) {
+        pool = Math.random() < 0.4 ? small : medium;
       } else if (remainingRatio > 0.4) {
-        pool = Math.random() < 0.6 ? small : medium;
-      } else {
         const r = Math.random();
-        if (r < 0.35) pool = small;
-        else if (r < 0.75) pool = medium;
-        else pool = large.length > 0 ? large : medium;
+        if (r < 0.15) pool = small;
+        else if (r < 0.50) pool = medium;
+        else if (r < 0.80) pool = large.length > 0 ? large : medium;
+        else pool = xlarge.length > 0 ? xlarge : large.length > 0 ? large : medium;
+      } else {
+        // 前期多给大件，增加挑战
+        const r = Math.random();
+        if (r < 0.10) pool = small;
+        else if (r < 0.35) pool = medium;
+        else if (r < 0.65) pool = large.length > 0 ? large : medium;
+        else pool = xlarge.length > 0 ? xlarge : large.length > 0 ? large : medium;
       }
 
       // 过滤掉放不进冰箱的食材
       const valid = pool.filter(f => f.w <= gridCols && f.h <= gridRows);
-      if (valid.length === 0) continue;
+      if (valid.length === 0) {
+        // 降级尝试
+        const fallback = medium.filter(f => f.w <= gridCols && f.h <= gridRows);
+        if (fallback.length === 0) continue;
+        const food = fallback[Math.floor(Math.random() * fallback.length)];
+        basket.push({ instanceId: id++, foodId: food.id, w: food.w, h: food.h, rotated: false });
+        totalArea += food.w * food.h;
+        continue;
+      }
 
       const food = valid[Math.floor(Math.random() * valid.length)];
       basket.push({
@@ -11214,6 +11244,19 @@ function refreshCharPreview() {
     const item = fridgeState.basket.find(i => i.instanceId === fridgeState.selectedItem);
     if (!item) return;
 
+    // 检查是否不可旋转
+    const foodData = FRIDGE_FOODS.find(f => f.id === item.foodId);
+    if (foodData && foodData.noRotate) {
+      fridgeShowNotice(`${foodData.emoji} ${foodData.name} 形状固定，无法旋转！`);
+      return;
+    }
+
+    // 正方形不需要旋转
+    if (item.w === item.h) {
+      fridgeShowNotice('正方形食材旋转无效果');
+      return;
+    }
+
     // 检查旋转后是否还能放进冰箱
     if (item.h > fridgeState.cols || item.w > fridgeState.rows) {
       fridgeShowNotice('旋转后太大了，放不进冰箱');
@@ -11224,7 +11267,7 @@ function refreshCharPreview() {
     item.w = item.h;
     item.h = tmp;
     item.rotated = !item.rotated;
-    fridgeShowNotice(`🔄 ${FRIDGE_FOODS.find(f => f.id === item.foodId)?.name} 已旋转 → ${item.w}×${item.h}`);
+    fridgeShowNotice(`🔄 ${foodData?.name || '食材'} 已旋转 → ${item.w}×${item.h}`);
     fridgeRender();
   }
 
@@ -11404,15 +11447,18 @@ function refreshCharPreview() {
 
     if (valuePercent >= 100 && basketRemaining === 0) {
       resultTitle = '🌟 完美收纳！';
-      bonusGold = 30 + Math.floor(Math.random() * 21);
-    } else if (valuePercent >= 90) {
+      bonusGold = 40 + Math.floor(Math.random() * 21);
+    } else if (valuePercent >= 95) {
       resultTitle = '🎉 优秀！';
-      bonusGold = 15 + Math.floor(Math.random() * 11);
-    } else if (valuePercent >= 70) {
+      bonusGold = 20 + Math.floor(Math.random() * 11);
+    } else if (valuePercent >= 80) {
       resultTitle = '👍 不错！';
-      bonusGold = 5;
+      bonusGold = 8;
+    } else if (valuePercent >= 60) {
+      resultTitle = '😅 还行吧';
+      bonusGold = 3;
     } else {
-      resultTitle = '😅 还需要努力';
+      resultTitle = '😰 需要努力';
       bonusGold = 0;
     }
 
@@ -11530,7 +11576,7 @@ function refreshCharPreview() {
       const data = FRIDGE_FOODS.find(f => f.id === item.foodId);
       const emoji = data ? data.emoji : '?';
       const name = data ? data.name : '?';
-      html += `<div class="sp-fridge-placed-item" style="grid-column:${item.col + 1}/span ${item.w};grid-row:${item.row + 1}/span ${item.h};" title="${name} (${item.w}×${item.h})"><span class="sp-fridge-placed-emoji">${emoji}</span><span class="sp-fridge-placed-name">${name}</span></div>`;
+      html += `<div class="sp-fridge-placed-item" data-placed-instance="${item.instanceId}" style="grid-column:${item.col + 1}/span ${item.w};grid-row:${item.row + 1}/span ${item.h};" title="${name} (${item.w}×${item.h}) - 点击取出"><span class="sp-fridge-placed-emoji">${emoji}</span><span class="sp-fridge-placed-name">${name}</span></div>`;
     });
 
     gridEl.innerHTML = html;
@@ -11550,6 +11596,49 @@ function refreshCharPreview() {
           }
         }
       });
+    // 绑定已放置物品点击事件（取出放回购物筐）
+    gridEl.querySelectorAll('.sp-fridge-placed-item').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!fridgeState.active) return;
+        const instanceId = parseInt(el.dataset.placedInstance);
+        if (isNaN(instanceId)) return;
+
+        const placedIdx = fridgeState.placed.findIndex(p => p.instanceId === instanceId);
+        if (placedIdx === -1) return;
+
+        const item = fridgeState.placed[placedIdx];
+        const data = FRIDGE_FOODS.find(f => f.id === item.foodId);
+
+        // 从网格中清除
+        for (let r = item.row; r < item.row + item.h; r++) {
+          for (let c = item.col; c < item.col + item.w; c++) {
+            if (r < fridgeState.rows && c < fridgeState.cols) {
+              fridgeState.grid[r][c] = 0;
+            }
+          }
+        }
+
+        // 从已放置列表中移除
+        fridgeState.placed.splice(placedIdx, 1);
+
+        // 放回购物筐
+        fridgeState.basket.push({
+          instanceId: item.instanceId,
+          foodId: item.foodId,
+          w: item.w,
+          h: item.h,
+          rotated: false,
+        });
+
+        // 更新已放置价值
+        if (data) fridgeState.placedValue -= data.value;
+
+        fridgeShowNotice(`${data?.emoji || ''} ${data?.name || '食材'} 已取出放回购物筐`);
+        saveDataDebounced('冰箱取出物品');
+        fridgeRender();
+      });
+    });
       // 鼠标悬停预览
       cell.addEventListener('mouseenter', () => {
         if (!fridgeState.active || !fridgeState.selectedItem) return;
@@ -11572,7 +11661,8 @@ function refreshCharPreview() {
         basketEl.innerHTML = basket.map(item => {
           const data = FRIDGE_FOODS.find(f => f.id === item.foodId);
           const isSelected = item.instanceId === selectedItem;
-          return `<div class="sp-fridge-basket-item ${isSelected ? 'sp-fridge-basket-selected' : ''}" data-instance="${item.instanceId}"><span class="sp-fridge-basket-emoji">${data?.emoji || '?'}</span><span class="sp-fridge-basket-info"><span class="sp-fridge-basket-name">${data?.name || '?'}</span><span class="sp-fridge-basket-size">${item.w}×${item.h}</span></span></div>`;
+          const noRotateTag = (data && data.noRotate) ? '<span style="font-size:8px;color:#f66;margin-left:2px;">🔒</span>' : '';
+          return `<div class="sp-fridge-basket-item ${isSelected ? 'sp-fridge-basket-selected' : ''}" data-instance="${item.instanceId}"><span class="sp-fridge-basket-emoji">${data?.emoji || '?'}</span><span class="sp-fridge-basket-info"><span class="sp-fridge-basket-name">${data?.name || '?'}${noRotateTag}</span><span class="sp-fridge-basket-size">${item.w}×${item.h}</span></span></div>`;
         }).join('');
 
         basketEl.querySelectorAll('.sp-fridge-basket-item').forEach(el => {
@@ -11857,6 +11947,22 @@ function refreshCharPreview() {
       </div>
     `;
     document.body.appendChild(panel);
+
+    // 阻止游戏面板内的滚轮事件冒泡到外部页面
+    const fridgeBody = document.getElementById('sp-fridge-body');
+    if (fridgeBody) {
+      fridgeBody.addEventListener('wheel', (e) => {
+        const el = fridgeBody;
+        const atTop = el.scrollTop <= 0;
+        const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+
+        // 如果已经滚到顶/底，阻止事件继续传播到页面
+        if ((e.deltaY < 0 && atTop) || (e.deltaY > 0 && atBottom)) {
+          e.preventDefault();
+        }
+        e.stopPropagation();
+      }, { passive: false });
+    }
 
     // 最小化
     document.getElementById('sp-fridge-minimize').addEventListener('click', () => {

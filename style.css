@@ -4749,6 +4749,7 @@
   flex-direction: column;
   z-index: 2147483646;
   overflow: hidden;
+  overscroll-behavior: contain;
 }
 
 #sp-fridge-panel.visible {
@@ -4892,9 +4893,16 @@
   justify-content: center;
   gap: 1px;
   z-index: 2;
-  pointer-events: none;
+  cursor: pointer;
+  pointer-events: auto;
   animation: sp-fridge-place-pop 0.3s ease;
   overflow: hidden;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.sp-fridge-placed-item:hover {
+  border-color: rgba(239,83,80,0.6);
+  background: rgba(239,83,80,0.12);
 }
 
 @keyframes sp-fridge-place-pop {
