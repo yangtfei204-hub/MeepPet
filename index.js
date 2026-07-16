@@ -6887,7 +6887,7 @@ function refreshCharPreview() {
   // ===== 游戏常量 =====
   const GAME_BOARD_SIZE = 6;
   const GAME_BOARD_CELLS = 36;
-  const GAME_STAMINA_RECOVER_INTERVAL = 8 * 60 * 1000; // 8分钟恢复1点
+  const GAME_STAMINA_RECOVER_INTERVAL = 5 * 60 * 1000; // 8分钟恢复1点
   const GAME_STAMINA_RECOVER_AMOUNT = 1;
   const GAME_MAX_CHAIN_LEVEL = 8;
 
