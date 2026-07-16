@@ -14859,14 +14859,19 @@ function refreshCharPreview() {
     const itemsPerBay = 3 + diff.backRows * 3;
     const totalItemsNeeded = BAYS * itemsPerBay;
 
-    // 如果所有商品总数不够填满全部隔间，自动扩增商品数量（保证每格都有东西）
-    const minPerType = Math.ceil(totalItemsNeeded / diff.itemTypes);
-    const actualPerType = Math.max(diff.totalPerType, Math.ceil(minPerType / 3) * 3);
+    // 核心：确保每种物品数量严格为3的倍数，总量刚好能填满棋盘
+    const totalGroups = Math.floor(totalItemsNeeded / 3);
+    const baseGroupsPerType = Math.floor(totalGroups / selectedTypes.length);
+    let remainderGroups = totalGroups % selectedTypes.length;
 
-    // 生成 allItems，保证总数足够
     const allItems = [];
     selectedTypes.forEach(type => {
-      for (let i = 0; i < actualPerType; i++) {
+      let groups = baseGroupsPerType;
+      if (remainderGroups > 0) {
+        groups++;
+        remainderGroups--;
+      }
+      for (let i = 0; i < groups * 3; i++) {
         allItems.push(type.id);
       }
     });
@@ -14905,22 +14910,30 @@ function refreshCharPreview() {
     shelfState.selected = null;
     shelfState.propsUsed = { basket: 0, autoMatch: 0, shuffle: 0 };
     shelfState.eliminatedGroups = 0;
-    shelfState.totalGroups = Math.floor((diff.itemTypes * actualPerType) / 3);
+    shelfState.totalGroups = totalGroups;
     shelfState.active = true;
 
-    // 随机空出前排格子（数量 = 列数，列越多空越多）
-    const emptyTarget = diff.cols;
-    const filledSlots = [];
+    // 随机空出前排格子（固定移除1组=3个同类型物品，空出3个格子给玩家初始操作空间）
+    const frontByType = {};
     shelfState.bays.forEach((bay, bayIdx) => {
       bay.slots.forEach((v, slotIdx) => {
-        if (v !== null) filledSlots.push({ bayIdx, slotIdx });
+        if (v !== null) {
+          if (!frontByType[v]) frontByType[v] = [];
+          frontByType[v].push({ bayIdx, slotIdx });
+        }
       });
     });
-    const emptyCount = Math.min(emptyTarget, filledSlots.length);
-    for (let i = 0; i < emptyCount; i++) {
-      const randIdx = Math.floor(Math.random() * filledSlots.length);
-      const pos = filledSlots.splice(randIdx, 1)[0];
-      shelfState.bays[pos.bayIdx].slots[pos.slotIdx] = null;
+
+    // 找出前排数量 >= 3 的类型，随机选一种整组移除
+    const removableTypes = Object.keys(frontByType).filter(k => frontByType[k].length >= 3);
+    if (removableTypes.length > 0) {
+      const chosenType = removableTypes[Math.floor(Math.random() * removableTypes.length)];
+      const positions = frontByType[chosenType];
+      const toRemove = positions.slice(0, 3);
+      toRemove.forEach(pos => {
+        shelfState.bays[pos.bayIdx].slots[pos.slotIdx] = null;
+      });
+      shelfState.totalGroups--;
     }
 
     saveDataDebounced('货架整理开局');
