@@ -355,6 +355,15 @@
     tanghuluSugarCrystal: 0,  // 完美的亮晶晶糖砂数量
     tanghuluPropInventory: { extraStick: 0, undo: 0, lubricant: 0 },  // 糖葫芦道具背包
     tanghuluPropShopLog: {},  // {'2026-07-15': {'extraStick': 1, ...}}
+    // ===== 小猫餐厅状态 =====
+    restaurantReputation: 0,
+    restaurantLevel: 1,
+    restaurantTotalEarnings: 0,
+    restaurantTodayEarnings: 0,
+    restaurantLastOpenDate: '',
+    restaurantCookedDishes: [],      // [{recipeId, count}]
+    restaurantSeasonings: {},        // {salt: 5, pepper: 2, ...}
+    restaurantServedCount: 0,
   };
 
   // ============================================================
@@ -2122,6 +2131,13 @@ function showInventoryPopup(category, quickKey, onUse) {
           </div>
         </div>
         <div class="sp-game-selector-body">
+          <div class="sp-game-selector-card" data-game="restaurant">
+            <div class="sp-game-selector-icon">🐱</div>
+            <div class="sp-game-selector-info">
+              <div class="sp-game-selector-name">小猫餐厅</div>
+              <div class="sp-game-selector-desc">用食材烹饪菜品，招待客人赚取金币</div>
+            </div>
+          </div>
           <div class="sp-game-selector-card" data-game="merge">
             <div class="sp-game-selector-icon">🧶</div>
             <div class="sp-game-selector-info">
@@ -2204,7 +2220,9 @@ function showInventoryPopup(category, quickKey, onUse) {
       card.onclick = () => {
         const game = card.dataset.game;
         overlay.remove();
-        if (game === 'merge') {
+        if (game === 'restaurant') {
+          toggleRestaurant();
+        } else if (game === 'merge') {
           toggleMergeGame();
         } else if (game === 'match3') {
           toggleMatch3Game();
@@ -12153,6 +12171,180 @@ function refreshCharPreview() {
     { key: 'tomato',     emoji: '🍅', name: '经典圣女果', color: '#dc143c', sellPrice: 14, feedAmount: 9  },
   ];
 
+  // ============================================================
+  // 🐱 小猫餐厅常量定义 - MeepCatRestaurant
+  // ============================================================
+
+  // ===== 调料定义 =====
+  const RESTAURANT_SEASONINGS = [
+    { id: 'salt',    name: '盐',     emoji: '🧂', price: 5,  reputationRequired: 0  },
+    { id: 'soy',     name: '酱油',   emoji: '🫙', price: 6,  reputationRequired: 0  },
+    { id: 'pepper',  name: '黑胡椒', emoji: '🌶️', price: 8,  reputationRequired: 0  },
+    { id: 'butter',  name: '黄油',   emoji: '🧈', price: 12, reputationRequired: 0  },
+    { id: 'honey',   name: '蜂蜜',   emoji: '🍯', price: 10, reputationRequired: 0  },
+    { id: 'sauce',   name: '番茄酱', emoji: '🍶', price: 10, reputationRequired: 0  },
+    { id: 'spice',   name: '五香粉', emoji: '✨', price: 20, reputationRequired: 15 },
+  ];
+
+  // ===== 食谱定义 =====
+  const RESTAURANT_RECIPES = [
+    // --- 饮品类 ---
+    { id: 'drink_juice',    name: '鲜榨果汁',     emoji: '🧃',  category: 'drink',
+      ingredients: [{ foodId: 'apple', count: 1 }], seasonings: [],
+      cookTime: 2, sellPrice: 8, feedAmount: 5, energyAmount: 3, reputationRequired: 0 },
+    { id: 'drink_grape',    name: '葡萄汁',       emoji: '🍇',  category: 'drink',
+      ingredients: [{ foodId: 'grape', count: 1 }], seasonings: [],
+      cookTime: 2, sellPrice: 9, feedAmount: 5, energyAmount: 3, reputationRequired: 0 },
+    { id: 'drink_melon',    name: '西瓜汁',       emoji: '🍉',  category: 'drink',
+      ingredients: [{ foodId: 'watermelon', count: 1 }], seasonings: [],
+      cookTime: 2, sellPrice: 10, feedAmount: 6, energyAmount: 4, reputationRequired: 0 },
+    { id: 'drink_cola',     name: '冰镇可乐',     emoji: '🥤',  category: 'drink',
+      ingredients: [{ foodId: 'cola', count: 1 }], seasonings: [],
+      cookTime: 1, sellPrice: 6, feedAmount: 3, energyAmount: 2, reputationRequired: 0 },
+    { id: 'drink_milk',     name: '香浓热奶',     emoji: '🥛',  category: 'drink',
+      ingredients: [{ foodId: 'milk', count: 1 }], seasonings: [{ id: 'honey', count: 1 }],
+      cookTime: 2, sellPrice: 12, feedAmount: 8, energyAmount: 5, reputationRequired: 5 },
+    { id: 'drink_smoothie', name: '缤纷冰沙',     emoji: '🫧',  category: 'drink',
+      ingredients: [{ foodId: 'apple', count: 1 }, { foodId: 'grape', count: 1 }], seasonings: [],
+      cookTime: 3, sellPrice: 18, feedAmount: 10, energyAmount: 6, reputationRequired: 10 },
+    { id: 'drink_cocktail', name: '猫咪特调',     emoji: '🍹',  category: 'drink',
+      ingredients: [{ foodId: 'juice', count: 1 }, { foodId: 'grape', count: 1 }], seasonings: [{ id: 'honey', count: 1 }],
+      cookTime: 4, sellPrice: 25, feedAmount: 12, energyAmount: 8, reputationRequired: 20 },
+
+    // --- 小食类 ---
+    { id: 'snack_toast',         name: '黄油吐司',     emoji: '🍞✨', category: 'snack',
+      ingredients: [{ foodId: 'bread', count: 1 }], seasonings: [{ id: 'butter', count: 1 }],
+      cookTime: 2, sellPrice: 10, feedAmount: 8, energyAmount: 0, reputationRequired: 0 },
+    { id: 'snack_salad',         name: '清爽沙拉',     emoji: '🥗',  category: 'snack',
+      ingredients: [{ foodId: 'cucumber', count: 1 }, { foodId: 'tomato', count: 1 }], seasonings: [{ id: 'salt', count: 1 }],
+      cookTime: 3, sellPrice: 14, feedAmount: 10, energyAmount: 0, reputationRequired: 0 },
+    { id: 'snack_cheese_toast',  name: '芝士烤吐司',   emoji: '🧀🍞', category: 'snack',
+      ingredients: [{ foodId: 'bread', count: 1 }, { foodId: 'cheese', count: 1 }], seasonings: [{ id: 'butter', count: 1 }],
+      cookTime: 3, sellPrice: 18, feedAmount: 12, energyAmount: 0, reputationRequired: 5 },
+    { id: 'snack_tomato_slice',  name: '番茄拼盘',     emoji: '🍅',  category: 'snack',
+      ingredients: [{ foodId: 'tomato', count: 2 }], seasonings: [{ id: 'salt', count: 1 }, { id: 'soy', count: 1 }],
+      cookTime: 2, sellPrice: 12, feedAmount: 10, energyAmount: 0, reputationRequired: 5 },
+    { id: 'snack_carrot_sticks', name: '胡萝卜条',     emoji: '🥕',  category: 'snack',
+      ingredients: [{ foodId: 'carrot', count: 2 }], seasonings: [{ id: 'salt', count: 1 }],
+      cookTime: 2, sellPrice: 11, feedAmount: 9, energyAmount: 0, reputationRequired: 0 },
+    { id: 'snack_cuke',          name: '拍黄瓜',       emoji: '🥒',  category: 'snack',
+      ingredients: [{ foodId: 'cucumber', count: 1 }], seasonings: [{ id: 'soy', count: 1 }, { id: 'salt', count: 1 }],
+      cookTime: 2, sellPrice: 13, feedAmount: 11, energyAmount: 0, reputationRequired: 8 },
+    { id: 'snack_bruschetta',    name: '意式烤面包',   emoji: '🍅🍞', category: 'snack',
+      ingredients: [{ foodId: 'bread', count: 1 }, { foodId: 'tomato', count: 1 }], seasonings: [{ id: 'butter', count: 1 }, { id: 'salt', count: 1 }],
+      cookTime: 4, sellPrice: 22, feedAmount: 15, energyAmount: 0, reputationRequired: 15 },
+
+    // --- 菜品类 ---
+    { id: 'dish_fried_fish',  name: '香煎小鱼',     emoji: '🐟🔥', category: 'dish',
+      ingredients: [{ foodId: 'fish', count: 1 }], seasonings: [{ id: 'salt', count: 1 }],
+      cookTime: 4, sellPrice: 15, feedAmount: 12, energyAmount: 0, reputationRequired: 0 },
+    { id: 'dish_tomato_egg',  name: '番茄炒蛋',     emoji: '🍅🥚', category: 'dish',
+      ingredients: [{ foodId: 'tomato', count: 1 }, { foodId: 'eggs', count: 1 }], seasonings: [{ id: 'salt', count: 1 }, { id: 'soy', count: 1 }],
+      cookTime: 4, sellPrice: 18, feedAmount: 14, energyAmount: 0, reputationRequired: 0 },
+    { id: 'dish_cucumber_egg', name: '黄瓜炒蛋',    emoji: '🥒🥚', category: 'dish',
+      ingredients: [{ foodId: 'cucumber', count: 1 }, { foodId: 'eggs', count: 1 }], seasonings: [{ id: 'salt', count: 1 }],
+      cookTime: 3, sellPrice: 16, feedAmount: 13, energyAmount: 0, reputationRequired: 0 },
+    { id: 'dish_roast_chicken', name: '香烤鸡腿',   emoji: '🍗',  category: 'dish',
+      ingredients: [{ foodId: 'chicken', count: 1 }], seasonings: [{ id: 'pepper', count: 1 }, { id: 'salt', count: 1 }],
+      cookTime: 6, sellPrice: 28, feedAmount: 22, energyAmount: 0, reputationRequired: 5 },
+    { id: 'dish_steak',       name: '黑椒牛排',     emoji: '🥩',  category: 'dish',
+      ingredients: [{ foodId: 'steak', count: 1 }], seasonings: [{ id: 'pepper', count: 2 }, { id: 'butter', count: 1 }],
+      cookTime: 8, sellPrice: 45, feedAmount: 30, energyAmount: 0, reputationRequired: 10 },
+    { id: 'dish_fish_soup',   name: '鲜鱼豆腐汤',   emoji: '🐟🫕', category: 'dish',
+      ingredients: [{ foodId: 'fish', count: 1 }, { foodId: 'pot', count: 1 }], seasonings: [{ id: 'salt', count: 1 }],
+      cookTime: 5, sellPrice: 22, feedAmount: 18, energyAmount: 0, reputationRequired: 10 },
+    { id: 'dish_sushi',       name: '精致寿司',     emoji: '🍣',  category: 'dish',
+      ingredients: [{ foodId: 'sushi', count: 1 }, { foodId: 'fish', count: 1 }], seasonings: [{ id: 'soy', count: 2 }],
+      cookTime: 5, sellPrice: 35, feedAmount: 24, energyAmount: 0, reputationRequired: 15 },
+    { id: 'dish_pizza',       name: '特制披萨',     emoji: '🍕',  category: 'dish',
+      ingredients: [{ foodId: 'pizza', count: 1 }, { foodId: 'cheese', count: 1 }], seasonings: [{ id: 'sauce', count: 2 }],
+      cookTime: 6, sellPrice: 38, feedAmount: 26, energyAmount: 0, reputationRequired: 15 },
+    { id: 'dish_seafood',     name: '豪华海鲜拼',   emoji: '🦞',  category: 'dish',
+      ingredients: [{ foodId: 'platter', count: 1 }, { foodId: 'fish', count: 1 }], seasonings: [{ id: 'pepper', count: 1 }, { id: 'butter', count: 2 }],
+      cookTime: 8, sellPrice: 55, feedAmount: 35, energyAmount: 0, reputationRequired: 20 },
+    { id: 'dish_turkey',      name: '感恩节火鸡',   emoji: '🦃',  category: 'dish',
+      ingredients: [{ foodId: 'turkey', count: 1 }], seasonings: [{ id: 'spice', count: 2 }, { id: 'pepper', count: 2 }],
+      cookTime: 12, sellPrice: 75, feedAmount: 45, energyAmount: 0, reputationRequired: 25 },
+    { id: 'dish_hotpot',      name: '猫咪小火锅',   emoji: '🫕🔥', category: 'dish',
+      ingredients: [{ foodId: 'pot', count: 1 }, { foodId: 'chicken', count: 1 }, { foodId: 'fish', count: 1 }], seasonings: [{ id: 'salt', count: 2 }, { id: 'spice', count: 1 }],
+      cookTime: 10, sellPrice: 65, feedAmount: 40, energyAmount: 0, reputationRequired: 20 },
+    { id: 'dish_bento',       name: '豪华便当',     emoji: '🍱',  category: 'dish',
+      ingredients: [{ foodId: 'bento', count: 1 }, { foodId: 'eggs', count: 1 }], seasonings: [{ id: 'soy', count: 1 }, { id: 'salt', count: 1 }],
+      cookTime: 5, sellPrice: 30, feedAmount: 22, energyAmount: 0, reputationRequired: 10 },
+    { id: 'dish_grandma',     name: '阿婆家常菜',   emoji: '🥘',  category: 'dish',
+      ingredients: [{ foodId: 'tomato', count: 2 }, { foodId: 'eggs', count: 2 }, { foodId: 'carrot', count: 1 }], seasonings: [{ id: 'soy', count: 2 }, { id: 'salt', count: 2 }],
+      cookTime: 8, sellPrice: 42, feedAmount: 28, energyAmount: 0, reputationRequired: 18 },
+  ];
+
+  // ===== 客人定义 =====
+  const RESTAURANT_CUSTOMERS = [
+    // --- 普通客人（声望0可见）---
+    { id: 'office_cat',     name: '上班族猫猫',   emoji: '😺💼',
+      wantsCategory: 'snack', patience: 45, tipMulti: 1.0, reputationGive: 1, reputationRequired: 0,
+      dialogue: '来份快餐，赶时间！' },
+    { id: 'kitten',         name: '小猫崽',       emoji: '🐱🎀',
+      wantsCategory: 'dessert', patience: 30, tipMulti: 0.8, reputationGive: 1, reputationRequired: 0,
+      dialogue: '要甜甜的！' },
+    { id: 'elder_cat',      name: '老爷爷猫',     emoji: '🐱👴',
+      wantsCategory: 'dish', patience: 90, tipMulti: 1.0, reputationGive: 1, reputationRequired: 0,
+      dialogue: '来一份家常菜吧，不急不急。' },
+    { id: 'exercise_cat',   name: '运动猫',       emoji: '🐱🏃',
+      wantsCategory: 'snack', patience: 40, tipMulti: 1.0, reputationGive: 1, reputationRequired: 0,
+      dialogue: '有沙拉吗？要轻食！' },
+    { id: 'hungry_cat',     name: '饥肠辘辘猫',   emoji: '🐱😤',
+      wantsCategory: 'dish', patience: 25, tipMulti: 1.2, reputationGive: 1, reputationRequired: 0,
+      dialogue: '快快快！饿死了！' },
+    { id: 'picky_cat',      name: '挑食小猫',     emoji: '🐱🙄',
+      wantsCategory: 'specific', patience: 50, tipMulti: 1.5, reputationGive: 2, reputationRequired: 0,
+      dialogue: '我只要那个…' },
+    { id: 'thirsty_cat',    name: '口渴猫',       emoji: '🐱💧',
+      wantsCategory: 'drink', patience: 35, tipMulti: 1.0, reputationGive: 1, reputationRequired: 0,
+      dialogue: '好渴啊，来杯喝的！' },
+
+    // --- 中级客人（声望10解锁）---
+    { id: 'foodie_cat',     name: '美食博主猫',   emoji: '🐱📸',
+      wantsCategory: 'dish', patience: 60, tipMulti: 2.0, reputationGive: 3, reputationRequired: 10,
+      dialogue: '拍照先！要好看的菜！', bonusGold: 10 },
+    { id: 'couple_cats',    name: '约会情侣猫',   emoji: '🐱❤️',
+      wantsCategory: 'dish', patience: 80, tipMulti: 1.5, reputationGive: 3, reputationRequired: 10,
+      dialogue: '两份哦，谢谢～', orderCount: 2 },
+    { id: 'chef_cat',       name: '美食评论家猫', emoji: '🐱📝',
+      wantsCategory: 'premium', patience: 30, tipMulti: 2.5, reputationGive: 4, reputationRequired: 10,
+      dialogue: '有什么拿手菜？快上！' },
+    { id: 'birthday_cat',   name: '生日猫',       emoji: '🐱🎂',
+      wantsCategory: 'dessert', patience: 100, tipMulti: 2.0, reputationGive: 3, reputationRequired: 10,
+      dialogue: '今天是我生日！要蛋糕！' },
+    { id: 'midnight_cat',   name: '深夜猫',       emoji: '🐱🌙',
+      wantsCategory: 'dish', patience: 70, tipMulti: 1.3, reputationGive: 2, reputationRequired: 10,
+      dialogue: '深夜食堂…来份热的。' },
+    { id: 'traveler_cat',   name: '旅行者猫',     emoji: '🐱🎒',
+      wantsCategory: 'snack', patience: 45, tipMulti: 1.2, reputationGive: 2, reputationRequired: 10,
+      dialogue: '有便当带走吗？' },
+
+    // --- 高级客人（声望20解锁）---
+    { id: 'noble_cat',      name: '贵族猫大人',   emoji: '🐱👑',
+      wantsCategory: 'premium', patience: 40, tipMulti: 3.0, reputationGive: 5, reputationRequired: 20,
+      dialogue: '本喵要最好的！' },
+    { id: 'mysterious_cat', name: '神秘老顾客',   emoji: '🐱🎭',
+      wantsCategory: 'any', patience: 60, tipMulti: 3.5, reputationGive: 6, reputationRequired: 20,
+      dialogue: '…随便来一份吧。' },
+    { id: 'alien_cat',      name: '外星猫',       emoji: '🐱👽',
+      wantsCategory: 'any', patience: 50, tipMulti: 4.0, reputationGive: 8, reputationRequired: 25,
+      dialogue: '喵星球的问候！什么好吃？' },
+    { id: 'cat_idol',       name: '猫咪偶像',     emoji: '🐱⭐',
+      wantsCategory: 'dish', patience: 55, tipMulti: 3.0, reputationGive: 5, reputationRequired: 20,
+      dialogue: '低调低调…来份招牌菜。', bonusGold: 20 },
+  ];
+
+  // ===== 餐厅等级定义 =====
+  const RESTAURANT_LEVELS = [
+    { level: 1, name: '路边小摊',   reputationRequired: 0,   maxCustomers: 2, emoji: '🏕️' },
+    { level: 2, name: '温馨小店',   reputationRequired: 15,  maxCustomers: 3, emoji: '🏠' },
+    { level: 3, name: '特色餐厅',   reputationRequired: 35,  maxCustomers: 4, emoji: '🏪' },
+    { level: 4, name: '星级餐厅',   reputationRequired: 60,  maxCustomers: 5, emoji: '🏨' },
+    { level: 5, name: '猫界传奇',   reputationRequired: 100, maxCustomers: 6, emoji: '🏰' },
+  ];
+
   // ===== 道具定义 =====
   const TANGHULU_PROPS = {
     extraStick: {
@@ -13169,6 +13361,1133 @@ function refreshCharPreview() {
     }
 
   }
+
+  // ============================================================
+  // 🐱 小猫餐厅游戏模块 - MeepCatRestaurant
+  // ============================================================
+
+  let isRestaurantOpen = false;
+  let restaurantCustomerTimer = null;
+  let restaurantCookTimer = null;
+  let restaurantCountdownTimer = null;
+
+  // 运行时状态（不持久化，面板打开时才有效）
+  let restaurantRuntime = {
+    customers: [],       // 当前等候中的客人 [{...customer, arriveTime, specificRecipe}]
+    cooking: null,       // 当前正在烹饪 {recipeId, startTime, duration} 或 null
+  };
+
+  // ===== 获取餐厅等级信息 =====
+  function restaurantGetLevel() {
+    let result = RESTAURANT_LEVELS[0];
+    for (const lvl of RESTAURANT_LEVELS) {
+      if (state.restaurantReputation >= lvl.reputationRequired) {
+        result = lvl;
+      }
+    }
+    return result;
+  }
+
+  // ===== 获取已解锁食谱 =====
+  function restaurantGetUnlockedRecipes() {
+    return RESTAURANT_RECIPES.filter(r => state.restaurantReputation >= r.reputationRequired);
+  }
+
+  // ===== 获取可选客人池 =====
+  function restaurantGetCustomerPool() {
+    return RESTAURANT_CUSTOMERS.filter(c => state.restaurantReputation >= c.reputationRequired);
+  }
+
+  // ===== 检查食材是否足够 =====
+  function restaurantCheckIngredients(recipe) {
+    for (const ing of recipe.ingredients) {
+      const inv = (state.fridgeInventory || []).find(i => i.foodId === ing.foodId);
+      if (!inv || inv.count < ing.count) return false;
+    }
+    for (const sea of recipe.seasonings) {
+      const have = (state.restaurantSeasonings && state.restaurantSeasonings[sea.id]) || 0;
+      if (have < sea.count) return false;
+    }
+    return true;
+  }
+
+  // ===== 扣除食材和调料 =====
+  function restaurantConsumeIngredients(recipe) {
+    for (const ing of recipe.ingredients) {
+      const inv = (state.fridgeInventory || []).find(i => i.foodId === ing.foodId);
+      if (inv) inv.count -= ing.count;
+    }
+    state.fridgeInventory = (state.fridgeInventory || []).filter(i => i.count > 0);
+    for (const sea of recipe.seasonings) {
+      if (!state.restaurantSeasonings) state.restaurantSeasonings = {};
+      state.restaurantSeasonings[sea.id] = (state.restaurantSeasonings[sea.id] || 0) - sea.count;
+      if (state.restaurantSeasonings[sea.id] <= 0) delete state.restaurantSeasonings[sea.id];
+    }
+  }
+
+  // ===== 开始烹饪 =====
+  function restaurantStartCooking(recipeId) {
+    if (restaurantRuntime.cooking) {
+      restaurantShowNotice('烹饪台正忙！等当前菜做好再下一道');
+      return;
+    }
+    const recipe = RESTAURANT_RECIPES.find(r => r.id === recipeId);
+    if (!recipe) return;
+
+    if (!restaurantCheckIngredients(recipe)) {
+      restaurantShowNotice('食材或调料不足！去补货或玩冰箱整理');
+      return;
+    }
+
+    // 扣食材
+    restaurantConsumeIngredients(recipe);
+
+    // 开始烹饪计时
+    restaurantRuntime.cooking = {
+      recipeId: recipe.id,
+      startTime: Date.now(),
+      duration: recipe.cookTime * 1000,
+    };
+
+    saveDataDebounced('餐厅开始烹饪');
+    restaurantRender();
+    restaurantShowNotice(`🔥 开始烹饪「${recipe.name}」…${recipe.cookTime}秒后出锅`);
+
+    // 烹饪完成定时器
+    if (restaurantCookTimer) clearTimeout(restaurantCookTimer);
+    restaurantCookTimer = setTimeout(() => {
+      restaurantFinishCooking();
+    }, recipe.cookTime * 1000);
+  }
+
+  // ===== 烹饪完成 =====
+  function restaurantFinishCooking() {
+    if (!restaurantRuntime.cooking) return;
+    const recipeId = restaurantRuntime.cooking.recipeId;
+    const recipe = RESTAURANT_RECIPES.find(r => r.id === recipeId);
+
+    restaurantRuntime.cooking = null;
+    restaurantCookTimer = null;
+
+    if (!recipe) return;
+
+    // 加入出餐台
+    if (!state.restaurantCookedDishes) state.restaurantCookedDishes = [];
+    const existing = state.restaurantCookedDishes.find(d => d.recipeId === recipeId);
+    if (existing) {
+      existing.count++;
+    } else {
+      state.restaurantCookedDishes.push({ recipeId, count: 1 });
+    }
+
+    saveDataDebounced('餐厅烹饪完成');
+    restaurantRender();
+    restaurantShowNotice(`✅ 「${recipe.name}」出锅啦！`);
+  }
+
+  // ===== 上菜给客人 =====
+  function restaurantServeCustomer(customerIdx, recipeId) {
+    const customer = restaurantRuntime.customers[customerIdx];
+    if (!customer) return;
+
+    // 查找出餐台菜品
+    const dishInv = (state.restaurantCookedDishes || []).find(d => d.recipeId === recipeId);
+    if (!dishInv || dishInv.count <= 0) {
+      restaurantShowNotice('出餐台没有这道菜！先烹饪一份吧');
+      return;
+    }
+
+    const recipe = RESTAURANT_RECIPES.find(r => r.id === recipeId);
+    if (!recipe) return;
+
+    // 验证客人是否接受这道菜
+    if (!restaurantCustomerAccepts(customer, recipe)) {
+      restaurantShowNotice(`${customer.emoji} 不想要这个！看看它想吃什么类型`);
+      return;
+    }
+
+    // 扣除出餐台库存
+    dishInv.count--;
+    state.restaurantCookedDishes = (state.restaurantCookedDishes || []).filter(d => d.count > 0);
+
+    // 计算收入
+    const gold = Math.round(recipe.sellPrice * customer.tipMulti);
+    const bonusGold = customer.bonusGold || 0;
+    const totalGold = gold + bonusGold;
+    state.gameGold += totalGold;
+    state.restaurantReputation += customer.reputationGive;
+    state.restaurantTotalEarnings += totalGold;
+    state.restaurantTodayEarnings += totalGold;
+    state.restaurantServedCount++;
+
+    // 检查升级
+    const oldLevel = state.restaurantLevel;
+    const newLevelData = restaurantGetLevel();
+    if (newLevelData.level > oldLevel) {
+      state.restaurantLevel = newLevelData.level;
+      restaurantShowNotice(`🎉 餐厅升级！${newLevelData.emoji} ${newLevelData.name} (Lv.${newLevelData.level})`);
+    }
+
+    // 移除客人
+    restaurantRuntime.customers.splice(customerIdx, 1);
+
+    saveDataDebounced('餐厅上菜');
+    restaurantRender();
+
+    const bonusText = bonusGold > 0 ? ` (+${bonusGold}额外)` : '';
+    restaurantShowNotice(`🍽️ ${customer.name} 满意离开！+${totalGold}🪙${bonusText} +${customer.reputationGive}⭐`);
+  }
+
+  // ===== 上菜甜品/糖葫芦给客人 =====
+  function restaurantServeDessert(customerIdx, dessertType, dessertKey) {
+    const customer = restaurantRuntime.customers[customerIdx];
+    if (!customer) return;
+
+    // 检查客人是否接受甜品
+    if (customer.wantsCategory !== 'dessert' && customer.wantsCategory !== 'any') {
+      restaurantShowNotice(`${customer.emoji} 不想要甜品！`);
+      return;
+    }
+
+    let sellPrice = 0;
+    let feedAmount = 0;
+    let itemName = '';
+
+    if (dessertType === 'tanghulu') {
+      const inv = (state.tanghuluInventory || []).find(i => i.fruitKey === dessertKey && i.count > 0);
+      if (!inv) { restaurantShowNotice('糖葫芦库存不足！'); return; }
+      const data = TANGHULU_FRUITS.find(f => f.key === dessertKey);
+      if (!data) return;
+      inv.count--;
+      state.tanghuluInventory = (state.tanghuluInventory || []).filter(i => i.count > 0);
+      sellPrice = Math.round(data.sellPrice * 1.8);
+      feedAmount = data.feedAmount;
+      itemName = `${data.name}糖葫芦`;
+    } else if (dessertType === 'fridge') {
+      const inv = (state.fridgeInventory || []).find(i => i.foodId === dessertKey && i.count > 0);
+      if (!inv) { restaurantShowNotice('甜品库存不足！'); return; }
+      const data = FRIDGE_FOODS.find(f => f.id === dessertKey);
+      if (!data) return;
+      inv.count--;
+      state.fridgeInventory = (state.fridgeInventory || []).filter(i => i.count > 0);
+      sellPrice = Math.round(data.value * 1.5);
+      feedAmount = data.feed;
+      itemName = data.name;
+    } else if (dessertType === 'crystal') {
+      if ((state.tanghuluSugarCrystal || 0) <= 0) { restaurantShowNotice('没有糖砂了！'); return; }
+      state.tanghuluSugarCrystal--;
+      sellPrice = 150;
+      feedAmount = 50;
+      itemName = '神秘糖砂甜品';
+    }
+
+    // 计算收入
+    const gold = Math.round(sellPrice * customer.tipMulti);
+    state.gameGold += gold;
+    state.restaurantReputation += customer.reputationGive;
+    state.restaurantTotalEarnings += gold;
+    state.restaurantTodayEarnings += gold;
+    state.restaurantServedCount++;
+
+    // 检查升级
+    const oldLevel = state.restaurantLevel;
+    const newLevelData = restaurantGetLevel();
+    if (newLevelData.level > oldLevel) {
+      state.restaurantLevel = newLevelData.level;
+      restaurantShowNotice(`🎉 餐厅升级！${newLevelData.emoji} ${newLevelData.name}`);
+    }
+
+    // 移除客人
+    restaurantRuntime.customers.splice(customerIdx, 1);
+
+    saveDataDebounced('餐厅上甜品');
+    restaurantRender();
+    restaurantShowNotice(`🍽️ ${customer.name} 吃了${itemName}，很满意！+${gold}🪙 +${customer.reputationGive}⭐`);
+  }
+
+  // ===== 判断客人是否接受菜品 =====
+  function restaurantCustomerAccepts(customer, recipe) {
+    const cat = customer.wantsCategory;
+    if (cat === 'any') return true;
+    if (cat === 'drink' && recipe.category === 'drink') return true;
+    if (cat === 'snack' && (recipe.category === 'snack' || recipe.category === 'drink')) return true;
+    if (cat === 'dish' && (recipe.category === 'dish' || recipe.category === 'snack')) return true;
+    if (cat === 'premium' && recipe.category === 'dish' && recipe.sellPrice >= 35) return true;
+    if (cat === 'dessert') return false; // 甜品走单独逻辑
+    if (cat === 'specific') {
+      return recipe.id === customer.specificRecipe;
+    }
+    return false;
+  }
+
+  // ===== 客人到来 =====
+  function restaurantSpawnCustomer() {
+    if (!isRestaurantOpen) return;
+    const levelData = restaurantGetLevel();
+    if (restaurantRuntime.customers.length >= levelData.maxCustomers) return;
+
+    const pool = restaurantGetCustomerPool();
+    if (pool.length === 0) return;
+
+    const template = pool[Math.floor(Math.random() * pool.length)];
+    const customer = { ...template, arriveTime: Date.now(), specificRecipe: null };
+
+    // 如果是 specific 类型，随机指定一道已解锁食谱
+    if (customer.wantsCategory === 'specific') {
+      const recipes = restaurantGetUnlockedRecipes();
+      if (recipes.length > 0) {
+        const chosen = recipes[Math.floor(Math.random() * recipes.length)];
+        customer.specificRecipe = chosen.id;
+        customer.dialogue = `我只要「${chosen.name}」！`;
+      }
+    }
+
+    restaurantRuntime.customers.push(customer);
+    restaurantRender();
+  }
+
+  // ===== 客人超时检测 =====
+  function restaurantCheckTimeout() {
+    if (!isRestaurantOpen) return;
+    const now = Date.now();
+    let changed = false;
+
+    restaurantRuntime.customers = restaurantRuntime.customers.filter(customer => {
+      const elapsed = (now - customer.arriveTime) / 1000;
+      if (elapsed >= customer.patience) {
+        // 超时离开
+        state.restaurantReputation = Math.max(0, state.restaurantReputation - 2);
+        restaurantShowNotice(`😾 ${customer.name} 等太久走了…声望 -2`);
+        changed = true;
+        return false;
+      }
+      return true;
+    });
+
+    if (changed) {
+      saveDataDebounced('餐厅客人超时');
+      restaurantRender();
+    }
+  }
+
+  // ===== 购买调料 =====
+  function restaurantBuySeasoning(seasoningId, amount) {
+    const seasoning = RESTAURANT_SEASONINGS.find(s => s.id === seasoningId);
+    if (!seasoning) return;
+
+    if (state.restaurantReputation < seasoning.reputationRequired) {
+      restaurantShowNotice(`需要声望 ${seasoning.reputationRequired} 才能购买 ${seasoning.name}`);
+      return;
+    }
+
+    const totalCost = seasoning.price * amount;
+    if (state.gameGold < totalCost) {
+      restaurantShowNotice(`金币不足！需要 ${totalCost} 🪙`);
+      return;
+    }
+
+    state.gameGold -= totalCost;
+    if (!state.restaurantSeasonings) state.restaurantSeasonings = {};
+    state.restaurantSeasonings[seasoningId] = (state.restaurantSeasonings[seasoningId] || 0) + amount;
+
+    saveDataDebounced('餐厅购买调料');
+    restaurantRender();
+    restaurantShowNotice(`购买了 ${seasoning.emoji} ${seasoning.name} ×${amount}！`);
+  }
+
+  // ===== 菜品喂桌宠 =====
+  function restaurantFeedPet(recipeId) {
+    const dishInv = (state.restaurantCookedDishes || []).find(d => d.recipeId === recipeId);
+    if (!dishInv || dishInv.count <= 0) {
+      restaurantShowNotice('出餐台没有这道菜了！');
+      return;
+    }
+    const recipe = RESTAURANT_RECIPES.find(r => r.id === recipeId);
+    if (!recipe) return;
+
+    dishInv.count--;
+    state.restaurantCookedDishes = (state.restaurantCookedDishes || []).filter(d => d.count > 0);
+
+    state.hunger = Math.min(100, state.hunger + recipe.feedAmount);
+    if (recipe.energyAmount > 0) {
+      state.energy = Math.min(100, state.energy + recipe.energyAmount);
+    }
+    state.totalInteractions++;
+
+    const actionSprite = settings.spriteEat || settings.spriteHappy;
+    if (actionSprite) {
+      const dur = (settings.spriteDurations && settings.spriteDurations.spriteEat) || 2000;
+      setSpriteWithLock('eat', actionSprite, dur);
+    }
+    showBubble(`${recipe.emoji} 好吃！谢谢主人～`, 3000);
+    updateMood();
+    updateStatusBars();
+    saveDataDebounced('餐厅喂桌宠');
+    restaurantRender();
+  }
+
+  // ===== 通知 =====
+  function restaurantShowNotice(text) {
+    const notice = document.getElementById('sp-restaurant-notice');
+    if (!notice) return;
+    notice.textContent = text;
+    notice.classList.add('visible');
+    clearTimeout(notice._timer);
+    notice._timer = setTimeout(() => notice.classList.remove('visible'), 3500);
+  }
+
+  // ===== 渲染主面板 =====
+  function restaurantRender() {
+    const panel = document.getElementById('sp-restaurant-panel');
+    if (!panel || !isRestaurantOpen) return;
+
+    const levelData = restaurantGetLevel();
+
+    // 更新头部信息
+    const goldEl = document.getElementById('sp-restaurant-gold');
+    const repEl = document.getElementById('sp-restaurant-rep');
+    const lvlEl = document.getElementById('sp-restaurant-lvl');
+    if (goldEl) goldEl.textContent = state.gameGold;
+    if (repEl) repEl.textContent = state.restaurantReputation;
+    if (lvlEl) lvlEl.textContent = `${levelData.emoji}Lv.${levelData.level}`;
+
+    // 渲染当前激活的标签页
+    const activeTab = panel.querySelector('.sp-game-tab.active')?.dataset.rtab || 'kitchen';
+    if (activeTab === 'kitchen') restaurantRenderKitchen();
+    else if (activeTab === 'menu') restaurantRenderMenu();
+    else if (activeTab === 'supply') restaurantRenderSupply();
+    else if (activeTab === 'stock') restaurantRenderStock();
+  }
+
+  // ===== 渲染厨房标签页 =====
+  function restaurantRenderKitchen() {
+    const container = document.getElementById('sp-restaurant-kitchen');
+    if (!container) return;
+
+    const levelData = restaurantGetLevel();
+    const customers = restaurantRuntime.customers;
+    const now = Date.now();
+
+    // 客人等候区
+    let customersHtml = '';
+    if (customers.length === 0) {
+      customersHtml = '<div style="text-align:center;padding:12px;color:var(--sp-text-muted);font-size:11px;">暂无客人…等待中</div>';
+    } else {
+      customersHtml = customers.map((c, idx) => {
+        const elapsed = Math.floor((now - c.arriveTime) / 1000);
+        const remaining = Math.max(0, c.patience - elapsed);
+        const urgentClass = remaining < 10 ? 'color:#f66;font-weight:700;' : '';
+        const wantText = c.wantsCategory === 'specific' ? `指定：${c.dialogue}` : c.dialogue;
+        return `
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:rgba(255,255,255,0.05);border:1px solid var(--sp-border-light);border-radius:8px;">
+            <span style="font-size:18px;">${c.emoji}</span>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);">${c.name}</div>
+              <div style="font-size:10px;color:var(--sp-text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${wantText}</div>
+            </div>
+            <span style="font-size:10px;${urgentClass}">⏱️${remaining}s</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 烹饪台
+    let cookingHtml = '';
+    if (restaurantRuntime.cooking) {
+      const recipe = RESTAURANT_RECIPES.find(r => r.id === restaurantRuntime.cooking.recipeId);
+      const elapsed = Date.now() - restaurantRuntime.cooking.startTime;
+      const remaining = Math.max(0, Math.ceil((restaurantRuntime.cooking.duration - elapsed) / 1000));
+      cookingHtml = `
+        <div style="text-align:center;padding:12px;background:rgba(255,180,50,0.08);border:1px solid rgba(255,180,50,0.3);border-radius:8px;">
+          <div style="font-size:18px;margin-bottom:4px;">🔥</div>
+          <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);">正在烹饪：${recipe?.name || '?'} ${recipe?.emoji || ''}</div>
+          <div style="font-size:11px;color:#ffb347;margin-top:4px;">剩余 ${remaining} 秒…</div>
+        </div>
+      `;
+    } else {
+      cookingHtml = `
+        <div style="padding:8px;background:rgba(255,255,255,0.04);border:1px solid var(--sp-border-light);border-radius:8px;">
+          <div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin-bottom:6px;">🍳 烹饪台</div>
+          <button id="sp-restaurant-cook-btn" style="width:100%;padding:9px;font-size:12px;font-weight:600;border-radius:6px;border:1px solid var(--sp-primary-border);background:var(--sp-primary);color:#fff;cursor:pointer;">📋 选择食谱并烹饪</button>
+        </div>
+      `;
+
+    }
+
+    // 出餐台
+    let dishesHtml = '';
+    const cookedDishes = state.restaurantCookedDishes || [];
+    if (cookedDishes.length === 0) {
+      dishesHtml = '<div style="text-align:center;padding:10px;color:var(--sp-text-muted);font-size:11px;">出餐台空空如也～</div>';
+    } else {
+      dishesHtml = cookedDishes.map(d => {
+        const recipe = RESTAURANT_RECIPES.find(r => r.id === d.recipeId);
+        if (!recipe) return '';
+
+        // 生成上菜按钮（对每个客人）
+        const serveButtons = customers.map((c, cidx) => {
+          const accepts = restaurantCustomerAccepts(c, recipe);
+          if (!accepts) return '';
+          return `<button class="sp-restaurant-serve-btn" data-customer="${cidx}" data-recipe="${d.recipeId}" style="padding:2px 6px;font-size:9px;border-radius:4px;border:1px solid rgba(100,220,100,0.5);background:rgba(100,220,100,0.15);color:#6f6;cursor:pointer;">🍽️${c.name.slice(0, 3)}</button>`;
+        }).filter(Boolean).join('');
+
+        return `
+          <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:rgba(255,255,255,0.04);border:1px solid var(--sp-border-light);border-radius:6px;margin-bottom:4px;flex-wrap:wrap;">
+            <span style="font-size:14px;">${recipe.emoji}</span>
+            <span style="font-size:11px;font-weight:600;color:var(--sp-text-primary);flex:1;">${recipe.name} ×${d.count}</span>
+            <div style="display:flex;gap:3px;flex-wrap:wrap;">
+              ${serveButtons}
+              <button class="sp-restaurant-feed-btn" data-recipe="${d.recipeId}" style="padding:2px 6px;font-size:9px;border-radius:4px;border:1px solid rgba(255,180,50,0.5);background:rgba(255,180,50,0.15);color:#ffb347;cursor:pointer;">🍖喂宠</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 甜品/糖葫芦快捷上菜（如果有客人要甜品）
+    let dessertHtml = '';
+    const dessertCustomers = customers.filter(c => c.wantsCategory === 'dessert' || c.wantsCategory === 'any');
+    if (dessertCustomers.length > 0) {
+      const tangInv = (state.tanghuluInventory || []).filter(i => i.count > 0);
+      const fridgeDesserts = (state.fridgeInventory || []).filter(i => {
+        const fd = FRIDGE_FOODS.find(f => f.id === i.foodId);
+        return fd && (i.foodId === 'icecream' || i.foodId === 'cake') && i.count > 0;
+      });
+      const hasCrystal = (state.tanghuluSugarCrystal || 0) > 0;
+
+      if (tangInv.length > 0 || fridgeDesserts.length > 0 || hasCrystal) {
+        let items = '';
+        tangInv.forEach(inv => {
+          const data = TANGHULU_FRUITS.find(f => f.key === inv.fruitKey);
+          if (!data) return;
+          dessertCustomers.forEach((c, relIdx) => {
+            const cidx = customers.indexOf(c);
+            items += `<button class="sp-restaurant-dessert-btn" data-customer="${cidx}" data-type="tanghulu" data-key="${inv.fruitKey}" style="padding:3px 6px;font-size:9px;border-radius:4px;border:1px solid rgba(255,150,200,0.5);background:rgba(255,150,200,0.1);color:#ffb;cursor:pointer;">${data.emoji}→${c.name.slice(0, 2)}</button>`;
+          });
+        });
+        fridgeDesserts.forEach(inv => {
+          const data = FRIDGE_FOODS.find(f => f.id === inv.foodId);
+          if (!data) return;
+          dessertCustomers.forEach((c, relIdx) => {
+            const cidx = customers.indexOf(c);
+            items += `<button class="sp-restaurant-dessert-btn" data-customer="${cidx}" data-type="fridge" data-key="${inv.foodId}" style="padding:3px 6px;font-size:9px;border-radius:4px;border:1px solid rgba(255,150,200,0.5);background:rgba(255,150,200,0.1);color:#ffb;cursor:pointer;">${data.emoji}→${c.name.slice(0, 2)}</button>`;
+          });
+        });
+        if (hasCrystal) {
+          dessertCustomers.forEach((c) => {
+            const cidx = customers.indexOf(c);
+            items += `<button class="sp-restaurant-dessert-btn" data-customer="${cidx}" data-type="crystal" data-key="crystal" style="padding:3px 6px;font-size:9px;border-radius:4px;border:1px solid rgba(255,200,50,0.5);background:rgba(255,200,50,0.1);color:#ffb347;cursor:pointer;">✨→${c.name.slice(0, 2)}</button>`;
+          });
+        }
+        dessertHtml = `
+          <div style="margin-top:6px;padding:6px 8px;background:rgba(255,150,200,0.05);border:1px solid rgba(255,150,200,0.2);border-radius:6px;">
+            <div style="font-size:10px;color:var(--sp-text-muted);margin-bottom:4px;">🍰 甜品/点心快捷上菜：</div>
+            <div style="display:flex;gap:3px;flex-wrap:wrap;">${items}</div>
+          </div>
+        `;
+      }
+    }
+
+    container.innerHTML = `
+      <div style="margin-bottom:8px;">
+        <div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin-bottom:4px;">👥 等候区 (${customers.length}/${levelData.maxCustomers})</div>
+        <div style="display:flex;flex-direction:column;gap:4px;">${customersHtml}</div>
+      </div>
+      ${cookingHtml}
+      <div style="margin-top:8px;">
+        <div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin-bottom:4px;">🍽️ 出餐台</div>
+        ${dishesHtml}
+        ${dessertHtml}
+      </div>
+    `;
+
+    // 绑定事件
+    const cookBtn = document.getElementById('sp-restaurant-cook-btn');
+    if (cookBtn) {
+      cookBtn.onclick = () => {
+        restaurantShowRecipeModal();
+      };
+    }
+
+
+    // 上菜给客人按钮
+    container.querySelectorAll('.sp-restaurant-serve-btn').forEach(btn => {
+      btn.onclick = () => {
+        const customerIdx = parseInt(btn.dataset.customer);
+        const recipeId = btn.dataset.recipe;
+        restaurantServeCustomer(customerIdx, recipeId);
+      };
+    });
+
+    // 喂桌宠按钮
+    container.querySelectorAll('.sp-restaurant-feed-btn').forEach(btn => {
+      btn.onclick = () => {
+        const recipeId = btn.dataset.recipe;
+        restaurantFeedPet(recipeId);
+      };
+    });
+
+    // 甜品上菜按钮
+    container.querySelectorAll('.sp-restaurant-dessert-btn').forEach(btn => {
+      btn.onclick = () => {
+        const customerIdx = parseInt(btn.dataset.customer);
+        const type = btn.dataset.type;
+        const key = btn.dataset.key;
+        restaurantServeDessert(customerIdx, type, key);
+      };
+    });
+  }
+
+  // ===== 渲染菜单标签页 =====
+  function restaurantRenderMenu() {
+    const container = document.getElementById('sp-restaurant-menu');
+    if (!container) return;
+
+    const allRecipes = RESTAURANT_RECIPES;
+    const categories = [
+      { key: 'drink', label: '🧃 饮品', emoji: '🧃' },
+      { key: 'snack', label: '🥗 小食', emoji: '🥗' },
+      { key: 'dish',  label: '🍽️ 菜品', emoji: '🍽️' },
+    ];
+
+    let html = '';
+    categories.forEach(cat => {
+      const recipes = allRecipes.filter(r => r.category === cat.key);
+      html += `
+        <div style="margin-bottom:12px;">
+          <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--sp-border-light);">${cat.label}</div>
+          ${recipes.map(r => {
+            const unlocked = state.restaurantReputation >= r.reputationRequired;
+            const ingText = r.ingredients.map(ing => {
+              const fd = FRIDGE_FOODS.find(f => f.id === ing.foodId);
+              return `${fd?.emoji || '?'}×${ing.count}`;
+            }).join('+');
+            const seaText = r.seasonings.map(s => {
+              const sd = RESTAURANT_SEASONINGS.find(x => x.id === s.id);
+              return `${sd?.emoji || '?'}×${s.count}`;
+            }).join('+');
+            const materials = [ingText, seaText].filter(Boolean).join(' 🧂');
+            return `
+              <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:${unlocked ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.1)'};border:1px solid ${unlocked ? 'var(--sp-border-light)' : 'rgba(255,255,255,0.04)'};border-radius:6px;margin-bottom:3px;opacity:${unlocked ? '1' : '0.45'};">
+                <span style="font-size:16px;flex-shrink:0;">${r.emoji}</span>
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);">${r.name} ${!unlocked ? `<span style="font-size:9px;color:#f66;">🔒声望${r.reputationRequired}</span>` : ''}</div>
+                  <div style="font-size:9px;color:var(--sp-text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${materials} | ⏱️${r.cookTime}s</div>
+                </div>
+                <div style="text-align:right;flex-shrink:0;">
+                  <div style="font-size:11px;color:#ffb347;font-weight:600;">🪙${r.sellPrice}</div>
+                  <div style="font-size:9px;color:var(--sp-status-hunger);">+${r.feedAmount}饱</div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    });
+
+    // 甜品区（来自库存）
+    html += `
+      <div style="margin-bottom:12px;">
+        <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--sp-border-light);">🍰 甜品/点心（来自库存，直接上架）</div>
+        <div style="font-size:10px;color:var(--sp-text-muted);line-height:1.6;padding:6px 8px;background:rgba(255,150,200,0.05);border-radius:6px;border:1px solid rgba(255,150,200,0.15);">
+          🍢 糖葫芦（来自糖葫芦工坊）→ 售出价 = 原价×1.8<br/>
+          🍦🎂 冰淇淋/蛋糕（来自冰箱整理）→ 售出价 = 原价×1.5<br/>
+          ✨ 完美糖砂甜品 → 售出价 150🪙<br/>
+          以上均在厨房标签页的「甜品快捷上菜」区操作
+        </div>
+      </div>
+    `;
+
+    container.innerHTML = html;
+  }
+
+  // ===== 渲染补货标签页 =====
+  function restaurantRenderSupply() {
+    const container = document.getElementById('sp-restaurant-supply');
+    if (!container) return;
+
+    let html = `
+      <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">🧂 调料商店</div>
+    `;
+
+    RESTAURANT_SEASONINGS.forEach(s => {
+      const unlocked = state.restaurantReputation >= s.reputationRequired;
+      const have = (state.restaurantSeasonings && state.restaurantSeasonings[s.id]) || 0;
+      const cantAfford3 = state.gameGold < s.price * 3;
+      const cantAfford5 = state.gameGold < s.price * 5;
+      html += `
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:${unlocked ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.1)'};border:1px solid var(--sp-border-light);border-radius:8px;margin-bottom:5px;opacity:${unlocked ? '1' : '0.45'};">
+          <span style="font-size:18px;flex-shrink:0;">${s.emoji}</span>
+          <div style="flex:1;">
+            <div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);">
+              ${s.name}
+              ${!unlocked ? `<span style="font-size:9px;color:#f66;margin-left:4px;">🔒声望${s.reputationRequired}</span>` : ''}
+            </div>
+            <div style="font-size:10px;color:var(--sp-text-muted);">库存: ${have} | 单价: ${s.price}🪙</div>
+          </div>
+          ${unlocked ? `
+            <button class="sp-restaurant-buy-sea-btn" data-id="${s.id}" data-amount="3" style="padding:3px 7px;font-size:10px;border-radius:5px;border:1px solid rgba(255,180,50,0.4);background:rgba(255,180,50,0.15);color:#ffb347;cursor:pointer;${cantAfford3 ? 'opacity:0.4;pointer-events:none;' : ''}">买3 (${s.price * 3}🪙)</button>
+            <button class="sp-restaurant-buy-sea-btn" data-id="${s.id}" data-amount="5" style="padding:3px 7px;font-size:10px;border-radius:5px;border:1px solid rgba(255,180,50,0.6);background:rgba(255,180,50,0.25);color:#ffb347;cursor:pointer;${cantAfford5 ? 'opacity:0.4;pointer-events:none;' : ''}">买5 (${s.price * 5}🪙)</button>
+          ` : ''}
+        </div>
+      `;
+    });
+
+    // 酱油瓶转调料说明
+    const bottleInv = (state.fridgeInventory || []).find(i => i.foodId === 'bottle');
+    const bottleCount = bottleInv ? bottleInv.count : 0;
+    html += `
+      <div style="margin-top:10px;padding:8px 10px;background:rgba(100,180,255,0.05);border:1px solid rgba(100,180,255,0.2);border-radius:8px;font-size:10px;color:var(--sp-text-muted);line-height:1.7;">
+        💡 冰箱整理中的「酱油瓶🫙」可在此转换为酱油调料（1瓶=3份）<br/>
+        当前酱油瓶库存：${bottleCount} 瓶
+        ${bottleCount > 0 ? `<br/><button id="sp-restaurant-convert-soy" style="margin-top:4px;padding:3px 8px;font-size:10px;border-radius:4px;border:1px solid rgba(100,180,255,0.4);background:rgba(100,180,255,0.15);color:#64b4ff;cursor:pointer;">🫙 全部转换为酱油 (+${bottleCount * 3}份)</button>` : ''}
+      </div>
+    `;
+
+    container.innerHTML = html;
+
+    // 绑定购买按钮
+    container.querySelectorAll('.sp-restaurant-buy-sea-btn').forEach(btn => {
+      btn.onclick = () => {
+        restaurantBuySeasoning(btn.dataset.id, parseInt(btn.dataset.amount));
+      };
+    });
+
+    // 绑定酱油瓶转换按钮
+    const convertBtn = document.getElementById('sp-restaurant-convert-soy');
+    if (convertBtn) {
+      convertBtn.onclick = () => {
+        const inv = (state.fridgeInventory || []).find(i => i.foodId === 'bottle');
+        if (!inv || inv.count <= 0) return;
+        const amount = inv.count * 3;
+        inv.count = 0;
+        state.fridgeInventory = (state.fridgeInventory || []).filter(i => i.count > 0);
+        if (!state.restaurantSeasonings) state.restaurantSeasonings = {};
+        state.restaurantSeasonings['soy'] = (state.restaurantSeasonings['soy'] || 0) + amount;
+        saveDataDebounced('酱油瓶转换');
+        restaurantRender();
+        restaurantShowNotice(`🫙 转换成功！获得酱油 ×${amount}`);
+      };
+    }
+  }
+
+  // ===== 渲染库存标签页 =====
+  function restaurantRenderStock() {
+    const container = document.getElementById('sp-restaurant-stock');
+    if (!container) return;
+
+    // 可用食材（来自冰箱库存）
+    const fridgeInv = (state.fridgeInventory || []).filter(i => i.count > 0);
+    let ingredientsHtml = '';
+    if (fridgeInv.length === 0) {
+      ingredientsHtml = '<div style="color:var(--sp-text-muted);font-size:11px;text-align:center;padding:8px;">暂无食材，去玩冰箱整理吧！</div>';
+    } else {
+      ingredientsHtml = fridgeInv.map(inv => {
+        const data = FRIDGE_FOODS.find(f => f.id === inv.foodId);
+        if (!data) return '';
+        return `
+          <div style="display:flex;align-items:center;gap:6px;padding:3px 6px;">
+            <span style="font-size:14px;">${data.emoji}</span>
+            <span style="font-size:11px;color:var(--sp-text-primary);flex:1;">${data.name}</span>
+            <span style="font-size:11px;font-weight:600;color:var(--sp-text-primary);">×${inv.count}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 调料库存
+    const seaEntries = Object.entries(state.restaurantSeasonings || {}).filter(([, v]) => v > 0);
+    let seasoningHtml = '';
+    if (seaEntries.length === 0) {
+      seasoningHtml = '<div style="color:var(--sp-text-muted);font-size:11px;text-align:center;padding:8px;">调料空空，去补货吧！</div>';
+    } else {
+      seasoningHtml = seaEntries.map(([id, count]) => {
+        const data = RESTAURANT_SEASONINGS.find(s => s.id === id);
+        if (!data) return '';
+        return `
+          <div style="display:flex;align-items:center;gap:6px;padding:3px 6px;">
+            <span style="font-size:14px;">${data.emoji}</span>
+            <span style="font-size:11px;color:var(--sp-text-primary);flex:1;">${data.name}</span>
+            <span style="font-size:11px;font-weight:600;color:var(--sp-text-primary);">×${count}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 甜品/点心库存
+    const tangInv = (state.tanghuluInventory || []).filter(i => i.count > 0);
+    const fridgeDesserts = (state.fridgeInventory || []).filter(i => {
+      return (i.foodId === 'icecream' || i.foodId === 'cake') && i.count > 0;
+    });
+    const crystalCount = state.tanghuluSugarCrystal || 0;
+    let dessertHtml = '';
+    if (tangInv.length === 0 && fridgeDesserts.length === 0 && crystalCount === 0) {
+      dessertHtml = '<div style="color:var(--sp-text-muted);font-size:11px;text-align:center;padding:8px;">暂无甜品/点心库存</div>';
+    } else {
+      dessertHtml = '';
+      tangInv.forEach(inv => {
+        const data = TANGHULU_FRUITS.find(f => f.key === inv.fruitKey);
+        if (!data) return;
+        dessertHtml += `
+          <div style="display:flex;align-items:center;gap:6px;padding:3px 6px;">
+            <span style="font-size:14px;">${data.emoji}</span>
+            <span style="font-size:11px;color:var(--sp-text-primary);flex:1;">🍢${data.name}糖葫芦</span>
+            <span style="font-size:11px;font-weight:600;color:var(--sp-text-primary);">×${inv.count}</span>
+          </div>
+        `;
+      });
+      fridgeDesserts.forEach(inv => {
+        const data = FRIDGE_FOODS.find(f => f.id === inv.foodId);
+        if (!data) return;
+        dessertHtml += `
+          <div style="display:flex;align-items:center;gap:6px;padding:3px 6px;">
+            <span style="font-size:14px;">${data.emoji}</span>
+            <span style="font-size:11px;color:var(--sp-text-primary);flex:1;">${data.name}</span>
+            <span style="font-size:11px;font-weight:600;color:var(--sp-text-primary);">×${inv.count}</span>
+          </div>
+        `;
+      });
+      if (crystalCount > 0) {
+        dessertHtml += `
+          <div style="display:flex;align-items:center;gap:6px;padding:3px 6px;">
+            <span style="font-size:14px;">✨</span>
+            <span style="font-size:11px;color:var(--sp-text-primary);flex:1;">完美的亮晶晶糖砂</span>
+            <span style="font-size:11px;font-weight:600;color:#ffb347;">×${crystalCount}</span>
+          </div>
+        `;
+      }
+    }
+
+    // 今日营收
+    const today = new Date().toISOString().slice(0, 10);
+    if (state.restaurantLastOpenDate !== today) {
+      state.restaurantTodayEarnings = 0;
+      state.restaurantLastOpenDate = today;
+    }
+
+    container.innerHTML = `
+      <div style="margin-bottom:10px;padding:8px 10px;background:rgba(255,180,50,0.06);border:1px solid rgba(255,180,50,0.2);border-radius:8px;">
+        <div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin-bottom:4px;">📊 营业数据</div>
+        <div style="font-size:11px;color:var(--sp-text-secondary);line-height:1.8;">
+          今日收入: <span style="color:#ffb347;font-weight:600;">🪙${state.restaurantTodayEarnings}</span><br/>
+          历史总收入: <span style="color:#ffb347;">🪙${state.restaurantTotalEarnings}</span><br/>
+          服务客人: <span style="color:var(--sp-text-primary);">${state.restaurantServedCount} 位</span>
+        </div>
+      </div>
+      <div style="margin-bottom:10px;background:rgba(255,255,255,0.03);border:1px solid var(--sp-border-light);border-radius:8px;overflow:hidden;">
+        <div style="padding:6px 10px;background:rgba(255,255,255,0.04);font-size:11px;font-weight:600;color:var(--sp-text-primary);">🥬 食材库存（来自冰箱整理）</div>
+        <div style="padding:4px 4px;">${ingredientsHtml}</div>
+      </div>
+      <div style="margin-bottom:10px;background:rgba(255,255,255,0.03);border:1px solid var(--sp-border-light);border-radius:8px;overflow:hidden;">
+        <div style="padding:6px 10px;background:rgba(255,255,255,0.04);font-size:11px;font-weight:600;color:var(--sp-text-primary);">🧂 调料库存</div>
+        <div style="padding:4px 4px;">${seasoningHtml}</div>
+      </div>
+      <div style="background:rgba(255,255,255,0.03);border:1px solid var(--sp-border-light);border-radius:8px;overflow:hidden;">
+        <div style="padding:6px 10px;background:rgba(255,255,255,0.04);font-size:11px;font-weight:600;color:var(--sp-text-primary);">🍰 甜品/点心库存</div>
+        <div style="padding:4px 4px;">${dessertHtml}</div>
+      </div>
+    `;
+  }
+
+  // ===== 渲染面板框架 =====
+  function restaurantRenderPanel() {
+    let panel = document.getElementById('sp-restaurant-panel');
+    if (panel) panel.remove();
+
+    panel = document.createElement('div');
+    panel.id = 'sp-restaurant-panel';
+    panel.style.cssText = `
+      position: fixed;
+      width: 360px;
+      max-width: 95vw;
+      max-height: 85vh;
+      background: var(--sp-bg-main);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--sp-border);
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      display: flex;
+      flex-direction: column;
+      z-index: 2147483646;
+      overflow: hidden;
+    `;
+
+    panel.innerHTML = `
+      <div id="sp-restaurant-header" style="display:flex;align-items:center;padding:10px 12px;background:var(--sp-bg-light);border-bottom:1px solid var(--sp-border-light);cursor:grab;user-select:none;gap:8px;">
+        <button id="sp-restaurant-minimize" style="background:none;border:none;font-size:14px;cursor:pointer;color:var(--sp-text-muted);padding:2px 4px;flex-shrink:0;" title="缩小">─</button>
+        <button id="sp-restaurant-close" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--sp-text-muted);padding:2px 4px;flex-shrink:0;" title="关闭">✕</button>
+        <span style="font-size:14px;font-weight:700;color:var(--sp-text-primary);flex:1;text-align:center;">🐱 小猫餐厅</span>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+          <span style="font-size:11px;color:#a0d4ff;" id="sp-restaurant-lvl">🏕️Lv.1</span>
+          <span style="font-size:11px;color:#ffdd80;font-weight:600;">⭐<span id="sp-restaurant-rep">0</span></span>
+          <span style="font-size:11px;color:#ffb347;font-weight:600;">🪙<span id="sp-restaurant-gold">0</span></span>
+        </div>
+      </div>
+      <div id="sp-restaurant-notice" style="position:absolute;top:52px;left:12px;right:12px;padding:5px 12px;font-size:11px;color:#fff;background:rgba(30,30,40,0.92);border:1px solid var(--sp-primary-border);border-radius:7px;text-align:center;opacity:0;pointer-events:none;transform:translateY(-5px);transition:opacity 0.2s,transform 0.2s;z-index:10;"></div>
+      <div style="display:flex;gap:3px;padding:5px 8px;background:rgba(255,255,255,0.03);border-bottom:1px solid var(--sp-border-light);">
+        <button class="sp-game-tab active" data-rtab="kitchen">🍳 厨房</button>
+        <button class="sp-game-tab" data-rtab="menu">📋 菜单</button>
+        <button class="sp-game-tab" data-rtab="supply">🛒 补货</button>
+        <button class="sp-game-tab" data-rtab="stock">🎒 库存</button>
+      </div>
+      <div id="sp-restaurant-body" style="flex:1;overflow-y:auto;padding:10px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.2) transparent;">
+        <div id="sp-restaurant-kitchen"></div>
+        <div id="sp-restaurant-menu" style="display:none;"></div>
+        <div id="sp-restaurant-supply" style="display:none;"></div>
+        <div id="sp-restaurant-stock" style="display:none;"></div>
+      </div>
+    `;
+
+    document.body.appendChild(panel);
+
+    // 绑定最小化
+    document.getElementById('sp-restaurant-minimize').onclick = () => {
+      const isMin = panel.style.height === 'auto';
+      if (isMin) {
+        panel.style.height = '';
+        panel.style.maxHeight = '85vh';
+        document.getElementById('sp-restaurant-body').style.display = '';
+        panel.querySelector('.sp-game-tab').parentElement.style.display = '';
+        document.getElementById('sp-restaurant-minimize').textContent = '─';
+      } else {
+        panel.style.height = 'auto';
+        panel.style.maxHeight = 'none';
+        document.getElementById('sp-restaurant-body').style.display = 'none';
+        panel.querySelector('.sp-game-tab').parentElement.style.display = 'none';
+        document.getElementById('sp-restaurant-minimize').textContent = '□';
+      }
+    };
+
+    // 绑定关闭
+    document.getElementById('sp-restaurant-close').onclick = () => toggleRestaurant();
+
+    // 绑定标签页
+    panel.querySelectorAll('.sp-game-tab[data-rtab]').forEach(tab => {
+      tab.onclick = () => {
+        panel.querySelectorAll('.sp-game-tab[data-rtab]').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        ['kitchen', 'menu', 'supply', 'stock'].forEach(name => {
+          const el = document.getElementById(`sp-restaurant-${name}`);
+          if (el) el.style.display = tab.dataset.rtab === name ? '' : 'none';
+        });
+        restaurantRender();
+      };
+    });
+
+    // 绑定拖拽
+    restaurantBindDrag();
+  }
+
+  // ===== 面板拖拽 =====
+  function restaurantBindDrag() {
+    const header = document.getElementById('sp-restaurant-header');
+    const panel = document.getElementById('sp-restaurant-panel');
+    if (!header || !panel) return;
+
+    let dragging = false, offX = 0, offY = 0;
+
+    const down = (e) => {
+      if (e.target.closest('#sp-restaurant-close') || e.target.closest('#sp-restaurant-minimize')) return;
+      dragging = true;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const rect = panel.getBoundingClientRect();
+      offX = clientX - rect.left;
+      offY = clientY - rect.top;
+    };
+    const move = (e) => {
+      if (!dragging) return;
+      if (e.cancelable) e.preventDefault();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      let x = clientX - offX;
+      let y = clientY - offY;
+      x = Math.max(0, Math.min(window.innerWidth - panel.offsetWidth, x));
+      y = Math.max(0, Math.min(window.innerHeight - panel.offsetHeight, y));
+      panel.style.left = x + 'px';
+      panel.style.top = y + 'px';
+    };
+    const up = () => { dragging = false; };
+
+    header.addEventListener('mousedown', down);
+    header.addEventListener('touchstart', down, { passive: true });
+    document.addEventListener('mousemove', move);
+    document.addEventListener('touchmove', move, { passive: false });
+    document.addEventListener('mouseup', up);
+    document.addEventListener('touchend', up);
+  }
+
+  // ===== 开关餐厅面板 =====
+  function toggleRestaurant() {
+    isRestaurantOpen = !isRestaurantOpen;
+    let panel = document.getElementById('sp-restaurant-panel');
+
+    if (isRestaurantOpen) {
+      // 重置今日收入（如果跨天了）
+      const today = new Date().toISOString().slice(0, 10);
+      if (state.restaurantLastOpenDate !== today) {
+        state.restaurantTodayEarnings = 0;
+        state.restaurantLastOpenDate = today;
+      }
+
+      // 重建面板
+      if (panel) panel.remove();
+      restaurantRenderPanel();
+      panel = document.getElementById('sp-restaurant-panel');
+
+      // 居中定位
+      const w = Math.min(360, window.innerWidth - 20);
+      panel.style.width = w + 'px';
+      requestAnimationFrame(() => {
+        const h = panel.offsetHeight;
+        const maxTop = window.innerHeight - h - 20;
+        const centerTop = Math.floor((window.innerHeight - h) / 2);
+        panel.style.left = Math.floor((window.innerWidth - w) / 2) + 'px';
+        panel.style.top = Math.max(10, Math.min(centerTop, maxTop)) + 'px';
+      });
+
+      // 初始渲染
+      restaurantRender();
+
+      // 启动客人到来定时器（15~25秒随机间隔）
+      restaurantStartCustomerTimer();
+
+      // 启动倒计时刷新定时器（每秒刷新客人耐心倒计时）
+      restaurantStartCountdownTimer();
+
+    } else {
+      // 关闭：停止所有定时器，销毁面板
+      restaurantStopTimers();
+      if (panel) panel.remove();
+
+      // 如果正在烹饪，取消烹饪（食材已扣除，但不产出菜品）
+      if (restaurantRuntime.cooking) {
+        const recipe = RESTAURANT_RECIPES.find(r => r.id === restaurantRuntime.cooking.recipeId);
+        restaurantShowNotice(`关店了，「${recipe?.name || '菜'}」没做完`);
+        restaurantRuntime.cooking = null;
+      }
+
+      // 清空等候客人
+      restaurantRuntime.customers = [];
+    }
+  }
+
+  // ===== 启动客人到来定时器 =====
+  function restaurantStartCustomerTimer() {
+    if (restaurantCustomerTimer) clearTimeout(restaurantCustomerTimer);
+
+    const scheduleNext = () => {
+      if (!isRestaurantOpen) return;
+      // 15~25秒随机间隔
+      const interval = (15 + Math.floor(Math.random() * 11)) * 1000;
+      restaurantCustomerTimer = setTimeout(() => {
+        restaurantSpawnCustomer();
+        scheduleNext();
+      }, interval);
+    };
+
+    // 开店后3秒来第一位客人
+    restaurantCustomerTimer = setTimeout(() => {
+      restaurantSpawnCustomer();
+      scheduleNext();
+    }, 3000);
+  }
+
+  // ===== 启动倒计时刷新定时器 =====
+  function restaurantStartCountdownTimer() {
+    if (restaurantCountdownTimer) clearInterval(restaurantCountdownTimer);
+    restaurantCountdownTimer = setInterval(() => {
+      if (!isRestaurantOpen) return;
+      restaurantCheckTimeout();
+      // 每秒刷新厨房界面（更新倒计时显示）
+      const activeTab = document.querySelector('#sp-restaurant-panel .sp-game-tab.active[data-rtab]');
+      if (activeTab && activeTab.dataset.rtab === 'kitchen') {
+        restaurantRenderKitchen();
+      }
+    }, 1000);
+  }
+
+  // ===== 小猫餐厅：食谱选择弹窗 =====
+  function restaurantShowRecipeModal() {
+    document.getElementById('sp-restaurant-recipe-modal-overlay')?.remove();
+
+    const recipes = restaurantGetUnlockedRecipes();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-restaurant-recipe-modal-overlay';
+
+    const itemsHtml = recipes.map(r => {
+      const canMake = restaurantCheckIngredients(r);
+      const ingText = r.ingredients.map(ing => {
+        const fd = FRIDGE_FOODS.find(f => f.id === ing.foodId);
+        const have = (state.fridgeInventory || []).find(i => i.foodId === ing.foodId);
+        const haveCount = have ? have.count : 0;
+        const ok = haveCount >= ing.count;
+        return `${fd?.emoji || '?'}×${ing.count}${ok ? '✅' : '❌'}`;
+      }).join(' ');
+      const seaText = r.seasonings.map(s => {
+        const sd = RESTAURANT_SEASONINGS.find(x => x.id === s.id);
+        const have = (state.restaurantSeasonings && state.restaurantSeasonings[s.id]) || 0;
+        const ok = have >= s.count;
+        return `${sd?.emoji || '?'}×${s.count}${ok ? '✅' : '❌'}`;
+      }).join(' ');
+      const materials = [ingText, seaText].filter(Boolean).join(' 🧂 ');
+      return `
+        <div class="sp-restaurant-recipe-item ${canMake ? '' : 'sp-restaurant-recipe-disabled'}" data-recipe-id="${r.id}">
+          <span class="sp-restaurant-recipe-emoji">${r.emoji}</span>
+          <div class="sp-restaurant-recipe-info">
+            <div class="sp-restaurant-recipe-name">${r.name}</div>
+            <div class="sp-restaurant-recipe-detail">${materials} | ⏱️${r.cookTime}s | 🍖+${r.feedAmount}</div>
+          </div>
+          <span class="sp-restaurant-recipe-price">🪙${r.sellPrice}</span>
+          ${!canMake ? '<span class="sp-restaurant-recipe-lock">缺料</span>' : ''}
+        </div>
+      `;
+    }).join('');
+
+    overlay.innerHTML = `
+      <div id="sp-restaurant-recipe-modal">
+        <div id="sp-restaurant-recipe-modal-header">
+          <span>📋 选择食谱</span>
+          <button id="sp-restaurant-recipe-modal-close">✕</button>
+        </div>
+        <div id="sp-restaurant-recipe-modal-body">
+          ${itemsHtml || '<div style="text-align:center;padding:20px;color:var(--sp-text-muted);font-size:12px;">暂无可用食谱，先去冰箱整理备货吧</div>'}
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    document.getElementById('sp-restaurant-recipe-modal-close').onclick = () => overlay.remove();
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+    overlay.querySelectorAll('.sp-restaurant-recipe-item').forEach(item => {
+      item.onclick = () => {
+        const recipeId = item.dataset.recipeId;
+        overlay.remove();
+        restaurantStartCooking(recipeId);
+      };
+    });
+  }
+
+  // ===== 停止所有定时器 =====
+  function restaurantStopTimers() {
+    if (restaurantCustomerTimer) {
+      clearTimeout(restaurantCustomerTimer);
+      restaurantCustomerTimer = null;
+    }
+    if (restaurantCountdownTimer) {
+      clearInterval(restaurantCountdownTimer);
+      restaurantCountdownTimer = null;
+    }
+    if (restaurantCookTimer) {
+      clearTimeout(restaurantCookTimer);
+      restaurantCookTimer = null;
+    }
+  }
+
 
 })();
 
