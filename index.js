@@ -323,8 +323,8 @@
     lastDiaryChatRange: null,     // {from: 1, to: 20}
     // ===== 合成游戏状态 =====
     gameGold: 0,
-    gameStamina: 80,
-    gameStaminaMax: 80,
+    gameStamina: 100,
+    gameStaminaMax: 100,
     gameLastStaminaRecover: Date.now(),
     gameBoard: [],          // 6x6 棋盘，每格 null 或 {chain, level}
     gameOrders: [],         // 当前3个订单
@@ -2322,8 +2322,8 @@ function showInventoryPopup(category, quickKey, onUse) {
                 💣 友情炸弹：无视通路强制消除两个相同方块（每局2次）<br/>
                 🧭 罗盘透视：10秒内点击方块显示可连通的同伴（每局1次）<br/><br/>
                 <strong style="color:var(--sp-text-primary);">难度与费用：</strong><br/>
-                棋盘大小随机（8×8 / 10×10 / 12×12 / 14×14）<br/>
-                体力消耗 5~10 点，通关奖励 40~200 金币🪙
+                棋盘大小随机（8×8 / 10×10 / 12×12 / 14×14 / 16×16 / 18×18）<br/>
+                体力消耗 5~16 点，通关奖励 40~500 金币🪙
               </p>
             </div>
           </details>
@@ -2348,8 +2348,9 @@ function showInventoryPopup(category, quickKey, onUse) {
                 • 低于90% → 基础奖励<br/>
                 • 塞进冰箱的食物会存入冰箱库存，可用于投喂桌宠🍖<br/><br/>
                 <strong style="color:var(--sp-text-primary);">冰箱类型：</strong><br/>
-                🧊 小单门 5×5 | ❄️ 中型 6×6 | 🏔️ 双开门 8×8<br/>
-                🌨️ 超大冰箱 10×10 | 🎪 巨无霸 12×12<br/>
+                🧊 小单门 5×5 | ❄️ 中型 6×6 | 🏔️ 双开门 7×7<br/>
+                🌨️ 超大 8×8 | 🎪 巨无霸 10×10<br/>
+                🏭 仓库级 12×12 | 🌌 极限挑战 14×14<br/>
                 ⚠️ 开局前不会告诉你冰箱大小和体力消耗！
               </p>
             </div>
@@ -6949,6 +6950,19 @@ function refreshCharPreview() {
         { level: 7, emoji: '🌀', name: '时空魔法阵', sell: 120 },
         { level: 8, emoji: '💎', name: '传说哲人之石', sell: 280 },
       ]
+    },
+    potion: {
+      name: '🧪 药剂链',
+      items: [
+        { level: 1, emoji: '🌿', name: '杂草', sell: 1 },
+        { level: 2, emoji: '🍀', name: '四叶草', sell: 2 },
+        { level: 3, emoji: '🧪', name: '初级药水', sell: 5 },
+        { level: 4, emoji: '⚗️', name: '炼金溶液', sell: 11 },
+        { level: 5, emoji: '🪄', name: '魔法精华', sell: 25 },
+        { level: 6, emoji: '🌟', name: '星尘凝露', sell: 55 },
+        { level: 7, emoji: '🔥', name: '凤凰之泪', sell: 120 },
+        { level: 8, emoji: '💫', name: '传说万灵药', sell: 280 },
+      ]
     }
   };
 
@@ -6959,19 +6973,26 @@ function refreshCharPreview() {
       { name: '猫罐头', price: 20, restore: 18, emoji: '🥫', dailyLimit: 4 },
       { name: '豪华猫粮', price: 40, restore: 35, emoji: '🍗', dailyLimit: 2 },
       { name: '满汉全席', price: 80, restore: 60, emoji: '🍱', dailyLimit: 1 },
+      { name: '秘制猫饭团', price: 15, restore: 14, emoji: '🍙', dailyLimit: 6 },
+      { name: '鲷鱼烧点心', price: 50, restore: 42, emoji: '🥮', dailyLimit: 2 },
     ],
     clean: [
       { name: '湿纸巾', price: 8, restore: 8, emoji: '🧻', dailyLimit: 10 },
       { name: '猫咪沐浴露', price: 20, restore: 18, emoji: '🧴', dailyLimit: 4 },
       { name: '自动清洁机', price: 40, restore: 35, emoji: '🫧', dailyLimit: 2 },
       { name: 'SPA豪华套餐', price: 80, restore: 60, emoji: '🛁', dailyLimit: 1 },
+      { name: '薰衣草香氛球', price: 12, restore: 12, emoji: '🪻', dailyLimit: 8 },
+      { name: '温泉浴盐罐', price: 55, restore: 45, emoji: '🧪', dailyLimit: 2 },
     ],
     energy: [
       { name: '猫薄荷枕', price: 8, restore: 8, emoji: '🌿', dailyLimit: 10 },
       { name: '温暖毛毯', price: 20, restore: 18, emoji: '🧣', dailyLimit: 4 },
       { name: '舒适猫窝', price: 40, restore: 35, emoji: '🛏️', dailyLimit: 2 },
       { name: '梦境胶囊', price: 80, restore: 60, emoji: '💊', dailyLimit: 1 },
+      { name: '安神小夜灯', price: 12, restore: 12, emoji: '🕯️', dailyLimit: 8 },
+      { name: '星空催眠曲盒', price: 55, restore: 45, emoji: '🎶', dailyLimit: 2 },
     ]
+
   };
 
   // 体力道具商店定义
@@ -6995,12 +7016,19 @@ function refreshCharPreview() {
     { chain: 'toy', minLevel: 2, maxLevel: 5, goldMulti: 2.0 },
     { chain: 'food', minLevel: 2, maxLevel: 5, goldMulti: 2.0 },
     { chain: 'gem', minLevel: 2, maxLevel: 5, goldMulti: 2.0 },
+    { chain: 'potion', minLevel: 2, maxLevel: 5, goldMulti: 2.0 },
     { chain: 'toy', minLevel: 3, maxLevel: 6, goldMulti: 2.5 },
     { chain: 'food', minLevel: 3, maxLevel: 6, goldMulti: 2.5 },
     { chain: 'gem', minLevel: 3, maxLevel: 6, goldMulti: 2.5 },
+    { chain: 'potion', minLevel: 3, maxLevel: 6, goldMulti: 2.5 },
     { chain: 'toy', minLevel: 4, maxLevel: 7, goldMulti: 3.0 },
     { chain: 'food', minLevel: 4, maxLevel: 7, goldMulti: 3.0 },
     { chain: 'gem', minLevel: 4, maxLevel: 7, goldMulti: 3.0 },
+    { chain: 'potion', minLevel: 4, maxLevel: 7, goldMulti: 3.0 },
+    { chain: 'toy', minLevel: 5, maxLevel: 8, goldMulti: 4.0 },
+    { chain: 'food', minLevel: 5, maxLevel: 8, goldMulti: 4.0 },
+    { chain: 'gem', minLevel: 5, maxLevel: 8, goldMulti: 4.0 },
+    { chain: 'potion', minLevel: 5, maxLevel: 8, goldMulti: 4.0 },
   ];
 
   let isGameOpen = false;
@@ -7101,7 +7129,7 @@ function refreshCharPreview() {
     }
 
     // 随机选择链
-    const chains = ['toy', 'food', 'gem'];
+    const chains = ['toy', 'food', 'gem', 'potion'];
     const chain = chains[Math.floor(Math.random() * chains.length)];
 
     // 放到随机空格
@@ -7869,7 +7897,7 @@ function refreshCharPreview() {
     const container = document.getElementById('sp-game-collection-content');
     if (!container) return;
 
-    const chainKeys = ['toy', 'food', 'gem'];
+    const chainKeys = ['toy', 'food', 'gem', 'potion'];
     container.innerHTML = chainKeys.map(chainKey => {
       const chain = GAME_CHAINS[chainKey];
       return `
@@ -8288,7 +8316,8 @@ function refreshCharPreview() {
   // 默认图案 Emoji 池
   const MATCH3_DEFAULT_ICONS = [
     '🦊', '🍇', '🔔', '🌲', '🍰', '🎈', '🌸', '🐳',
-    '🍬', '🎯', '🌙', '🍄', '⭐', '🎀', '🐝', '🌈'
+    '🍬', '🎯', '🌙', '🍄', '⭐', '🎀', '🐝', '🌈',
+    '🧂', '🫗', '🥜', '🌶️', '🥟', '🦞', '🍜', '🥧'
   ];
 
   // 道具定义
@@ -8319,6 +8348,8 @@ function refreshCharPreview() {
     { name: '普通', layers: 5, density: 0.7, iconCount: 10, cardsPerIcon: 6 },
     { name: '困难', layers: 6, density: 0.75, iconCount: 12, cardsPerIcon: 6 },
     { name: '噩梦', layers: 7, density: 0.8, iconCount: 14, cardsPerIcon: 6 },
+    { name: '地狱', layers: 8, density: 0.85, iconCount: 18, cardsPerIcon: 6 },
+    { name: '深渊', layers: 9, density: 0.9, iconCount: 20, cardsPerIcon: 9 },
   ];
 
   // 游戏运行时状态
@@ -9276,6 +9307,10 @@ function refreshCharPreview() {
         // 糖葫芦道具
         { type: 'tanghuluprop', key: 'undo', label: '↩️ 悔步撤销 ×1', weight: 20 },
         { type: 'tanghuluprop', key: 'lubricant', label: '🌀 顺滑剂 ×1', weight: 15 },
+        // 新增：工坊新道具
+        { type: 'shopitem', category: 'food',   idx: 4, label: '🍙 秘制猫饭团 ×1', weight: 18 },
+        { type: 'shopitem', category: 'clean',  idx: 4, label: '🪻 薰衣草香氛球 ×1', weight: 18 },
+        { type: 'shopitem', category: 'energy', idx: 4, label: '🕯️ 安神小夜灯 ×1', weight: 18 },
       ]
     },
     {
@@ -9307,6 +9342,8 @@ function refreshCharPreview() {
         { type: 'boarditem', chain: 'toy',  level: 3, label: '🧸 毛绒小熊 (Lv3)',   weight: 8  },
         { type: 'boarditem', chain: 'food', level: 3, label: '🍰 草莓蛋糕 (Lv3)',   weight: 8  },
         { type: 'boarditem', chain: 'gem',  level: 3, label: '💍 灵力戒指 (Lv3)',   weight: 8  },
+        { type: 'boarditem', chain: 'potion', level: 2, label: '🍀 四叶草 (Lv2)',     weight: 20 },
+        { type: 'boarditem', chain: 'potion', level: 3, label: '🧪 初级药水 (Lv3)',   weight: 8  },
         // 体力道具
         { type: 'staminaitem', key: 'stamina50', label: '🥤 中能量罐 ×1', weight: 20 },
         // 冰箱道具
@@ -9317,6 +9354,13 @@ function refreshCharPreview() {
         { type: 'tanghuluprop', key: 'undo', label: '↩️ 悔步撤销 ×2', count: 2, weight: 25 },
         { type: 'tanghuluprop', key: 'lubricant', label: '🌀 顺滑剂 ×2', count: 2, weight: 20 },
         { type: 'tanghuluprop', key: 'extraStick', label: '🥢 赠送竹签 ×1', weight: 12 },
+        // 新增：工坊新道具（中级）
+        { type: 'shopitem', category: 'food',   idx: 5, label: '🥮 鲷鱼烧点心 ×1', weight: 15 },
+        { type: 'shopitem', category: 'clean',  idx: 5, label: '🧪 温泉浴盐罐 ×1', weight: 15 },
+        { type: 'shopitem', category: 'energy', idx: 5, label: '🎶 星空催眠曲盒 ×1', weight: 15 },
+        // 新增：糖葫芦新品种
+        { type: 'tanghuluItem', fruitKey: 'blueberry', label: '🫐 冰晶蓝莓糖葫芦 ×1', count: 1, weight: 10 },
+        { type: 'tanghuluItem', fruitKey: 'coconut', label: '🥥 椰子奶球糖葫芦 ×1', count: 1, weight: 10 },
       ]
     },
     {
@@ -9353,6 +9397,9 @@ function refreshCharPreview() {
         { type: 'boarditem', chain: 'toy',  level: 5, label: '🏰 黄金猫爬架 (Lv5)', weight: 3 },
         { type: 'boarditem', chain: 'food', level: 5, label: '🧪 极品猫薄荷 (Lv5)', weight: 3 },
         { type: 'boarditem', chain: 'gem',  level: 5, label: '🐉 龙之心宝石 (Lv5)', weight: 3 },
+        { type: 'boarditem', chain: 'potion', level: 3, label: '🧪 初级药水 (Lv3)',   weight: 30 },
+        { type: 'boarditem', chain: 'potion', level: 4, label: '⚗️ 炼金溶液 (Lv4)',   weight: 12 },
+        { type: 'boarditem', chain: 'potion', level: 5, label: '🪄 魔法精华 (Lv5)',   weight: 3  },
         // 体力道具
         { type: 'staminaitem', key: 'stamina100', label: '🪫 满能量桶 ×1', weight: 10 },
         { type: 'staminaitem', key: 'stamina50', label: '🥤 中能量罐 ×2', count: 2, weight: 20 },
@@ -9364,6 +9411,15 @@ function refreshCharPreview() {
         { type: 'tanghuluprop', key: 'undo', label: '↩️ 悔步撤销 ×3', count: 3, weight: 30 },
         { type: 'tanghuluprop', key: 'lubricant', label: '🌀 顺滑剂 ×3', count: 3, weight: 25 },
         { type: 'tanghuluprop', key: 'extraStick', label: '🥢 赠送竹签 ×2', count: 2, weight: 15 },
+        { type: 'tanghuluItem', fruitKey: 'peach', label: '🍑 蜜汁水蜜桃糖葫芦 ×2', count: 2, weight: 8 },
+        { type: 'tanghuluItem', fruitKey: 'mango', label: '🥭 热带金芒果糖葫芦 ×2', count: 2, weight: 5 },
+        // 新增：工坊高级道具
+        { type: 'shopitem', category: 'food',   idx: 5, label: '🥮 鲷鱼烧点心 ×2', count: 2, weight: 8 },
+        { type: 'shopitem', category: 'clean',  idx: 5, label: '🧪 温泉浴盐罐 ×2', count: 2, weight: 8 },
+        { type: 'shopitem', category: 'energy', idx: 5, label: '🎶 星空催眠曲盒 ×2', count: 2, weight: 8 },
+        // 新增：糖葫芦稀有品种
+        { type: 'tanghuluItem', fruitKey: 'lychee', label: '🪷 玲珑荔枝糖葫芦 ×2', count: 2, weight: 4 },
+        { type: 'tanghuluItem', fruitKey: 'blueberry', label: '🫐 冰晶蓝莓糖葫芦 ×3', count: 3, weight: 3 },
       ]
     }
   ];
@@ -9448,11 +9504,12 @@ function refreshCharPreview() {
 
       case 'shopitem':
         if (!state.gameInventory) state.gameInventory = [];
+        const shopCount = result.count || 1;
         const existing = state.gameInventory.find(i => i.category === result.category && i.idx === result.idx);
         if (existing) {
-          existing.count++;
+          existing.count += shopCount;
         } else {
-          state.gameInventory.push({ category: result.category, idx: result.idx, count: 1 });
+          state.gameInventory.push({ category: result.category, idx: result.idx, count: shopCount });
         }
         rewardMsg = `获得 ${result.label}（已存入工坊背包）`;
         break;
@@ -9484,6 +9541,19 @@ function refreshCharPreview() {
           rewardMsg = `获得 ${result.label}（棋盘已满，转换为 ${goldComp} 🪙）`;
         }
         break;
+      case 'tanghuluItem':
+        if (!state.tanghuluInventory) state.tanghuluInventory = [];
+        const thKey = result.fruitKey;
+        const thCount = result.count || 1;
+        const thExisting = state.tanghuluInventory.find(i => i.fruitKey === thKey);
+        if (thExisting) {
+          thExisting.count += thCount;
+        } else {
+          state.tanghuluInventory.push({ fruitKey: thKey, count: thCount });
+        }
+        rewardMsg = `获得 ${result.label}（已存入糖葫芦库存）`;
+        break;
+
     }
 
     // 记录抽奖日志（按奖池分别计数）
@@ -9757,7 +9827,8 @@ function refreshCharPreview() {
     '🐱', '🐶', '🐰', '🦊', '🐻', '🐼', '🐨', '🦁',
     '🐸', '🐧', '🐝', '🦋', '🌸', '🍎', '🍰', '⭐',
     '🎀', '🌙', '🔔', '💎', '🍬', '🎯', '🌈', '🐳',
-    '🦄', '🍩', '🎵', '🔥', '🍀', '🐞', '🦢', '🎲'
+    '🦄', '🍩', '🎵', '🔥', '🍀', '🐞', '🦢', '🎲',
+    '🥟', '🦐', '🌽', '🥑', '🍄', '🧁', '🍡', '🥧'
   ];
 
   // 难度配置：随机选取
@@ -9766,6 +9837,8 @@ function refreshCharPreview() {
     { name: '10×10', rows: 10, cols: 10, iconCount: 16, energyCost: 5, clearReward: 70 },
     { name: '12×12', rows: 12, cols: 12, iconCount: 20, energyCost: 8, clearReward: 120 },
     { name: '14×14', rows: 14, cols: 14, iconCount: 24, energyCost: 10, clearReward: 200 },
+    { name: '16×16', rows: 16, cols: 16, iconCount: 28, energyCost: 13, clearReward: 320 },
+    { name: '18×18', rows: 18, cols: 18, iconCount: 32, energyCost: 16, clearReward: 500 },
   ];
 
   // 道具定义
@@ -11065,6 +11138,17 @@ function refreshCharPreview() {
     { id: 'turkey',     name: '整只火鸡',   emoji: '🦃', w: 4, h: 3, value: 24, feed: 22, noRotate: true },
     { id: 'pot',        name: '火锅底料',   emoji: '🫕', w: 4, h: 2, value: 16, feed: 12 },
     { id: 'platter',    name: '海鲜拼盘',   emoji: '🦞', w: 5, h: 2, value: 22, feed: 20, noRotate: true },
+    { id: 'barrel',     name: '泡菜大缸',   emoji: '🪣', w: 4, h: 4, value: 28, feed: 24, noRotate: true },
+    { id: 'icechest',   name: '冷藏箱',     emoji: '📦', w: 5, h: 3, value: 30, feed: 26  },
+    // 新增小食材（与餐厅新菜联动）
+    { id: 'mushroom',   name: '香菇',       emoji: '🍄', w: 1, h: 1, value: 4,  feed: 4  },
+    { id: 'shrimp',     name: '鲜虾',       emoji: '🦐', w: 2, h: 1, value: 6,  feed: 6  },
+    { id: 'corn',       name: '甜玉米',     emoji: '🌽', w: 1, h: 2, value: 5,  feed: 5  },
+    { id: 'avocado',    name: '牛油果',     emoji: '🥑', w: 1, h: 1, value: 5,  feed: 5  },
+    { id: 'dumpling',   name: '速冻饺子',   emoji: '🥟', w: 2, h: 2, value: 10, feed: 10 },
+    { id: 'tofu',       name: '嫩豆腐',     emoji: '🧊', w: 2, h: 1, value: 4,  feed: 4  },
+    { id: 'noodle',     name: '拉面包',     emoji: '🍜', w: 3, h: 1, value: 7,  feed: 7  },
+    { id: 'lobster',    name: '大龙虾',     emoji: '🦞', w: 3, h: 2, value: 20, feed: 18 },
   ];
 
   // ===== 冰箱类型定义 =====
@@ -11074,6 +11158,8 @@ function refreshCharPreview() {
     { name: '双开门冰箱', rows: 7,  cols: 7,  energyCost: 12, emoji: '🏔️', itemRange: [12, 18] },
     { name: '超大冰箱',   rows: 8,  cols: 8,  energyCost: 15, emoji: '🌨️', itemRange: [16, 24] },
     { name: '豪华巨无霸', rows: 10, cols: 10, energyCost: 18, emoji: '🎪', itemRange: [22, 32] },
+    { name: '仓库级冰柜', rows: 12, cols: 12, energyCost: 22, emoji: '🏭', itemRange: [30, 42] },
+    { name: '极限挑战',   rows: 14, cols: 14, energyCost: 28, emoji: '🌌', itemRange: [40, 55] },
   ];
 
   // ===== 冰箱游戏运行时状态 =====
@@ -12166,6 +12252,11 @@ function refreshCharPreview() {
     { key: 'cherry',     emoji: '🍒', name: '玛瑙樱桃',   color: '#ff69b4', sellPrice: 22, feedAmount: 13 },
     { key: 'banana',     emoji: '🍌', name: '香蕉片儿',   color: '#ffd700', sellPrice: 10, feedAmount: 6  },
     { key: 'tomato',     emoji: '🍅', name: '经典圣女果', color: '#dc143c', sellPrice: 14, feedAmount: 9  },
+    { key: 'peach',      emoji: '🍑', name: '蜜汁水蜜桃', color: '#ffb6c1', sellPrice: 25, feedAmount: 14 },
+    { key: 'mango',      emoji: '🥭', name: '热带金芒果', color: '#ff6347', sellPrice: 28, feedAmount: 16 },
+    { key: 'blueberry', emoji: '🫐', name: '冰晶蓝莓',   color: '#4169e1', sellPrice: 24, feedAmount: 14 },
+    { key: 'coconut',   emoji: '🥥', name: '椰子奶球',   color: '#f5f5dc', sellPrice: 20, feedAmount: 12 },
+    { key: 'lychee',    emoji: '🪷', name: '玲珑荔枝',   color: '#ff6b6b', sellPrice: 26, feedAmount: 15 },
   ];
 
   // ============================================================
@@ -12181,6 +12272,11 @@ function refreshCharPreview() {
     { id: 'honey',   name: '蜂蜜',   emoji: '🍯', price: 10, reputationRequired: 0  },
     { id: 'sauce',   name: '番茄酱', emoji: '🍶', price: 10, reputationRequired: 0  },
     { id: 'spice',   name: '五香粉', emoji: '✨', price: 20, reputationRequired: 15 },
+    { id: 'vinegar', name: '陈醋',   emoji: '🫗', price: 8,  reputationRequired: 5  },
+    { id: 'sesame',  name: '芝麻酱', emoji: '🥜', price: 15, reputationRequired: 10 },
+    { id: 'chili',   name: '辣椒油', emoji: '🌶️', price: 12, reputationRequired: 8  },
+    { id: 'wasabi',  name: '芥末',   emoji: '💚', price: 18, reputationRequired: 12 },
+    { id: 'cream',   name: '奶油',   emoji: '🍦', price: 14, reputationRequired: 8  },
   ];
 
   // ===== 食谱定义 =====
@@ -12271,6 +12367,40 @@ function refreshCharPreview() {
     { id: 'dish_grandma',     name: '阿婆家常菜',   emoji: '🥘',  category: 'dish',
       ingredients: [{ foodId: 'tomato', count: 2 }, { foodId: 'eggs', count: 2 }, { foodId: 'carrot', count: 1 }], seasonings: [{ id: 'soy', count: 2 }, { id: 'salt', count: 2 }],
       cookTime: 8, sellPrice: 42, feedAmount: 28, energyAmount: 0, reputationRequired: 18 },
+    { id: 'dish_pickle',      name: '秘制泡菜宴',   emoji: '🪣🔥', category: 'dish',
+      ingredients: [{ foodId: 'barrel', count: 1 }, { foodId: 'cucumber', count: 1 }], seasonings: [{ id: 'spice', count: 2 }, { id: 'salt', count: 2 }],
+      cookTime: 10, sellPrice: 60, feedAmount: 35, energyAmount: 0, reputationRequired: 22 },
+    { id: 'dish_icechest_feast', name: '冷藏箱惊喜', emoji: '📦✨', category: 'dish',
+      ingredients: [{ foodId: 'icechest', count: 1 }, { foodId: 'steak', count: 1 }], seasonings: [{ id: 'pepper', count: 2 }, { id: 'butter', count: 2 }, { id: 'spice', count: 1 }],
+      cookTime: 15, sellPrice: 90, feedAmount: 50, energyAmount: 0, reputationRequired: 28 },
+    // --- 新增：使用新食材的菜品 ---
+    { id: 'dish_shrimp_dumpling', name: '鲜虾蒸饺',     emoji: '🥟🦐', category: 'dish',
+      ingredients: [{ foodId: 'dumpling', count: 1 }, { foodId: 'shrimp', count: 1 }], seasonings: [{ id: 'vinegar', count: 1 }, { id: 'soy', count: 1 }],
+      cookTime: 5, sellPrice: 28, feedAmount: 20, energyAmount: 0, reputationRequired: 8 },
+    { id: 'dish_mushroom_soup',   name: '奶油蘑菇汤',   emoji: '🍄🥛', category: 'dish',
+      ingredients: [{ foodId: 'mushroom', count: 2 }, { foodId: 'milk', count: 1 }], seasonings: [{ id: 'cream', count: 1 }, { id: 'salt', count: 1 }],
+      cookTime: 6, sellPrice: 32, feedAmount: 22, energyAmount: 0, reputationRequired: 10 },
+    { id: 'dish_corn_soup',       name: '甜玉米浓汤',   emoji: '🌽🫕', category: 'dish',
+      ingredients: [{ foodId: 'corn', count: 2 }], seasonings: [{ id: 'cream', count: 1 }, { id: 'butter', count: 1 }],
+      cookTime: 4, sellPrice: 22, feedAmount: 16, energyAmount: 0, reputationRequired: 5 },
+    { id: 'dish_avocado_toast',   name: '牛油果吐司',   emoji: '🥑🍞', category: 'snack',
+      ingredients: [{ foodId: 'avocado', count: 1 }, { foodId: 'bread', count: 1 }], seasonings: [{ id: 'salt', count: 1 }, { id: 'sesame', count: 1 }],
+      cookTime: 3, sellPrice: 20, feedAmount: 14, energyAmount: 0, reputationRequired: 8 },
+    { id: 'dish_spicy_noodle',    name: '麻辣拌面',     emoji: '🍜🌶️', category: 'dish',
+      ingredients: [{ foodId: 'noodle', count: 1 }], seasonings: [{ id: 'chili', count: 2 }, { id: 'vinegar', count: 1 }, { id: 'sesame', count: 1 }],
+      cookTime: 4, sellPrice: 26, feedAmount: 18, energyAmount: 0, reputationRequired: 10 },
+    { id: 'dish_lobster_feast',   name: '蒜蓉大龙虾',   emoji: '🦞🧈', category: 'dish',
+      ingredients: [{ foodId: 'lobster', count: 1 }], seasonings: [{ id: 'butter', count: 2 }, { id: 'pepper', count: 1 }, { id: 'salt', count: 1 }],
+      cookTime: 10, sellPrice: 68, feedAmount: 38, energyAmount: 0, reputationRequired: 18 },
+    { id: 'dish_tofu_mushroom',   name: '蘑菇豆腐煲',   emoji: '🧊🍄', category: 'dish',
+      ingredients: [{ foodId: 'tofu', count: 1 }, { foodId: 'mushroom', count: 1 }], seasonings: [{ id: 'soy', count: 1 }, { id: 'spice', count: 1 }],
+      cookTime: 5, sellPrice: 24, feedAmount: 16, energyAmount: 0, reputationRequired: 12 },
+    { id: 'snack_wasabi_shrimp',  name: '芥末虾球',     emoji: '🦐💚', category: 'snack',
+      ingredients: [{ foodId: 'shrimp', count: 2 }], seasonings: [{ id: 'wasabi', count: 1 }, { id: 'soy', count: 1 }],
+      cookTime: 4, sellPrice: 30, feedAmount: 20, energyAmount: 0, reputationRequired: 12 },
+    { id: 'drink_corn_milk',      name: '玉米奶昔',     emoji: '🌽🥛', category: 'drink',
+      ingredients: [{ foodId: 'corn', count: 1 }, { foodId: 'milk', count: 1 }], seasonings: [{ id: 'honey', count: 1 }],
+      cookTime: 3, sellPrice: 16, feedAmount: 10, energyAmount: 5, reputationRequired: 5 },
   ];
 
   // ===== 客人定义 =====
@@ -12374,6 +12504,8 @@ function refreshCharPreview() {
     { name: '困难', fruitTypes: 5, stickCount: 7, shuffleMoves: 90,  energyCost: 7,  goldReward: [35, 65]  },
     { name: '噩梦', fruitTypes: 6, stickCount: 8, shuffleMoves: 110, energyCost: 10, goldReward: [50, 80]  },
     { name: '地狱', fruitTypes: 7, stickCount: 9, shuffleMoves: 130, energyCost: 12, goldReward: [70, 100] },
+    { name: '炼狱', fruitTypes: 8, stickCount: 10, shuffleMoves: 160, energyCost: 15, goldReward: [90, 130] },
+    { name: '至尊', fruitTypes: 9, stickCount: 11, shuffleMoves: 200, energyCost: 18, goldReward: [120, 180] },
   ];
 
   // ===== 运行时状态 =====

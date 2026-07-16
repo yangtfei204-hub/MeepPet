@@ -2029,6 +2029,10 @@
   border-color: rgba(150,100,255,0.3);
 }
 
+.sp-game-cell.sp-game-chain-potion {
+  border-color: rgba(100,255,150,0.3);
+}
+
 .sp-game-cell.sp-game-generator {
   border-color: rgba(255,215,0,0.5);
   background: rgba(255,215,0,0.1);
@@ -4538,12 +4542,26 @@
   font-size: 12px;
 }
 
+#sp-link-board[style*="repeat(16"] .sp-link-cell {
+  font-size: 11px;
+}
+
+#sp-link-board[style*="repeat(18"] .sp-link-cell {
+  font-size: 10px;
+}
+
 @media (max-width: 768px) {
   #sp-link-board[style*="repeat(12"] .sp-link-cell {
     font-size: 11px;
   }
   #sp-link-board[style*="repeat(14"] .sp-link-cell {
     font-size: 10px;
+  }
+  #sp-link-board[style*="repeat(16"] .sp-link-cell {
+    font-size: 9px;
+  }
+  #sp-link-board[style*="repeat(18"] .sp-link-cell {
+    font-size: 8px;
   }
 }
 
