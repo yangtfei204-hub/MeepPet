@@ -2201,6 +2201,27 @@
   background: var(--sp-primary-hover);
 }
 
+.sp-game-order-card.sp-game-order-matched {
+  border-color: rgba(100,220,100,0.7);
+  background: rgba(100,220,100,0.12);
+  box-shadow: 0 0 12px rgba(100,220,100,0.3);
+  animation: sp-game-order-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes sp-game-order-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(100,220,100,0.2); }
+  50% { box-shadow: 0 0 16px rgba(100,220,100,0.5); }
+}
+
+.sp-game-order-card.sp-game-order-matched .sp-game-order-name {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  max-width: none;
+  color: rgba(100,220,100,0.95);
+  font-weight: 600;
+}
+
 /* ===== 商店 ===== */
 #sp-game-shop-content {
   display: flex;
@@ -2818,7 +2839,7 @@
   -webkit-backdrop-filter: blur(14px);
   border: 1px solid var(--sp-border);
   border-radius: 16px;
-  width: 280px;
+  width: 360px;
   max-width: 90vw;
   box-shadow: 0 8px 32px rgba(0,0,0,0.4);
   overflow: hidden;
@@ -2852,9 +2873,43 @@
 
 .sp-game-selector-body {
   padding: 12px;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 10px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.sp-game-selector-body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sp-game-selector-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sp-game-selector-body::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.2);
+  border-radius: 2px;
+}
+
+.sp-game-selector-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.35);
+}
+
+.sp-game-selector-body {
+  padding: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  max-height: 60vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.2) transparent;
+}
+
+.sp-game-selector-card[data-game="inventory"] {
+  grid-column: 1 / -1;
 }
 
 .sp-game-selector-card {
@@ -5665,4 +5720,569 @@
   font-size: 10px;
   color: #f66;
   flex-shrink: 0;
+}
+
+/* ============================================================ */
+/* 🛒 货架整理游戏样式 - MeepShelfSort                          */
+/* ============================================================ */
+
+#sp-shelf-panel {
+  position: fixed;
+  width: 420px;
+  max-width: 95vw;
+  max-height: 90vh;
+  background: var(--sp-bg-main);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--sp-border);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  display: none;
+  flex-direction: column;
+  z-index: 2147483646;
+  overflow: hidden;
+}
+
+#sp-shelf-panel.visible {
+  display: flex;
+}
+
+#sp-shelf-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--sp-bg-light);
+  border-bottom: 1px solid var(--sp-border-light);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--sp-text-primary);
+  cursor: grab;
+  user-select: none;
+}
+
+#sp-shelf-header:active {
+  cursor: grabbing;
+}
+
+.sp-shelf-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sp-shelf-gold-display {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffb347;
+}
+
+#sp-shelf-close {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: var(--sp-text-muted);
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 0.2s;
+}
+
+#sp-shelf-close:hover {
+  color: #fff;
+}
+
+#sp-shelf-notice {
+  position: absolute;
+  top: 50px;
+  left: 14px;
+  right: 14px;
+  padding: 6px 14px;
+  font-size: 12px;
+  color: #fff;
+  background: rgba(30,30,40,0.92);
+  border: 1px solid var(--sp-primary-border);
+  border-radius: 8px;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 10;
+}
+
+#sp-shelf-notice.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+#sp-shelf-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.2) transparent;
+}
+
+#sp-shelf-body::-webkit-scrollbar {
+  width: 5px;
+}
+
+#sp-shelf-body::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.2);
+  border-radius: 3px;
+}
+
+/* 信息栏 */
+#sp-shelf-info {
+  display: flex;
+  justify-content: space-around;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--sp-text-secondary);
+  background: rgba(255,255,255,0.03);
+  border-radius: 6px;
+}
+
+#sp-shelf-info span {
+  font-weight: 600;
+}
+
+/* 货架区域 */
+#sp-shelf-area {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  padding: 8px;
+  background: rgba(139,100,60,0.12);
+  border-radius: 12px;
+  border: 2px solid rgba(139,100,60,0.3);
+}
+
+/* 单个隔间（可放3个物品） */
+.sp-shelf-bay {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  min-height: 48px;
+  position: relative;
+  transition: border-color 0.15s ease;
+}
+
+.sp-shelf-bay:hover {
+  border-color: rgba(255,255,255,0.18);
+}
+
+.sp-shelf-bay.sp-shelf-bay-blocked {
+  border-color: rgba(100,100,100,0.2);
+  background: rgba(0,0,0,0.15);
+  pointer-events: none;
+}
+
+.sp-shelf-bay.sp-shelf-bay-blocked::after {
+  content: '🔒';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  opacity: 0.35;
+}
+
+.sp-shelf-bay.sp-shelf-bay-drop-ok {
+  border-color: rgba(100,220,100,0.7) !important;
+  background: rgba(100,220,100,0.08) !important;
+}
+
+.sp-shelf-bay.sp-shelf-bay-drop-bad {
+  border-color: rgba(239,83,80,0.7) !important;
+  background: rgba(239,83,80,0.08) !important;
+}
+
+/* 隔间内的单格 */
+.sp-shelf-slot {
+  width: 42px;
+  height: 42px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.05);
+  border: 1px dashed rgba(255,255,255,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease, background 0.15s ease;
+  flex-shrink: 0;
+  position: relative;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.sp-shelf-slot:hover {
+  border-color: rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.08);
+}
+
+.sp-shelf-slot.sp-shelf-slot-filled {
+  background: rgba(100,180,255,0.1);
+  border: 1px solid rgba(100,180,255,0.25);
+  cursor: grab;
+}
+
+.sp-shelf-slot.sp-shelf-slot-filled:active {
+  cursor: grabbing;
+}
+
+.sp-shelf-slot.sp-shelf-slot-selected {
+  border-color: rgba(100,220,100,0.8) !important;
+  box-shadow: 0 0 8px rgba(100,220,100,0.4);
+  transform: scale(1.08);
+  z-index: 2;
+}
+
+.sp-shelf-slot.sp-shelf-slot-dragging {
+  opacity: 0.35;
+  transform: scale(0.88);
+}
+
+/* 消除动画 */
+.sp-shelf-slot.sp-shelf-slot-eliminating {
+  animation: sp-shelf-eliminate 0.45s ease forwards;
+}
+
+@keyframes sp-shelf-eliminate {
+  0%   { transform: scale(1); opacity: 1; }
+  40%  { transform: scale(1.35); opacity: 0.8; filter: brightness(2); }
+  100% { transform: scale(0); opacity: 0; }
+}
+
+/* 前排补位动画 */
+.sp-shelf-slot.sp-shelf-slot-advance {
+  animation: sp-shelf-advance 0.3s ease;
+}
+
+@keyframes sp-shelf-advance {
+  0%   { transform: translateX(12px); opacity: 0.4; }
+  100% { transform: translateX(0);    opacity: 1; }
+}
+
+/* 货架层标签 */
+.sp-shelf-row-label {
+  font-size: 9px;
+  color: var(--sp-text-muted);
+  text-align: center;
+  margin-top: 2px;
+}
+
+/* 总背包区（底部两格） */
+#sp-shelf-bag-area {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  padding: 6px 8px;
+  background: rgba(255,215,0,0.06);
+  border-radius: 10px;
+  border: 2px solid rgba(255,215,0,0.22);
+}
+
+.sp-shelf-bag-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  border-radius: 8px;
+  border: 2px dashed rgba(255,215,0,0.3);
+  background: rgba(255,215,0,0.05);
+  font-size: 24px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  position: relative;
+}
+
+.sp-shelf-bag-slot:hover {
+  border-color: rgba(255,215,0,0.6);
+  background: rgba(255,215,0,0.1);
+}
+
+.sp-shelf-bag-slot.sp-shelf-bag-filled {
+  border-color: rgba(255,180,50,0.5);
+  background: rgba(255,180,50,0.08);
+  cursor: grab;
+}
+
+.sp-shelf-bag-slot.sp-shelf-bag-filled:active {
+  cursor: grabbing;
+}
+
+.sp-shelf-bag-slot.sp-shelf-slot-selected {
+  border-color: rgba(100,220,100,0.8) !important;
+  box-shadow: 0 0 8px rgba(100,220,100,0.4);
+}
+
+.sp-shelf-bag-label {
+  font-size: 10px;
+  color: rgba(255,215,0,0.7);
+  text-align: center;
+  margin-top: 2px;
+}
+
+/* 道具按钮行 */
+#sp-shelf-props {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.sp-shelf-prop-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 10px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--sp-border-light);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex: 1;
+  max-width: 100px;
+  min-width: 75px;
+}
+
+.sp-shelf-prop-btn:hover {
+  background: rgba(100,180,255,0.1);
+  border-color: var(--sp-primary-border);
+  transform: translateY(-2px);
+}
+
+.sp-shelf-prop-icon {
+  font-size: 18px;
+}
+
+.sp-shelf-prop-name {
+  font-size: 9px;
+  color: var(--sp-text-secondary);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.sp-shelf-prop-count {
+  font-size: 9px;
+  color: var(--sp-text-muted);
+}
+
+/* 背包、商店、库存标签页 */
+.sp-shelf-bag-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--sp-border-light);
+  border-radius: 8px;
+  margin-bottom: 6px;
+}
+
+.sp-shelf-shop-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--sp-border-light);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  transition: background 0.15s;
+}
+
+.sp-shelf-shop-item:hover {
+  background: rgba(255,255,255,0.08);
+}
+
+.sp-shelf-shop-item.sp-shelf-shop-disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.sp-shelf-shop-buy {
+  padding: 4px 10px;
+  font-size: 11px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,180,50,0.5);
+  background: rgba(255,180,50,0.2);
+  color: #ffb347;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.sp-shelf-shop-buy:hover {
+  background: rgba(255,180,50,0.4);
+  color: #fff;
+}
+
+.sp-shelf-shop-buy:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 结算弹窗 */
+.sp-shelf-result-box {
+  background: var(--sp-bg-secondary);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--sp-border);
+  border-radius: 16px;
+  padding: 24px;
+  width: 280px;
+  max-width: 85%;
+  text-align: center;
+  animation: sp-fade-in 0.3s ease;
+}
+
+.sp-shelf-result-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--sp-text-primary);
+  margin-bottom: 12px;
+}
+
+.sp-shelf-result-info {
+  font-size: 13px;
+  color: var(--sp-text-secondary);
+  line-height: 1.8;
+  margin-bottom: 16px;
+}
+
+.sp-shelf-result-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.sp-shelf-result-btn {
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--sp-primary-border);
+  background: var(--sp-primary);
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sp-shelf-result-btn:hover {
+  background: var(--sp-primary-hover);
+}
+
+.sp-shelf-result-close {
+  background: var(--sp-bg-light);
+  color: var(--sp-text-secondary);
+  border-color: var(--sp-border);
+}
+
+.sp-shelf-result-close:hover {
+  background: rgba(255,255,255,0.1);
+  color: var(--sp-text-primary);
+}
+
+/* 拖拽克隆 */
+.sp-shelf-drag-clone {
+  position: fixed;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: rgba(100,180,255,0.3);
+  border: 2px solid rgba(100,180,255,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  pointer-events: none;
+  z-index: 2147483648;
+  opacity: 0.9;
+  transform: scale(1.1);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+
+/* 最小化 */
+#sp-shelf-panel.sp-shelf-minimized {
+  width: 160px !important;
+  min-width: 160px !important;
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
+  resize: none;
+}
+
+#sp-shelf-panel.sp-shelf-minimized #sp-shelf-notice,
+#sp-shelf-panel.sp-shelf-minimized #sp-shelf-body {
+  display: none;
+}
+
+#sp-shelf-panel.sp-shelf-minimized #sp-shelf-header {
+  border-bottom: none;
+  border-radius: 16px;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  #sp-shelf-panel {
+    width: calc(100vw - 16px);
+    max-width: 420px;
+    max-height: 85vh;
+  }
+
+  #sp-shelf-area {
+    gap: 4px;
+    padding: 5px;
+  }
+
+  .sp-shelf-slot {
+    width: 36px;
+    height: 36px;
+    font-size: 17px;
+  }
+
+  .sp-shelf-bay {
+    gap: 1px;
+    padding: 3px;
+    min-height: 44px;
+  }
+
+  .sp-shelf-prop-btn {
+    padding: 5px 7px;
+    min-width: 65px;
+  }
+
+  .sp-shelf-prop-icon {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .sp-shelf-slot {
+    width: 30px;
+    height: 30px;
+    font-size: 14px;
+  }
+
+  .sp-shelf-bag-slot {
+    min-height: 40px;
+    font-size: 20px;
+  }
 }

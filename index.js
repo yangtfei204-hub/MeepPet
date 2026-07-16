@@ -350,6 +350,8 @@
     fridgeInventory: [],  // [{foodId: 'cola', count: 3}, ...] 冰箱食物库存
     fridgePropInventory: { compress: 0, backpack: 0, organize: 0 },  // 冰箱道具背包
     fridgePropShopLog: {},  // {'2026-07-15': {'compress': 2, ...}}
+    shelfPropInventory: { basket: 0, autoMatch: 0, shuffle: 0 },
+    shelfPropShopLog: {},
     // ===== 糖葫芦工坊状态 =====
     tanghuluInventory: [],  // [{fruitKey: 'strawberry', count: 3}, ...] 糖葫芦成品库存
     tanghuluSugarCrystal: 0,  // 完美的亮晶晶糖砂数量
@@ -1789,9 +1791,21 @@ function sleepPet() {
       }
     }
 
-    // 没有快捷物品，检查背包中该分类是否有物品
+    // 没有快捷物品，检查所有来源是否有可用物品
     const available = state.gameInventory.filter(i => i.category === category && i.count > 0);
-    if (available.length === 0) {
+
+    // 额外检查冰箱库存和糖葫芦库存（仅投喂类别）
+    let hasExtraFood = false;
+    if (category === 'food') {
+      const fridgeItems = (state.fridgeInventory || []).filter(i => i.count > 0);
+      const tangItems = (state.tanghuluInventory || []).filter(i => i.count > 0);
+      const hasCrystal = (state.tanghuluSugarCrystal || 0) > 0;
+      if (fridgeItems.length > 0 || tangItems.length > 0 || hasCrystal) {
+        hasExtraFood = true;
+      }
+    }
+
+    if (available.length === 0 && !hasExtraFood) {
       showBubble('背包里没有可用的物品！去游戏商店买一些吧～', 4000);
       return;
     }
@@ -1799,6 +1813,7 @@ function sleepPet() {
     // 弹出背包选择弹窗
     showInventoryPopup(category, quickKey, onUse);
   }
+
 
 function showInventoryPopup(category, quickKey, onUse) {
     // 移除旧弹窗
@@ -2180,6 +2195,13 @@ function showInventoryPopup(category, quickKey, onUse) {
               <div class="sp-game-selector-desc">水果排序归类，做出漂亮糖葫芦</div>
             </div>
           </div>
+          <div class="sp-game-selector-card" data-game="shelf">
+            <div class="sp-game-selector-icon">🛒</div>
+            <div class="sp-game-selector-info">
+              <div class="sp-game-selector-name">整理货架</div>
+              <div class="sp-game-selector-desc">三消消除，清空货架上所有商品</div>
+            </div>
+          </div>
           <div class="sp-game-selector-card" data-game="inventory">
             <div class="sp-game-selector-icon">🎒</div>
             <div class="sp-game-selector-info">
@@ -2234,6 +2256,8 @@ function showInventoryPopup(category, quickKey, onUse) {
           toggleFridgeGame();
         } else if (game === 'tanghulu') {
           toggleTanghuluGame();
+        } else if (game === 'shelf') {
+          toggleShelfGame();
         } else if (game === 'inventory') {
           showTotalInventory();
         }
@@ -2379,6 +2403,30 @@ function showInventoryPopup(category, quickKey, onUse) {
                 • 通关奖励 10~100 金币（根据水果种类数）<br/>
                 • 通关增加桌宠心情 +1<br/>
                 • 低概率掉落「✨完美的亮晶晶糖砂」（价值150🪙，可投喂桌宠）
+              </p>
+            </div>
+          </details>
+          <details class="sp-guide-details">
+            <summary class="sp-guide-summary">🛒 整理货架</summary>
+            <div class="sp-guide-details-content">
+              <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
+                整理货架是一个三消类益智游戏。<br/><br/>
+                <strong style="color:var(--sp-text-primary);">核心玩法：</strong><br/>
+                • 货架由 2×4 个隔间组成，每个隔间最多放 3 件相同商品<br/>
+                • 点击或拖动商品到同类型隔间，凑满3个即可消除<br/>
+                • 消除后后排被遮挡的商品自动向前补位<br/>
+                • 目标：清空所有货架隔间！<br/><br/>
+                <strong style="color:var(--sp-text-primary);">道具说明：</strong><br/>
+                🪵 临时扩展篮：额外挂载3格临时收纳区（每局1次）<br/>
+                🧹 喵喵爪理货：自动找一组三个相同并消除（每局2次）<br/>
+                🔄 货架大洗牌：将所有已露出商品重新随机排列（每局3次）<br/><br/>
+                <strong style="color:var(--sp-text-primary);">操作方式：</strong><br/>
+                • 点击商品选中 → 再点击目标隔间放入<br/>
+                • 也支持拖拽操作（PC端）<br/>
+                • 底部总背包区可临时存放最多2件商品<br/><br/>
+                <strong style="color:var(--sp-text-primary);">费用与奖励：</strong><br/>
+                开局消耗 5 点体力⚡<br/>
+                通关奖励金币🪙 + 消除奖励，商品进入餐厅后厨和桌宠物资
               </p>
             </div>
           </details>
@@ -2531,6 +2579,21 @@ function showInventoryPopup(category, quickKey, onUse) {
       }).join('');
     }
 
+    // 货架整理道具
+    function renderShelfItems() {
+      const shelfInv = state.shelfPropInventory || { basket: 0, autoMatch: 0, shuffle: 0 };
+      const items = [
+        { key: 'basket', emoji: '🪵', name: '临时扩展篮', count: shelfInv.basket || 0 },
+        { key: 'autoMatch', emoji: '🧹', name: '喵喵爪理货', count: shelfInv.autoMatch || 0 },
+        { key: 'shuffle', emoji: '🔄', name: '货架大洗牌', count: shelfInv.shuffle || 0 },
+      ];
+      const hasAny = items.some(i => i.count > 0);
+      if (!hasAny) return '<div class="sp-total-inv-empty">暂无</div>';
+      return items.filter(i => i.count > 0).map(i => {
+        return `<div class="sp-total-inv-row"><span class="sp-total-inv-emoji">${i.emoji}</span><span class="sp-total-inv-name">${i.name}</span><span class="sp-total-inv-detail"></span><span class="sp-total-inv-count">×${i.count}</span></div>`;
+      }).join('');
+    }
+
     // 冰箱库存
     function renderFridgeItems() {
       const fridgeInv = state.fridgeInventory || [];
@@ -2642,6 +2705,29 @@ function showInventoryPopup(category, quickKey, onUse) {
           <div class="sp-total-inv-section">
             <div class="sp-total-inv-section-title">🔗 连连看道具</div>
             <div class="sp-total-inv-section-content">${renderLinkItems()}</div>
+          </div>
+          <div class="sp-total-inv-section">
+            <div class="sp-total-inv-section-title">🛒 货架整理道具</div>
+            <div class="sp-total-inv-section-content">${renderShelfItems()}</div>
+          </div>
+          <div class="sp-total-inv-section">
+            <div class="sp-total-inv-section-title">🛒 货架消除联动说明</div>
+            <div class="sp-total-inv-section-content">
+              <div style="font-size:11px;color:var(--sp-text-muted);line-height:1.7;">
+                🥤 饮品消除 → 冰箱库存（可乐）<br/>
+                🍪 零食消除 → 冰箱库存（面包）<br/>
+                🐟 宠物消除 → 冰箱库存（猫罐头）<br/>
+                🧸 玩具消除 → 工坊睡眠道具<br/>
+                🧴 清洁消除 → 工坊清洁道具<br/>
+                🍄🦐🌽🥑🥟🍜 食物消除 → 冰箱库存（对应食材，可投喂+餐厅烹饪）<br/>
+                🍰🍦 甜品消除 → 冰箱库存（蛋糕/冰淇淋，可给餐厅客人）<br/>
+                🍡 糖葫芦串消除 → 糖葫芦工坊库存<br/>
+                🧂🫙🌶️🧈🍯 调料消除 → 餐厅调料库存（每组+2份）<br/>
+                🫧🪻 沐浴用品消除 → 工坊清洁道具（给桌宠洗澡）<br/>
+                🕯️🧣 睡眠用品消除 → 工坊睡眠道具（给桌宠睡觉）<br/>
+                💰 所有消除 → 额外+1~2金币
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -7326,13 +7412,26 @@ function refreshCharPreview() {
       return;
     }
 
+    // 检查棋盘上是否有匹配订单的物品
+    const boardItems = {};
+    for (let i = 0; i < GAME_BOARD_CELLS; i++) {
+      const cell = state.gameBoard[i];
+      if (cell) {
+        const key = `${cell.chain}_${cell.level}`;
+        boardItems[key] = (boardItems[key] || 0) + 1;
+      }
+    }
+
     container.innerHTML = state.gameOrders.map((order, idx) => {
       const customImg = state.gameCustomImages?.[`${order.chain}_${order.level}`];
       const display = customImg
         ? `<img src="${customImg}" class="sp-game-order-img" />`
         : `<span class="sp-game-order-emoji">${order.emoji}</span>`;
+      const orderKey = `${order.chain}_${order.level}`;
+      const matched = boardItems[orderKey] && boardItems[orderKey] > 0;
+      const matchedClass = matched ? ' sp-game-order-matched' : '';
       return `
-        <div class="sp-game-order-card" data-order-idx="${idx}">
+        <div class="sp-game-order-card${matchedClass}" data-order-idx="${idx}">
           <div class="sp-game-order-item">${display}</div>
           <div class="sp-game-order-info">
             <span class="sp-game-order-name">${order.name} (Lv${order.level})</span>
@@ -7351,6 +7450,7 @@ function refreshCharPreview() {
       });
     });
   }
+
 
   // ===== 渲染棋盘 =====
   function gameRenderBoard() {
@@ -8511,14 +8611,10 @@ function refreshCharPreview() {
       }
     }
 
-    // 检查胜利
-    const remaining = match3State.cards.filter(c => c.state !== 'collected' && c.state !== 'eliminated');
-    if (remaining.length === 0 && match3State.slots.length === 0) {
-      match3State.active = false;
-      setTimeout(() => match3GameOver(true), 500);
-    }
+    // 胜利检测已在 match3CheckEliminate 中处理，此处不再重复检测
 
     match3Render();
+
   }
 
   // ===== 三消检查 =====
@@ -9311,6 +9407,9 @@ function refreshCharPreview() {
         { type: 'shopitem', category: 'food',   idx: 4, label: '🍙 秘制猫饭团 ×1', weight: 18 },
         { type: 'shopitem', category: 'clean',  idx: 4, label: '🪻 薰衣草香氛球 ×1', weight: 18 },
         { type: 'shopitem', category: 'energy', idx: 4, label: '🕯️ 安神小夜灯 ×1', weight: 18 },
+        // 货架整理道具
+        { type: 'shelfprop', key: 'shuffle', label: '🔄 货架大洗牌 ×1', weight: 20 },
+        { type: 'shelfprop', key: 'autoMatch', label: '🧹 喵喵爪理货 ×1', weight: 15 },
       ]
     },
     {
@@ -9361,6 +9460,10 @@ function refreshCharPreview() {
         // 新增：糖葫芦新品种
         { type: 'tanghuluItem', fruitKey: 'blueberry', label: '🫐 冰晶蓝莓糖葫芦 ×1', count: 1, weight: 10 },
         { type: 'tanghuluItem', fruitKey: 'coconut', label: '🥥 椰子奶球糖葫芦 ×1', count: 1, weight: 10 },
+        // 货架整理道具
+        { type: 'shelfprop', key: 'shuffle', label: '🔄 货架大洗牌 ×2', count: 2, weight: 25 },
+        { type: 'shelfprop', key: 'autoMatch', label: '🧹 喵喵爪理货 ×2', count: 2, weight: 20 },
+        { type: 'shelfprop', key: 'basket', label: '🪵 临时扩展篮 ×1', weight: 12 },
       ]
     },
     {
@@ -9420,6 +9523,10 @@ function refreshCharPreview() {
         // 新增：糖葫芦稀有品种
         { type: 'tanghuluItem', fruitKey: 'lychee', label: '🪷 玲珑荔枝糖葫芦 ×2', count: 2, weight: 4 },
         { type: 'tanghuluItem', fruitKey: 'blueberry', label: '🫐 冰晶蓝莓糖葫芦 ×3', count: 3, weight: 3 },
+        // 货架整理道具
+        { type: 'shelfprop', key: 'shuffle', label: '🔄 货架大洗牌 ×3', count: 3, weight: 30 },
+        { type: 'shelfprop', key: 'autoMatch', label: '🧹 喵喵爪理货 ×3', count: 3, weight: 25 },
+        { type: 'shelfprop', key: 'basket', label: '🪵 临时扩展篮 ×2', count: 2, weight: 15 },
       ]
     }
   ];
@@ -9552,6 +9659,12 @@ function refreshCharPreview() {
           state.tanghuluInventory.push({ fruitKey: thKey, count: thCount });
         }
         rewardMsg = `获得 ${result.label}（已存入糖葫芦库存）`;
+        break;
+      case 'shelfprop':
+        if (!state.shelfPropInventory) state.shelfPropInventory = { basket: 0, autoMatch: 0, shuffle: 0 };
+        const shelfPropCount = result.count || 1;
+        state.shelfPropInventory[result.key] = (state.shelfPropInventory[result.key] || 0) + shelfPropCount;
+        rewardMsg = `获得 ${result.label}（已存入货架道具背包）`;
         break;
 
     }
@@ -13229,7 +13342,7 @@ function refreshCharPreview() {
         <span>🍢 糖葫芦工坊</span>
         <div class="sp-link-header-right">
           <button id="sp-tanghulu-minimize" title="缩小悬挂" style="background:none;border:none;font-size:14px;cursor:pointer;color:var(--sp-text-muted);padding:2px 6px;">─</button>
-          <button id="sp-tanghulu-close" title="关闭">✕</button>
+          <button id="sp-tanghulu-close" title="关闭" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--sp-text-muted);padding:2px 6px;border-radius:4px;transition:color 0.2s;">✕</button>
         </div>
       </div>
       <div id="sp-tanghulu-notice"></div>
@@ -14614,6 +14727,1383 @@ function refreshCharPreview() {
     if (restaurantCookTimer) {
       clearTimeout(restaurantCookTimer);
       restaurantCookTimer = null;
+    }
+  }
+
+  // ============================================================
+  // 🛒 货架整理游戏模块 - MeepShelfSort
+  // ============================================================
+
+  // ===== 商品定义（每种商品有图标和类型ID）=====
+  const SHELF_ITEMS = [
+    // --- 原有联动类 ---
+    { id: 1,  emoji: '🥤', name: '可乐',       category: 'drink'  },
+    { id: 2,  emoji: '🍺', name: '啤酒',       category: 'drink'  },
+    { id: 3,  emoji: '🧃', name: '果汁',       category: 'drink'  },
+    { id: 4,  emoji: '🍪', name: '饼干',       category: 'snack'  },
+    { id: 5,  emoji: '🍫', name: '巧克力',     category: 'snack'  },
+    { id: 6,  emoji: '🍭', name: '糖果',       category: 'snack'  },
+    { id: 7,  emoji: '🧸', name: '毛绒熊',     category: 'toy'    },
+    { id: 8,  emoji: '🪀', name: '悠悠球',     category: 'toy'    },
+    { id: 9,  emoji: '🎯', name: '飞镖',       category: 'toy'    },
+    { id: 10, emoji: '🐟', name: '猫罐头',     category: 'pet'    },
+    { id: 11, emoji: '🌿', name: '猫草',       category: 'pet'    },
+    { id: 12, emoji: '🧴', name: '洗护露',     category: 'clean'  },
+    // --- 货架专属：食物类（消除后进冰箱库存+餐厅食材）---
+    { id: 13, emoji: '🍄', name: '香菇包',     category: 'shelfFood',  linkedFoodId: 'mushroom' },
+    { id: 14, emoji: '🦐', name: '鲜虾盒',     category: 'shelfFood',  linkedFoodId: 'shrimp'   },
+    { id: 15, emoji: '🌽', name: '甜玉米',     category: 'shelfFood',  linkedFoodId: 'corn'     },
+    { id: 16, emoji: '🥑', name: '牛油果',     category: 'shelfFood',  linkedFoodId: 'avocado'  },
+    { id: 17, emoji: '🥟', name: '速冻饺子',   category: 'shelfFood',  linkedFoodId: 'dumpling' },
+    { id: 18, emoji: '🍜', name: '拉面包',     category: 'shelfFood',  linkedFoodId: 'noodle'   },
+    // --- 货架专属：甜品类（消除后进糖葫芦库存或冰箱）---
+    { id: 19, emoji: '🍰', name: '小蛋糕',     category: 'shelfDessert', linkedFoodId: 'cake'     },
+    { id: 20, emoji: '🍦', name: '冰淇淋杯',   category: 'shelfDessert', linkedFoodId: 'icecream' },
+    { id: 21, emoji: '🍡', name: '糖葫芦串',   category: 'shelfDessert', linkedTanghulu: 'strawberry' },
+    // --- 货架专属：调味料类（消除后进餐厅调料库存）---
+    { id: 22, emoji: '🧂', name: '精盐罐',     category: 'shelfSeasoning', linkedSeasoning: 'salt'   },
+    { id: 23, emoji: '🫙', name: '酱油瓶',     category: 'shelfSeasoning', linkedSeasoning: 'soy'    },
+    { id: 24, emoji: '🌶️', name: '辣椒酱',     category: 'shelfSeasoning', linkedSeasoning: 'chili'  },
+    { id: 25, emoji: '🧈', name: '黄油块',     category: 'shelfSeasoning', linkedSeasoning: 'butter' },
+    { id: 26, emoji: '🍯', name: '蜂蜜罐',     category: 'shelfSeasoning', linkedSeasoning: 'honey'  },
+    // --- 货架专属：沐浴用品类（消除后进工坊清洁道具背包给桌宠用）---
+    { id: 27, emoji: '🫧', name: '泡泡浴液',   category: 'shelfBath',  linkedShopCategory: 'clean', linkedShopIdx: 1 },
+    { id: 28, emoji: '🪻', name: '薰衣草皂',   category: 'shelfBath',  linkedShopCategory: 'clean', linkedShopIdx: 4 },
+    // --- 货架专属：睡眠用品类（消除后进工坊睡眠道具背包给桌宠用）---
+    { id: 29, emoji: '🕯️', name: '香薰蜡烛',   category: 'shelfSleep', linkedShopCategory: 'energy', linkedShopIdx: 4 },
+    { id: 30, emoji: '🧣', name: '暖暖毛毯',   category: 'shelfSleep', linkedShopCategory: 'energy', linkedShopIdx: 1 },
+  ];
+
+
+  // ===== 难度配置 =====
+  // 货架 2列×4行 = 8个隔间，每隔间3槽 = 24槽
+  // 后排深度：每个隔间有几层（前排可见，后排被遮挡）
+  const SHELF_DIFFICULTIES = [
+    { name: '简单', rows: 4, cols: 2, itemTypes: 5,  totalPerType: 9,  backRows: 3, energyCost: 5,  goldReward: [20, 35]  },
+    { name: '普通', rows: 4, cols: 3, itemTypes: 7,  totalPerType: 9,  backRows: 3, energyCost: 7,  goldReward: [35, 55]  },
+    { name: '困难', rows: 5, cols: 3, itemTypes: 9,  totalPerType: 9,  backRows: 4, energyCost: 10, goldReward: [55, 80]  },
+    { name: '噩梦', rows: 5, cols: 4, itemTypes: 11, totalPerType: 9,  backRows: 4, energyCost: 13, goldReward: [75, 110] },
+    { name: '地狱', rows: 6, cols: 4, itemTypes: 12, totalPerType: 12, backRows: 5, energyCost: 16, goldReward: [100, 150] },
+    { name: '深渊', rows: 6, cols: 5, itemTypes: 12, totalPerType: 15, backRows: 6, energyCost: 20, goldReward: [130, 200] },
+  ];
+
+  // ===== 道具定义 =====
+  const SHELF_PROPS = {
+    basket: {
+      name: '🪵 临时扩展篮',
+      desc: '额外提供3格临时收纳（每局1次）',
+      price: 100,
+      perGameLimit: 1,
+      dailyLimit: 5
+    },
+    autoMatch: {
+      name: '🧹 喵喵爪理货',
+      desc: '自动找一组三个相同并消除（每局2次）',
+      price: 60,
+      perGameLimit: 2,
+      dailyLimit: 10
+    },
+    shuffle: {
+      name: '🔄 货架大洗牌',
+      desc: '将所有露出商品重新随机排列（每局3次）',
+      price: 30,
+      perGameLimit: 3,
+      dailyLimit: 15
+    }
+  };
+
+  // ===== 运行时状态 =====
+  // 货架结构：bays[bayIdx] = { slots: [front[0..2]], backStack: [[type,...]] }
+  // slots: 前排3个位置，每个位置存 itemId 或 null
+  // backStack: 后排（每个元素是一组3个同类型物品，等前排空出后补充）
+  let shelfState = {
+    active: false,
+    bays: [],           // 8个隔间（2列×4行）
+    bagSlots: [null, null],  // 底部总背包2格
+    selected: null,     // {source:'bay'|'bag', bayIdx, slotIdx} 当前选中
+    difficulty: null,
+    propsUsed: { basket: 0, autoMatch: 0, shuffle: 0 },
+    basketActive: false,
+    basketSlots: [null, null, null],  // 扩展篮3格
+    eliminatedGroups: 0,
+    totalGroups: 0,
+    energyCost: 0,
+  };
+
+  let isShelfOpen = false;
+
+  // ===== 生成关卡 =====
+  function shelfGenerateLevel() {
+    const diff = SHELF_DIFFICULTIES[Math.floor(Math.random() * SHELF_DIFFICULTIES.length)];
+    shelfState.difficulty = diff;
+    shelfState.energyCost = diff.energyCost;
+
+    if (state.gameStamina < diff.energyCost) {
+      shelfShowNotice(`体力不足！本局需要 ${diff.energyCost} 点体力`);
+      shelfState.active = false;
+      return false;
+    }
+    state.gameStamina -= diff.energyCost;
+
+    // 选择商品类型
+    const available = [...SHELF_ITEMS];
+    const selectedTypes = [];
+    for (let i = 0; i < diff.itemTypes && available.length > 0; i++) {
+      const idx = Math.floor(Math.random() * available.length);
+      selectedTypes.push(available.splice(idx, 1)[0]);
+    }
+
+    // 每种商品 totalPerType 个（必须是3的倍数）
+    const allItems = [];
+    selectedTypes.forEach(type => {
+      for (let i = 0; i < diff.totalPerType; i++) {
+        allItems.push(type.id);
+      }
+    });
+
+    // 洗牌
+    for (let i = allItems.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [allItems[i], allItems[j]] = [allItems[j], allItems[i]];
+    }
+
+    // 根据难度的 rows × cols 计算隔间数量
+    const BAYS = diff.rows * diff.cols;
+    shelfState.bays = [];
+    let itemIdx = 0;
+
+    for (let b = 0; b < BAYS; b++) {
+      const bay = {
+        slots: [null, null, null],
+        backStack: []
+      };
+      // 填充后排
+      for (let layer = 0; layer < diff.backRows; layer++) {
+        const row = [];
+        for (let s = 0; s < 3; s++) {
+          row.push(itemIdx < allItems.length ? allItems[itemIdx++] : null);
+        }
+        bay.backStack.push(row);
+      }
+      // 填充前排
+      for (let s = 0; s < 3; s++) {
+        bay.slots[s] = itemIdx < allItems.length ? allItems[itemIdx++] : null;
+      }
+      shelfState.bays.push(bay);
+    }
+
+    shelfState.bagSlots = [null, null];
+    shelfState.basketSlots = [null, null, null];
+    shelfState.basketActive = false;
+    shelfState.selected = null;
+    shelfState.propsUsed = { basket: 0, autoMatch: 0, shuffle: 0 };
+    shelfState.eliminatedGroups = 0;
+    shelfState.totalGroups = Math.floor((diff.itemTypes * diff.totalPerType) / 3);
+    shelfState.active = true;
+
+    saveDataDebounced('货架整理开局');
+    return true;
+  }
+
+  // ===== 检查隔间/背包是否触发消除 =====
+  // source: 'bay' | 'bag' | 'basket'
+  // 返回消除发生的位置信息，或 null
+  function shelfCheckEliminate() {
+    let eliminated = false;
+
+    // 检查每个隔间的前排3槽
+    shelfState.bays.forEach((bay, bayIdx) => {
+      const slots = bay.slots;
+      // 三槽全满且全相同
+      if (slots[0] !== null && slots[0] === slots[1] && slots[1] === slots[2]) {
+        const itemData = SHELF_ITEMS.find(it => it.id === slots[0]);
+        // 消除
+        bay.slots = [null, null, null];
+        shelfState.eliminatedGroups++;
+        eliminated = true;
+
+        // 后排补位
+        shelfAdvanceBack(bayIdx);
+
+        // 给桌宠/餐厅联动 + 货架独有库存
+        if (itemData) {
+          // === 原有联动：饮品/零食/宠物 → 冰箱库存 ===
+          const fridgeFoodMap = {
+            'drink': 'cola',
+            'snack': 'bread',
+            'pet':   'fish',
+          };
+          const mappedFoodId = fridgeFoodMap[itemData.category];
+          if (mappedFoodId) {
+            if (!state.fridgeInventory) state.fridgeInventory = [];
+            const existing = state.fridgeInventory.find(i => i.foodId === mappedFoodId);
+            if (existing) existing.count++;
+            else state.fridgeInventory.push({ foodId: mappedFoodId, count: 1 });
+          }
+
+          // === 原有联动：玩具 → 工坊睡眠道具 ===
+          if (itemData.category === 'toy') {
+            if (!state.gameInventory) state.gameInventory = [];
+            const toyRewardIdx = Math.floor(Math.random() * 2);
+            const existing = state.gameInventory.find(i => i.category === 'energy' && i.idx === toyRewardIdx);
+            if (existing) existing.count++;
+            else state.gameInventory.push({ category: 'energy', idx: toyRewardIdx, count: 1 });
+          }
+
+          // === 原有联动：清洁 → 工坊清洁道具 ===
+          if (itemData.category === 'clean') {
+            if (!state.gameInventory) state.gameInventory = [];
+            const cleanRewardIdx = Math.floor(Math.random() * 2);
+            const existing = state.gameInventory.find(i => i.category === 'clean' && i.idx === cleanRewardIdx);
+            if (existing) existing.count++;
+            else state.gameInventory.push({ category: 'clean', idx: cleanRewardIdx, count: 1 });
+          }
+
+          // === 新增：货架食物类 → 冰箱库存（给桌宠投喂+给餐厅食材）===
+          if (itemData.linkedFoodId) {
+            if (!state.fridgeInventory) state.fridgeInventory = [];
+            const existing = state.fridgeInventory.find(i => i.foodId === itemData.linkedFoodId);
+            if (existing) existing.count++;
+            else state.fridgeInventory.push({ foodId: itemData.linkedFoodId, count: 1 });
+          }
+
+          // === 新增：货架甜品类 → 冰箱库存或糖葫芦库存 ===
+          if (itemData.category === 'shelfDessert') {
+            if (itemData.linkedFoodId) {
+              if (!state.fridgeInventory) state.fridgeInventory = [];
+              const existing = state.fridgeInventory.find(i => i.foodId === itemData.linkedFoodId);
+              if (existing) existing.count++;
+              else state.fridgeInventory.push({ foodId: itemData.linkedFoodId, count: 1 });
+            }
+            if (itemData.linkedTanghulu) {
+              if (!state.tanghuluInventory) state.tanghuluInventory = [];
+              const existing = state.tanghuluInventory.find(i => i.fruitKey === itemData.linkedTanghulu);
+              if (existing) existing.count++;
+              else state.tanghuluInventory.push({ fruitKey: itemData.linkedTanghulu, count: 1 });
+            }
+          }
+
+          // === 新增：货架调味料类 → 餐厅调料库存 ===
+          if (itemData.linkedSeasoning) {
+            if (!state.restaurantSeasonings) state.restaurantSeasonings = {};
+            state.restaurantSeasonings[itemData.linkedSeasoning] = (state.restaurantSeasonings[itemData.linkedSeasoning] || 0) + 2;
+          }
+
+          // === 新增：货架沐浴/睡眠用品类 → 工坊道具背包 ===
+          if (itemData.linkedShopCategory && itemData.linkedShopIdx !== undefined) {
+            if (!state.gameInventory) state.gameInventory = [];
+            const existing = state.gameInventory.find(i => i.category === itemData.linkedShopCategory && i.idx === itemData.linkedShopIdx);
+            if (existing) existing.count++;
+            else state.gameInventory.push({ category: itemData.linkedShopCategory, idx: itemData.linkedShopIdx, count: 1 });
+          }
+
+          // === 所有消除都额外给金币（1~2）===
+          state.gameGold += 1 + Math.floor(Math.random() * 2);
+        }
+
+      }
+    });
+
+    // 检查扩展篮（3槽全满且全相同）
+    if (shelfState.basketActive) {
+      const bs = shelfState.basketSlots;
+      if (bs[0] !== null && bs[0] === bs[1] && bs[1] === bs[2]) {
+        shelfState.basketSlots = [null, null, null];
+        shelfState.eliminatedGroups++;
+        eliminated = true;
+      }
+    }
+
+    // 检查总背包（2槽，只做参考，不自动消除，需配合隔间）
+    // 总背包的物品可以手动移到隔间凑三消，不自动消
+
+    return eliminated;
+  }
+
+  // ===== 后排补位 =====
+  function shelfAdvanceBack(bayIdx) {
+    const bay = shelfState.bays[bayIdx];
+    if (bay.backStack.length === 0) return;
+    // 取最前面的后排一层补到前排
+    const nextRow = bay.backStack.shift();
+    bay.slots = nextRow.map(v => v); // 复制
+  }
+
+  // ===== 移动物品逻辑 =====
+  // from: {source:'bay'|'bag'|'basket', bayIdx?, slotIdx}
+  // to:   {source:'bay'|'bag'|'basket', bayIdx?, slotIdx}
+  function shelfMove(from, to) {
+    // 获取 from 的值
+    let fromVal = shelfGetSlotValue(from);
+    if (fromVal === null) return false;
+
+    // 获取 to 的值
+    let toVal = shelfGetSlotValue(to);
+
+    // 目标已满（非null）且不是要交换
+    // 规则：目标格为空时才能放入
+    if (toVal !== null) {
+      shelfShowNotice('目标格已有物品！');
+      return false;
+    }
+
+    // 目标是隔间：检查隔间是否该格可用（前排任意空格均可）
+    // 这里直接允许放到任意空格
+
+    // 执行移动
+    shelfSetSlotValue(to, fromVal);
+    shelfSetSlotValue(from, null);
+
+    return true;
+  }
+
+  function shelfGetSlotValue(pos) {
+    if (pos.source === 'bay') {
+      return shelfState.bays[pos.bayIdx].slots[pos.slotIdx];
+    } else if (pos.source === 'bag') {
+      return shelfState.bagSlots[pos.slotIdx];
+    } else if (pos.source === 'basket') {
+      return shelfState.basketSlots[pos.slotIdx];
+    }
+    return null;
+  }
+
+  function shelfSetSlotValue(pos, val) {
+    if (pos.source === 'bay') {
+      shelfState.bays[pos.bayIdx].slots[pos.slotIdx] = val;
+    } else if (pos.source === 'bag') {
+      shelfState.bagSlots[pos.slotIdx] = val;
+    } else if (pos.source === 'basket') {
+      shelfState.basketSlots[pos.slotIdx] = val;
+    }
+  }
+
+  // ===== 检查是否死局（所有可见格都满且无法凑三消）=====
+  function shelfCheckDeadlock() {
+    // 收集所有可见的物品（前排 + 背包 + 扩展篮）
+    const visible = {};
+    shelfState.bays.forEach(bay => {
+      bay.slots.forEach(v => {
+        if (v !== null) visible[v] = (visible[v] || 0) + 1;
+      });
+    });
+    shelfState.bagSlots.forEach(v => {
+      if (v !== null) visible[v] = (visible[v] || 0) + 1;
+    });
+    if (shelfState.basketActive) {
+      shelfState.basketSlots.forEach(v => {
+        if (v !== null) visible[v] = (visible[v] || 0) + 1;
+      });
+    }
+
+    // 检查是否有任何类型≥3
+    const canEliminate = Object.values(visible).some(c => c >= 3);
+    if (canEliminate) return false;
+
+    // 检查是否有空格可以移动
+    const hasEmpty =
+      shelfState.bays.some(bay => bay.slots.some(v => v === null)) ||
+      shelfState.bagSlots.some(v => v === null) ||
+      (shelfState.basketActive && shelfState.basketSlots.some(v => v === null));
+
+    if (hasEmpty) return false;
+
+    return true; // 死局
+  }
+
+  // ===== 检查胜利 =====
+  function shelfCheckWin() {
+    const allEmpty =
+      shelfState.bays.every(bay =>
+        bay.slots.every(v => v === null) && bay.backStack.length === 0
+      ) &&
+      shelfState.bagSlots.every(v => v === null) &&
+      (!shelfState.basketActive || shelfState.basketSlots.every(v => v === null));
+    return allEmpty;
+  }
+
+  // ===== 道具：临时扩展篮 =====
+  function shelfUsePropBasket() {
+    if (shelfState.propsUsed.basket >= SHELF_PROPS.basket.perGameLimit) {
+      shelfShowNotice(`扩展篮本局已用完（限${SHELF_PROPS.basket.perGameLimit}次）`);
+      return;
+    }
+    if (!state.shelfPropInventory) state.shelfPropInventory = { basket: 0, autoMatch: 0, shuffle: 0 };
+    if ((state.shelfPropInventory.basket || 0) <= 0) {
+      shelfShowNotice('扩展篮库存不足！去商店购买吧');
+      return;
+    }
+    if (shelfState.basketActive) {
+      shelfShowNotice('扩展篮已经在使用中！');
+      return;
+    }
+
+    state.shelfPropInventory.basket--;
+    shelfState.propsUsed.basket++;
+    shelfState.basketActive = true;
+    shelfState.basketSlots = [null, null, null];
+
+    shelfShowNotice('🪵 扩展篮已激活！获得3个临时格子');
+    saveDataDebounced('货架使用扩展篮');
+    shelfRender();
+  }
+
+  // ===== 道具：喵喵爪理货（自动消除一组）=====
+  function shelfUsePropAutoMatch() {
+    if (shelfState.propsUsed.autoMatch >= SHELF_PROPS.autoMatch.perGameLimit) {
+      shelfShowNotice(`喵喵爪本局已用完（限${SHELF_PROPS.autoMatch.perGameLimit}次）`);
+      return;
+    }
+    if (!state.shelfPropInventory) state.shelfPropInventory = { basket: 0, autoMatch: 0, shuffle: 0 };
+    if ((state.shelfPropInventory.autoMatch || 0) <= 0) {
+      shelfShowNotice('喵喵爪库存不足！去商店购买吧');
+      return;
+    }
+
+    // 收集所有可见物品的位置
+    const positions = {};
+    shelfState.bays.forEach((bay, bayIdx) => {
+      bay.slots.forEach((v, slotIdx) => {
+        if (v === null) return;
+        if (!positions[v]) positions[v] = [];
+        positions[v].push({ source: 'bay', bayIdx, slotIdx });
+      });
+    });
+    shelfState.bagSlots.forEach((v, slotIdx) => {
+      if (v === null) return;
+      if (!positions[v]) positions[v] = [];
+      positions[v].push({ source: 'bag', slotIdx });
+    });
+    if (shelfState.basketActive) {
+      shelfState.basketSlots.forEach((v, slotIdx) => {
+        if (v === null) return;
+        if (!positions[v]) positions[v] = [];
+        positions[v].push({ source: 'basket', slotIdx });
+      });
+    }
+
+    // 找可以凑3个的类型
+    const matchable = Object.keys(positions).filter(k => positions[k].length >= 3);
+    if (matchable.length === 0) {
+      shelfShowNotice('🧹 当前没有可以直接凑满3个的商品！');
+      // 不扣库存
+      return;
+    }
+
+    state.shelfPropInventory.autoMatch--;
+    shelfState.propsUsed.autoMatch++;
+
+    // 随机选一种消除
+    const chosen = matchable[Math.floor(Math.random() * matchable.length)];
+    const locs = positions[chosen].slice(0, 3);
+    const itemData = SHELF_ITEMS.find(it => it.id === parseInt(chosen));
+
+    locs.forEach(loc => {
+      shelfSetSlotValue(loc, null);
+    });
+    shelfState.eliminatedGroups++;
+
+    // 后排补位（可能有隔间空出来）
+    shelfState.bays.forEach((bay, bayIdx) => {
+      if (bay.slots.every(v => v === null) && bay.backStack.length > 0) {
+        shelfAdvanceBack(bayIdx);
+      }
+    });
+
+    shelfShowNotice(`🧹 喵喵爪消除了 ${itemData?.emoji || '?'} ${itemData?.name || '?'} ×3！`);
+    saveDataDebounced('货架喵喵爪');
+
+    // 检查胜利
+    if (shelfCheckWin()) {
+      shelfState.active = false;
+      setTimeout(() => shelfGameOver(true), 400);
+    }
+
+    shelfRender();
+  }
+
+  // ===== 道具：货架大洗牌 =====
+  function shelfUsePropShuffle() {
+    if (shelfState.propsUsed.shuffle >= SHELF_PROPS.shuffle.perGameLimit) {
+      shelfShowNotice(`洗牌本局已用完（限${SHELF_PROPS.shuffle.perGameLimit}次）`);
+      return;
+    }
+    if (!state.shelfPropInventory) state.shelfPropInventory = { basket: 0, autoMatch: 0, shuffle: 0 };
+    if ((state.shelfPropInventory.shuffle || 0) <= 0) {
+      shelfShowNotice('洗牌道具库存不足！去商店购买吧');
+      return;
+    }
+
+    // 收集所有前排可见物品
+    const visible = [];
+    shelfState.bays.forEach((bay, bayIdx) => {
+      bay.slots.forEach((v, slotIdx) => {
+        if (v !== null) visible.push({ v, source: 'bay', bayIdx, slotIdx });
+      });
+    });
+
+    if (visible.length < 2) {
+      shelfShowNotice('可见商品太少，无法洗牌！');
+      return;
+    }
+
+    state.shelfPropInventory.shuffle--;
+    shelfState.propsUsed.shuffle++;
+
+    // 洗牌值
+    const vals = visible.map(p => p.v);
+    for (let i = vals.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [vals[i], vals[j]] = [vals[j], vals[i]];
+    }
+
+    // 写回
+    visible.forEach((pos, i) => {
+      shelfSetSlotValue(pos, vals[i]);
+    });
+
+    shelfShowNotice('🔄 货架商品已重新洗牌！');
+    saveDataDebounced('货架洗牌');
+    shelfRender();
+  }
+
+  // ===== 商店购买 =====
+  function shelfBuyProp(propKey) {
+    const prop = SHELF_PROPS[propKey];
+    if (!prop) return;
+
+    if (state.gameGold < prop.price) {
+      shelfShowNotice(`金币不足！需要 ${prop.price} 🪙`);
+      return;
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    if (!state.shelfPropShopLog) state.shelfPropShopLog = {};
+    if (!state.shelfPropShopLog[today]) state.shelfPropShopLog[today] = {};
+    const bought = state.shelfPropShopLog[today][propKey] || 0;
+    if (bought >= prop.dailyLimit) {
+      shelfShowNotice(`${prop.name} 今日已售罄（限${prop.dailyLimit}个/天）`);
+      return;
+    }
+
+    state.gameGold -= prop.price;
+    state.shelfPropShopLog[today][propKey] = bought + 1;
+    if (!state.shelfPropInventory) state.shelfPropInventory = { basket: 0, autoMatch: 0, shuffle: 0 };
+    state.shelfPropInventory[propKey] = (state.shelfPropInventory[propKey] || 0) + 1;
+
+    shelfShowNotice(`购买了 ${prop.name}，已放入背包！`);
+    saveDataDebounced('货架商店购买');
+    shelfRenderShop();
+    shelfRenderBag();
+    const goldEl = document.getElementById('sp-shelf-gold');
+    if (goldEl) goldEl.textContent = state.gameGold;
+  }
+
+  // ===== 游戏结算 =====
+  function shelfGameOver(victory) {
+    shelfState.active = false;
+
+    const baseReward = shelfState.eliminatedGroups * 2;
+    let bonusReward = 0;
+    let bonusMsg = '';
+
+    if (victory) {
+      const diff = shelfState.difficulty;
+      bonusReward = diff.goldReward[0] + Math.floor(Math.random() * (diff.goldReward[1] - diff.goldReward[0] + 1));
+      bonusMsg = `\n🏆 通关奖励: +${bonusReward} 🪙`;
+      state.energy = Math.min(100, state.energy + 2);
+      state.hunger = Math.min(100, state.hunger + 2);
+      updateMood();
+      updateStatusBars();
+    }
+
+    const totalGold = baseReward + bonusReward;
+    state.gameGold += totalGold;
+    saveDataImmediate('货架整理结算');
+
+    const panel = document.getElementById('sp-shelf-panel');
+    if (!panel) return;
+    panel.querySelector('#sp-shelf-result-overlay')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-shelf-result-overlay';
+    overlay.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:10;border-radius:16px;';
+    overlay.innerHTML = `
+      <div class="sp-shelf-result-box">
+        <div class="sp-shelf-result-title">${victory ? '🎉 货架清空啦！' : '😿 货架卡住了'}</div>
+        <div class="sp-shelf-result-info">
+          <div>难度: ${shelfState.difficulty?.name || '未知'}</div>
+          <div>消除: ${shelfState.eliminatedGroups} 组</div>
+          <div>消除奖励: +${baseReward} 🪙${bonusMsg}</div>
+          <div style="font-weight:700;margin-top:6px;">总获得: +${totalGold} 🪙</div>
+        </div>
+        <div class="sp-shelf-result-actions">
+          <button class="sp-shelf-result-btn" id="sp-shelf-restart">🔄 再来一局</button>
+          <button class="sp-shelf-result-btn sp-shelf-result-close" id="sp-shelf-quit">❌ 退出</button>
+        </div>
+      </div>
+    `;
+    panel.appendChild(overlay);
+
+    document.getElementById('sp-shelf-restart')?.addEventListener('click', () => {
+      overlay.remove();
+      shelfConfirmNewGame();
+    });
+    document.getElementById('sp-shelf-quit')?.addEventListener('click', () => {
+      overlay.remove();
+      toggleShelfGame();
+    });
+  }
+
+  // ===== 通知 =====
+  function shelfShowNotice(text) {
+    const notice = document.getElementById('sp-shelf-notice');
+    if (!notice) return;
+    notice.textContent = text;
+    notice.classList.add('visible');
+    clearTimeout(notice._timer);
+    notice._timer = setTimeout(() => notice.classList.remove('visible'), 3000);
+  }
+
+  // ===== 渲染背包标签页 =====
+  function shelfRenderBag() {
+    const container = document.getElementById('sp-shelf-bag-content');
+    if (!container) return;
+    if (!state.shelfPropInventory) state.shelfPropInventory = { basket: 0, autoMatch: 0, shuffle: 0 };
+
+    const items = Object.entries(SHELF_PROPS).map(([key, prop]) => ({
+      key, ...prop, count: state.shelfPropInventory[key] || 0
+    }));
+
+    const hasAny = items.some(i => i.count > 0);
+    container.innerHTML = hasAny ? items.map(item => `
+      <div class="sp-shelf-bag-item">
+        <span style="font-size:20px;width:28px;text-align:center;flex-shrink:0;">${item.name.split(' ')[0]}</span>
+        <div style="flex:1;display:flex;flex-direction:column;gap:2px;">
+          <span style="font-size:12px;font-weight:600;color:var(--sp-text-primary);">${item.name.split(' ').slice(1).join(' ')}</span>
+          <span style="font-size:10px;color:var(--sp-text-muted);">${item.desc}</span>
+        </div>
+        <span style="font-size:14px;font-weight:700;color:var(--sp-text-primary);min-width:30px;text-align:right;">×${item.count}</span>
+      </div>
+    `).join('') : '<div style="text-align:center;padding:20px;color:var(--sp-text-muted);font-size:12px;">背包空空如也～去商店买点道具吧</div>';
+  }
+
+  // ===== 渲染商店标签页 =====
+  function shelfRenderShop() {
+    const container = document.getElementById('sp-shelf-shop-content');
+    if (!container) return;
+    if (!state.shelfPropInventory) state.shelfPropInventory = { basket: 0, autoMatch: 0, shuffle: 0 };
+
+    const today = new Date().toISOString().slice(0, 10);
+    const todayLog = (state.shelfPropShopLog && state.shelfPropShopLog[today]) || {};
+
+    const items = Object.entries(SHELF_PROPS).map(([key, prop]) => {
+      const bought = todayLog[key] || 0;
+      const soldOut = bought >= prop.dailyLimit;
+      const cantAfford = state.gameGold < prop.price;
+      const disabled = soldOut || cantAfford;
+      const stock = state.shelfPropInventory[key] || 0;
+      return { key, ...prop, bought, soldOut, cantAfford, disabled, stock };
+    });
+
+    container.innerHTML = items.map(item => `
+      <div class="sp-shelf-shop-item ${item.disabled ? 'sp-shelf-shop-disabled' : ''}">
+        <span style="font-size:20px;width:28px;text-align:center;flex-shrink:0;">${item.name.split(' ')[0]}</span>
+        <div style="flex:1;display:flex;flex-direction:column;gap:2px;">
+          <span style="font-size:12px;font-weight:600;color:var(--sp-text-primary);">${item.name.split(' ').slice(1).join(' ')}</span>
+          <span style="font-size:10px;color:var(--sp-text-muted);">${item.desc} | 每局限${item.perGameLimit}次</span>
+          <span style="font-size:9px;color:var(--sp-text-muted);">${item.soldOut ? '今日售罄' : `今日剩 ${item.dailyLimit - item.bought}`} | 背包: ${item.stock}</span>
+        </div>
+        <button class="sp-shelf-shop-buy sp-shelf-buy-btn" data-prop="${item.key}" ${item.disabled ? 'disabled' : ''}>🪙${item.price}</button>
+      </div>
+    `).join('');
+
+    container.querySelectorAll('.sp-shelf-buy-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        shelfBuyProp(btn.dataset.prop);
+      });
+    });
+  }
+
+  // ===== 渲染库存标签页 =====
+  function shelfRenderInventory() {
+    const container = document.getElementById('sp-shelf-inv-content');
+    if (!container) return;
+
+    let html = '<div style="font-size:11px;color:var(--sp-text-muted);margin-bottom:8px;line-height:1.7;">消除商品后，对应物资会进入相关背包/库存：<br/>🥤饮品→冰箱可乐 🍪零食→冰箱面包 🐟宠物→冰箱猫罐头<br/>🧸玩具→工坊睡眠道具 🧴清洁→工坊清洁道具<br/>🍄🦐🌽🥑🥟🍜食物→冰箱食材（投喂+餐厅）<br/>🍰🍦甜品→冰箱 🍡糖葫芦→工坊库存<br/>🧂🫙🌶️🧈🍯调料→餐厅（每组+2份）<br/>🫧🪻沐浴→清洁道具 🕯️🧣睡眠→睡眠道具<br/>💰所有消除→额外金币</div>';
+
+    // 冰箱联动库存
+    const fridgeItems = ['cola', 'bread', 'fish'];
+    const fridgeNames = { cola: '可乐（饮品→冰箱）', bread: '面包（零食→冰箱）', fish: '猫罐头（宠物→冰箱）' };
+    const fridgeEmoji = { cola: '🥤', bread: '🍞', fish: '🐟' };
+
+    const fridgeInv = state.fridgeInventory || [];
+    const mappedFridge = fridgeItems.map(fid => {
+      const inv = fridgeInv.find(i => i.foodId === fid);
+      return { fid, count: inv ? inv.count : 0 };
+    }).filter(i => i.count > 0);
+
+    if (mappedFridge.length > 0) {
+      html += '<div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin:8px 0 4px;">🧊 冰箱联动库存</div>';
+      mappedFridge.forEach(item => {
+        html += `
+          <div class="sp-shelf-bag-item">
+            <span style="font-size:20px;width:28px;text-align:center;flex-shrink:0;">${fridgeEmoji[item.fid]}</span>
+            <div style="flex:1;">
+              <span style="font-size:12px;font-weight:600;color:var(--sp-text-primary);">${fridgeNames[item.fid]}</span>
+            </div>
+            <span style="font-size:14px;font-weight:700;color:var(--sp-text-primary);">×${item.count}</span>
+          </div>
+        `;
+      });
+    }
+
+    // 工坊道具联动库存（从货架获得的清洁和睡眠道具）
+    const inv = state.gameInventory || [];
+    const cleanFromShelf = inv.filter(i => i.category === 'clean' && i.count > 0);
+    const energyFromShelf = inv.filter(i => i.category === 'energy' && i.count > 0);
+
+    if (cleanFromShelf.length > 0 || energyFromShelf.length > 0) {
+      html += '<div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin:8px 0 4px;">🎒 工坊道具联动</div>';
+      cleanFromShelf.forEach(i => {
+        const data = GAME_SHOP_ITEMS.clean[i.idx];
+        if (!data) return;
+        html += `
+          <div class="sp-shelf-bag-item">
+            <span style="font-size:20px;width:28px;text-align:center;flex-shrink:0;">${data.emoji}</span>
+            <div style="flex:1;">
+              <span style="font-size:12px;font-weight:600;color:var(--sp-text-primary);">${data.name}（清洁）</span>
+            </div>
+            <span style="font-size:14px;font-weight:700;color:var(--sp-text-primary);">×${i.count}</span>
+          </div>
+        `;
+      });
+      energyFromShelf.forEach(i => {
+        const data = GAME_SHOP_ITEMS.energy[i.idx];
+        if (!data) return;
+        html += `
+          <div class="sp-shelf-bag-item">
+            <span style="font-size:20px;width:28px;text-align:center;flex-shrink:0;">${data.emoji}</span>
+            <div style="flex:1;">
+              <span style="font-size:12px;font-weight:600;color:var(--sp-text-primary);">${data.name}（睡眠）</span>
+            </div>
+            <span style="font-size:14px;font-weight:700;color:var(--sp-text-primary);">×${i.count}</span>
+          </div>
+        `;
+      });
+    }
+
+    if (mappedFridge.length === 0 && cleanFromShelf.length === 0 && energyFromShelf.length === 0) {
+      html += '<div style="text-align:center;padding:16px;color:var(--sp-text-muted);font-size:12px;">暂无库存，消除商品后会在此显示</div>';
+    }
+
+    // 餐厅调料联动库存
+    const seaEntries = Object.entries(state.restaurantSeasonings || {}).filter(([, v]) => v > 0);
+    if (seaEntries.length > 0) {
+      html += '<div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin:8px 0 4px;">🧂 餐厅调料联动</div>';
+      seaEntries.forEach(([id, count]) => {
+        const data = RESTAURANT_SEASONINGS.find(s => s.id === id);
+        if (!data) return;
+        html += `
+          <div class="sp-shelf-bag-item">
+            <span style="font-size:20px;width:28px;text-align:center;flex-shrink:0;">${data.emoji}</span>
+            <div style="flex:1;">
+              <span style="font-size:12px;font-weight:600;color:var(--sp-text-primary);">${data.name}（调料→餐厅）</span>
+            </div>
+            <span style="font-size:14px;font-weight:700;color:var(--sp-text-primary);">×${count}</span>
+          </div>
+        `;
+      });
+    }
+
+    // 新增食材进冰箱的联动
+    const shelfFoodIds = ['mushroom', 'shrimp', 'corn', 'avocado', 'dumpling', 'noodle', 'cake', 'icecream'];
+    const shelfFridgeItems = (state.fridgeInventory || []).filter(i => shelfFoodIds.includes(i.foodId) && i.count > 0);
+    if (shelfFridgeItems.length > 0) {
+      html += '<div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin:8px 0 4px;">🧊 食材/甜品联动（冰箱）</div>';
+      shelfFridgeItems.forEach(inv => {
+        const data = FRIDGE_FOODS.find(f => f.id === inv.foodId);
+        if (!data) return;
+        html += `
+          <div class="sp-shelf-bag-item">
+            <span style="font-size:20px;width:28px;text-align:center;flex-shrink:0;">${data.emoji}</span>
+            <div style="flex:1;">
+              <span style="font-size:12px;font-weight:600;color:var(--sp-text-primary);">${data.name}（货架→冰箱→投喂/餐厅）</span>
+            </div>
+            <span style="font-size:14px;font-weight:700;color:var(--sp-text-primary);">×${inv.count}</span>
+          </div>
+        `;
+      });
+    }
+
+    container.innerHTML = html;
+  }
+
+  // ===== 主渲染函数 =====
+  function shelfRender() {
+    const panel = document.getElementById('sp-shelf-panel');
+    if (!panel) return;
+
+    // 更新金币
+    const goldEl = document.getElementById('sp-shelf-gold');
+    if (goldEl) goldEl.textContent = state.gameGold;
+
+    // 更新信息栏
+    const infoEl = document.getElementById('sp-shelf-info');
+    if (infoEl) {
+      const remaining = shelfState.bays.reduce((sum, bay) => {
+        const frontCount = bay.slots.filter(v => v !== null).length;
+        const backCount = bay.backStack.reduce((s, row) => s + row.filter(v => v !== null).length, 0);
+        return sum + frontCount + backCount;
+      }, 0);
+      infoEl.innerHTML = `
+        <span>剩余: ${remaining}件</span>
+        <span>已消: ${shelfState.eliminatedGroups}组</span>
+        <span>难度: ${shelfState.difficulty?.name || '-'}</span>
+      `;
+    }
+
+    // 渲染货架（2列×4行 = 8个隔间）
+    const areaEl = document.getElementById('sp-shelf-area');
+    if (areaEl) {
+      // 动态设置网格列数
+      const gridCols = shelfState.difficulty ? shelfState.difficulty.cols : 2;
+      areaEl.style.gridTemplateColumns = `repeat(${gridCols}, 1fr)`;
+
+      areaEl.innerHTML = shelfState.bays.map((bay, bayIdx) => {
+        const hasBack = bay.backStack.length > 0 && bay.backStack.some(row => row.some(v => v !== null));
+        const backDepth = bay.backStack.length;
+
+        const slotsHtml = bay.slots.map((v, slotIdx) => {
+          const sel = shelfState.selected;
+          const isSelected = sel && sel.source === 'bay' && sel.bayIdx === bayIdx && sel.slotIdx === slotIdx;
+          const filled = v !== null;
+          const itemData = filled ? SHELF_ITEMS.find(it => it.id === v) : null;
+
+          let cls = 'sp-shelf-slot';
+          if (filled) cls += ' sp-shelf-slot-filled';
+          if (isSelected) cls += ' sp-shelf-slot-selected';
+
+          return `<div class="${cls}" data-source="bay" data-bay="${bayIdx}" data-slot="${slotIdx}" title="${itemData ? itemData.name : '空格'}">${filled ? itemData.emoji : ''}</div>`;
+        }).join('');
+
+        // 后排指示器
+        const backIndicator = backDepth > 0
+          ? `<div style="position:absolute;top:2px;right:3px;font-size:8px;color:rgba(255,180,100,0.7);font-weight:700;">${backDepth}层</div>`
+          : '';
+
+        const rowNum = Math.floor(bayIdx / gridCols) + 1;
+        const colNum = (bayIdx % gridCols) + 1;
+
+        return `
+          <div class="sp-shelf-bay" data-bay="${bayIdx}" style="position:relative;" title="第${rowNum}排第${colNum}列">
+            ${slotsHtml}
+            ${backIndicator}
+          </div>
+        `;
+      }).join('');
+
+      // 绑定隔间格子点击
+      areaEl.querySelectorAll('.sp-shelf-slot').forEach(el => {
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const source = 'bay';
+          const bayIdx = parseInt(el.dataset.bay);
+          const slotIdx = parseInt(el.dataset.slot);
+          shelfHandleClick({ source, bayIdx, slotIdx });
+        });
+      });
+
+      // PC端拖拽
+      shelfBindDragOnSlots(areaEl);
+    }
+
+    // 渲染扩展篮（如果激活）
+    const basketAreaEl = document.getElementById('sp-shelf-basket-area');
+    if (basketAreaEl) {
+      if (shelfState.basketActive) {
+        basketAreaEl.style.display = '';
+        basketAreaEl.innerHTML = `
+          <div style="font-size:10px;color:rgba(255,215,0,0.7);font-weight:600;margin-bottom:4px;">🪵 临时扩展篮</div>
+          <div style="display:flex;gap:4px;">
+            ${shelfState.basketSlots.map((v, slotIdx) => {
+              const sel = shelfState.selected;
+              const isSelected = sel && sel.source === 'basket' && sel.slotIdx === slotIdx;
+              const filled = v !== null;
+              const itemData = filled ? SHELF_ITEMS.find(it => it.id === v) : null;
+              let cls = 'sp-shelf-slot';
+              if (filled) cls += ' sp-shelf-slot-filled';
+              if (isSelected) cls += ' sp-shelf-slot-selected';
+              return `<div class="${cls}" data-source="basket" data-slot="${slotIdx}" style="width:42px;height:42px;">${filled ? itemData.emoji : ''}</div>`;
+            }).join('')}
+          </div>
+        `;
+        basketAreaEl.querySelectorAll('.sp-shelf-slot').forEach(el => {
+          el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            shelfHandleClick({ source: 'basket', slotIdx: parseInt(el.dataset.slot) });
+          });
+        });
+      } else {
+        basketAreaEl.style.display = 'none';
+      }
+    }
+
+    // 渲染总背包区（底部2格）
+    const bagAreaEl = document.getElementById('sp-shelf-bag-area');
+    if (bagAreaEl) {
+      bagAreaEl.innerHTML = shelfState.bagSlots.map((v, slotIdx) => {
+        const sel = shelfState.selected;
+        const isSelected = sel && sel.source === 'bag' && sel.slotIdx === slotIdx;
+        const filled = v !== null;
+        const itemData = filled ? SHELF_ITEMS.find(it => it.id === v) : null;
+        let cls = 'sp-shelf-bag-slot';
+        if (filled) cls += ' sp-shelf-bag-filled';
+        if (isSelected) cls += ' sp-shelf-slot-selected';
+        return `<div class="${cls}" data-source="bag" data-slot="${slotIdx}" title="${itemData ? itemData.name : '总背包格'}">${filled ? itemData.emoji : ''}</div>`;
+      }).join('');
+
+      bagAreaEl.querySelectorAll('.sp-shelf-bag-slot').forEach(el => {
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          shelfHandleClick({ source: 'bag', slotIdx: parseInt(el.dataset.slot) });
+        });
+      });
+    }
+
+    // 渲染道具按钮状态
+    if (!state.shelfPropInventory) state.shelfPropInventory = { basket: 0, autoMatch: 0, shuffle: 0 };
+    const basketCountEl = document.getElementById('sp-shelf-prop-basket-count');
+    const autoMatchCountEl = document.getElementById('sp-shelf-prop-automatch-count');
+    const shuffleCountEl = document.getElementById('sp-shelf-prop-shuffle-count');
+    if (basketCountEl) basketCountEl.textContent = `×${state.shelfPropInventory.basket || 0} (${shelfState.propsUsed.basket}/${SHELF_PROPS.basket.perGameLimit})`;
+    if (autoMatchCountEl) autoMatchCountEl.textContent = `×${state.shelfPropInventory.autoMatch || 0} (${shelfState.propsUsed.autoMatch}/${SHELF_PROPS.autoMatch.perGameLimit})`;
+    if (shuffleCountEl) shuffleCountEl.textContent = `×${state.shelfPropInventory.shuffle || 0} (${shelfState.propsUsed.shuffle}/${SHELF_PROPS.shuffle.perGameLimit})`;
+  }
+
+  // ===== 点击处理（选中/移动）=====
+  function shelfHandleClick(pos) {
+    const sel = shelfState.selected;
+
+    // 没有选中 → 选中当前格（必须有物品）
+    if (!sel) {
+      const val = shelfGetSlotValue(pos);
+      if (val === null) return;
+      shelfState.selected = pos;
+      shelfRender();
+      return;
+    }
+
+    // 点同一格 → 取消选中
+    const isSame = sel.source === pos.source &&
+      sel.slotIdx === pos.slotIdx &&
+      (sel.source !== 'bay' || sel.bayIdx === pos.bayIdx);
+    if (isSame) {
+      shelfState.selected = null;
+      shelfRender();
+      return;
+    }
+
+    // 尝试移动
+    const success = shelfMove(sel, pos);
+    shelfState.selected = null;
+
+    if (success) {
+      // 检查消除
+      const eliminated = shelfCheckEliminate();
+
+      // 后排补位（不论是否触发了消除，只要前排空了就补）
+      shelfState.bays.forEach((bay, bayIdx) => {
+        if (bay.slots.every(v => v === null) && bay.backStack.length > 0) {
+          shelfAdvanceBack(bayIdx);
+        }
+      });
+
+      saveDataDebounced('货架移动');
+
+      // 检查胜利
+      if (shelfCheckWin()) {
+        shelfState.active = false;
+        shelfRender();
+        setTimeout(() => shelfGameOver(true), 400);
+        return;
+      }
+
+      // 检查死局
+      if (shelfCheckDeadlock()) {
+        shelfShowNotice('⚠️ 好像卡住了！试试使用道具破局？');
+      }
+    }
+
+    shelfRender();
+  }
+
+  // ===== PC端拖拽绑定 =====
+  let _shelfDragState = { from: null, clone: null };
+
+  function shelfBindDragOnSlots(container) {
+    container.querySelectorAll('.sp-shelf-slot.sp-shelf-slot-filled').forEach(el => {
+      el.setAttribute('draggable', 'true');
+
+      el.addEventListener('dragstart', (e) => {
+        const source = el.dataset.source;
+        const bayIdx = el.dataset.bay !== undefined ? parseInt(el.dataset.bay) : undefined;
+        const slotIdx = parseInt(el.dataset.slot);
+        _shelfDragState.from = { source, bayIdx, slotIdx };
+        el.classList.add('sp-shelf-slot-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+
+      el.addEventListener('dragend', () => {
+        el.classList.remove('sp-shelf-slot-dragging');
+        _shelfDragState.from = null;
+        // 清除所有 drop 高亮
+        document.querySelectorAll('.sp-shelf-bay-drop-ok, .sp-shelf-bay-drop-bad').forEach(b => {
+          b.classList.remove('sp-shelf-bay-drop-ok', 'sp-shelf-bay-drop-bad');
+        });
+      });
+    });
+
+    // dragover / drop 在隔间上
+    container.querySelectorAll('.sp-shelf-bay').forEach(bayEl => {
+      bayEl.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        if (!_shelfDragState.from) return;
+        const toIdx = parseInt(bayEl.dataset.bay);
+        const bay = shelfState.bays[toIdx];
+        const hasEmpty = bay.slots.some(v => v === null);
+        bayEl.classList.toggle('sp-shelf-bay-drop-ok', hasEmpty);
+        bayEl.classList.toggle('sp-shelf-bay-drop-bad', !hasEmpty);
+      });
+
+      bayEl.addEventListener('dragleave', () => {
+        bayEl.classList.remove('sp-shelf-bay-drop-ok', 'sp-shelf-bay-drop-bad');
+      });
+
+      bayEl.addEventListener('drop', (e) => {
+        e.preventDefault();
+        bayEl.classList.remove('sp-shelf-bay-drop-ok', 'sp-shelf-bay-drop-bad');
+        if (!_shelfDragState.from) return;
+
+        const toIdx = parseInt(bayEl.dataset.bay);
+        const bay = shelfState.bays[toIdx];
+        // 找第一个空槽
+        const emptySlot = bay.slots.findIndex(v => v === null);
+        if (emptySlot === -1) {
+          shelfShowNotice('该隔间已满！');
+          return;
+        }
+
+        const to = { source: 'bay', bayIdx: toIdx, slotIdx: emptySlot };
+        const success = shelfMove(_shelfDragState.from, to);
+        _shelfDragState.from = null;
+        shelfState.selected = null;
+
+        if (success) {
+          const eliminated = shelfCheckEliminate();
+
+          // 后排补位（不论是否触发了消除）
+          shelfState.bays.forEach((b, bIdx) => {
+            if (b.slots.every(v => v === null) && b.backStack.length > 0) {
+              shelfAdvanceBack(bIdx);
+            }
+          });
+
+          saveDataDebounced('货架拖拽移动');
+          if (shelfCheckWin()) {
+            shelfState.active = false;
+            shelfRender();
+            setTimeout(() => shelfGameOver(true), 400);
+            return;
+          }
+          if (shelfCheckDeadlock()) {
+            shelfShowNotice('⚠️ 好像卡住了！试试使用道具破局？');
+          }
+        }
+        shelfRender();
+      });
+    });
+
+    // drop 到总背包格
+    const bagAreaEl = document.getElementById('sp-shelf-bag-area');
+    if (bagAreaEl) {
+      bagAreaEl.querySelectorAll('.sp-shelf-bag-slot').forEach(bagEl => {
+        bagEl.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          if (!_shelfDragState.from) return;
+          const slotIdx = parseInt(bagEl.dataset.slot);
+          const isEmpty = shelfState.bagSlots[slotIdx] === null;
+          bagEl.style.borderColor = isEmpty ? 'rgba(100,220,100,0.7)' : 'rgba(239,83,80,0.7)';
+        });
+        bagEl.addEventListener('dragleave', () => {
+          bagEl.style.borderColor = '';
+        });
+        bagEl.addEventListener('drop', (e) => {
+          e.preventDefault();
+          bagEl.style.borderColor = '';
+          if (!_shelfDragState.from) return;
+          const slotIdx = parseInt(bagEl.dataset.slot);
+          if (shelfState.bagSlots[slotIdx] !== null) {
+            shelfShowNotice('总背包该格已满！');
+            return;
+          }
+          const to = { source: 'bag', slotIdx };
+          shelfMove(_shelfDragState.from, to);
+          _shelfDragState.from = null;
+          shelfState.selected = null;
+          saveDataDebounced('货架拖入背包');
+          shelfRender();
+        });
+      });
+    }
+  }
+
+  // ===== 渲染主面板 =====
+  function shelfRenderPanel() {
+    let panel = document.getElementById('sp-shelf-panel');
+    if (panel) panel.remove();
+
+    panel = document.createElement('div');
+    panel.id = 'sp-shelf-panel';
+    panel.innerHTML = `
+      <div id="sp-shelf-header">
+        <span>🛒 整理货架</span>
+        <div class="sp-shelf-header-right">
+          <button id="sp-shelf-minimize" title="缩小悬挂" style="background:none;border:none;font-size:14px;cursor:pointer;color:var(--sp-text-muted);padding:2px 6px;">─</button>
+          <button id="sp-shelf-close" title="关闭">✕</button>
+        </div>
+      </div>
+      <div id="sp-shelf-notice"></div>
+      <div style="display:flex;gap:4px;padding:6px 10px;background:rgba(255,255,255,0.03);border-bottom:1px solid var(--sp-border-light);align-items:center;">
+        <button class="sp-game-tab active" data-shelftab="play" id="sp-shelf-tab-play">🎮 游戏</button>
+        <button class="sp-game-tab" data-shelftab="bag" id="sp-shelf-tab-bag">🎒 背包</button>
+        <button class="sp-game-tab" data-shelftab="shop" id="sp-shelf-tab-shop">🛒 商店</button>
+        <button class="sp-game-tab" data-shelftab="inventory" id="sp-shelf-tab-inventory">📦 库存</button>
+        <span class="sp-shelf-gold-display" style="margin-left:auto;">🪙 <span id="sp-shelf-gold">${state.gameGold}</span></span>
+      </div>
+      <div id="sp-shelf-body">
+        <div id="sp-shelf-tab-content-play">
+          <div id="sp-shelf-info"></div>
+          <div id="sp-shelf-area" class="sp-shelf-area"></div>
+          <div id="sp-shelf-basket-area" style="display:none;margin-top:6px;padding:6px 8px;background:rgba(255,215,0,0.06);border-radius:8px;border:1px solid rgba(255,215,0,0.2);"></div>
+          <div style="margin-top:6px;">
+            <div style="font-size:10px;color:var(--sp-text-muted);text-align:center;margin-bottom:4px;">🎒 总背包（2格临时存放）</div>
+            <div id="sp-shelf-bag-area" class="sp-shelf-bag-area" style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;padding:6px 8px;background:rgba(255,215,0,0.06);border-radius:10px;border:2px solid rgba(255,215,0,0.22);"></div>
+          </div>
+          <div id="sp-shelf-props" style="margin-top:8px;">
+            <button class="sp-shelf-prop-btn" id="sp-shelf-prop-basket-btn" title="${SHELF_PROPS.basket.desc}">
+              <span class="sp-shelf-prop-icon">🪵</span>
+              <span class="sp-shelf-prop-name">扩展篮</span>
+              <span class="sp-shelf-prop-count" id="sp-shelf-prop-basket-count">×0</span>
+            </button>
+            <button class="sp-shelf-prop-btn" id="sp-shelf-prop-automatch-btn" title="${SHELF_PROPS.autoMatch.desc}">
+              <span class="sp-shelf-prop-icon">🧹</span>
+              <span class="sp-shelf-prop-name">喵喵爪</span>
+              <span class="sp-shelf-prop-count" id="sp-shelf-prop-automatch-count">×0</span>
+            </button>
+            <button class="sp-shelf-prop-btn" id="sp-shelf-prop-shuffle-btn" title="${SHELF_PROPS.shuffle.desc}">
+              <span class="sp-shelf-prop-icon">🔄</span>
+              <span class="sp-shelf-prop-name">大洗牌</span>
+              <span class="sp-shelf-prop-count" id="sp-shelf-prop-shuffle-count">×0</span>
+            </button>
+          </div>
+          <div style="height:8px;"></div>
+          <div style="display:flex;gap:8px;justify-content:center;">
+            <button class="sp-link-ctrl-btn" id="sp-shelf-restart-btn">🔄 重开</button>
+            <button class="sp-link-ctrl-btn sp-link-ctrl-quit" id="sp-shelf-quit-btn">❌ 放弃</button>
+          </div>
+        </div>
+        <div id="sp-shelf-tab-content-bag" style="display:none;padding:8px;">
+          <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">🎒 道具背包</div>
+          <div id="sp-shelf-bag-content"></div>
+        </div>
+        <div id="sp-shelf-tab-content-shop" style="display:none;padding:8px;">
+          <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">🛒 道具商店 <span style="font-size:10px;color:var(--sp-text-muted);font-weight:400;">（每种每天限量）</span></div>
+          <div id="sp-shelf-shop-content"></div>
+        </div>
+        <div id="sp-shelf-tab-content-inventory" style="display:none;padding:8px;">
+          <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">📦 联动库存</div>
+          <div id="sp-shelf-inv-content"></div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(panel);
+
+    // 最小化
+    document.getElementById('sp-shelf-minimize').addEventListener('click', () => {
+      const sp = document.getElementById('sp-shelf-panel');
+      const minBtn = document.getElementById('sp-shelf-minimize');
+      if (!sp || !minBtn) return;
+      if (sp.classList.contains('sp-shelf-minimized')) {
+        sp.classList.remove('sp-shelf-minimized');
+        minBtn.textContent = '─';
+        minBtn.title = '缩小悬挂';
+      } else {
+        sp.classList.add('sp-shelf-minimized');
+        minBtn.textContent = '□';
+        minBtn.title = '恢复窗口';
+      }
+    });
+
+    // 关闭
+    document.getElementById('sp-shelf-close').addEventListener('click', () => toggleShelfGame());
+
+    // 道具按钮
+    document.getElementById('sp-shelf-prop-basket-btn').addEventListener('click', () => shelfUsePropBasket());
+    document.getElementById('sp-shelf-prop-automatch-btn').addEventListener('click', () => shelfUsePropAutoMatch());
+    document.getElementById('sp-shelf-prop-shuffle-btn').addEventListener('click', () => shelfUsePropShuffle());
+
+    // 重开
+    document.getElementById('sp-shelf-restart-btn').addEventListener('click', () => {
+      showConfirmDialog({
+        title: '🔄 重开本局？',
+        desc: '当前进度将清零，重新开始新的一局。<br/>将消耗一定体力。',
+        confirmText: '重开',
+        cancelText: '继续',
+        onConfirm: () => {
+          gameRecoverStamina();
+          const ok = shelfGenerateLevel();
+          if (!ok) return;
+          shelfRender();
+          shelfShowNotice(`🔄 新一局！难度: ${shelfState.difficulty.name} | -${shelfState.energyCost}⚡`);
+          if (isGameOpen) gameRenderStatus();
+        }
+      });
+    });
+
+    // 放弃
+    document.getElementById('sp-shelf-quit-btn').addEventListener('click', () => {
+      showConfirmDialog({
+        title: '❌ 放弃本局？',
+        desc: '当前进度将丢失，体力不退还。',
+        confirmText: '放弃',
+        cancelText: '继续',
+        onConfirm: () => {
+          shelfState.active = false;
+          isShelfOpen = false;
+          const p = document.getElementById('sp-shelf-panel');
+          if (p) p.remove();
+        }
+      });
+    });
+
+    // 标签页切换
+    const shelfTabs = ['play', 'bag', 'shop', 'inventory'];
+    shelfTabs.forEach(tabName => {
+      const tabBtn = document.getElementById(`sp-shelf-tab-${tabName}`);
+      if (tabBtn) {
+        tabBtn.addEventListener('click', () => {
+          shelfTabs.forEach(t => {
+            const b = document.getElementById(`sp-shelf-tab-${t}`);
+            if (b) b.classList.toggle('active', t === tabName);
+            const c = document.getElementById(`sp-shelf-tab-content-${t}`);
+            if (c) c.style.display = t === tabName ? '' : 'none';
+          });
+          if (tabName === 'bag') shelfRenderBag();
+          if (tabName === 'shop') shelfRenderShop();
+          if (tabName === 'inventory') shelfRenderInventory();
+        });
+      }
+    });
+
+    // 面板拖拽
+    shelfBindPanelDrag();
+  }
+
+  // ===== 面板拖拽 =====
+  function shelfBindPanelDrag() {
+    const header = document.getElementById('sp-shelf-header');
+    const panel = document.getElementById('sp-shelf-panel');
+    if (!header || !panel) return;
+
+    let dragging = false, offX = 0, offY = 0;
+
+    const down = (e) => {
+      if (e.target.closest('#sp-shelf-close') || e.target.closest('#sp-shelf-minimize')) return;
+      dragging = true;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const rect = panel.getBoundingClientRect();
+      offX = clientX - rect.left;
+      offY = clientY - rect.top;
+    };
+    const move = (e) => {
+      if (!dragging) return;
+      if (e.cancelable) e.preventDefault();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      let x = clientX - offX;
+      let y = clientY - offY;
+      x = Math.max(0, Math.min(window.innerWidth - panel.offsetWidth, x));
+      y = Math.max(0, Math.min(window.innerHeight - panel.offsetHeight, y));
+      panel.style.left = x + 'px';
+      panel.style.top = y + 'px';
+    };
+    const up = () => { dragging = false; };
+
+    header.addEventListener('mousedown', down);
+    header.addEventListener('touchstart', down, { passive: true });
+    document.addEventListener('mousemove', move);
+    document.addEventListener('touchmove', move, { passive: false });
+    document.addEventListener('mouseup', up);
+    document.addEventListener('touchend', up);
+  }
+
+  // ===== 开局确认弹窗 =====
+  function shelfConfirmNewGame() {
+    showConfirmDialog({
+      title: '🛒 开始整理货架？',
+      desc: '难度随机分配，开局消耗一定体力。<br/>把货架上所有商品三消清空吧！',
+      confirmText: '✨ 开始',
+      cancelText: '算了',
+      onConfirm: () => {
+        gameRecoverStamina();
+        const ok = shelfGenerateLevel();
+        if (!ok) return;
+        shelfRender();
+        shelfShowNotice(`开局！难度: ${shelfState.difficulty.name} | -${shelfState.energyCost}⚡ | ${shelfState.totalGroups}组待消除`);
+        if (isGameOpen) gameRenderStatus();
+      },
+      onCancel: () => {
+        isShelfOpen = false;
+        const panel = document.getElementById('sp-shelf-panel');
+        if (panel) panel.remove();
+      }
+    });
+  }
+
+  // ===== 开关货架整理面板 =====
+  function toggleShelfGame() {
+    isShelfOpen = !isShelfOpen;
+    let panel = document.getElementById('sp-shelf-panel');
+
+    if (isShelfOpen) {
+      if (panel) panel.remove();
+      shelfRenderPanel();
+      panel = document.getElementById('sp-shelf-panel');
+      panel.classList.add('visible');
+
+      const w = Math.min(420, window.innerWidth - 20);
+      panel.style.width = w + 'px';
+      requestAnimationFrame(() => {
+        const h = panel.offsetHeight;
+        const maxTop = window.innerHeight - h - 20;
+        const centerTop = Math.floor((window.innerHeight - h) / 2);
+        panel.style.left = Math.floor((window.innerWidth - w) / 2) + 'px';
+        panel.style.top = Math.max(10, Math.min(centerTop, maxTop)) + 'px';
+      });
+
+      if (!shelfState.active) {
+        shelfRender();
+        shelfConfirmNewGame();
+      } else {
+        shelfRender();
+      }
+    } else {
+      if (panel) panel.remove();
+      shelfState.selected = null;
+      _shelfDragState.from = null;
     }
   }
 
