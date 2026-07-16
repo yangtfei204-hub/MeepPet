@@ -7049,7 +7049,47 @@ function refreshCharPreview() {
         { level: 7, emoji: '🔥', name: '凤凰之泪', sell: 120 },
         { level: 8, emoji: '💫', name: '传说万灵药', sell: 280 },
       ]
+    },
+    music: {
+      name: '🎵 音律链',
+      items: [
+        { level: 1, emoji: '🔔', name: '小铃铛', sell: 1 },
+        { level: 2, emoji: '🎶', name: '音符碎片', sell: 2 },
+        { level: 3, emoji: '🎸', name: '迷你吉他', sell: 5 },
+        { level: 4, emoji: '🎹', name: '水晶钢琴', sell: 11 },
+        { level: 5, emoji: '🎺', name: '黄金号角', sell: 25 },
+        { level: 6, emoji: '🎻', name: '精灵提琴', sell: 55 },
+        { level: 7, emoji: '🪗', name: '梦境管风琴', sell: 120 },
+        { level: 8, emoji: '🌌', name: '传说天籁交响', sell: 280 },
+      ]
+    },
+    flower: {
+      name: '🌺 花卉链',
+      items: [
+        { level: 1, emoji: '🌱', name: '小嫩芽', sell: 1 },
+        { level: 2, emoji: '🌼', name: '雏菊', sell: 2 },
+        { level: 3, emoji: '🌷', name: '郁金香', sell: 5 },
+        { level: 4, emoji: '🌹', name: '红玫瑰', sell: 11 },
+        { level: 5, emoji: '🪷', name: '七色莲花', sell: 25 },
+        { level: 6, emoji: '💐', name: '永生花束', sell: 55 },
+        { level: 7, emoji: '🌸', name: '千年樱之魂', sell: 120 },
+        { level: 8, emoji: '🏵️', name: '传说世界树之花', sell: 280 },
+      ]
+    },
+    star: {
+      name: '⭐ 星辰链',
+      items: [
+        { level: 1, emoji: '💧', name: '露水珠', sell: 1 },
+        { level: 2, emoji: '❄️', name: '霜晶', sell: 2 },
+        { level: 3, emoji: '🌙', name: '月光碎片', sell: 5 },
+        { level: 4, emoji: '☀️', name: '日耀石', sell: 11 },
+        { level: 5, emoji: '🌠', name: '流星核心', sell: 25 },
+        { level: 6, emoji: '🪐', name: '星环宝珠', sell: 55 },
+        { level: 7, emoji: '🌌', name: '银河之钥', sell: 120 },
+        { level: 8, emoji: '✴️', name: '传说创世星火', sell: 280 },
+      ]
     }
+
   };
 
   // 商店物品定义
@@ -7115,7 +7155,20 @@ function refreshCharPreview() {
     { chain: 'food', minLevel: 5, maxLevel: 8, goldMulti: 4.0 },
     { chain: 'gem', minLevel: 5, maxLevel: 8, goldMulti: 4.0 },
     { chain: 'potion', minLevel: 5, maxLevel: 8, goldMulti: 4.0 },
+    { chain: 'music', minLevel: 2, maxLevel: 5, goldMulti: 2.0 },
+    { chain: 'music', minLevel: 3, maxLevel: 6, goldMulti: 2.5 },
+    { chain: 'music', minLevel: 4, maxLevel: 7, goldMulti: 3.0 },
+    { chain: 'music', minLevel: 5, maxLevel: 8, goldMulti: 4.0 },
+    { chain: 'flower', minLevel: 2, maxLevel: 5, goldMulti: 2.0 },
+    { chain: 'flower', minLevel: 3, maxLevel: 6, goldMulti: 2.5 },
+    { chain: 'flower', minLevel: 4, maxLevel: 7, goldMulti: 3.0 },
+    { chain: 'flower', minLevel: 5, maxLevel: 8, goldMulti: 4.0 },
+    { chain: 'star', minLevel: 2, maxLevel: 5, goldMulti: 2.0 },
+    { chain: 'star', minLevel: 3, maxLevel: 6, goldMulti: 2.5 },
+    { chain: 'star', minLevel: 4, maxLevel: 7, goldMulti: 3.0 },
+    { chain: 'star', minLevel: 5, maxLevel: 8, goldMulti: 4.0 },
   ];
+
 
   let isGameOpen = false;
   let gameSelectedCell = null; // 轻触选中模式
@@ -7215,7 +7268,7 @@ function refreshCharPreview() {
     }
 
     // 随机选择链
-    const chains = ['toy', 'food', 'gem', 'potion'];
+    const chains = ['toy', 'food', 'gem', 'potion', 'music', 'flower', 'star'];
     const chain = chains[Math.floor(Math.random() * chains.length)];
 
     // 放到随机空格
@@ -7997,7 +8050,7 @@ function refreshCharPreview() {
     const container = document.getElementById('sp-game-collection-content');
     if (!container) return;
 
-    const chainKeys = ['toy', 'food', 'gem', 'potion'];
+    const chainKeys = ['toy', 'food', 'gem', 'potion', 'music', 'flower', 'star'];
     container.innerHTML = chainKeys.map(chainKey => {
       const chain = GAME_CHAINS[chainKey];
       return `
@@ -9001,6 +9054,11 @@ function refreshCharPreview() {
     // 更新金币显示
     const goldEl = document.getElementById('sp-match3-gold');
     if (goldEl) goldEl.textContent = state.gameGold;
+
+    // 控制开始按钮显示/隐藏
+    const startWrapper = document.getElementById('sp-match3-start-wrapper');
+    if (startWrapper) startWrapper.style.display = match3State.active ? 'none' : 'flex';
+
   }
 
   // ===== 消消看面板 =====
@@ -9052,6 +9110,7 @@ function refreshCharPreview() {
           </div>
           <div id="sp-match3-props-used" style="text-align:center;font-size:10px;color:var(--sp-text-muted);margin-top:4px;">本局已用: 0/3</div>
           <div style="height:8px;"></div>
+          <div id="sp-match3-start-wrapper" style="display:flex;justify-content:center;margin-bottom:8px;"><button class="sp-match3-ctrl-btn" id="sp-match3-start-btn" style="background:var(--sp-primary);color:#fff;border-color:var(--sp-primary-border);padding:10px 24px;font-size:13px;">✨ 开始游戏</button></div>
           <div id="sp-match3-controls">
             <button class="sp-match3-ctrl-btn" id="sp-match3-restart-btn">🔄 重开</button>
             <button class="sp-match3-ctrl-btn sp-match3-ctrl-quit" id="sp-match3-end-btn">❌ 结束</button>
@@ -9096,6 +9155,12 @@ function refreshCharPreview() {
     document.getElementById('sp-match3-prop-expand').addEventListener('click', () => match3UseProp('expand'));
     document.getElementById('sp-match3-prop-sweep').addEventListener('click', () => match3UseProp('sweep'));
     document.getElementById('sp-match3-prop-shuffle').addEventListener('click', () => match3UseProp('shuffle'));
+
+    // 开始游戏按钮
+    document.getElementById('sp-match3-start-btn')?.addEventListener('click', () => {
+      match3ConfirmNewGame();
+    });
+
 
     // 重开按钮
     document.getElementById('sp-match3-restart-btn').addEventListener('click', () => {
@@ -9318,13 +9383,9 @@ function refreshCharPreview() {
         panel.style.top = Math.max(10, Math.min(centerTop, maxTop)) + 'px';
       });
 
-      // 如果没有活跃游戏，弹窗确认后开新局
-      if (!match3State.active) {
-        match3Render();
-        match3ConfirmNewGame();
-      } else {
-        match3Render();
-      }
+      // 如果没有活跃游戏，只渲染面板，不自动弹窗
+      match3Render();
+
     } else {
       // 彻底销毁 DOM
       if (panel) panel.remove();
@@ -9351,11 +9412,9 @@ function refreshCharPreview() {
         if (isGameOpen) gameRenderStatus();
       },
       onCancel: () => {
-        // 不开局，关闭面板
-        isMatch3Open = false;
-        const panel = document.getElementById('sp-match3-panel');
-        if (panel) panel.classList.remove('visible');
+        // 不开局，留在游戏面板
       }
+
     });
   }
 
@@ -9410,6 +9469,18 @@ function refreshCharPreview() {
         // 货架整理道具
         { type: 'shelfprop', key: 'shuffle', label: '🔄 货架大洗牌 ×1', weight: 20 },
         { type: 'shelfprop', key: 'autoMatch', label: '🧹 喵喵爪理货 ×1', weight: 15 },
+        // 合成棋盘物品（低级）- 小档补全
+        { type: 'boarditem', chain: 'toy',    level: 1, label: '🧶 线团 (Lv1)',       weight: 8  },
+        { type: 'boarditem', chain: 'food',   level: 1, label: '🌾 面粉 (Lv1)',       weight: 8  },
+        { type: 'boarditem', chain: 'gem',    level: 1, label: '✨ 碎晶 (Lv1)',       weight: 8  },
+        { type: 'boarditem', chain: 'potion', level: 1, label: '🌿 杂草 (Lv1)',       weight: 8  },
+        { type: 'boarditem', chain: 'music',  level: 1, label: '🔔 小铃铛 (Lv1)',     weight: 8  },
+        { type: 'boarditem', chain: 'flower', level: 1, label: '🌱 小嫩芽 (Lv1)',     weight: 8  },
+        { type: 'boarditem', chain: 'star',   level: 1, label: '💧 露水珠 (Lv1)',     weight: 8  },
+        { type: 'boarditem', chain: 'music',  level: 2, label: '🎶 音符碎片 (Lv2)',   weight: 5  },
+        { type: 'boarditem', chain: 'flower', level: 2, label: '🌼 雏菊 (Lv2)',       weight: 5  },
+        { type: 'boarditem', chain: 'star',   level: 2, label: '❄️ 霜晶 (Lv2)',       weight: 5  },
+
       ]
     },
     {
@@ -9464,6 +9535,14 @@ function refreshCharPreview() {
         { type: 'shelfprop', key: 'shuffle', label: '🔄 货架大洗牌 ×2', count: 2, weight: 25 },
         { type: 'shelfprop', key: 'autoMatch', label: '🧹 喵喵爪理货 ×2', count: 2, weight: 20 },
         { type: 'shelfprop', key: 'basket', label: '🪵 临时扩展篮 ×1', weight: 12 },
+        // 新链合成棋盘物品
+        { type: 'boarditem', chain: 'music',  level: 2, label: '🎶 音符碎片 (Lv2)',   weight: 20 },
+        { type: 'boarditem', chain: 'flower', level: 2, label: '🌼 雏菊 (Lv2)',       weight: 20 },
+        { type: 'boarditem', chain: 'star',   level: 2, label: '❄️ 霜晶 (Lv2)',       weight: 20 },
+        { type: 'boarditem', chain: 'music',  level: 3, label: '🎸 迷你吉他 (Lv3)',   weight: 8  },
+        { type: 'boarditem', chain: 'flower', level: 3, label: '🌷 郁金香 (Lv3)',     weight: 8  },
+        { type: 'boarditem', chain: 'star',   level: 3, label: '🌙 月光碎片 (Lv3)',   weight: 8  },
+
       ]
     },
     {
@@ -9527,6 +9606,17 @@ function refreshCharPreview() {
         { type: 'shelfprop', key: 'shuffle', label: '🔄 货架大洗牌 ×3', count: 3, weight: 30 },
         { type: 'shelfprop', key: 'autoMatch', label: '🧹 喵喵爪理货 ×3', count: 3, weight: 25 },
         { type: 'shelfprop', key: 'basket', label: '🪵 临时扩展篮 ×2', count: 2, weight: 15 },
+        // 新链合成棋盘物品
+        { type: 'boarditem', chain: 'music',  level: 3, label: '🎸 迷你吉他 (Lv3)',   weight: 30 },
+        { type: 'boarditem', chain: 'flower', level: 3, label: '🌷 郁金香 (Lv3)',     weight: 30 },
+        { type: 'boarditem', chain: 'star',   level: 3, label: '🌙 月光碎片 (Lv3)',   weight: 30 },
+        { type: 'boarditem', chain: 'music',  level: 4, label: '🎹 水晶钢琴 (Lv4)',   weight: 12 },
+        { type: 'boarditem', chain: 'flower', level: 4, label: '🌹 红玫瑰 (Lv4)',     weight: 12 },
+        { type: 'boarditem', chain: 'star',   level: 4, label: '☀️ 日耀石 (Lv4)',     weight: 12 },
+        { type: 'boarditem', chain: 'music',  level: 5, label: '🎺 黄金号角 (Lv5)',   weight: 3  },
+        { type: 'boarditem', chain: 'flower', level: 5, label: '🪷 七色莲花 (Lv5)',   weight: 3  },
+        { type: 'boarditem', chain: 'star',   level: 5, label: '🌠 流星核心 (Lv5)',   weight: 3  },
+
       ]
     }
   ];
@@ -10751,6 +10841,11 @@ function refreshCharPreview() {
     // 更新金币
     const goldEl = document.getElementById('sp-link-gold');
     if (goldEl) goldEl.textContent = state.gameGold;
+
+    // 控制开始按钮显示/隐藏
+    const startWrapper = document.getElementById('sp-link-start-wrapper');
+    if (startWrapper) startWrapper.style.display = linkState.active ? 'none' : 'flex';
+
   }
 
   // ===== 渲染道具按钮 =====
@@ -10968,6 +11063,7 @@ function refreshCharPreview() {
             </button>
           </div>
           <div style="height:8px;"></div>
+          <div id="sp-link-start-wrapper" style="display:flex;justify-content:center;margin-bottom:8px;"><button class="sp-link-ctrl-btn" id="sp-link-start-btn" style="background:var(--sp-primary);color:#fff;border-color:var(--sp-primary-border);padding:10px 24px;font-size:13px;">✨ 开始游戏</button></div>
           <div id="sp-link-controls">
             <button class="sp-link-ctrl-btn" id="sp-link-restart-btn">🔄 重开</button>
             <button class="sp-link-ctrl-btn sp-link-ctrl-quit" id="sp-link-end-btn">❌ 结束</button>
@@ -11013,6 +11109,11 @@ function refreshCharPreview() {
     document.getElementById('sp-link-prop-shuffle').addEventListener('click', () => linkUseProp('shuffle'));
     document.getElementById('sp-link-prop-bomb').addEventListener('click', () => linkUseProp('bomb'));
     document.getElementById('sp-link-prop-compass').addEventListener('click', () => linkUseProp('compass'));
+
+    // 开始游戏按钮
+    document.getElementById('sp-link-start-btn')?.addEventListener('click', () => {
+      linkConfirmNewGame();
+    });
 
     // 重开按钮
     document.getElementById('sp-link-restart-btn').addEventListener('click', () => {
@@ -11146,13 +11247,9 @@ function refreshCharPreview() {
         panel.style.top = Math.max(10, Math.min(centerTop, maxTop)) + 'px';
       });
 
-      // 如果没有活跃游戏，弹窗确认后开新局
-      if (!linkState.active) {
-        linkRender(); // 先渲染空面板
-        linkConfirmNewGame();
-      } else {
-        linkRender();
-      }
+      // 如果没有活跃游戏，只渲染面板，不自动弹窗
+      linkRender();
+
     } else {
       // 彻底销毁 DOM 和清理定时器
       if (panel) panel.remove();
@@ -11182,11 +11279,9 @@ function refreshCharPreview() {
         if (isGameOpen) gameRenderStatus();
       },
       onCancel: () => {
-        // 不开局，关闭面板
-        isLinkOpen = false;
-        const panel = document.getElementById('sp-link-panel');
-        if (panel) panel.classList.remove('visible');
+        // 不开局，留在游戏面板
       }
+
     });
   }
 
@@ -11920,6 +12015,11 @@ function refreshCharPreview() {
     // 金币显示
     const goldEl = document.getElementById('sp-fridge-gold');
     if (goldEl) goldEl.textContent = state.gameGold;
+
+    // 控制开始按钮显示/隐藏
+    const startWrapper = document.getElementById('sp-fridge-start-wrapper');
+    if (startWrapper) startWrapper.style.display = fridgeState.active ? 'none' : 'flex';
+
   }
 
   // ===== 预览高亮 =====
@@ -12137,6 +12237,7 @@ function refreshCharPreview() {
           </div>
           <div id="sp-fridge-props-used" style="text-align:center;font-size:10px;color:var(--sp-text-muted);margin-top:4px;"></div>
           <div style="height:8px;"></div>
+          <div id="sp-fridge-start-wrapper" style="display:flex;justify-content:center;margin-bottom:8px;"><button class="sp-fridge-ctrl-btn" id="sp-fridge-start-btn" style="background:var(--sp-primary);color:#fff;border-color:var(--sp-primary-border);padding:10px 24px;font-size:13px;">✨ 开始游戏</button></div>
           <div style="display:flex;gap:8px;justify-content:center;">
             <button class="sp-fridge-ctrl-btn" id="sp-fridge-close-door">🚪 关上冰箱门</button>
             <button class="sp-fridge-ctrl-btn sp-fridge-ctrl-quit" id="sp-fridge-quit-btn">❌ 放弃</button>
@@ -12200,6 +12301,11 @@ function refreshCharPreview() {
     document.getElementById('sp-fridge-btn-compress').addEventListener('click', () => fridgeUseCompress());
     document.getElementById('sp-fridge-btn-organize').addEventListener('click', () => fridgeUseOrganize());
     document.getElementById('sp-fridge-btn-backpack').addEventListener('click', () => fridgeUseBackpack());
+
+    // 开始游戏按钮
+    document.getElementById('sp-fridge-start-btn')?.addEventListener('click', () => {
+      fridgeConfirmNewGame();
+    });
 
     // 关上冰箱门
     document.getElementById('sp-fridge-close-door').addEventListener('click', () => {
@@ -12309,10 +12415,9 @@ function refreshCharPreview() {
         if (isGameOpen) gameRenderStatus();
       },
       onCancel: () => {
-        isFridgeOpen = false;
-        const panel = document.getElementById('sp-fridge-panel');
-        if (panel) panel.classList.remove('visible');
+        // 不开局，留在游戏面板
       }
+
     });
   }
 
@@ -12339,12 +12444,9 @@ function refreshCharPreview() {
         panel.style.top = Math.max(10, Math.min(centerTop, maxTop)) + 'px';
       });
 
-      if (!fridgeState.active) {
-        fridgeRender();
-        fridgeConfirmNewGame();
-      } else {
-        fridgeRender();
-      }
+      // 如果没有活跃游戏，只渲染面板，不自动弹窗
+      fridgeRender();
+
     } else {
       // 彻底销毁 DOM
       if (panel) panel.remove();
@@ -13216,6 +13318,11 @@ function refreshCharPreview() {
     // 金币
     const goldEl = document.getElementById('sp-tanghulu-gold');
     if (goldEl) goldEl.textContent = state.gameGold;
+
+    // 控制开始按钮显示/隐藏
+    const startWrapper = document.getElementById('sp-tanghulu-start-wrapper');
+    if (startWrapper) startWrapper.style.display = tanghuluState.active ? 'none' : 'flex';
+
   }
 
   // ===== 渲染背包 =====
@@ -13375,6 +13482,7 @@ function refreshCharPreview() {
             </button>
           </div>
           <div style="height:8px;"></div>
+          <div id="sp-tanghulu-start-wrapper" style="display:flex;justify-content:center;margin-bottom:8px;"><button class="sp-link-ctrl-btn" id="sp-tanghulu-start-btn" style="background:var(--sp-primary);color:#fff;border-color:var(--sp-primary-border);padding:10px 24px;font-size:13px;">✨ 开始游戏</button></div>
           <div style="display:flex;gap:8px;justify-content:center;">
             <button class="sp-link-ctrl-btn" id="sp-tanghulu-restart-btn">🔄 重开</button>
             <button class="sp-link-ctrl-btn sp-link-ctrl-quit" id="sp-tanghulu-quit-btn">❌ 放弃</button>
@@ -13416,6 +13524,11 @@ function refreshCharPreview() {
     document.getElementById('sp-tanghulu-prop-es').addEventListener('click', () => tanghuluUseExtraStick());
     document.getElementById('sp-tanghulu-prop-undo').addEventListener('click', () => tanghuluUndo());
     document.getElementById('sp-tanghulu-prop-lub').addEventListener('click', () => tanghuluUseLubricant());
+
+    // 开始游戏按钮
+    document.getElementById('sp-tanghulu-start-btn')?.addEventListener('click', () => {
+      tanghuluConfirmNewGame();
+    });
 
     // 重开
     document.getElementById('sp-tanghulu-restart-btn').addEventListener('click', () => {
@@ -13559,10 +13672,9 @@ function refreshCharPreview() {
         });
       },
       onCancel: () => {
-        isTanghuluOpen = false;
-        const panel = document.getElementById('sp-tanghulu-panel');
-        if (panel) panel.classList.remove('visible');
+        // 不开局，留在游戏面板
       }
+
     });
   }
 
@@ -13589,12 +13701,9 @@ function refreshCharPreview() {
         panel.style.top = Math.max(10, Math.min(centerTop, maxTop)) + 'px';
       });
 
-      if (!tanghuluState.active) {
-        tanghuluRender();
-        tanghuluConfirmNewGame();
-      } else {
-        tanghuluRender();
-      }
+      // 如果没有活跃游戏，只渲染面板，不自动弹窗
+      tanghuluRender();
+
     } else {
       // 彻底销毁 DOM
       if (panel) panel.remove();
@@ -15685,6 +15794,11 @@ function refreshCharPreview() {
     if (basketCountEl) basketCountEl.textContent = `×${state.shelfPropInventory.basket || 0} (${shelfState.propsUsed.basket}/${SHELF_PROPS.basket.perGameLimit})`;
     if (autoMatchCountEl) autoMatchCountEl.textContent = `×${state.shelfPropInventory.autoMatch || 0} (${shelfState.propsUsed.autoMatch}/${SHELF_PROPS.autoMatch.perGameLimit})`;
     if (shuffleCountEl) shuffleCountEl.textContent = `×${state.shelfPropInventory.shuffle || 0} (${shelfState.propsUsed.shuffle}/${SHELF_PROPS.shuffle.perGameLimit})`;
+
+    // 控制开始按钮显示/隐藏
+    const startWrapper = document.getElementById('sp-shelf-start-wrapper');
+    if (startWrapper) startWrapper.style.display = shelfState.active ? 'none' : 'flex';
+
   }
 
   // ===== 点击处理（选中/移动）=====
@@ -15913,6 +16027,7 @@ function refreshCharPreview() {
             </button>
           </div>
           <div style="height:8px;"></div>
+          <div id="sp-shelf-start-wrapper" style="display:flex;justify-content:center;margin-bottom:8px;"><button class="sp-link-ctrl-btn" id="sp-shelf-start-btn" style="background:var(--sp-primary);color:#fff;border-color:var(--sp-primary-border);padding:10px 24px;font-size:13px;">✨ 开始游戏</button></div>
           <div style="display:flex;gap:8px;justify-content:center;">
             <button class="sp-link-ctrl-btn" id="sp-shelf-restart-btn">🔄 重开</button>
             <button class="sp-link-ctrl-btn sp-link-ctrl-quit" id="sp-shelf-quit-btn">❌ 放弃</button>
@@ -15957,6 +16072,11 @@ function refreshCharPreview() {
     document.getElementById('sp-shelf-prop-basket-btn').addEventListener('click', () => shelfUsePropBasket());
     document.getElementById('sp-shelf-prop-automatch-btn').addEventListener('click', () => shelfUsePropAutoMatch());
     document.getElementById('sp-shelf-prop-shuffle-btn').addEventListener('click', () => shelfUsePropShuffle());
+
+    // 开始游戏按钮
+    document.getElementById('sp-shelf-start-btn')?.addEventListener('click', () => {
+      shelfConfirmNewGame();
+    });
 
     // 重开
     document.getElementById('sp-shelf-restart-btn').addEventListener('click', () => {
@@ -16070,10 +16190,9 @@ function refreshCharPreview() {
         if (isGameOpen) gameRenderStatus();
       },
       onCancel: () => {
-        isShelfOpen = false;
-        const panel = document.getElementById('sp-shelf-panel');
-        if (panel) panel.remove();
+        // 不开局，留在游戏面板
       }
+
     });
   }
 
@@ -16098,12 +16217,9 @@ function refreshCharPreview() {
         panel.style.top = Math.max(10, Math.min(centerTop, maxTop)) + 'px';
       });
 
-      if (!shelfState.active) {
-        shelfRender();
-        shelfConfirmNewGame();
-      } else {
-        shelfRender();
-      }
+      // 如果没有活跃游戏，只渲染面板，不自动弹窗
+      shelfRender();
+
     } else {
       if (panel) panel.remove();
       shelfState.selected = null;
