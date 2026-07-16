@@ -1995,7 +1995,10 @@ function showInventoryPopup(category, quickKey, onUse) {
       <div class="sp-game-selector-box">
         <div class="sp-game-selector-header">
           <span>🎮 选择游戏</span>
-          <button class="sp-game-selector-close" title="关闭">✕</button>
+          <div style="display:flex;gap:4px;align-items:center;">
+            <button class="sp-game-selector-help" id="sp-game-selector-help" title="游戏帮助">?</button>
+            <button class="sp-game-selector-close" title="关闭">✕</button>
+          </div>
         </div>
         <div class="sp-game-selector-body">
           <div class="sp-game-selector-card" data-game="merge">
@@ -2055,6 +2058,12 @@ function showInventoryPopup(category, quickKey, onUse) {
     overlay.querySelector('.sp-game-selector-close').onclick = () => overlay.remove();
     overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
 
+    // 帮助按钮
+    overlay.querySelector('.sp-game-selector-help').onclick = (e) => {
+      e.stopPropagation();
+      showGameHelpModal();
+    };
+
     // 选择游戏
     overlay.querySelectorAll('.sp-game-selector-card').forEach(card => {
       card.onclick = () => {
@@ -2074,6 +2083,174 @@ function showInventoryPopup(category, quickKey, onUse) {
       };
     });
 
+  }
+
+  // ============================================================
+  // ❓ 游戏帮助悬浮窗
+  // ============================================================
+  function showGameHelpModal() {
+    document.getElementById('sp-game-help-overlay')?.remove();
+
+    const helpOverlay = document.createElement('div');
+    helpOverlay.id = 'sp-game-help-overlay';
+    helpOverlay.innerHTML = `
+      <div id="sp-game-help-box">
+        <div id="sp-game-help-header">
+          <span>❓ 游戏帮助</span>
+          <button id="sp-game-help-close" title="关闭">✕</button>
+        </div>
+        <div id="sp-game-help-body">
+          <details class="sp-guide-details" open>
+            <summary class="sp-guide-summary">🧶 合成工坊</summary>
+            <div class="sp-guide-details-content">
+              <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
+                合成工坊是一个合成+经营小游戏。<br/><br/>
+                <strong style="color:var(--sp-text-primary);">核心玩法：</strong><br/>
+                • 点击「🐾 猫爪生成器」消耗 1 点体力，随机生成物品到棋盘<br/>
+                • 将两个<strong>相同种类、相同等级</strong>的物品拖到一起即可合成升级<br/>
+                • 完成订单交付指定物品可获得金币奖励<br/>
+                • 多余的物品可以拖到「💰 售卖区」换取少量金币<br/><br/>
+                <strong style="color:var(--sp-text-primary);">三条合成链：</strong><br/>
+                🧶 玩具链：线团 → 逗猫棒 → 毛绒小熊 → ... → 喵星飞船<br/>
+                🍪 零食链：面粉 → 面包 → 草莓蛋糕 → ... → 永恒盛宴<br/>
+                💎 宝石链：碎晶 → 魔法水晶 → 灵力戒指 → ... → 哲人之石<br/><br/>
+                <strong style="color:var(--sp-text-primary);">操作方式：</strong><br/>
+                • 电脑端：拖拽物品到目标格子，或点击选中再点击目标<br/>
+                • 手机端：轻触选中物品，再轻触目标格子<br/><br/>
+                <strong style="color:var(--sp-text-primary);">商店说明：</strong><br/>
+                用金币在商店购买食物🍖/洗护🧴/睡眠🛏️道具，存入背包。<br/>
+                点击桌宠菜单投喂/洗澡/睡觉时会从背包消耗道具。<br/>
+                还可以购买体力⚡道具恢复游戏体力。
+              </p>
+            </div>
+          </details>
+
+          <details class="sp-guide-details">
+            <summary class="sp-guide-summary">🃏 消消看</summary>
+            <div class="sp-guide-details-content">
+              <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
+                消消看是一个三消类益智游戏。<br/><br/>
+                <strong style="color:var(--sp-text-primary);">核心玩法：</strong><br/>
+                • 场景中有多层堆叠的图案牌<br/>
+                • 点击未被遮挡的牌，收集到下方暂存栏<br/>
+                • 暂存栏中凑齐<strong>3个相同图案</strong>即可消除<br/>
+                • 消除所有牌即通关<br/>
+                • 暂存栏满了且没有可消除的三连 → 游戏失败<br/><br/>
+                <strong style="color:var(--sp-text-primary);">道具说明：</strong><br/>
+                🪜 扩充神架：临时增加1个暂存格（上限10）<br/>
+                🧹 魔法扫帚：随机消除场景中3个相同图案<br/>
+                🌀 混沌风暴：打乱场景中所有图案位置<br/>
+                ⚠️ 每局最多使用3个道具，需要在商店提前购买存入背包<br/><br/>
+                <strong style="color:var(--sp-text-primary);">费用：</strong><br/>
+                开局消耗 5 点体力⚡<br/>
+                通关奖励 30~60 金币🪙 + 消除组数奖励
+              </p>
+            </div>
+          </details>
+
+          <details class="sp-guide-details">
+            <summary class="sp-guide-summary">🔗 连连看</summary>
+            <div class="sp-guide-details-content">
+              <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
+                连连看是经典的配对消除游戏。<br/><br/>
+                <strong style="color:var(--sp-text-primary);">核心玩法：</strong><br/>
+                •棋盘上有成对的图案方块<br/>
+                • 点击两个相同图案的方块<br/>
+                • 如果它们之间可以用<strong>不超过2次转折</strong>的折线连通<br/>
+                 （线路上不能有其他方块阻挡），就能消除这一对<br/>
+                • 消除所有方块即通关<br/><br/>
+                <strong style="color:var(--sp-text-primary);">道具说明：</strong><br/>
+                🔍 寻路放大镜：高亮一对可消除的方块（每局3次）<br/>
+                🌀 重组旋风：打乱所有方块位置（每局3次）<br/>
+                💣 友情炸弹：无视通路强制消除两个相同方块（每局2次）<br/>
+                🧭 罗盘透视：10秒内点击方块显示可连通的同伴（每局1次）<br/><br/>
+                <strong style="color:var(--sp-text-primary);">难度与费用：</strong><br/>
+                棋盘大小随机（8×8 / 10×10 / 12×12 / 14×14）<br/>
+                体力消耗 5~10 点，通关奖励 40~200 金币🪙
+              </p>
+            </div>
+          </details>
+
+          <details class="sp-guide-details">
+            <summary class="sp-guide-summary">🎰 幸运抽奖</summary>
+            <div class="sp-guide-details-content">
+              <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
+                消耗金币进行抽奖，获得各种道具和物品。<br/><br/>
+                <strong style="color:var(--sp-text-primary);">三个奖池：</strong><br/>
+                🎲 小试牛刀：10金币/次，每日限10次<br/>
+                ✨ 锦鲤附体：30金币/次，每日限5次<br/>
+                💫 欧皇时刻：50金币/次，每日限3次<br/><br/>
+                <strong style="color:var(--sp-text-primary);">可能奖励：</strong><br/>
+                • 金币🪙（直接入账）<br/>
+                • 消消看/连连看道具（存入对应背包）<br/>
+                • 工坊道具-食物/洗护/睡眠（存入工坊背包）<br/>
+                • 体力道具⚡（存入体力背包）<br/>
+                • 合成棋盘物品🧶（直接放入棋盘空格）<br/><br/>
+                💡 花费越高的奖池，获得高价值奖励的概率越大！
+              </p>
+            </div>
+          </details>
+
+          <details class="sp-guide-details">
+            <summary class="sp-guide-summary">🎒 总背包</summary>
+            <div class="sp-guide-details-content">
+              <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
+                总背包汇总显示你在所有游戏中获得的道具。<br/><br/>
+                <strong style="color:var(--sp-text-primary);">包含以下类别：</strong><br/>
+                • 🍖 喂食道具（投喂桌宠时消耗）<br/>
+                • 🧴 洗澡道具（给桌宠洗澡时消耗）<br/>
+                • 🛏️ 睡觉道具（让桌宠睡觉时消耗）<br/>
+                • ⚡ 体力道具（恢复游戏体力）<br/>
+                • 🃏 消消看道具<br/>
+                • 🔗 连连看道具<br/><br/>
+                💡 道具通过商店购买或抽奖获得。<br/>
+                💡 喂食/洗澡/睡觉时可设置快捷物品，下次直接使用不弹窗。
+              </p>
+            </div>
+          </details>
+
+          <details class="sp-guide-details">
+            <summary class="sp-guide-summary">💡 通用说明</summary>
+            <div class="sp-guide-details-content">
+              <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
+                <strong style="color:var(--sp-text-primary);">金币系统：</strong><br/>
+                所有游戏共享同一个金币池🪙。<br/>
+                合成工坊赚金币最稳定，抽奖消耗金币。<br/><br/>
+                <strong style="color:var(--sp-text-primary);">体力系统：</strong><br/>
+                所有游戏共享同一个体力池⚡。<br/>
+                体力每 8 分钟自动恢复 1 点。<br/>
+                也可以使用体力道具快速恢复。<br/>
+                点击体力数值旁的 ⊕ 按钮可使用体力道具。<br/><br/>
+                <strong style="color:var(--sp-text-primary);">图鉴系统：</strong><br/>
+                合成工坊、消消看、连连看都支持自定义图案图片。<br/>
+                在图鉴中点击 📷 按钮上传图片或输入链接。<br/><br/>
+                <strong style="color:var(--sp-text-primary);">数据重置：</strong><br/>
+                在合成工坊设置⚙️中可重置所有游戏数据（24小时冷却）。
+              </p>
+            </div>
+          </details>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(helpOverlay);
+
+    // 居中定位
+    requestAnimationFrame(() => {
+      const box = document.getElementById('sp-game-help-box');
+      if (box) {
+        const boxH = box.offsetHeight || 400;
+        const boxW = box.offsetWidth || 340;
+        box.style.position = 'fixed';
+        box.style.top = Math.max(20, Math.floor((window.innerHeight - boxH) / 2)) + 'px';
+        box.style.left = Math.floor((window.innerWidth - boxW) / 2) + 'px';
+        box.style.margin = '0';
+      }
+    });
+
+    // 关闭按钮
+    document.getElementById('sp-game-help-close').onclick = () => helpOverlay.remove();
+    // 点击遮罩关闭
+    helpOverlay.onclick = (e) => { if (e.target === helpOverlay) helpOverlay.remove(); };
   }
 
   // ============================================================
@@ -6908,11 +7085,13 @@ function refreshCharPreview() {
         // 只在内容实际变化时更新 DOM
         if (cell.className !== cellClass) cell.className = cellClass;
         if (cell.title !== title) cell.title = title;
+        const shouldDrag = (state.gameBoard[i] && i !== state.gameGeneratorPos && i !== state.gameSellPos);
+        cell.draggable = shouldDrag;
 
         const newInner = content + `<span class="sp-game-level-badge">${levelBadge}</span>`;
         if (cell.innerHTML !== newInner) cell.innerHTML = newInner;
       }
-      gameBindCellEvents();
+      gameBindBoardDelegation();
       return;
     }
 
@@ -6949,184 +7128,181 @@ function refreshCharPreview() {
         cellClass += ' sp-game-selected';
       }
 
-      html += `<div class="${cellClass}" data-cell-idx="${i}" title="${title}">${content}<span class="sp-game-level-badge">${state.gameBoard[i] ? 'L' + state.gameBoard[i].level : ''}</span></div>`;
+      const draggable = (state.gameBoard[i] && i !== state.gameGeneratorPos && i !== state.gameSellPos) ? ' draggable="true"' : '';
+      html += `<div class="${cellClass}" data-cell-idx="${i}" title="${title}"${draggable}>${content}<span class="sp-game-level-badge">${state.gameBoard[i] ? 'L' + state.gameBoard[i].level : ''}</span></div>`;
     }
     boardEl.innerHTML = html;
 
-    // 绑定事件
-    gameBindCellEvents();
+    // 绑定事件（委托模式，只绑一次）
+    gameBindBoardDelegation();
   }
 
-  // ===== 绑定棋盘格子事件（拖拽+轻触双模式）=====
-  function gameBindCellEvents() {
-    const cells = document.querySelectorAll('.sp-game-cell');
-    cells.forEach(cell => {
+  // ===== 绑定棋盘格子事件（事件委托，只绑定一次）=====
+  let _gameSpawnLock = false; // 防抖锁
+  let _gameBoardBound = null; // 已绑定委托的棋盘元素引用
+  let _gameTouchState = { startIdx: null, clone: null, moved: false, startTime: 0 };
+
+  function gameBindBoardDelegation() {
+    const boardEl = document.getElementById('sp-game-board');
+    if (!boardEl || boardEl === _gameBoardBound) return;
+    _gameBoardBound = boardEl;
+
+    // ===== Click 委托 =====
+    boardEl.addEventListener('click', (e) => {
+      const cell = e.target.closest('.sp-game-cell');
+      if (!cell) return;
       const idx = parseInt(cell.dataset.cellIdx);
+      if (isNaN(idx)) return;
+      e.stopPropagation();
 
-      // --- 轻触选中模式 ---
-      cell.addEventListener('click', (e) => {
-        e.stopPropagation();
-
-        // 生成器点击
-        if (idx === state.gameGeneratorPos) {
-          gameSpawnItem();
-          return;
-        }
-
-        // 如果已经有选中的格子
-        if (gameSelectedCell !== null && gameSelectedCell !== idx) {
-          // 尝试移动/合成/售卖
-          const success = gameTryMerge(gameSelectedCell, idx);
-          gameSelectedCell = null;
-          gameRenderBoard();
-          return;
-        }
-
-        // 选中当前格子（必须有物品）
-        if (state.gameBoard[idx] && idx !== state.gameSellPos) {
-          gameSelectedCell = (gameSelectedCell === idx) ? null : idx;
-          gameRenderBoard();
-        } else if (idx === state.gameSellPos && gameSelectedCell !== null) {
-          // 点击售卖区
-          gameTryMerge(gameSelectedCell, idx);
-          gameSelectedCell = null;
-          gameRenderBoard();
-        } else {
-          gameSelectedCell = null;
-          gameRenderBoard();
-        }
-      });
-
-      // --- 拖拽模式 ---
-      if (state.gameBoard[idx] && idx !== state.gameGeneratorPos && idx !== state.gameSellPos) {
-        cell.setAttribute('draggable', 'true');
-        cell.addEventListener('dragstart', (e) => {
-          e.dataTransfer.setData('text/plain', String(idx));
-          cell.classList.add('sp-game-dragging');
-        });
-        cell.addEventListener('dragend', () => {
-          cell.classList.remove('sp-game-dragging');
-        });
+      // 生成器点击
+      if (idx === state.gameGeneratorPos) {
+        if (_gameSpawnLock) return;
+        _gameSpawnLock = true;
+        gameSpawnItem();
+        setTimeout(() => { _gameSpawnLock = false; }, 300);
+        return;
       }
 
-      cell.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        cell.classList.add('sp-game-dragover');
-      });
-      cell.addEventListener('dragleave', () => {
-        cell.classList.remove('sp-game-dragover');
-      });
-      cell.addEventListener('drop', (e) => {
-        e.preventDefault();
-        cell.classList.remove('sp-game-dragover');
-        const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
-        if (!isNaN(fromIdx)) {
-          gameTryMerge(fromIdx, idx);
-          gameSelectedCell = null;
-          gameRenderBoard();
-          gameRenderStatus();
-        }
-      });
-
-      // --- 拖拽模式 ---
-      if (state.gameBoard[idx] && idx !== state.gameGeneratorPos && idx !== state.gameSellPos) {
-        cell.setAttribute('draggable', 'true');
-        cell.addEventListener('dragstart', (e) => {
-          e.dataTransfer.setData('text/plain', String(idx));
-          cell.classList.add('sp-game-dragging');
-        });
-        cell.addEventListener('dragend', () => {
-          cell.classList.remove('sp-game-dragging');
-        });
+      // 如果已经有选中的格子
+      if (gameSelectedCell !== null && gameSelectedCell !== idx) {
+        gameTryMerge(gameSelectedCell, idx);
+        gameSelectedCell = null;
+        gameRenderBoard();
+        return;
       }
 
-      cell.addEventListener('dragover', (e) => {
+      // 选中当前格子（必须有物品）
+      if (state.gameBoard[idx] && idx !== state.gameSellPos) {
+        gameSelectedCell = (gameSelectedCell === idx) ? null : idx;
+        gameRenderBoard();
+      } else if (idx === state.gameSellPos && gameSelectedCell !== null) {
+        gameTryMerge(gameSelectedCell, idx);
+        gameSelectedCell = null;
+        gameRenderBoard();
+      } else {
+        gameSelectedCell = null;
+        gameRenderBoard();
+      }
+    });
+
+    // ===== Drag 委托 =====
+    boardEl.addEventListener('dragstart', (e) => {
+      const cell = e.target.closest('.sp-game-cell');
+      if (!cell) return;
+      const idx = parseInt(cell.dataset.cellIdx);
+      if (isNaN(idx)) return;
+      if (!state.gameBoard[idx] || idx === state.gameGeneratorPos || idx === state.gameSellPos) {
         e.preventDefault();
-        cell.classList.add('sp-game-dragover');
-      });
-      cell.addEventListener('dragleave', () => {
-        cell.classList.remove('sp-game-dragover');
-      });
-      cell.addEventListener('drop', (e) => {
-        e.preventDefault();
-        cell.classList.remove('sp-game-dragover');
-        const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
-        if (!isNaN(fromIdx)) {
-          gameTryMerge(fromIdx, idx);
-          gameSelectedCell = null;
-          gameRenderBoard();
-          gameRenderStatus();
+        return;
+      }
+      e.dataTransfer.setData('text/plain', String(idx));
+      cell.classList.add('sp-game-dragging');
+    });
+
+    boardEl.addEventListener('dragend', (e) => {
+      const cell = e.target.closest('.sp-game-cell');
+      if (cell) cell.classList.remove('sp-game-dragging');
+    });
+
+    boardEl.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      const cell = e.target.closest('.sp-game-cell');
+      if (cell) cell.classList.add('sp-game-dragover');
+    });
+
+    boardEl.addEventListener('dragleave', (e) => {
+      const cell = e.target.closest('.sp-game-cell');
+      if (cell) cell.classList.remove('sp-game-dragover');
+    });
+
+    boardEl.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const cell = e.target.closest('.sp-game-cell');
+      if (!cell) return;
+      cell.classList.remove('sp-game-dragover');
+      const toIdx = parseInt(cell.dataset.cellIdx);
+      const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
+      if (!isNaN(fromIdx) && !isNaN(toIdx)) {
+        gameTryMerge(fromIdx, toIdx);
+        gameSelectedCell = null;
+        gameRenderBoard();
+        gameRenderStatus();
+      }
+    });
+
+    // ===== Touch 委托 =====
+    boardEl.addEventListener('touchstart', (e) => {
+      const cell = e.target.closest('.sp-game-cell');
+      if (!cell) return;
+      const idx = parseInt(cell.dataset.cellIdx);
+      if (isNaN(idx)) return;
+      if (!state.gameBoard[idx] || idx === state.gameGeneratorPos || idx === state.gameSellPos) return;
+      _gameTouchState.startIdx = idx;
+      _gameTouchState.moved = false;
+      _gameTouchState.startTime = Date.now();
+    }, { passive: true });
+
+    boardEl.addEventListener('touchmove', (e) => {
+      if (_gameTouchState.startIdx === null) return;
+      if (Date.now() - _gameTouchState.startTime < 150) return;
+      _gameTouchState.moved = true;
+      if (e.cancelable) e.preventDefault();
+
+      if (!_gameTouchState.clone) {
+        const cell = boardEl.querySelector(`.sp-game-cell[data-cell-idx="${_gameTouchState.startIdx}"]`);
+        if (cell) {
+          _gameTouchState.clone = cell.cloneNode(true);
+          _gameTouchState.clone.classList.add('sp-game-touch-clone');
+          document.getElementById('sp-game-panel').appendChild(_gameTouchState.clone);
         }
-      });
+      }
 
-      // --- 触摸拖拽（移动端）---
-      let touchStartIdx = null;
-      let touchClone = null;
-      let touchMoved = false;
-      let touchStartTime = 0;
-
-      cell.addEventListener('touchstart', (e) => {
-        if (!state.gameBoard[idx] || idx === state.gameGeneratorPos || idx === state.gameSellPos) return;
-        touchStartIdx = idx;
-        touchMoved = false;
-        touchStartTime = Date.now();
-      }, { passive: true });
-
-      cell.addEventListener('touchmove', (e) => {
-        if (touchStartIdx === null) return;
-        if (Date.now() - touchStartTime < 150) return; // 短触不触发拖拽
-        touchMoved = true;
-        if (e.cancelable) e.preventDefault();
-
-        if (!touchClone) {
-          touchClone = cell.cloneNode(true);
-          touchClone.classList.add('sp-game-touch-clone');
-          document.getElementById('sp-game-panel').appendChild(touchClone);
-        }
-
+      if (_gameTouchState.clone) {
         const touch = e.touches[0];
         const panel = document.getElementById('sp-game-panel');
         const panelRect = panel.getBoundingClientRect();
-        touchClone.style.left = (touch.clientX - panelRect.left - 22) + 'px';
-        touchClone.style.top = (touch.clientY - panelRect.top - 22) + 'px';
-      }, { passive: false });
+        _gameTouchState.clone.style.left = (touch.clientX - panelRect.left - 22) + 'px';
+        _gameTouchState.clone.style.top = (touch.clientY - panelRect.top - 22) + 'px';
+      }
+    }, { passive: false });
 
-      cell.addEventListener('touchend', (e) => {
-        if (touchStartIdx === null) {
-          return;
+    boardEl.addEventListener('touchend', (e) => {
+      if (_gameTouchState.startIdx === null) return;
+
+      if (_gameTouchState.clone) {
+        _gameTouchState.clone.remove();
+        _gameTouchState.clone = null;
+      }
+
+      if (!_gameTouchState.moved) {
+        _gameTouchState.startIdx = null;
+        return; // click 事件会处理轻触逻辑
+      }
+
+      // 拖动结束，找落点格子
+      const touch = e.changedTouches[0];
+      const targetEl = document.elementFromPoint(touch.clientX, touch.clientY);
+      const targetCell = targetEl?.closest('.sp-game-cell');
+
+      if (targetCell) {
+        const toIdx = parseInt(targetCell.dataset.cellIdx);
+        if (!isNaN(toIdx) && toIdx !== _gameTouchState.startIdx) {
+          gameTryMerge(_gameTouchState.startIdx, toIdx);
+          gameSelectedCell = null;
+          gameRenderBoard();
+          gameRenderStatus();
         }
+      }
 
-        // 移除克隆
-        if (touchClone) {
-          touchClone.remove();
-          touchClone = null;
-        }
-
-        if (!touchMoved) {
-          // 没有拖动 → 走轻触选中逻辑（click 事件已处理）
-          touchStartIdx = null;
-          return;
-        }
-
-        // 拖动结束 → 找到落点格子
-        const touch = e.changedTouches[0];
-        const targetEl = document.elementFromPoint(touch.clientX, touch.clientY);
-        const targetCell = targetEl?.closest('.sp-game-cell');
-
-        if (targetCell) {
-          const toIdx = parseInt(targetCell.dataset.cellIdx);
-          if (!isNaN(toIdx) && toIdx !== touchStartIdx) {
-            gameTryMerge(touchStartIdx, toIdx);
-            gameSelectedCell = null;
-            gameRenderBoard();
-            gameRenderStatus();
-          }
-        }
-
-        touchStartIdx = null;
-        touchMoved = false;
-      });
+      _gameTouchState.startIdx = null;
+      _gameTouchState.moved = false;
     });
+  }
+
+  // 空壳保留兼容名（其他地方可能还有调用）
+  function gameBindCellEvents() {
+    // 不再逐格绑定，委托已在 gameBindBoardDelegation 中完成
   }
 
   // ===== 渲染状态栏 =====
@@ -8267,8 +8443,8 @@ function refreshCharPreview() {
       bonusReward = 30 + Math.floor(Math.random() * 31); // 30~60
       bonusMsg = `\n🏆 通关奖励: +${bonusReward} 🪙`;
       // 增加桌宠属性
-      state.energy = Math.min(100, state.energy + 10);
-      state.hunger = Math.min(100, state.hunger + 5);
+      state.energy = Math.min(100, state.energy + 1);
+      state.hunger = Math.min(100, state.hunger + 1);
       updateMood();
       updateStatusBars();
     }
@@ -8299,7 +8475,6 @@ function refreshCharPreview() {
 
     const panel = document.getElementById('sp-match3-panel');
     if (panel) {
-      panel.style.position = 'relative';
       panel.appendChild(resultOverlay);
     }
 
@@ -8719,6 +8894,7 @@ function refreshCharPreview() {
       if (oldResult) oldResult.remove();
 
       panel.classList.add('visible');
+      panel.style.position = '';
 
       // 居中
       const w = Math.min(380, window.innerWidth - 20);
@@ -9948,7 +10124,7 @@ function refreshCharPreview() {
     if (victory) {
       bonusReward = linkState.difficulty.clearReward;
       bonusMsg = `\n🏆 通关奖励: +${bonusReward} 🪙`;
-      state.energy = Math.min(100, state.energy + 10);
+      state.energy = Math.min(100, state.energy + 1);
       updateMood();
       updateStatusBars();
     }
