@@ -97,17 +97,74 @@
 
 /* ===== 状态条 ===== */
 #silly-pet-status-bar {
-  position: absolute; bottom: -30px; left: 50%; transform: translateX(-50%);
-  display: flex; gap: 4px; background: rgba(0,0,0,0.6);
-  border-radius: 8px; padding: 3px 8px; font-size: 10px; white-space: nowrap;
+  position: absolute;
+  bottom: -60px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: rgba(0,0,0,0.35);
+  border-radius: 8px;
+  padding: 5px 8px;
+  font-size: 10px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  min-width: 100px;
 }
-.sp-stat { display: flex; align-items: center; gap: 2px; color: #fff; }
-.sp-stat-icon { font-size: 12px; }
-.sp-stat-bar { width: 24px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; overflow: hidden; }
-.sp-stat-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
+
+#silly-pet-status-bar.visible {
+  opacity: 1;
+}
+
+.sp-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #fff;
+}
+
+.sp-stat-icon {
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.sp-stat-bar {
+  flex: 1;
+  height: 4px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.sp-stat-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.5s ease;
+}
+
 .sp-stat-fill.hunger { background: var(--sp-status-hunger); }
-.sp-stat-fill.clean { background: var(--sp-status-clean); }
+.sp-stat-fill.clean  { background: var(--sp-status-clean); }
 .sp-stat-fill.energy { background: var(--sp-status-energy); }
+
+.sp-stat-pct {
+  font-size: 9px;
+  color: rgba(255,255,255,0.7);
+  min-width: 26px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  #silly-pet-status-bar {
+    min-width: 80px;
+    padding: 4px 6px;
+  }
+  .sp-stat-icon { font-size: 10px; }
+  .sp-stat-bar { height: 3px; }
+}
 
 /* ===== 菜单（圆形发散版） ===== */
 #silly-pet-menu {
@@ -955,12 +1012,10 @@
   }
 
   #silly-pet-status-bar {
-    padding: 2px 5px;
-    font-size: 9px;
-    bottom: -24px;
+    padding: 4px 6px;
+    min-width: 80px;
+    bottom: -60px;
   }
-  .sp-stat-bar { width: 18px; height: 3px; }
-  .sp-stat-icon { font-size: 10px; }
 
   #silly-pet-menu {
     padding: 5px;
@@ -6580,11 +6635,17 @@
 
 /* ===== 成就弹窗修复 ===== */
 #sp-achievements-overlay .sp-total-inv-body {
-  max-height: 60vh;
+  height: 0;
+  flex: 1 1 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  will-change: scroll-position;
+  contain: layout style;
   scrollbar-width: thin;
   scrollbar-color: rgba(255,200,50,0.3) transparent;
 }
+
 
 #sp-achievements-overlay .sp-total-inv-body::-webkit-scrollbar {
   width: 5px;
@@ -6636,8 +6697,6 @@
 
 #sp-achievements-overlay details > div {
   padding: 6px 8px;
-  max-height: 200px;
-  overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(255,200,50,0.3) transparent;
 }

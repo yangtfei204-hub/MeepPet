@@ -892,9 +892,9 @@
       </div>
       <div id="silly-pet-sprite" class="idle"></div>
       <div id="silly-pet-status-bar">
-        <div class="sp-stat"><span class="sp-stat-icon">🍖</span><div class="sp-stat-bar"><div class="sp-stat-fill hunger" id="sp-hunger-fill"></div></div></div>
-        <div class="sp-stat"><span class="sp-stat-icon">💧</span><div class="sp-stat-bar"><div class="sp-stat-fill clean" id="sp-clean-fill"></div></div></div>
-        <div class="sp-stat"><span class="sp-stat-icon">⚡</span><div class="sp-stat-bar"><div class="sp-stat-fill energy" id="sp-energy-fill"></div></div></div>
+        <div class="sp-stat"><span class="sp-stat-icon">🍖</span><div class="sp-stat-bar"><div class="sp-stat-fill hunger" id="sp-hunger-fill"></div></div><span class="sp-stat-pct" id="sp-hunger-pct">0%</span></div>
+        <div class="sp-stat"><span class="sp-stat-icon">💧</span><div class="sp-stat-bar"><div class="sp-stat-fill clean" id="sp-clean-fill"></div></div><span class="sp-stat-pct" id="sp-clean-pct">0%</span></div>
+        <div class="sp-stat"><span class="sp-stat-icon">⚡</span><div class="sp-stat-bar"><div class="sp-stat-fill energy" id="sp-energy-fill"></div></div><span class="sp-stat-pct" id="sp-energy-pct">0%</span></div>
       </div>
     `;
     document.body.appendChild(container);
@@ -1030,7 +1030,14 @@
     if (hungerFill) hungerFill.style.width = `${state.hunger}%`;
     if (cleanFill) cleanFill.style.width = `${state.cleanliness}%`;
     if (energyFill) energyFill.style.width = `${state.energy}%`;
+    const hungerPct = document.getElementById('sp-hunger-pct');
+    const cleanPct = document.getElementById('sp-clean-pct');
+    const energyPct = document.getElementById('sp-energy-pct');
+    if (hungerPct) hungerPct.textContent = `${Math.round(state.hunger)}%`;
+    if (cleanPct) cleanPct.textContent = `${Math.round(state.cleanliness)}%`;
+    if (energyPct) energyPct.textContent = `${Math.round(state.energy)}%`;
   }
+
 
   function updateMoodDisplay() {
     const moodEl = document.getElementById('silly-pet-mood');
@@ -2200,6 +2207,18 @@ function showInventoryPopup(category, quickKey, onUse) {
       updateMenuPositions();
     }
     menu.classList.toggle('visible', isMenuOpen);
+
+    // 状态条跟随菜单显示/隐藏
+    const statusBar = document.getElementById('silly-pet-status-bar');
+    if (statusBar) {
+      clearTimeout(statusBar._hideTimer);
+      if (isMenuOpen) {
+        statusBar.classList.add('visible');
+        statusBar._hideTimer = setTimeout(() => statusBar.classList.remove('visible'), 5000);
+      } else {
+        statusBar.classList.remove('visible');
+      }
+    }
   }
 
    function handleMenuAction(action) {
@@ -7895,6 +7914,9 @@ function refreshCharPreview() {
       state.gameStamina = Math.min(state.gameStaminaMax, state.gameStamina + ticks * GAME_STAMINA_RECOVER_AMOUNT);
       state.gameLastStaminaRecover = last + ticks * GAME_STAMINA_RECOVER_INTERVAL;
       saveDataDebounced('游戏体力恢复');
+    } else if (ticks > 0 && state.gameStamina >= state.gameStaminaMax) {
+      // 体力已满或溢出，不恢复，但更新时间戳防止下次累积
+      state.gameLastStaminaRecover = now;
     }
   }
 
@@ -8522,7 +8544,8 @@ function refreshCharPreview() {
     const goldEl = document.getElementById('sp-game-gold');
     const staminaEl = document.getElementById('sp-game-stamina');
     if (goldEl) goldEl.textContent = state.gameGold;
-    if (staminaEl) staminaEl.innerHTML = `${Math.floor(state.gameStamina)} / ${state.gameStaminaMax} <span id="sp-game-stamina-add" style="cursor:pointer;margin-left:2px;font-size:14px;color:rgba(100,220,100,0.8);" title="使用体力道具">⊕</span>`;
+    const staminaColor = state.gameStamina > state.gameStaminaMax ? 'color:rgba(255,200,50,0.9);font-weight:700;' : '';
+    if (staminaEl) staminaEl.innerHTML = `<span style="${staminaColor}">${Math.floor(state.gameStamina)}</span> / ${state.gameStaminaMax} <span id="sp-game-stamina-add" style="cursor:pointer;margin-left:2px;font-size:14px;color:rgba(100,220,100,0.8);" title="使用体力道具">⊕</span>`;
     // 绑定体力加号按钮
     const staminaAddBtn = document.getElementById('sp-game-stamina-add');
     if (staminaAddBtn) {
@@ -8626,7 +8649,7 @@ function refreshCharPreview() {
           gameShowNotice('库存不足！'); return;
         }
         state.gameStaminaInventory[key]--;
-        state.gameStamina = Math.min(state.gameStaminaMax, state.gameStamina + item.restore);
+        state.gameStamina = Math.min(999, state.gameStamina + item.restore);
         saveDataDebounced('使用体力道具');
         gameShowNotice(`使用了 ${item.emoji} ${item.name}，体力 +${item.restore}！`);
         gameRenderStatus();
@@ -9438,6 +9461,10 @@ function refreshCharPreview() {
       '🥜': { type: 'seasoning', id: 'sesame' },
       '🐳': { type: 'fridge', id: 'fish' },
       '🍬': { type: 'fridge', id: 'icecream' },
+      '🌸': { type: 'cleanItem', shopIdx: 1 },
+      '🎈': { type: 'energyItem', shopIdx: 0 },
+      '🎀': { type: 'cleanItem', shopIdx: 4 },
+      '🌈': { type: 'energyItem', shopIdx: 1 },
     };
 
     while (true) {
@@ -9483,6 +9510,16 @@ function refreshCharPreview() {
           const existing = state.tanghuluInventory.find(i => i.fruitKey === link.id);
           if (existing) existing.count++;
           else state.tanghuluInventory.push({ fruitKey: link.id, count: 1 });
+        } else if (link.type === 'cleanItem') {
+          if (!state.gameInventory) state.gameInventory = [];
+          const existing = state.gameInventory.find(i => i.category === 'clean' && i.idx === link.shopIdx);
+          if (existing) existing.count++;
+          else state.gameInventory.push({ category: 'clean', idx: link.shopIdx, count: 1 });
+        } else if (link.type === 'energyItem') {
+          if (!state.gameInventory) state.gameInventory = [];
+          const existing = state.gameInventory.find(i => i.category === 'energy' && i.idx === link.shopIdx);
+          if (existing) existing.count++;
+          else state.gameInventory.push({ category: 'energy', idx: link.shopIdx, count: 1 });
         }
       }
     }
@@ -11380,6 +11417,10 @@ function refreshCharPreview() {
       '🔔': { type: 'seasoning', id: 'salt' },
       '🔥': { type: 'seasoning', id: 'chili' },
       '🍀': { type: 'seasoning', id: 'butter' },
+      '🐰': { type: 'cleanItem', shopIdx: 0 },
+      '🐻': { type: 'energyItem', shopIdx: 0 },
+      '🦋': { type: 'cleanItem', shopIdx: 4 },
+      '🐧': { type: 'energyItem', shopIdx: 1 },
     };
 
     if (eliminatedEmoji) {
@@ -11398,6 +11439,16 @@ function refreshCharPreview() {
           const existing = state.tanghuluInventory.find(i => i.fruitKey === link.id);
           if (existing) existing.count++;
           else state.tanghuluInventory.push({ fruitKey: link.id, count: 1 });
+        } else if (link.type === 'cleanItem') {
+          if (!state.gameInventory) state.gameInventory = [];
+          const existing = state.gameInventory.find(i => i.category === 'clean' && i.idx === link.shopIdx);
+          if (existing) existing.count++;
+          else state.gameInventory.push({ category: 'clean', idx: link.shopIdx, count: 1 });
+        } else if (link.type === 'energyItem') {
+          if (!state.gameInventory) state.gameInventory = [];
+          const existing = state.gameInventory.find(i => i.category === 'energy' && i.idx === link.shopIdx);
+          if (existing) existing.count++;
+          else state.gameInventory.push({ category: 'energy', idx: link.shopIdx, count: 1 });
         }
       }
     }
@@ -14718,8 +14769,9 @@ function refreshCharPreview() {
 
     // 发放体力
     if (staminaReward > 0) {
-      state.gameStamina = Math.min(state.gameStaminaMax || 100, (state.gameStamina || 0) + staminaReward);
+      state.gameStamina = Math.min(999, (state.gameStamina || 0) + staminaReward);
     }
+
 
     // 发放随机道具
     for (let i = 0; i < randomItemCount; i++) {
@@ -14880,7 +14932,7 @@ function refreshCharPreview() {
     overlay.id = 'sp-achievements-overlay';
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:2147483649;';
     overlay.innerHTML = `
-      <div class="sp-total-inv-box" style="max-height:80vh;">
+      <div class="sp-total-inv-box" style="height:80vh;max-height:80vh;display:flex;flex-direction:column;">
         <div class="sp-total-inv-header">
           <span>🏆 成就系统</span>
           <button class="sp-total-inv-close" id="sp-achievements-close" title="关闭">✕</button>
@@ -14908,6 +14960,19 @@ function refreshCharPreview() {
     document.getElementById('sp-achievements-close').onclick = () => overlay.remove();
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
     overlay.querySelector('.sp-total-inv-box').addEventListener('click', (e) => { e.stopPropagation(); });
+    // 防止 details 展开时滚动位置被重置
+    const achBody = overlay.querySelector('.sp-total-inv-body');
+    if (achBody) {
+      overlay.querySelectorAll('details').forEach(detail => {
+        detail.addEventListener('toggle', () => {
+          // toggle 事件是同步的，但布局重算是异步的，用 rAF 保住位置
+          const savedScrollTop = achBody.scrollTop;
+          requestAnimationFrame(() => {
+            achBody.scrollTop = savedScrollTop;
+          });
+        });
+      });
+    }
 
   }
 
