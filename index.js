@@ -438,6 +438,7 @@
   let settings = {};
   let state = {};
   let settingsDragAbortController = null; // 新增：用于防止设置拖拽事件重复绑定的控制器
+  let _isSaving = false;
   let wanderInterval = null;
   let decayInterval = null;
   let lastReactTime = 0;
@@ -648,6 +649,20 @@
         state = { ...DEFAULT_STATE, ...parsed.state };
         emojiStickers = settings.emojiStickers || [];
         isOfflineMode = state.isOfflineMode || false;
+
+        // 用备份修正可能丢失的最后状态
+        try {
+          const backup = localStorage.getItem(STORAGE_KEY + '_backup');
+          if (backup) {
+            const b = JSON.parse(backup);
+            if (b.lastOnlineTimestamp > (state.lastOnlineTimestamp || 0)) {
+              state.lastOnlineTimestamp = b.lastOnlineTimestamp;
+              state.hunger = b.hunger ?? state.hunger;
+              state.cleanliness = b.cleanliness ?? state.cleanliness;
+              state.energy = b.energy ?? state.energy;
+            }
+          }
+        } catch(e) {}
       }
       // 顺便把旧的 localStorage 数据迁移过来（只做一次）
       const oldRaw = localStorage.getItem(STORAGE_KEY);
@@ -669,37 +684,57 @@
       }
     } catch (e) {
       console.warn(`[${PLUGIN_NAME}] IndexedDB 读取失败，使用默认值`, e);
+      // 降级：尝试从 localStorage 读取
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const fallback = JSON.parse(raw);
+          settings = { ...DEFAULT_SETTINGS, ...fallback.settings };
+          settings.reactions = { ...DEFAULT_SETTINGS.reactions, ...(fallback.settings?.reactions || {}) };
+          settings.moodImages = { ...DEFAULT_SETTINGS.moodImages, ...(fallback.settings?.moodImages || {}) };
+          state = { ...DEFAULT_STATE, ...fallback.state };
+          emojiStickers = settings.emojiStickers || [];
+          isOfflineMode = state.isOfflineMode || false;
+          console.log(`[${PLUGIN_NAME}] 已从 localStorage 降级读取`);
+        }
+      } catch(e2) {}
     }
   }
 
+let _isSaving = false;
 
-
-  function saveData() {
-    state.lastOnlineTimestamp = Date.now();
-    // 自动清理膨胀数据
-    if (state.petChatArchive && state.petChatArchive.length > 10) {
-      state.petChatArchive = state.petChatArchive.slice(-10);
-    }
-    if (state.diaryEntries && state.diaryEntries.length > 60) {
-      state.diaryEntries = state.diaryEntries.slice(-60);
-    }
-    // 清理超过7天的商店购买日志
-    if (state.gameShopBuyLog) {
-      const today = new Date().toISOString().slice(0, 10);
-      Object.keys(state.gameShopBuyLog).forEach(k => {
-        if (k < today.slice(0, 8)) delete state.gameShopBuyLog[k];
-      });
-    }
-    idbSet(STORAGE_KEY, { settings, state }).catch(e => {
-      console.error(`[${PLUGIN_NAME}] IndexedDB 保存失败`, e);
-      const now = Date.now();
-      if (!saveData._lastWarning || now - saveData._lastWarning > 5 * 60 * 1000) {
-        saveData._lastWarning = now;
-        showBubble('⚠️ 数据保存失败！请检查浏览器存储权限', 6000);
-      }
+function saveData() {
+  state.lastOnlineTimestamp = Date.now();
+  if (state.petChatArchive && state.petChatArchive.length > 10) {
+    state.petChatArchive = state.petChatArchive.slice(-10);
+  }
+  if (state.diaryEntries && state.diaryEntries.length > 60) {
+    state.diaryEntries = state.diaryEntries.slice(-60);
+  }
+  if (state.gameShopBuyLog) {
+    const today = new Date().toISOString().slice(0, 10);
+    Object.keys(state.gameShopBuyLog).forEach(k => {
+      if (k < today.slice(0, 8)) delete state.gameShopBuyLog[k];
     });
-
   }
+  if (_isSaving) return;
+  _isSaving = true;
+  idbSet(STORAGE_KEY, { settings, state }).then(() => {
+    _isSaving = false;
+  }).catch(e => {
+    _isSaving = false;
+    // IndexedDB 失败时降级到 localStorage
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings, state }));
+    } catch(e2) {}
+    console.error(`[${PLUGIN_NAME}] IndexedDB 保存失败`, e);
+    const now = Date.now();
+    if (!saveData._lastWarning || now - saveData._lastWarning > 5 * 60 * 1000) {
+      saveData._lastWarning = now;
+      showBubble('⚠️ 数据保存失败！请检查浏览器存储权限', 6000);
+    }
+  });
+}
 
 
   // 防抖版保存（高频调用场景用这个）
@@ -6162,7 +6197,7 @@ async function refreshWorldPreview() {
               <details class="sp-guide-details">
                 <summary class="sp-guide-summary">💾 数据与存档管理</summary>
                 <div class="sp-guide-details-content">
-                  <p style="font-size:12px;color:#ccc;line-height:1.7;margin-bottom:8px;">所有数据存储在浏览器本地 localStorage 中。</p>
+                  <p style="font-size:12px;color:#ccc;line-height:1.7;margin-bottom:8px;">所有数据存储在本地浏览器 IndexedDB 中。</p>
                   <p style="font-size:11px;color:#999;margin-top:6px;"><strong>多桌宠存档：</strong></p>
                   <div class="sp-guide-block" style="margin-top:6px;">
                     <div class="sp-guide-step"><span class="sp-guide-num">1</span><div>在「💾 数据」→「🐾 桌宠存档」点击「💾 保存当前」</div></div>
@@ -6176,7 +6211,7 @@ async function refreshWorldPreview() {
                     <div class="sp-guide-row"><span class="sp-guide-key">📥 导入</span><span class="sp-guide-val">从 JSON 文件恢复数据，会覆盖当前所有配置</span></div>
                   </div>
                   <p style="font-size:11px;color:#999;margin-top:10px;"><strong>存储空间说明：</strong></p>
-                  <p style="font-size:11px;color:#999;margin-top:4px;">• 浏览器 localStorage 通常限制 5MB<br/>• 在「💾 数据」底部的「状态总览」可以看到当前存储占用<br/>• 上传了大量精灵图/表情包时容易接近上限<br/>• 快满时会自动提醒，建议导出备份后清理旧图片</p>
+                  <p style="font-size:11px;color:#999;margin-top:4px;">• 如果浏览器卡顿请及时备份迁移数据 <br/>• 在「💾 数据」底部的「状态总览」可以看到当前存储占用<br/>• 上传了大量精灵图/表情包时容易接近上限<br/>• 快满时会自动提醒，建议导出备份后清理旧图片</p>
                   <p style="font-size:11px;color:#f66;margin-top:10px;"><strong>⚠️ 重要提醒：</strong></p>
                   <p style="font-size:11px;color:#f66;margin-top:4px;">• 换浏览器/清除缓存/卸载酒馆 = 数据丢失！务必定期导出备份<br/>• 「🗑️ 清空所有聊天数据」会删除聊天记录+归档+总结<br/>• 「💀 重置全部数据」会永久删除一切，包括设置和图片，不可撤销</p>
                 </div>
@@ -6302,8 +6337,10 @@ async function refreshWorldPreview() {
         const value = localStorage.getItem(key);
         total += (key.length + value.length) * 2; // UTF-16 每字符 2 字节
       }
-      const myData = localStorage.getItem(STORAGE_KEY) || '';
-      const mySize = (STORAGE_KEY.length + myData.length) * 2;
+      // IndexedDB 无法同步读取大小，用总数据估算
+      const myData = JSON.stringify({ settings, state });
+      const mySize = myData.length * 2;
+
       return {
         totalBytes: total,
         myBytes: mySize,
@@ -6315,8 +6352,9 @@ async function refreshWorldPreview() {
         myPercent: Math.min(100, (mySize / (100 * 1024 * 1024) * 100)).toFixed(1), // 这里也改
       };
     } catch (e) {
-      return { totalBytes: 0, myBytes: 0, maxBytes: 5242880, totalKB: '0', myKB: '0', maxKB: '5120', percent: '0', myPercent: '0' };
+      return { totalBytes: 0, myBytes: 0, maxBytes: 100 * 1024 * 1024, totalKB: '0', myKB: '0', maxKB: '102400', percent: '0', myPercent: '0' };
     }
+
   }
 
   // ============================================================
@@ -6864,7 +6902,10 @@ async function refreshWorldPreview() {
     });
 
     // 导入导出
-    document.getElementById('sp-export')?.addEventListener('click', exportData);
+document.getElementById('sp-export')?.addEventListener('click', async () => {
+  await idbSet(STORAGE_KEY, { settings, state }).catch(() => {});
+  exportData();
+});
     const importBtn = document.getElementById('sp-import-btn');
     const importFile = document.getElementById('sp-import-file');
     if (importBtn && importFile) {
@@ -6979,8 +7020,10 @@ async function refreshWorldPreview() {
       // 清空内存数据
       settings = { ...DEFAULT_SETTINGS };
       state = { ...DEFAULT_STATE };
-      // 删除存储
-      localStorage.removeItem(STORAGE_KEY);
+      // 清除 IndexedDB 存储
+      idbSet(STORAGE_KEY, null).catch(() => {});
+      localStorage.removeItem(STORAGE_KEY); // 顺便清旧的
+
       alert('数据已重置！点确定后页面将刷新。');
       window.location.reload(true);
     });
@@ -8060,10 +8103,21 @@ function refreshCharPreview() {
   // ============================================================
   // 生命周期
   // ============================================================
-  window.addEventListener('beforeunload', () => {
-    state.lastOnlineTimestamp = Date.now();
-    saveData();
-  });
+window.addEventListener('beforeunload', () => {
+  state.lastOnlineTimestamp = Date.now();
+  // IndexedDB 写入是异步的，beforeunload 无法保证完成
+  // 用 localStorage 做一次同步备份保证最后状态不丢
+  try {
+    localStorage.setItem(STORAGE_KEY + '_backup', JSON.stringify({
+      lastOnlineTimestamp: state.lastOnlineTimestamp,
+      hunger: state.hunger,
+      cleanliness: state.cleanliness,
+      energy: state.energy,
+    }));
+  } catch(e) {}
+  saveData();
+});
+
 
   setInterval(saveData, 60000);
 
