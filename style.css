@@ -7077,3 +7077,34 @@
     max-height: 70%;
   }
 }
+
+/* ===== 小猫餐厅食谱弹窗：客人需要的菜高亮 ===== */
+.sp-restaurant-recipe-item.sp-restaurant-recipe-wanted {
+  border-color: rgba(255,180,50,0.5);
+  background: rgba(255,180,50,0.08);
+  position: relative;
+}
+
+.sp-restaurant-recipe-item.sp-restaurant-recipe-wanted::before {
+  content: '📋';
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.sp-restaurant-recipe-item.sp-restaurant-recipe-wanted:not(.sp-restaurant-recipe-disabled) {
+  border-color: rgba(100,220,100,0.6);
+  background: rgba(100,220,100,0.1);
+  box-shadow: 0 0 8px rgba(100,220,100,0.15);
+}
+
+.sp-restaurant-recipe-item.sp-restaurant-recipe-wanted:not(.sp-restaurant-recipe-disabled)::before {
+  content: '⭐';
+}
+
+.sp-restaurant-recipe-item.sp-restaurant-recipe-wanted:not(.sp-restaurant-recipe-disabled):hover {
+  background: rgba(100,220,100,0.18);
+  border-color: rgba(100,220,100,0.8);
+}

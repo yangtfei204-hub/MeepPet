@@ -8858,20 +8858,48 @@ function refreshCharPreview() {
 
   // ===== 图片上传弹窗 =====
   function gamePromptImageUpload(itemKey) {
-    // 先问用户选哪种方式
+    if (!state.gameCustomImages) state.gameCustomImages = {};
+    const currentImg = state.gameCustomImages[itemKey];
+
+    // 如果已有图片，先问是否要移除
+    if (currentImg) {
+      const action = confirm('当前已有自定义图片\n\n点「确定」→ 移除图片（恢复默认emoji）\n点「取消」→ 替换为新图片');
+      if (action) {
+        delete state.gameCustomImages[itemKey];
+        saveDataImmediate('游戏图片移除');
+        gameRenderCollection();
+        gameRenderBoard();
+        gameShowNotice('图片已移除，恢复默认显示');
+        return;
+      }
+    }
+
+    // 设置新图片
     const choice = confirm('设置物品图片\n\n点「确定」→ 输入图片链接\n点「取消」→ 选择本地文件上传');
 
     if (choice) {
       // 链接模式
-      const url = prompt('输入图片链接：');
-      if (url && url.trim().startsWith('http')) {
-        if (!state.gameCustomImages) state.gameCustomImages = {};
-        state.gameCustomImages[itemKey] = url.trim();
-        saveDataImmediate('游戏图片链接');
+      const url = prompt('输入图片链接（留空确认=清除图片）：', currentImg && currentImg.startsWith('http') ? currentImg : '');
+      if (url === null) return; // 点了取消
+      const trimmed = url.trim();
+      if (!trimmed) {
+        // 留空=清除
+        delete state.gameCustomImages[itemKey];
+        saveDataImmediate('游戏图片清除');
         gameRenderCollection();
         gameRenderBoard();
-        gameShowNotice('图片链接已设置！');
+        gameShowNotice('图片已清除');
+        return;
       }
+      if (!trimmed.startsWith('http')) {
+        gameShowNotice('链接需要以 http 开头');
+        return;
+      }
+      state.gameCustomImages[itemKey] = trimmed;
+      saveDataImmediate('游戏图片链接');
+      gameRenderCollection();
+      gameRenderBoard();
+      gameShowNotice('图片链接已设置！');
     } else {
       // 文件模式
       const input = document.createElement('input');
@@ -8899,6 +8927,7 @@ function refreshCharPreview() {
       input.click();
     }
   }
+
 
   // ===== 背景图上传 =====
   function gameUploadBackground() {
@@ -8999,6 +9028,7 @@ function refreshCharPreview() {
             <button class="sp-game-settings-btn" id="sp-game-upload-bg">上传游戏背景图</button>
             <button class="sp-game-settings-btn" id="sp-game-upload-gen">上传生成器图片</button>
             <button class="sp-game-settings-btn" id="sp-game-clear-bg">清除背景图</button>
+            <button class="sp-game-settings-btn" id="sp-game-clear-gen">清除生成器图片</button>
             <p class="sp-game-settings-hint">💡 在图鉴中点击物品上的 📷 即可上传/替换物品图片（优先推荐链接）</p>
           </div>
           <div class="sp-game-settings-section">
@@ -9052,6 +9082,14 @@ function refreshCharPreview() {
     document.getElementById('sp-game-order-refresh-btn')?.addEventListener('click', (e) => { e.stopPropagation(); gameRefreshOrders(); });
     document.getElementById('sp-game-upload-bg')?.addEventListener('click', gameUploadBackground);
     document.getElementById('sp-game-upload-gen')?.addEventListener('click', gameUploadGenerator);
+    document.getElementById('sp-game-clear-gen')?.addEventListener('click', () => {
+      if (!state.gameCustomImages) state.gameCustomImages = {};
+      delete state.gameCustomImages['generator'];
+      saveDataImmediate('清除生成器图片');
+      gameRenderBoard();
+      gameRenderCollection();
+      gameShowNotice('生成器图片已清除，恢复默认猫爪');
+    });
     document.getElementById('sp-game-clear-bg')?.addEventListener('click', () => {
       state.gameBgImage = '';
       saveDataImmediate('清除游戏背景');
@@ -10106,17 +10144,42 @@ function refreshCharPreview() {
   // ===== 消消看图案上传 =====
   function match3PromptIconUpload(idx) {
     const key = `match3_icon_${idx}`;
+    if (!state.gameCustomImages) state.gameCustomImages = {};
+    const currentImg = state.gameCustomImages[key];
+
+    // 如果已有图片，先问是否要移除
+    if (currentImg) {
+      const action = confirm(`图案 ${MATCH3_DEFAULT_ICONS[idx]} 已有自定义图片\n\n点「确定」→ 移除图片（恢复默认emoji）\n点「取消」→ 替换为新图片`);
+      if (action) {
+        delete state.gameCustomImages[key];
+        saveDataImmediate('消消看图案移除');
+        match3RenderCollection();
+        match3ShowNotice('图片已移除，恢复默认显示');
+        return;
+      }
+    }
+
     const choice = confirm(`设置图案 ${MATCH3_DEFAULT_ICONS[idx]} 的自定义图片\n\n点「确定」→ 输入图片链接\n点「取消」→ 选择本地文件上传`);
 
     if (choice) {
-      const url = prompt('输入图片链接：');
-      if (url && url.trim().startsWith('http')) {
-        if (!state.gameCustomImages) state.gameCustomImages = {};
-        state.gameCustomImages[key] = url.trim();
-        saveDataImmediate('消消看图案链接');
+      const url = prompt('输入图片链接（留空确认=清除）：', currentImg && currentImg.startsWith('http') ? currentImg : '');
+      if (url === null) return;
+      const trimmed = url.trim();
+      if (!trimmed) {
+        delete state.gameCustomImages[key];
+        saveDataImmediate('消消看图案清除');
         match3RenderCollection();
-        match3ShowNotice('图案图片已设置！');
+        match3ShowNotice('图片已清除');
+        return;
       }
+      if (!trimmed.startsWith('http')) {
+        match3ShowNotice('链接需要以 http 开头');
+        return;
+      }
+      state.gameCustomImages[key] = trimmed;
+      saveDataImmediate('消消看图案链接');
+      match3RenderCollection();
+      match3ShowNotice('图案图片已设置！');
     } else {
       const input = document.createElement('input');
       input.type = 'file';
@@ -11959,17 +12022,42 @@ function refreshCharPreview() {
   // ===== 图案图片上传 =====
   function linkPromptIconUpload(idx) {
     const key = `link_icon_${idx}`;
+    if (!state.gameCustomImages) state.gameCustomImages = {};
+    const currentImg = state.gameCustomImages[key];
+
+    // 如果已有图片，先问是否要移除
+    if (currentImg) {
+      const action = confirm(`图案 ${LINK_DEFAULT_ICONS[idx]} 已有自定义图片\n\n点「确定」→ 移除图片（恢复默认emoji）\n点「取消」→ 替换为新图片`);
+      if (action) {
+        delete state.gameCustomImages[key];
+        saveDataImmediate('连连看图案移除');
+        linkRenderCollection();
+        linkShowNotice('图片已移除，恢复默认显示');
+        return;
+      }
+    }
+
     const choice = confirm(`设置图案 ${LINK_DEFAULT_ICONS[idx]} 的自定义图片\n\n点「确定」→ 输入图片链接\n点「取消」→ 选择本地文件上传`);
 
     if (choice) {
-      const url = prompt('输入图片链接：');
-      if (url && url.trim().startsWith('http')) {
-        if (!state.gameCustomImages) state.gameCustomImages = {};
-        state.gameCustomImages[key] = url.trim();
-        saveDataImmediate('连连看图案链接');
+      const url = prompt('输入图片链接（留空确认=清除）：', currentImg && currentImg.startsWith('http') ? currentImg : '');
+      if (url === null) return;
+      const trimmed = url.trim();
+      if (!trimmed) {
+        delete state.gameCustomImages[key];
+        saveDataImmediate('连连看图案清除');
         linkRenderCollection();
-        linkShowNotice('图案图片已设置！');
+        linkShowNotice('图片已清除');
+        return;
       }
+      if (!trimmed.startsWith('http')) {
+        linkShowNotice('链接需要以 http 开头');
+        return;
+      }
+      state.gameCustomImages[key] = trimmed;
+      saveDataImmediate('连连看图案链接');
+      linkRenderCollection();
+      linkShowNotice('图案图片已设置！');
     } else {
       const input = document.createElement('input');
       input.type = 'file';
@@ -13260,21 +13348,42 @@ function refreshCharPreview() {
   function fridgePromptFoodUpload(foodId) {
     const food = FRIDGE_FOODS.find(f => f.id === foodId);
     const key = `fridge_food_${foodId}`;
-    const currentImg = state.gameCustomImages?.[key];
+    if (!state.gameCustomImages) state.gameCustomImages = {};
+    const currentImg = state.gameCustomImages[key];
+
+    // 如果已有图片，先问是否要移除
+    if (currentImg) {
+      const action = confirm(`「${food?.name || foodId}」已有自定义图片\n\n点「确定」→ 移除图片（恢复默认emoji）\n点「取消」→ 替换为新图片`);
+      if (action) {
+        delete state.gameCustomImages[key];
+        saveDataImmediate('冰箱食材图片移除');
+        fridgeRenderCollection();
+        fridgeShowNotice('图片已移除，恢复默认显示');
+        return;
+      }
+    }
 
     const choice = confirm(`设置食材「${food?.name || foodId}」的自定义图片\n\n⭐ 推荐：点「确定」→ 输入图片链接（节省内存）\n点「取消」→ 选择本地文件上传`);
 
     if (choice) {
-      const url = prompt('输入图片链接（推荐，不占存储空间）：', currentImg?.startsWith('http') ? currentImg : '');
-      if (url && url.trim().startsWith('http')) {
-        if (!state.gameCustomImages) state.gameCustomImages = {};
-        state.gameCustomImages[key] = url.trim();
-        saveDataImmediate('冰箱食材图片链接');
+      const url = prompt('输入图片链接（留空确认=清除）：', currentImg && currentImg.startsWith('http') ? currentImg : '');
+      if (url === null) return;
+      const trimmed = url.trim();
+      if (!trimmed) {
+        delete state.gameCustomImages[key];
+        saveDataImmediate('冰箱食材图片清除');
         fridgeRenderCollection();
-        fridgeShowNotice('图片链接已设置！');
-      } else if (url !== null && url !== '') {
-        fridgeShowNotice('请输入以 http 开头的链接');
+        fridgeShowNotice('图片已清除');
+        return;
       }
+      if (!trimmed.startsWith('http')) {
+        fridgeShowNotice('请输入以 http 开头的链接');
+        return;
+      }
+      state.gameCustomImages[key] = trimmed;
+      saveDataImmediate('冰箱食材图片链接');
+      fridgeRenderCollection();
+      fridgeShowNotice('图片链接已设置！');
     } else {
       const input = document.createElement('input');
       input.type = 'file';
@@ -15551,21 +15660,42 @@ function refreshCharPreview() {
   function tanghuluPromptFruitUpload(fruitKey) {
     const fruit = TANGHULU_FRUITS.find(f => f.key === fruitKey);
     const key = `tanghulu_fruit_${fruitKey}`;
-    const currentImg = state.gameCustomImages?.[key];
+    if (!state.gameCustomImages) state.gameCustomImages = {};
+    const currentImg = state.gameCustomImages[key];
+
+    // 如果已有图片，先问是否要移除
+    if (currentImg) {
+      const action = confirm(`「${fruit?.name || fruitKey}」已有自定义图片\n\n点「确定」→ 移除图片（恢复默认emoji）\n点「取消」→ 替换为新图片`);
+      if (action) {
+        delete state.gameCustomImages[key];
+        saveDataImmediate('糖葫芦水果图片移除');
+        tanghuluRenderCollection();
+        tanghuluShowNotice('图片已移除，恢复默认显示');
+        return;
+      }
+    }
 
     const choice = confirm(`设置水果「${fruit?.name || fruitKey}」的自定义图片\n\n⭐ 推荐：点「确定」→ 输入图片链接（节省内存）\n点「取消」→ 选择本地文件上传`);
 
     if (choice) {
-      const url = prompt('输入图片链接（推荐，不占存储空间）：', currentImg?.startsWith('http') ? currentImg : '');
-      if (url && url.trim().startsWith('http')) {
-        if (!state.gameCustomImages) state.gameCustomImages = {};
-        state.gameCustomImages[key] = url.trim();
-        saveDataImmediate('糖葫芦水果图片链接');
+      const url = prompt('输入图片链接（留空确认=清除）：', currentImg && currentImg.startsWith('http') ? currentImg : '');
+      if (url === null) return;
+      const trimmed = url.trim();
+      if (!trimmed) {
+        delete state.gameCustomImages[key];
+        saveDataImmediate('糖葫芦水果图片清除');
         tanghuluRenderCollection();
-        tanghuluShowNotice('图片链接已设置！');
-      } else if (url !== null && url !== '') {
-        tanghuluShowNotice('请输入以 http 开头的链接');
+        tanghuluShowNotice('图片已清除');
+        return;
       }
+      if (!trimmed.startsWith('http')) {
+        tanghuluShowNotice('请输入以 http 开头的链接');
+        return;
+      }
+      state.gameCustomImages[key] = trimmed;
+      saveDataImmediate('糖葫芦水果图片链接');
+      tanghuluRenderCollection();
+      tanghuluShowNotice('图片链接已设置！');
     } else {
       const input = document.createElement('input');
       input.type = 'file';
@@ -15591,6 +15721,7 @@ function refreshCharPreview() {
       input.click();
     }
   }
+
 
   // ===== 卖糖葫芦 =====
   function tanghuluSellItem(fruitKey) {
@@ -17178,21 +17309,42 @@ function refreshCharPreview() {
 
   // ===== 餐厅图鉴图片上传 =====
   function restaurantPromptAtlasUpload(key, name) {
-    const currentImg = state.gameCustomImages?.[key];
+    if (!state.gameCustomImages) state.gameCustomImages = {};
+    const currentImg = state.gameCustomImages[key];
+
+    // 如果已有图片，先问是否要移除
+    if (currentImg) {
+      const action = confirm(`「${name}」已有自定义图片\n\n点「确定」→ 移除图片（恢复默认emoji）\n点「取消」→ 替换为新图片`);
+      if (action) {
+        delete state.gameCustomImages[key];
+        saveDataImmediate('餐厅图鉴图片移除');
+        restaurantRenderAtlas();
+        restaurantShowNotice(`${name} 图片已移除`);
+        return;
+      }
+    }
 
     const choice = confirm(`设置「${name}」的自定义图片\n\n⭐ 推荐：点「确定」→ 输入图片链接（节省内存）\n点「取消」→ 选择本地文件上传`);
 
     if (choice) {
-      const url = prompt('输入图片链接（推荐，不占存储空间）：', currentImg?.startsWith('http') ? currentImg : '');
-      if (url && url.trim().startsWith('http')) {
-        if (!state.gameCustomImages) state.gameCustomImages = {};
-        state.gameCustomImages[key] = url.trim();
-        saveDataImmediate('餐厅图鉴图片链接');
+      const url = prompt('输入图片链接（留空确认=清除）：', currentImg && currentImg.startsWith('http') ? currentImg : '');
+      if (url === null) return;
+      const trimmed = url.trim();
+      if (!trimmed) {
+        delete state.gameCustomImages[key];
+        saveDataImmediate('餐厅图鉴图片清除');
         restaurantRenderAtlas();
-        restaurantShowNotice(`${name} 图片已设置！`);
-      } else if (url !== null && url !== '') {
-        restaurantShowNotice('请输入以 http 开头的链接');
+        restaurantShowNotice(`${name} 图片已清除`);
+        return;
       }
+      if (!trimmed.startsWith('http')) {
+        restaurantShowNotice('请输入以 http 开头的链接');
+        return;
+      }
+      state.gameCustomImages[key] = trimmed;
+      saveDataImmediate('餐厅图鉴图片链接');
+      restaurantRenderAtlas();
+      restaurantShowNotice(`${name} 图片已设置！`);
     } else {
       const input = document.createElement('input');
       input.type = 'file';
@@ -17459,11 +17611,46 @@ function refreshCharPreview() {
     document.getElementById('sp-restaurant-recipe-modal-overlay')?.remove();
 
     const recipes = restaurantGetUnlockedRecipes();
+
+    // 收集当前所有客人需要的菜品类型和指定食谱
+    const wantedRecipeIds = new Set();
+    const wantedCategories = new Set();
+    restaurantRuntime.customers.forEach(customer => {
+      if (customer.wantsCategory === 'specific' && customer.specificRecipe) {
+        wantedRecipeIds.add(customer.specificRecipe);
+      }
+      if (customer.wantsCategory === 'drink') wantedCategories.add('drink');
+      if (customer.wantsCategory === 'snack') { wantedCategories.add('snack'); wantedCategories.add('drink'); }
+      if (customer.wantsCategory === 'dish') { wantedCategories.add('dish'); wantedCategories.add('snack'); }
+      if (customer.wantsCategory === 'premium') wantedCategories.add('premium');
+      if (customer.wantsCategory === 'any') { wantedCategories.add('drink'); wantedCategories.add('snack'); wantedCategories.add('dish'); wantedCategories.add('premium'); }
+    });
+
+    // 判断食谱是否被客人需要
+    function isWantedByCustomer(recipe) {
+      if (wantedRecipeIds.has(recipe.id)) return true;
+      if (wantedCategories.has('drink') && recipe.category === 'drink') return true;
+      if (wantedCategories.has('snack') && (recipe.category === 'snack' || recipe.category === 'drink')) return true;
+      if (wantedCategories.has('dish') && (recipe.category === 'dish' || recipe.category === 'snack')) return true;
+      if (wantedCategories.has('premium') && recipe.category === 'dish' && recipe.sellPrice >= 35) return true;
+      return false;
+    }
+
+    // 排序优先级：
+    // 1. 客人需要 + 能制作（最优先）
+    // 2. 客人需要 + 不能制作
+    // 3. 能制作 + 客人不需要
+    // 4. 不能制作 + 客人不需要
     recipes.sort((a, b) => {
       const canA = restaurantCheckIngredients(a) ? 0 : 1;
       const canB = restaurantCheckIngredients(b) ? 0 : 1;
+      const wantA = isWantedByCustomer(a) ? 0 : 1;
+      const wantB = isWantedByCustomer(b) ? 0 : 1;
+      // 先按 wanted 排序，再按 can 排序
+      if (wantA !== wantB) return wantA - wantB;
       return canA - canB;
     });
+
 
     const overlay = document.createElement('div');
     overlay.id = 'sp-restaurant-recipe-modal-overlay';
@@ -18424,21 +18611,42 @@ function refreshCharPreview() {
   function shelfPromptItemUpload(itemId) {
     const item = SHELF_ITEMS.find(it => it.id === itemId);
     const key = `shelf_item_${itemId}`;
-    const currentImg = state.gameCustomImages?.[key];
+    if (!state.gameCustomImages) state.gameCustomImages = {};
+    const currentImg = state.gameCustomImages[key];
+
+    // 如果已有图片，先问是否要移除
+    if (currentImg) {
+      const action = confirm(`「${item?.name || itemId}」已有自定义图片\n\n点「确定」→ 移除图片（恢复默认emoji）\n点「取消」→ 替换为新图片`);
+      if (action) {
+        delete state.gameCustomImages[key];
+        saveDataImmediate('货架商品图片移除');
+        shelfRenderCollection();
+        shelfShowNotice('图片已移除，恢复默认显示');
+        return;
+      }
+    }
 
     const choice = confirm(`设置商品「${item?.name || itemId}」的自定义图片\n\n⭐ 推荐：点「确定」→ 输入图片链接（节省内存）\n点「取消」→ 选择本地文件上传`);
 
     if (choice) {
-      const url = prompt('输入图片链接（推荐，不占存储空间）：', currentImg?.startsWith('http') ? currentImg : '');
-      if (url && url.trim().startsWith('http')) {
-        if (!state.gameCustomImages) state.gameCustomImages = {};
-        state.gameCustomImages[key] = url.trim();
-        saveDataImmediate('货架商品图片链接');
+      const url = prompt('输入图片链接（留空确认=清除）：', currentImg && currentImg.startsWith('http') ? currentImg : '');
+      if (url === null) return;
+      const trimmed = url.trim();
+      if (!trimmed) {
+        delete state.gameCustomImages[key];
+        saveDataImmediate('货架商品图片清除');
         shelfRenderCollection();
-        shelfShowNotice('图片链接已设置！');
-      } else if (url !== null && url !== '') {
-        shelfShowNotice('请输入以 http 开头的链接');
+        shelfShowNotice('图片已清除');
+        return;
       }
+      if (!trimmed.startsWith('http')) {
+        shelfShowNotice('请输入以 http 开头的链接');
+        return;
+      }
+      state.gameCustomImages[key] = trimmed;
+      saveDataImmediate('货架商品图片链接');
+      shelfRenderCollection();
+      shelfShowNotice('图片链接已设置！');
     } else {
       const input = document.createElement('input');
       input.type = 'file';
