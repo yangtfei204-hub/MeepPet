@@ -4567,32 +4567,77 @@ async function refreshWorldPreview() {
     `;
     document.body.appendChild(house);
 
-    // 绑定事件
-    document.getElementById('sp-house-close').onclick = () => toggleHouse();
-    document.getElementById('sp-house-feed-btn').onclick = () => {
-      if (settings.houseActionFeed) {
-        const charLayer = document.getElementById('sp-house-char-layer');
-        if (charLayer) charLayer.innerHTML = `<img src="${settings.houseActionFeed}" alt="喂食" />`;
-        setTimeout(() => updateHouseScene(), 3000);
-      }
-      feedPet();
-    };
-    document.getElementById('sp-house-bath-btn').onclick = () => {
-      if (settings.houseActionBath) {
-        const charLayer = document.getElementById('sp-house-char-layer');
-        if (charLayer) charLayer.innerHTML = `<img src="${settings.houseActionBath}" alt="洗澡" />`;
-        setTimeout(() => updateHouseScene(), 3000);
-      }
-      bathPet();
-    };
-    document.getElementById('sp-house-sleep-btn').onclick = () => {
-      if (settings.houseActionSleep) {
-        const charLayer = document.getElementById('sp-house-char-layer');
-        if (charLayer) charLayer.innerHTML = `<img src="${settings.houseActionSleep}" alt="睡觉" />`;
-        setTimeout(() => updateHouseScene(), 5000);
-      }
-      sleepPet();
-    };
+// 绑定事件
+document.getElementById('sp-house-close').onclick = () => toggleHouse();
+document.getElementById('sp-house-feed-btn').onclick = () => {
+  const quickKey = 'quickFeed';
+  const category = 'food';
+  // 延迟切换立绘，等物品使用完成后才播放
+  useInventoryItem(category, quickKey, (item, restoreAmount) => {
+    // 切换立绘
+    if (settings.houseActionFeed) {
+      const charLayer = document.getElementById('sp-house-char-layer');
+      if (charLayer) charLayer.innerHTML = `<img src="${settings.houseActionFeed}" alt="喂食" />`;
+      setTimeout(() => updateHouseScene(), 3000);
+    }
+    if (settings.foodImage) showInteractionItem(settings.foodImage);
+    state.hunger = Math.min(100, state.hunger + restoreAmount);
+    state.lastFed = Date.now();
+    state.totalInteractions++;
+    const actionSprite = settings.spriteEat || settings.spriteHappy;
+    if (actionSprite) {
+      const dur = (settings.spriteDurations && settings.spriteDurations.spriteEat) || 2000;
+      setSpriteWithLock('eat', actionSprite, dur);
+    }
+    showBubble(settings.reactions.feed, 3000);
+    updateMood(); updateStatusBars(); saveData(); checkAchievements();
+  });
+};
+document.getElementById('sp-house-bath-btn').onclick = () => {
+  const quickKey = 'quickClean';
+  const category = 'clean';
+  useInventoryItem(category, quickKey, (item, restoreAmount) => {
+    // 切换立绘
+    if (settings.houseActionBath) {
+      const charLayer = document.getElementById('sp-house-char-layer');
+      if (charLayer) charLayer.innerHTML = `<img src="${settings.houseActionBath}" alt="洗澡" />`;
+      setTimeout(() => updateHouseScene(), 3000);
+    }
+    if (settings.bathImage) showInteractionItem(settings.bathImage);
+    state.cleanliness = Math.min(100, state.cleanliness + restoreAmount);
+    state.lastBathed = Date.now();
+    state.totalInteractions++;
+    if (settings.spriteBath) {
+      const dur = (settings.spriteDurations && settings.spriteDurations.spriteBath) || 2500;
+      setSpriteWithLock('bath', settings.spriteBath, dur);
+    }
+    showBubble(settings.reactions.bath, 3000);
+    updateMood(); updateStatusBars(); saveData(); checkAchievements();
+  });
+};
+document.getElementById('sp-house-sleep-btn').onclick = () => {
+  const quickKey = 'quickEnergy';
+  const category = 'energy';
+  useInventoryItem(category, quickKey, (item, restoreAmount) => {
+    // 切换立绘
+    if (settings.houseActionSleep) {
+      const charLayer = document.getElementById('sp-house-char-layer');
+      if (charLayer) charLayer.innerHTML = `<img src="${settings.houseActionSleep}" alt="睡觉" />`;
+      setTimeout(() => updateHouseScene(), 5000);
+    }
+    if (settings.bedImage) showInteractionItem(settings.bedImage);
+    state.energy = Math.min(100, state.energy + restoreAmount);
+    state.lastSlept = Date.now();
+    state.totalInteractions++;
+    if (settings.spriteSleep) {
+      const dur = (settings.spriteDurations && settings.spriteDurations.spriteSleep) || 8000;
+      setSpriteWithLock('sleep', settings.spriteSleep, dur);
+    }
+    showBubble(settings.reactions.sleep, 4000);
+    updateMood(); updateStatusBars(); saveData(); checkAchievements();
+  });
+};
+
     document.getElementById('sp-house-expand-btn').onclick = () => {
       const box = document.getElementById('sp-house-dialogue-box');
       const btn = document.getElementById('sp-house-expand-btn');
