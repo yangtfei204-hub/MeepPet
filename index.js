@@ -351,7 +351,7 @@
     gameCustomImages: {},   // 玩家自定义图片 {key: url}
     gameBgImage: '',        // 游戏背景图
     gameGeneratorPos: 0,    // 生成器固定位置（0-35索引）
-    gameSellPos: 35,        // 售卖区固定位置
+    gameSellPos: 47,        // 售卖区固定位置
     gameInventory: [],        // [{category, idx, count}] 玩家购买的物品库存
     quickFeed: null,          // {category:'food', idx:0} 快捷投喂物品
     quickClean: null,         // {category:'clean', idx:0} 快捷清洁物品
@@ -8044,7 +8044,7 @@ function refreshCharPreview() {
 
   // ===== 游戏常量 =====
   const GAME_BOARD_SIZE = 6;
-  const GAME_BOARD_CELLS = 36;
+  const GAME_BOARD_CELLS = 48;
   const GAME_STAMINA_RECOVER_INTERVAL = 5 * 60 * 1000; // 8分钟恢复1点
   const GAME_STAMINA_RECOVER_AMOUNT = 1;
   const GAME_MAX_CHAIN_LEVEL = 8;
@@ -9538,7 +9538,7 @@ function refreshCharPreview() {
               state.gameCustomImages = {};
               state.gameBgImage = '';
               state.gameGeneratorPos = 0;
-              state.gameSellPos = 35;
+              state.gameSellPos = 47;
               state.gameInventory = [];
               state.quickFeed = null;
               state.quickClean = null;
@@ -15153,15 +15153,15 @@ function refreshCharPreview() {
         const chains = ['toy', 'food', 'gem', 'potion', 'music', 'flower', 'star', 'seasoning'];
         return chains.every(chain => (state.gameCollection || []).includes(`${chain}_8`));
       }},
-    { id: 'merge_board_full',  name: '棋盘爆满',       emoji: '🧩', desc: '棋盘34格全部有物品（不含生成器和售卖区）', category: 'merge', tier: 3,
+    { id: 'merge_board_full',  name: '棋盘爆满',       emoji: '🧩', desc: '棋盘46格全部有物品（不含生成器和售卖区）', category: 'merge', tier: 3,
       check: () => {
-        if (!state.gameBoard || state.gameBoard.length !== 36) return false;
+        if (!state.gameBoard || state.gameBoard.length !== 48) return false;
         let filled = 0;
-        for (let i = 0; i < 36; i++) {
+        for (let i = 0; i < 48; i++) {
           if (i === state.gameGeneratorPos || i === state.gameSellPos) continue;
           if (state.gameBoard[i]) filled++;
         }
-        return filled >= 34;
+        return filled >= 46;
       }},
 
     // ===================== 新增：餐厅进阶 =====================

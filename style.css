@@ -1881,7 +1881,7 @@
   position: fixed;
   width: 380px;
   max-width: 95vw;
-  max-height: 85vh;
+  max-height: 95vh;
   background: var(--sp-bg-main);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
@@ -2012,7 +2012,9 @@
   position: relative;
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.2) transparent;
+  min-height: 0;
 }
+
 
 #sp-game-content::-webkit-scrollbar {
   width: 5px;
@@ -2036,7 +2038,7 @@
 #sp-game-board {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  gap: 4px;
+  gap: 3px;
   padding: 8px;
   background: rgba(0,0,0,0.2);
   border-radius: 12px;
@@ -2567,8 +2569,12 @@
   #sp-game-panel {
     width: calc(100vw - 16px);
     max-width: 380px;
-    max-height: 75vh;
+    height: 96dvh;
+    height: 96vh;
+    max-height: 96dvh;
+    max-height: 96vh;
   }
+
 
   #sp-game-header {
     padding: 8px 10px;
@@ -2647,7 +2653,7 @@
 
 @media (max-width: 480px) {
   #sp-game-panel {
-    max-height: 70vh;
+    max-height: 82vh;
   }
 
   .sp-game-cell-emoji {
@@ -3401,8 +3407,9 @@
   #sp-match3-panel {
     width: calc(100vw - 16px);
     max-width: 380px;
-    max-height: 80vh;
+    max-height: 90vh;
   }
+
 
   #sp-match3-board {
     height: 300px;
@@ -3910,8 +3917,9 @@
   #sp-lottery-panel {
     width: calc(100vw - 16px);
     max-width: 340px;
-    max-height: 80vh;
+    max-height: 90vh;
   }
+
 
   .sp-lottery-pool-card {
     padding: 10px;
@@ -4474,8 +4482,9 @@
   #sp-link-panel {
     width: calc(100vw - 16px);
     max-width: 420px;
-    max-height: 85vh;
+    max-height: 90vh;
   }
+
 
   .sp-link-cell {
     font-size: 14px;
@@ -5344,8 +5353,9 @@
   #sp-fridge-panel {
     width: calc(100vw - 16px);
     max-width: 420px;
-    max-height: 85vh;
+    max-height: 90vh;
   }
+
 
   .sp-fridge-placed-emoji {
     font-size: 14px;
@@ -5598,8 +5608,9 @@
   #sp-tanghulu-panel {
     width: calc(100vw - 16px);
     max-width: 420px;
-    max-height: 85vh;
+    max-height: 90vh;
   }
+
 
   .sp-tanghulu-board {
     gap: 4px;
@@ -6408,8 +6419,9 @@
   #sp-shelf-panel {
     width: calc(100vw - 16px);
     max-width: 420px;
-    max-height: 85vh;
+    max-height: 90vh;
   }
+
 
   #sp-shelf-area {
     gap: 3px;
