@@ -1901,6 +1901,25 @@ function showInventoryPopup(category, quickKey, onUse) {
       }
     }
 
+      // 追加餐厅出餐台菜品到投喂列表
+      const cookedDishes = (state.restaurantCookedDishes || []).filter(d => d.count > 0);
+      cookedDishes.forEach(d => {
+        const recipe = RESTAURANT_RECIPES.find(r => r.id === d.recipeId);
+        if (!recipe) return;
+        itemsHtml += `
+          <div class="sp-inv-item" data-cooked-recipe="${d.recipeId}">
+            <span class="sp-inv-item-emoji">${recipe.emoji}</span>
+            <div class="sp-inv-item-info">
+              <span class="sp-inv-item-name">🐱 ${recipe.name}</span>
+              <span class="sp-inv-item-detail">+${recipe.feedAmount}饱食${recipe.energyAmount > 0 ? ' +' + recipe.energyAmount + '精力' : ''} | 出餐台: ${d.count}</span>
+            </div>
+            <div class="sp-inv-item-actions">
+              <button class="sp-inv-use-btn sp-inv-cooked-use" data-cooked-recipe="${d.recipeId}">使用</button>
+            </div>
+          </div>
+        `;
+      });
+
     overlay.innerHTML = `
       <div class="sp-inv-popup-box">
         <div class="sp-inv-popup-header">
@@ -2007,6 +2026,26 @@ function showInventoryPopup(category, quickKey, onUse) {
         }
         showBubble('✨ 哇！亮晶晶的糖砂！好甜好开心！！', 4000);
         updateMood(); updateStatusBars(); saveData();
+      };
+    });
+
+    // 餐厅出餐台菜品使用按钮
+    overlay.querySelectorAll('.sp-inv-cooked-use').forEach(btn => {
+      btn.onclick = () => {
+        const recipeId = btn.dataset.cookedRecipe;
+        const dishInv = (state.restaurantCookedDishes || []).find(d => d.recipeId === recipeId && d.count > 0);
+        if (!dishInv) { showBubble('出餐台没有了', 2000); overlay.remove(); return; }
+        const recipe = RESTAURANT_RECIPES.find(r => r.id === recipeId);
+        if (!recipe) return;
+        dishInv.count--;
+        state.restaurantCookedDishes = (state.restaurantCookedDishes || []).filter(d => d.count > 0);
+        overlay.remove();
+        onUse(recipe, recipe.feedAmount);
+        // 额外恢复精力（如果菜品有energyAmount）
+        if (recipe.energyAmount > 0) {
+          state.energy = Math.min(100, state.energy + recipe.energyAmount);
+        }
+        saveDataDebounced('使用餐厅菜品投喂');
       };
     });
 
@@ -7088,6 +7127,19 @@ function refreshCharPreview() {
         { level: 7, emoji: '🌌', name: '银河之钥', sell: 120 },
         { level: 8, emoji: '✴️', name: '传说创世星火', sell: 280 },
       ]
+    },
+    seasoning: {
+      name: '🧂 调料链',
+      items: [
+        { level: 1, emoji: '🧂', name: '粗盐粒', sell: 1, seasoningId: 'salt' },
+        { level: 2, emoji: '🫙', name: '酿造酱油', sell: 2, seasoningId: 'soy' },
+        { level: 3, emoji: '🌶️', name: '研磨胡椒', sell: 5, seasoningId: 'pepper' },
+        { level: 4, emoji: '🧈', name: '发酵黄油', sell: 11, seasoningId: 'butter' },
+        { level: 5, emoji: '🍯', name: '百花蜂蜜', sell: 25, seasoningId: 'honey' },
+        { level: 6, emoji: '✨', name: '秘制五香粉', sell: 55, seasoningId: 'spice' },
+        { level: 7, emoji: '🫗', name: '陈年老醋', sell: 120, seasoningId: 'vinegar' },
+        { level: 8, emoji: '🏺', name: '传说万味精华', sell: 280, seasoningId: 'spice' },
+      ]
     }
 
   };
@@ -7128,13 +7180,13 @@ function refreshCharPreview() {
     { key: 'stamina100', name: '满能量桶', price: 300, restore: 100, emoji: '🪫', dailyLimit: 1 },
   ];
 
-  // 生成器产出权重（等级越高概率越低）
+  // 生成器产出权重（1级概率最大，等级越高概率越低）
   const GAME_SPAWN_WEIGHTS = [
-    { level: 1, weight: 55 },
-    { level: 2, weight: 25 },
-    { level: 3, weight: 12 },
-    { level: 4, weight: 6 },
-    { level: 5, weight: 2 },
+    { level: 1, weight: 70 },
+    { level: 2, weight: 18 },
+    { level: 3, weight: 8 },
+    { level: 4, weight: 3 },
+    { level: 5, weight: 1 },
   ];
 
   // 订单模板
@@ -7167,6 +7219,10 @@ function refreshCharPreview() {
     { chain: 'star', minLevel: 3, maxLevel: 6, goldMulti: 2.5 },
     { chain: 'star', minLevel: 4, maxLevel: 7, goldMulti: 3.0 },
     { chain: 'star', minLevel: 5, maxLevel: 8, goldMulti: 4.0 },
+    { chain: 'seasoning', minLevel: 2, maxLevel: 5, goldMulti: 2.0 },
+    { chain: 'seasoning', minLevel: 3, maxLevel: 6, goldMulti: 2.5 },
+    { chain: 'seasoning', minLevel: 4, maxLevel: 7, goldMulti: 3.0 },
+    { chain: 'seasoning', minLevel: 5, maxLevel: 8, goldMulti: 4.0 },
   ];
 
 
@@ -7268,8 +7324,9 @@ function refreshCharPreview() {
     }
 
     // 随机选择链
-    const chains = ['toy', 'food', 'gem', 'potion', 'music', 'flower', 'star'];
+    const chains = ['toy', 'food', 'gem', 'potion', 'music', 'flower', 'star', 'seasoning'];
     const chain = chains[Math.floor(Math.random() * chains.length)];
+
 
     // 放到随机空格
     const targetSlot = emptySlots[Math.floor(Math.random() * emptySlots.length)];
@@ -7281,9 +7338,20 @@ function refreshCharPreview() {
       state.gameCollection.push(itemKey);
     }
 
+    // 调料链联动：生成调料时同步到餐厅库存
+    if (chain === 'seasoning') {
+      const seasoningItem = GAME_CHAINS.seasoning.items[spawnLevel - 1];
+      if (seasoningItem && seasoningItem.seasoningId) {
+        if (!state.restaurantSeasonings) state.restaurantSeasonings = {};
+        state.restaurantSeasonings[seasoningItem.seasoningId] = (state.restaurantSeasonings[seasoningItem.seasoningId] || 0) + 1;
+      }
+    }
+
     saveDataDebounced('游戏生成道具');
     gameRenderBoard();
     gameRenderStatus();
+    gameRenderOrders();
+
   }
 
   // ===== 合成逻辑 =====
@@ -7301,10 +7369,22 @@ function refreshCharPreview() {
       const itemData = chainData.items[fromItem.level - 1];
       state.gameGold += itemData.sell;
       state.gameBoard[fromIdx] = null;
+
+      // 调料链联动：售卖调料时从餐厅库存扣除
+      if (fromItem.chain === 'seasoning' && itemData.seasoningId) {
+        if (state.restaurantSeasonings && state.restaurantSeasonings[itemData.seasoningId] > 0) {
+          state.restaurantSeasonings[itemData.seasoningId]--;
+          if (state.restaurantSeasonings[itemData.seasoningId] <= 0) {
+            delete state.restaurantSeasonings[itemData.seasoningId];
+          }
+        }
+      }
+
       gameShowNotice(`售出 ${itemData.emoji} ${itemData.name}，获得 ${itemData.sell} 金币！`);
       saveDataDebounced('游戏售卖');
       gameRenderBoard();
       gameRenderStatus();
+      gameRenderOrders();
       return true;
     }
 
@@ -7339,9 +7419,17 @@ function refreshCharPreview() {
       const newItem = chainData.items[newLevel - 1];
       gameShowNotice(`合成成功！获得 ${newItem.emoji} ${newItem.name} (Lv${newLevel})`);
 
+      // 调料链联动：合成出调料时同步到餐厅库存
+      if (fromItem.chain === 'seasoning' && newItem.seasoningId) {
+        if (!state.restaurantSeasonings) state.restaurantSeasonings = {};
+        state.restaurantSeasonings[newItem.seasoningId] = (state.restaurantSeasonings[newItem.seasoningId] || 0) + 1;
+      }
+
       saveDataDebounced('游戏合成');
       gameRenderBoard();
       gameRenderStatus();
+      gameRenderOrders();
+
       return true;
     }
 
@@ -8050,7 +8138,7 @@ function refreshCharPreview() {
     const container = document.getElementById('sp-game-collection-content');
     if (!container) return;
 
-    const chainKeys = ['toy', 'food', 'gem', 'potion', 'music', 'flower', 'star'];
+    const chainKeys = ['toy', 'food', 'gem', 'potion', 'music', 'flower', 'star', 'seasoning'];
     container.innerHTML = chainKeys.map(chainKey => {
       const chain = GAME_CHAINS[chainKey];
       return `
@@ -8587,7 +8675,7 @@ function refreshCharPreview() {
     const cards = match3State.cards;
     const cardW = 44;
     const cardH = 44;
-    const overlapThreshold = 20;
+    const overlapThreshold = 5;
 
     // 按层分组，只需要拿上层的牌来检查遮挡
     const activeLayers = {};
@@ -9480,6 +9568,14 @@ function refreshCharPreview() {
         { type: 'boarditem', chain: 'music',  level: 2, label: '🎶 音符碎片 (Lv2)',   weight: 5  },
         { type: 'boarditem', chain: 'flower', level: 2, label: '🌼 雏菊 (Lv2)',       weight: 5  },
         { type: 'boarditem', chain: 'star',   level: 2, label: '❄️ 霜晶 (Lv2)',       weight: 5  },
+        // 调料链（低级）
+        { type: 'boarditem', chain: 'seasoning', level: 1, label: '🧂 粗盐粒 (Lv1)', weight: 8 },
+        { type: 'boarditem', chain: 'seasoning', level: 2, label: '🫙 酿造酱油 (Lv2)', weight: 5 },
+        // 基础蔬菜
+        { type: 'groceryitem', foodId: 'potato',   label: '🥔 土豆 ×2', count: 2, weight: 15 },
+        { type: 'groceryitem', foodId: 'onion',    label: '🧅 洋葱 ×2', count: 2, weight: 15 },
+        { type: 'groceryitem', foodId: 'garlic',   label: '🧄 大蒜 ×3', count: 3, weight: 18 },
+        { type: 'groceryitem', foodId: 'leek',     label: '🌿 大葱 ×3', count: 3, weight: 18 },
 
       ]
     },
@@ -9542,6 +9638,15 @@ function refreshCharPreview() {
         { type: 'boarditem', chain: 'music',  level: 3, label: '🎸 迷你吉他 (Lv3)',   weight: 8  },
         { type: 'boarditem', chain: 'flower', level: 3, label: '🌷 郁金香 (Lv3)',     weight: 8  },
         { type: 'boarditem', chain: 'star',   level: 3, label: '🌙 月光碎片 (Lv3)',   weight: 8  },
+        // 调料链
+        { type: 'boarditem', chain: 'seasoning', level: 2, label: '🫙 酿造酱油 (Lv2)', weight: 20 },
+        { type: 'boarditem', chain: 'seasoning', level: 3, label: '🌶️ 研磨胡椒 (Lv3)', weight: 8 },
+        // 基础蔬菜
+        { type: 'groceryitem', foodId: 'potato',   label: '🥔 土豆 ×5', count: 5, weight: 15 },
+        { type: 'groceryitem', foodId: 'eggplant', label: '🍆 茄子 ×3', count: 3, weight: 12 },
+        { type: 'groceryitem', foodId: 'broccoli', label: '🥦 西兰花 ×3', count: 3, weight: 12 },
+        { type: 'groceryitem', foodId: 'cabbage',  label: '🥬 卷心菜 ×3', count: 3, weight: 12 },
+        { type: 'groceryitem', foodId: 'ginger',   label: '🫚 生姜 ×4', count: 4, weight: 15 },
 
       ]
     },
@@ -9616,6 +9721,16 @@ function refreshCharPreview() {
         { type: 'boarditem', chain: 'music',  level: 5, label: '🎺 黄金号角 (Lv5)',   weight: 3  },
         { type: 'boarditem', chain: 'flower', level: 5, label: '🪷 七色莲花 (Lv5)',   weight: 3  },
         { type: 'boarditem', chain: 'star',   level: 5, label: '🌠 流星核心 (Lv5)',   weight: 3  },
+        // 调料链
+        { type: 'boarditem', chain: 'seasoning', level: 3, label: '🌶️ 研磨胡椒 (Lv3)', weight: 30 },
+        { type: 'boarditem', chain: 'seasoning', level: 4, label: '🧈 发酵黄油 (Lv4)', weight: 12 },
+        { type: 'boarditem', chain: 'seasoning', level: 5, label: '🍯 百花蜂蜜 (Lv5)', weight: 3 },
+        // 基础蔬菜大礼包
+        { type: 'groceryitem', foodId: 'pumpkin',   label: '🎃 南瓜 ×3', count: 3, weight: 10 },
+        { type: 'groceryitem', foodId: 'broccoli',  label: '🥦 西兰花 ×5', count: 5, weight: 12 },
+        { type: 'groceryitem', foodId: 'eggplant',  label: '🍆 茄子 ×5', count: 5, weight: 12 },
+        { type: 'groceryitem', foodId: 'potato',    label: '🥔 土豆 ×8', count: 8, weight: 8  },
+        { type: 'groceryitem', foodId: 'cabbage',   label: '🥬 卷心菜 ×5', count: 5, weight: 10 },
 
       ]
     }
@@ -9729,6 +9844,16 @@ function refreshCharPreview() {
           if (!state.gameCollection) state.gameCollection = [];
           if (!state.gameCollection.includes(itemKey)) state.gameCollection.push(itemKey);
           rewardMsg = `获得 ${result.label}（已放入合成棋盘）`;
+
+          // 调料链联动：抽到调料同时加入餐厅库存
+          if (result.chain === 'seasoning') {
+            const seasoningItem = GAME_CHAINS.seasoning.items[result.level - 1];
+            if (seasoningItem && seasoningItem.seasoningId) {
+              if (!state.restaurantSeasonings) state.restaurantSeasonings = {};
+              state.restaurantSeasonings[seasoningItem.seasoningId] = (state.restaurantSeasonings[seasoningItem.seasoningId] || 0) + 1;
+            }
+            rewardMsg = `获得 ${result.label}（已放入棋盘 + 餐厅调料库存）`;
+          }
         } else {
           // 棋盘满了，转换成金币补偿
           const chainData = GAME_CHAINS[result.chain];
@@ -9736,8 +9861,19 @@ function refreshCharPreview() {
           const goldComp = itemData ? itemData.sell * 2 : 5;
           state.gameGold += goldComp;
           rewardMsg = `获得 ${result.label}（棋盘已满，转换为 ${goldComp} 🪙）`;
+
+          // 调料链即使棋盘满了，也给餐厅库存（金币补偿之外的额外福利）
+          if (result.chain === 'seasoning') {
+            const seasoningItem = GAME_CHAINS.seasoning?.items[result.level - 1];
+            if (seasoningItem && seasoningItem.seasoningId) {
+              if (!state.restaurantSeasonings) state.restaurantSeasonings = {};
+              state.restaurantSeasonings[seasoningItem.seasoningId] = (state.restaurantSeasonings[seasoningItem.seasoningId] || 0) + 1;
+              rewardMsg += ` + 餐厅调料 +1`;
+            }
+          }
         }
         break;
+
       case 'tanghuluItem':
         if (!state.tanghuluInventory) state.tanghuluInventory = [];
         const thKey = result.fruitKey;
@@ -9755,6 +9891,17 @@ function refreshCharPreview() {
         const shelfPropCount = result.count || 1;
         state.shelfPropInventory[result.key] = (state.shelfPropInventory[result.key] || 0) + shelfPropCount;
         rewardMsg = `获得 ${result.label}（已存入货架道具背包）`;
+        break;
+      case 'groceryitem':
+        if (!state.fridgeInventory) state.fridgeInventory = [];
+        const groceryCount = result.count || 1;
+        const groceryExisting = state.fridgeInventory.find(i => i.foodId === result.foodId);
+        if (groceryExisting) {
+          groceryExisting.count += groceryCount;
+        } else {
+          state.fridgeInventory.push({ foodId: result.foodId, count: groceryCount });
+        }
+        rewardMsg = `获得 ${result.label}（已存入冰箱库存）`;
         break;
 
     }
@@ -11357,6 +11504,17 @@ function refreshCharPreview() {
     { id: 'tofu',       name: '嫩豆腐',     emoji: '🧊', w: 2, h: 1, value: 4,  feed: 4  },
     { id: 'noodle',     name: '拉面包',     emoji: '🍜', w: 3, h: 1, value: 7,  feed: 7  },
     { id: 'lobster',    name: '大龙虾',     emoji: '🦞', w: 3, h: 2, value: 20, feed: 18 },
+    // 餐厅进货区基础蔬菜（花金币购买或者抽奖）
+    { id: 'potato',    name: '土豆',     emoji: '🥔', w: 1, h: 1, value: 3,  feed: 3  },
+    { id: 'onion',     name: '洋葱',     emoji: '🧅', w: 1, h: 1, value: 3,  feed: 3  },
+    { id: 'garlic',    name: '大蒜',     emoji: '🧄', w: 1, h: 1, value: 2,  feed: 2  },
+    { id: 'cabbage',   name: '卷心菜',   emoji: '🥬', w: 2, h: 1, value: 4,  feed: 4  },
+    { id: 'eggplant',  name: '茄子',     emoji: '🍆', w: 1, h: 2, value: 4,  feed: 4  },
+    { id: 'broccoli',  name: '西兰花',   emoji: '🥦', w: 1, h: 1, value: 4,  feed: 4  },
+    { id: 'pumpkin',   name: '南瓜',     emoji: '🎃', w: 2, h: 2, value: 6,  feed: 6  },
+    { id: 'leek',      name: '大葱',     emoji: '🌿', w: 1, h: 2, value: 3,  feed: 2  },
+    { id: 'ginger',    name: '生姜',     emoji: '🫚', w: 1, h: 1, value: 3,  feed: 2  },
+
   ];
 
   // ===== 冰箱类型定义 =====
@@ -12049,24 +12207,95 @@ function refreshCharPreview() {
     const container = document.getElementById('sp-fridge-collection-content');
     if (!container) return;
     const inv = state.fridgeInventory || [];
+    if (!state.gameCustomImages) state.gameCustomImages = {};
 
     container.innerHTML = `
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
         ${FRIDGE_FOODS.map(food => {
           const owned = inv.find(i => i.foodId === food.id);
           const count = owned ? owned.count : 0;
+          const key = `fridge_food_${food.id}`;
+          const custom = state.gameCustomImages[key];
+          const display = custom
+            ? `<img src="${custom}" style="width:24px;height:24px;object-fit:contain;border-radius:3px;" />`
+            : `<span style="font-size:20px;">${food.emoji}</span>`;
           return `
-            <div style="aspect-ratio:1;border-radius:8px;border:2px solid ${count > 0 ? 'rgba(100,180,255,0.3)' : 'rgba(255,255,255,0.1)'};background:${count > 0 ? 'rgba(100,180,255,0.06)' : 'rgba(255,255,255,0.05)'};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;">
-              <span style="font-size:20px;">${food.emoji}</span>
+            <div style="aspect-ratio:1;border-radius:8px;border:2px solid ${count > 0 ? 'rgba(100,180,255,0.3)' : 'rgba(255,255,255,0.1)'};background:${count > 0 ? 'rgba(100,180,255,0.06)' : 'rgba(255,255,255,0.05)'};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;position:relative;cursor:pointer;overflow:hidden;transition:all 0.15s;" data-fridge-food-id="${food.id}">
+              ${display}
               <span style="font-size:8px;color:var(--sp-text-muted);text-align:center;">${food.name}</span>
               <span style="font-size:8px;color:var(--sp-text-muted);">${food.w}×${food.h}</span>
               ${count > 0 ? `<span style="font-size:9px;color:#ffb347;font-weight:600;">×${count}</span>` : ''}
+              <div class="sp-fridge-food-upload" data-food-id="${food.id}" style="position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;font-size:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity 0.2s;">📷</div>
             </div>
           `;
         }).join('')}
       </div>
     `;
+
+    container.querySelectorAll('[data-fridge-food-id]').forEach(item => {
+      item.addEventListener('mouseenter', () => {
+        const btn = item.querySelector('.sp-fridge-food-upload');
+        if (btn) btn.style.opacity = '1';
+      });
+      item.addEventListener('mouseleave', () => {
+        const btn = item.querySelector('.sp-fridge-food-upload');
+        if (btn) btn.style.opacity = '0';
+      });
+    });
+
+    container.querySelectorAll('.sp-fridge-food-upload').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        fridgePromptFoodUpload(btn.dataset.foodId);
+      });
+    });
   }
+
+  // ===== 冰箱食材图片上传 =====
+  function fridgePromptFoodUpload(foodId) {
+    const food = FRIDGE_FOODS.find(f => f.id === foodId);
+    const key = `fridge_food_${foodId}`;
+    const currentImg = state.gameCustomImages?.[key];
+
+    const choice = confirm(`设置食材「${food?.name || foodId}」的自定义图片\n\n⭐ 推荐：点「确定」→ 输入图片链接（节省内存）\n点「取消」→ 选择本地文件上传`);
+
+    if (choice) {
+      const url = prompt('输入图片链接（推荐，不占存储空间）：', currentImg?.startsWith('http') ? currentImg : '');
+      if (url && url.trim().startsWith('http')) {
+        if (!state.gameCustomImages) state.gameCustomImages = {};
+        state.gameCustomImages[key] = url.trim();
+        saveDataImmediate('冰箱食材图片链接');
+        fridgeRenderCollection();
+        fridgeShowNotice('图片链接已设置！');
+      } else if (url !== null && url !== '') {
+        fridgeShowNotice('请输入以 http 开头的链接');
+      }
+    } else {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) {
+          fridgeShowNotice('图片不能超过2MB，推荐使用图片链接');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          const compressed = await compressImage(ev.target.result, 80, 0.7);
+          if (!state.gameCustomImages) state.gameCustomImages = {};
+          state.gameCustomImages[key] = compressed;
+          saveDataImmediate('冰箱食材图片上传');
+          fridgeRenderCollection();
+          fridgeShowNotice('图片已设置！（提示：使用链接可节省存储空间）');
+        };
+        reader.readAsDataURL(file);
+      };
+      input.click();
+    }
+  }
+
 
   // ===== 冰箱库存背包 =====
   function fridgeRenderBag() {
@@ -12478,6 +12707,20 @@ function refreshCharPreview() {
   // 🐱 小猫餐厅常量定义 - MeepCatRestaurant
   // ============================================================
 
+  // ===== 餐厅基础蔬菜进货定义 =====
+  const RESTAURANT_GROCERIES = [
+    { id: 'potato',    name: '土豆',     emoji: '🥔', price: 3,  reputationRequired: 0  },
+    { id: 'onion',     name: '洋葱',     emoji: '🧅', price: 3,  reputationRequired: 0  },
+    { id: 'garlic',    name: '大蒜',     emoji: '🧄', price: 2,  reputationRequired: 0  },
+    { id: 'cabbage',   name: '卷心菜',   emoji: '🥬', price: 3,  reputationRequired: 0  },
+    { id: 'eggplant',  name: '茄子',     emoji: '🍆', price: 4,  reputationRequired: 0  },
+    { id: 'broccoli',  name: '西兰花',   emoji: '🥦', price: 4,  reputationRequired: 5  },
+    { id: 'spinach',   name: '菠菜',     emoji: '🥬', price: 3,  reputationRequired: 5  },
+    { id: 'pumpkin',   name: '南瓜',     emoji: '🎃', price: 5,  reputationRequired: 8  },
+    { id: 'leek',      name: '大葱',     emoji: '🌿', price: 2,  reputationRequired: 0  },
+    { id: 'ginger',    name: '生姜',     emoji: '🫚', price: 3,  reputationRequired: 5  },
+  ];
+
   // ===== 调料定义 =====
   const RESTAURANT_SEASONINGS = [
     { id: 'salt',    name: '盐',     emoji: '🧂', price: 5,  reputationRequired: 0  },
@@ -12616,6 +12859,32 @@ function refreshCharPreview() {
     { id: 'drink_corn_milk',      name: '玉米奶昔',     emoji: '🌽🥛', category: 'drink',
       ingredients: [{ foodId: 'corn', count: 1 }, { foodId: 'milk', count: 1 }], seasonings: [{ id: 'honey', count: 1 }],
       cookTime: 3, sellPrice: 16, feedAmount: 10, energyAmount: 5, reputationRequired: 5 },
+    // --- 新增：使用进货区基础蔬菜的菜品 ---
+    { id: 'dish_potato_stew',     name: '土豆炖肉',     emoji: '🥔🍖', category: 'dish',
+      ingredients: [{ foodId: 'potato', count: 2 }, { foodId: 'chicken', count: 1 }], seasonings: [{ id: 'salt', count: 1 }, { id: 'soy', count: 1 }],
+      cookTime: 7, sellPrice: 32, feedAmount: 24, energyAmount: 0, reputationRequired: 5 },
+    { id: 'dish_garlic_shrimp',   name: '蒜蓉虾仁',     emoji: '🧄🦐', category: 'dish',
+      ingredients: [{ foodId: 'shrimp', count: 2 }, { foodId: 'garlic', count: 2 }], seasonings: [{ id: 'butter', count: 1 }, { id: 'salt', count: 1 }],
+      cookTime: 5, sellPrice: 34, feedAmount: 22, energyAmount: 0, reputationRequired: 8 },
+    { id: 'dish_eggplant_pot',    name: '鱼香茄子煲',   emoji: '🍆🔥', category: 'dish',
+      ingredients: [{ foodId: 'eggplant', count: 2 }, { foodId: 'garlic', count: 1 }], seasonings: [{ id: 'soy', count: 2 }, { id: 'vinegar', count: 1 }, { id: 'chili', count: 1 }],
+      cookTime: 6, sellPrice: 28, feedAmount: 20, energyAmount: 0, reputationRequired: 10 },
+    { id: 'dish_broccoli_beef',   name: '西兰花炒牛肉', emoji: '🥦🥩', category: 'dish',
+      ingredients: [{ foodId: 'broccoli', count: 2 }, { foodId: 'steak', count: 1 }], seasonings: [{ id: 'soy', count: 1 }, { id: 'pepper', count: 1 }],
+      cookTime: 6, sellPrice: 42, feedAmount: 28, energyAmount: 0, reputationRequired: 12 },
+    { id: 'dish_pumpkin_soup',    name: '奶油南瓜汤',   emoji: '🎃🥛', category: 'dish',
+      ingredients: [{ foodId: 'pumpkin', count: 1 }, { foodId: 'milk', count: 1 }], seasonings: [{ id: 'cream', count: 1 }, { id: 'salt', count: 1 }],
+      cookTime: 5, sellPrice: 26, feedAmount: 18, energyAmount: 3, reputationRequired: 8 },
+    { id: 'dish_cabbage_roll',    name: '日式卷心菜卷', emoji: '🥬🍖', category: 'dish',
+      ingredients: [{ foodId: 'cabbage', count: 2 }, { foodId: 'chicken', count: 1 }], seasonings: [{ id: 'soy', count: 1 }, { id: 'sesame', count: 1 }],
+      cookTime: 6, sellPrice: 30, feedAmount: 22, energyAmount: 0, reputationRequired: 10 },
+    { id: 'snack_onion_rings',    name: '炸洋葱圈',     emoji: '🧅🔥', category: 'snack',
+      ingredients: [{ foodId: 'onion', count: 2 }], seasonings: [{ id: 'salt', count: 1 }, { id: 'pepper', count: 1 }],
+      cookTime: 3, sellPrice: 16, feedAmount: 12, energyAmount: 0, reputationRequired: 5 },
+    { id: 'dish_ginger_fish',     name: '姜葱蒸鱼',     emoji: '🫚🐟', category: 'dish',
+      ingredients: [{ foodId: 'fish', count: 1 }, { foodId: 'ginger', count: 2 }, { foodId: 'leek', count: 1 }], seasonings: [{ id: 'soy', count: 2 }, { id: 'salt', count: 1 }],
+      cookTime: 7, sellPrice: 36, feedAmount: 26, energyAmount: 0, reputationRequired: 12 },
+
   ];
 
   // ===== 客人定义 =====
@@ -13207,6 +13476,91 @@ function refreshCharPreview() {
     container.innerHTML = html;
   }
 
+  // ===== 糖葫芦水果图鉴渲染 =====
+  function tanghuluRenderCollection() {
+    const grid = document.getElementById('sp-tanghulu-collection-grid');
+    if (!grid) return;
+    if (!state.gameCustomImages) state.gameCustomImages = {};
+
+    grid.innerHTML = TANGHULU_FRUITS.map((fruit, idx) => {
+      const key = `tanghulu_fruit_${fruit.key}`;
+      const custom = state.gameCustomImages[key];
+      const display = custom
+        ? `<img src="${custom}" style="width:28px;height:28px;object-fit:contain;border-radius:50%;" />`
+        : `<span style="font-size:22px;">${fruit.emoji}</span>`;
+      return `
+        <div style="aspect-ratio:1;border-radius:8px;border:2px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;position:relative;cursor:pointer;overflow:hidden;transition:all 0.15s;" data-tanghulu-fruit-key="${fruit.key}">
+          ${display}
+          <span style="font-size:8px;color:var(--sp-text-muted);text-align:center;">${fruit.name}</span>
+          <div class="sp-tanghulu-fruit-upload" data-key="${fruit.key}" style="position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;font-size:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity 0.2s;">📷</div>
+        </div>
+      `;
+    }).join('');
+
+    grid.querySelectorAll('[data-tanghulu-fruit-key]').forEach(item => {
+      item.addEventListener('mouseenter', () => {
+        const btn = item.querySelector('.sp-tanghulu-fruit-upload');
+        if (btn) btn.style.opacity = '1';
+      });
+      item.addEventListener('mouseleave', () => {
+        const btn = item.querySelector('.sp-tanghulu-fruit-upload');
+        if (btn) btn.style.opacity = '0';
+      });
+    });
+
+    grid.querySelectorAll('.sp-tanghulu-fruit-upload').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        tanghuluPromptFruitUpload(btn.dataset.key);
+      });
+    });
+  }
+
+  // ===== 糖葫芦水果图片上传 =====
+  function tanghuluPromptFruitUpload(fruitKey) {
+    const fruit = TANGHULU_FRUITS.find(f => f.key === fruitKey);
+    const key = `tanghulu_fruit_${fruitKey}`;
+    const currentImg = state.gameCustomImages?.[key];
+
+    const choice = confirm(`设置水果「${fruit?.name || fruitKey}」的自定义图片\n\n⭐ 推荐：点「确定」→ 输入图片链接（节省内存）\n点「取消」→ 选择本地文件上传`);
+
+    if (choice) {
+      const url = prompt('输入图片链接（推荐，不占存储空间）：', currentImg?.startsWith('http') ? currentImg : '');
+      if (url && url.trim().startsWith('http')) {
+        if (!state.gameCustomImages) state.gameCustomImages = {};
+        state.gameCustomImages[key] = url.trim();
+        saveDataImmediate('糖葫芦水果图片链接');
+        tanghuluRenderCollection();
+        tanghuluShowNotice('图片链接已设置！');
+      } else if (url !== null && url !== '') {
+        tanghuluShowNotice('请输入以 http 开头的链接');
+      }
+    } else {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) {
+          tanghuluShowNotice('图片不能超过2MB，推荐使用图片链接');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          const compressed = await compressImage(ev.target.result, 80, 0.7);
+          if (!state.gameCustomImages) state.gameCustomImages = {};
+          state.gameCustomImages[key] = compressed;
+          saveDataImmediate('糖葫芦水果图片上传');
+          tanghuluRenderCollection();
+          tanghuluShowNotice('图片已设置！（提示：使用链接可节省存储空间）');
+        };
+        reader.readAsDataURL(file);
+      };
+      input.click();
+    }
+  }
+
   // ===== 卖糖葫芦 =====
   function tanghuluSellItem(fruitKey) {
     const inv = (state.tanghuluInventory || []).find(i => i.fruitKey === fruitKey && i.count > 0);
@@ -13458,7 +13812,8 @@ function refreshCharPreview() {
         <button class="sp-game-tab" data-thtab="bag" id="sp-tanghulu-tab-bag">🎒 背包</button>
         <button class="sp-game-tab" data-thtab="shop" id="sp-tanghulu-tab-shop">🛒 商城</button>
         <button class="sp-game-tab" data-thtab="inventory" id="sp-tanghulu-tab-inventory">📦 库存</button>
-        <span class="sp-link-gold-display" style="margin-left:auto;">🪙 <span id="sp-tanghulu-gold">${state.gameGold}</span></span>
+        <button class="sp-game-tab" data-thtab="collection" id="sp-tanghulu-tab-collection">📖 图鉴</button>
+        <span class="sp-link-gold-display" style="margin-left:auto;">🪙 <span id="sp-tanghulu-gold">
       </div>
       <div id="sp-tanghulu-body" style="flex:1;overflow-y:auto;padding:10px;">
         <div id="sp-tanghulu-tab-content-play">
@@ -13498,6 +13853,10 @@ function refreshCharPreview() {
         <div id="sp-tanghulu-tab-content-inventory" style="display:none;padding:8px;">
           <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">📦 库存一览</div>
           <div id="sp-tanghulu-inventory-content"></div>
+        </div>
+        <div id="sp-tanghulu-tab-content-collection" style="display:none;padding:8px;">
+          <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">📖 水果图鉴 <span style="font-size:10px;color:var(--sp-text-muted);font-weight:400;">（点击 📷 设置图片，优先推荐链接节省内存）</span></div>
+          <div id="sp-tanghulu-collection-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;"></div>
         </div>
       </div>
     `;
@@ -13571,7 +13930,7 @@ function refreshCharPreview() {
     });
 
     // 标签页切换
-    const thTabs = ['play', 'bag', 'shop', 'inventory'];
+    const thTabs = ['play', 'bag', 'shop', 'inventory', 'collection'];
     thTabs.forEach(tabName => {
       const tabBtn = document.getElementById(`sp-tanghulu-tab-${tabName}`);
       if (tabBtn) {
@@ -13584,9 +13943,11 @@ function refreshCharPreview() {
           document.getElementById('sp-tanghulu-tab-content-bag').style.display = tabName === 'bag' ? '' : 'none';
           document.getElementById('sp-tanghulu-tab-content-shop').style.display = tabName === 'shop' ? '' : 'none';
           document.getElementById('sp-tanghulu-tab-content-inventory').style.display = tabName === 'inventory' ? '' : 'none';
+          document.getElementById('sp-tanghulu-tab-content-collection').style.display = tabName === 'collection' ? '' : 'none';
           if (tabName === 'bag') tanghuluRenderBag();
           if (tabName === 'shop') tanghuluRenderShop();
           if (tabName === 'inventory') tanghuluRenderInventory();
+          if (tabName === 'collection') tanghuluRenderCollection();
         });
       }
     });
@@ -13773,6 +14134,18 @@ function refreshCharPreview() {
       if (!state.restaurantSeasonings) state.restaurantSeasonings = {};
       state.restaurantSeasonings[sea.id] = (state.restaurantSeasonings[sea.id] || 0) - sea.count;
       if (state.restaurantSeasonings[sea.id] <= 0) delete state.restaurantSeasonings[sea.id];
+
+      // 联动棋盘：从棋盘上移除对应的调料格子
+      let removeCount = sea.count;
+      for (let i = 0; i < GAME_BOARD_CELLS && removeCount > 0; i++) {
+        const cell = state.gameBoard[i];
+        if (!cell || cell.chain !== 'seasoning') continue;
+        const cellItem = GAME_CHAINS.seasoning.items[cell.level - 1];
+        if (cellItem && cellItem.seasoningId === sea.id) {
+          state.gameBoard[i] = null;
+          removeCount--;
+        }
+      }
     }
   }
 
@@ -14044,6 +14417,36 @@ function refreshCharPreview() {
     saveDataDebounced('餐厅购买调料');
     restaurantRender();
     restaurantShowNotice(`购买了 ${seasoning.emoji} ${seasoning.name} ×${amount}！`);
+  }
+
+  // ===== 购买基础蔬菜 =====
+  function restaurantBuyGrocery(groceryId, amount) {
+    const grocery = RESTAURANT_GROCERIES.find(g => g.id === groceryId);
+    if (!grocery) return;
+
+    if (state.restaurantReputation < grocery.reputationRequired) {
+      restaurantShowNotice(`需要声望 ${grocery.reputationRequired} 才能购买 ${grocery.name}`);
+      return;
+    }
+
+    const totalCost = grocery.price * amount;
+    if (state.gameGold < totalCost) {
+      restaurantShowNotice(`金币不足！需要 ${totalCost} 🪙`);
+      return;
+    }
+
+    state.gameGold -= totalCost;
+    if (!state.fridgeInventory) state.fridgeInventory = [];
+    const existing = state.fridgeInventory.find(i => i.foodId === groceryId);
+    if (existing) {
+      existing.count += amount;
+    } else {
+      state.fridgeInventory.push({ foodId: groceryId, count: amount });
+    }
+
+    saveDataDebounced('餐厅购买蔬菜');
+    restaurantRender();
+    restaurantShowNotice(`购买了 ${grocery.emoji} ${grocery.name} ×${amount}！`);
   }
 
   // ===== 菜品喂桌宠 =====
@@ -14395,12 +14798,49 @@ function refreshCharPreview() {
       </div>
     `;
 
+    // 基础蔬菜进货区
+    html += `
+      <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin:16px 0 8px;">🥬 基础蔬菜进货</div>
+      <div style="font-size:10px;color:var(--sp-text-muted);margin-bottom:8px;">花金币直接购买，不需要玩其他小游戏获得</div>
+    `;
+
+    RESTAURANT_GROCERIES.forEach(g => {
+      const unlocked = state.restaurantReputation >= g.reputationRequired;
+      const have = (state.fridgeInventory || []).find(i => i.foodId === g.id);
+      const haveCount = have ? have.count : 0;
+      const cantAfford3 = state.gameGold < g.price * 3;
+      const cantAfford5 = state.gameGold < g.price * 5;
+      html += `
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:${unlocked ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.1)'};border:1px solid var(--sp-border-light);border-radius:8px;margin-bottom:5px;opacity:${unlocked ? '1' : '0.45'};">
+          <span style="font-size:18px;flex-shrink:0;">${g.emoji}</span>
+          <div style="flex:1;">
+            <div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);">
+              ${g.name}
+              ${!unlocked ? `<span style="font-size:9px;color:#f66;margin-left:4px;">🔒声望${g.reputationRequired}</span>` : ''}
+            </div>
+            <div style="font-size:10px;color:var(--sp-text-muted);">库存: ${haveCount} | 单价: ${g.price}🪙</div>
+          </div>
+          ${unlocked ? `
+            <button class="sp-restaurant-buy-grocery-btn" data-id="${g.id}" data-amount="3" style="padding:3px 7px;font-size:10px;border-radius:5px;border:1px solid rgba(100,220,100,0.4);background:rgba(100,220,100,0.15);color:#6f6;cursor:pointer;${cantAfford3 ? 'opacity:0.4;pointer-events:none;' : ''}">买3 (${g.price * 3}🪙)</button>
+            <button class="sp-restaurant-buy-grocery-btn" data-id="${g.id}" data-amount="5" style="padding:3px 7px;font-size:10px;border-radius:5px;border:1px solid rgba(100,220,100,0.6);background:rgba(100,220,100,0.25);color:#6f6;cursor:pointer;${cantAfford5 ? 'opacity:0.4;pointer-events:none;' : ''}">买5 (${g.price * 5}🪙)</button>
+          ` : ''}
+        </div>
+      `;
+    });
+
     container.innerHTML = html;
 
     // 绑定购买按钮
     container.querySelectorAll('.sp-restaurant-buy-sea-btn').forEach(btn => {
       btn.onclick = () => {
         restaurantBuySeasoning(btn.dataset.id, parseInt(btn.dataset.amount));
+      };
+    });
+
+    // 绑定蔬菜进货按钮
+    container.querySelectorAll('.sp-restaurant-buy-grocery-btn').forEach(btn => {
+      btn.onclick = () => {
+        restaurantBuyGrocery(btn.dataset.id, parseInt(btn.dataset.amount));
       };
     });
 
@@ -15679,6 +16119,91 @@ function refreshCharPreview() {
     container.innerHTML = html;
   }
 
+  // ===== 货架商品图鉴渲染 =====
+  function shelfRenderCollection() {
+    const grid = document.getElementById('sp-shelf-collection-grid');
+    if (!grid) return;
+    if (!state.gameCustomImages) state.gameCustomImages = {};
+
+    grid.innerHTML = SHELF_ITEMS.map((item) => {
+      const key = `shelf_item_${item.id}`;
+      const custom = state.gameCustomImages[key];
+      const display = custom
+        ? `<img src="${custom}" style="width:28px;height:28px;object-fit:contain;border-radius:4px;" />`
+        : `<span style="font-size:22px;">${item.emoji}</span>`;
+      return `
+        <div style="aspect-ratio:1;border-radius:8px;border:2px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;position:relative;cursor:pointer;overflow:hidden;transition:all 0.15s;" data-shelf-item-id="${item.id}">
+          ${display}
+          <span style="font-size:8px;color:var(--sp-text-muted);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90%;">${item.name}</span>
+          <div class="sp-shelf-item-upload" data-item-id="${item.id}" style="position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;font-size:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity 0.2s;">📷</div>
+        </div>
+      `;
+    }).join('');
+
+    grid.querySelectorAll('[data-shelf-item-id]').forEach(item => {
+      item.addEventListener('mouseenter', () => {
+        const btn = item.querySelector('.sp-shelf-item-upload');
+        if (btn) btn.style.opacity = '1';
+      });
+      item.addEventListener('mouseleave', () => {
+        const btn = item.querySelector('.sp-shelf-item-upload');
+        if (btn) btn.style.opacity = '0';
+      });
+    });
+
+    grid.querySelectorAll('.sp-shelf-item-upload').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        shelfPromptItemUpload(parseInt(btn.dataset.itemId));
+      });
+    });
+  }
+
+  // ===== 货架商品图片上传 =====
+  function shelfPromptItemUpload(itemId) {
+    const item = SHELF_ITEMS.find(it => it.id === itemId);
+    const key = `shelf_item_${itemId}`;
+    const currentImg = state.gameCustomImages?.[key];
+
+    const choice = confirm(`设置商品「${item?.name || itemId}」的自定义图片\n\n⭐ 推荐：点「确定」→ 输入图片链接（节省内存）\n点「取消」→ 选择本地文件上传`);
+
+    if (choice) {
+      const url = prompt('输入图片链接（推荐，不占存储空间）：', currentImg?.startsWith('http') ? currentImg : '');
+      if (url && url.trim().startsWith('http')) {
+        if (!state.gameCustomImages) state.gameCustomImages = {};
+        state.gameCustomImages[key] = url.trim();
+        saveDataImmediate('货架商品图片链接');
+        shelfRenderCollection();
+        shelfShowNotice('图片链接已设置！');
+      } else if (url !== null && url !== '') {
+        shelfShowNotice('请输入以 http 开头的链接');
+      }
+    } else {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) {
+          shelfShowNotice('图片不能超过2MB，推荐使用图片链接');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          const compressed = await compressImage(ev.target.result, 80, 0.7);
+          if (!state.gameCustomImages) state.gameCustomImages = {};
+          state.gameCustomImages[key] = compressed;
+          saveDataImmediate('货架商品图片上传');
+          shelfRenderCollection();
+          shelfShowNotice('图片已设置！（提示：使用链接可节省存储空间）');
+        };
+        reader.readAsDataURL(file);
+      };
+      input.click();
+    }
+  }
+
   // ===== 主渲染函数 =====
   function shelfRender() {
     const panel = document.getElementById('sp-shelf-panel');
@@ -15999,6 +16524,7 @@ function refreshCharPreview() {
         <button class="sp-game-tab" data-shelftab="bag" id="sp-shelf-tab-bag">🎒 背包</button>
         <button class="sp-game-tab" data-shelftab="shop" id="sp-shelf-tab-shop">🛒 商店</button>
         <button class="sp-game-tab" data-shelftab="inventory" id="sp-shelf-tab-inventory">📦 库存</button>
+        <button class="sp-game-tab" data-shelftab="collection" id="sp-shelf-tab-collection">📖 图鉴</button>
         <span class="sp-shelf-gold-display" style="margin-left:auto;">🪙 <span id="sp-shelf-gold">${state.gameGold}</span></span>
       </div>
       <div id="sp-shelf-body">
@@ -16044,6 +16570,10 @@ function refreshCharPreview() {
         <div id="sp-shelf-tab-content-inventory" style="display:none;padding:8px;">
           <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">📦 联动库存</div>
           <div id="sp-shelf-inv-content"></div>
+        </div>
+        <div id="sp-shelf-tab-content-collection" style="display:none;padding:8px;">
+          <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">📖 商品图鉴 <span style="font-size:10px;color:var(--sp-text-muted);font-weight:400;">（点击 📷 设置图片，优先推荐链接节省内存）</span></div>
+          <div id="sp-shelf-collection-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;"></div>
         </div>
       </div>
     `;
@@ -16113,7 +16643,7 @@ function refreshCharPreview() {
     });
 
     // 标签页切换
-    const shelfTabs = ['play', 'bag', 'shop', 'inventory'];
+    const shelfTabs = ['play', 'bag', 'shop', 'inventory', 'collection'];
     shelfTabs.forEach(tabName => {
       const tabBtn = document.getElementById(`sp-shelf-tab-${tabName}`);
       if (tabBtn) {
@@ -16127,6 +16657,7 @@ function refreshCharPreview() {
           if (tabName === 'bag') shelfRenderBag();
           if (tabName === 'shop') shelfRenderShop();
           if (tabName === 'inventory') shelfRenderInventory();
+          if (tabName === 'collection') shelfRenderCollection();
         });
       }
     });
