@@ -1131,9 +1131,9 @@ function setSpriteWithLock(lockName, spriteImage, duration = null) {
     spriteStateLockTimer = setTimeout(() => {
       // 只有锁还是自己的才恢复
       if (spriteStateLock === lockName) {
-        spriteStateLock = null;
         spriteStateLockTimer = null;
-        updateSpriteImage(); // 恢复为默认状态
+        // 通过 clearSpriteLock 统一恢复（会自动检测边缘吸附）
+        clearSpriteLock();
       }
     }, duration);
   }
@@ -1148,8 +1148,30 @@ function clearSpriteLock() {
     spriteStateLockTimer = null;
   }
   spriteStateLock = null;
+
+  // 如果桌宠当前吸附在边缘，恢复为对应的挂起图而不是闲置图
+  const container = document.getElementById('silly-pet-container');
+  if (container) {
+    if (container.classList.contains('sp-edge-left') && settings.spriteHangLeft) {
+      spriteStateLock = 'hang';
+      updateSpriteImage(settings.spriteHangLeft);
+      return;
+    }
+    if (container.classList.contains('sp-edge-right') && settings.spriteHangRight) {
+      spriteStateLock = 'hang';
+      updateSpriteImage(settings.spriteHangRight);
+      return;
+    }
+    if (container.classList.contains('sp-edge-top') && settings.spriteHangTop) {
+      spriteStateLock = 'hang';
+      updateSpriteImage(settings.spriteHangTop);
+      return;
+    }
+  }
+
   updateSpriteImage();
 }
+
 
   // ============================================================
   // 统一确认弹窗工具
@@ -4123,10 +4145,11 @@ async function refreshWorldPreview() {
             <div id="sp-house-char-name"><span id="sp-house-avatar"></span><span id="sp-house-name-text">${settings.petName || '咪噗'}</span></div>
             <div id="sp-house-dialogue-text"></div>
           </div>
-          <div id="sp-house-input-area">
-            <input type="text" id="sp-house-input-field" placeholder="请输入你想对${settings.petName || '他'}说的话..." />
-            <button id="sp-house-send-btn" title="发送">➤</button>
-          </div>
+        <div id="sp-house-input-area">
+          <button id="sp-house-regen-btn" title="重新生成上一条回复">🔄</button>
+          <input type="text" id="sp-house-input-field" placeholder="请输入你想对${settings.petName || '他'}说的话..." />
+          <button id="sp-house-send-btn" title="发送">➤</button>
+        </div>
         </div>
       </div>
     `;
@@ -4172,6 +4195,65 @@ async function refreshWorldPreview() {
       if (!text) return;
       input.value = '';
       sendHouseMessage(text);
+    };
+
+    document.getElementById('sp-house-regen-btn').onclick = async () => {
+      // 找最后一条桌宠回复并删除
+      const lastAssistantIdx = state.petChatHistory.map(m => m.role).lastIndexOf('assistant');
+      if (lastAssistantIdx < 0) {
+        showBubble('没有可以重新生成的回复', 2000);
+        return;
+      }
+      state.petChatHistory = state.petChatHistory.slice(0, lastAssistantIdx);
+      saveDataImmediate('小屋重新生成');
+
+      // 显示思考中
+      const dialogueText = document.getElementById('sp-house-dialogue-text');
+      if (dialogueText) {
+        dialogueText.classList.remove('sp-house-typing-done');
+        dialogueText.innerHTML = '<span class="sp-thinking-dots">●●●</span>';
+      }
+
+      if (settings.spriteThink) setSpriteWithLock('think', settings.spriteThink, null);
+
+      const prevOffline = isOfflineMode;
+      isOfflineMode = true;
+      const reply = await callPetAPI('chat', '');
+      isOfflineMode = prevOffline;
+
+      if (spriteStateLock === 'think') clearSpriteLock();
+
+      if (reply) {
+        state.petChatHistory.push({ role: 'assistant', content: reply, timestamp: Date.now() });
+        saveData();
+
+        const matched = matchHouseExpression(reply);
+        const charLayer = document.getElementById('sp-house-char-layer');
+        if (charLayer) {
+          if (matched && matched.image) {
+            charLayer.innerHTML = `<img src="${matched.image}" alt="${matched.name || ''}" />`;
+          } else if (settings.houseCharacter) {
+            charLayer.innerHTML = `<img src="${settings.houseCharacter}" alt="立绘" />`;
+          }
+        }
+
+        if (dialogueText) {
+          typewriterEffect(dialogueText, reply, (matched) => {
+            const charLayer = document.getElementById('sp-house-char-layer');
+            if (charLayer && matched.image) {
+              charLayer.innerHTML = `<img src="${matched.image}" alt="${matched.name || ''}" />`;
+            }
+          });
+        }
+
+        showBubble(reply.slice(0, 50) + (reply.length > 50 ? '…' : ''), 4000);
+      } else {
+        if (dialogueText) {
+          dialogueText.innerHTML = '';
+          dialogueText.textContent = '呜…重新生成失败了…';
+          dialogueText.classList.add('sp-house-typing-done');
+        }
+      }
     };
 
     document.getElementById('sp-house-input-field').onkeydown = (e) => {
@@ -4224,35 +4306,68 @@ async function refreshWorldPreview() {
     if (!dialogueText) return;
 
     if (lastReply) {
-      // 尝试匹配表情
-      const matched = matchHouseExpression(lastReply.content);
+      // 匹配最后一个关键词对应的表情（遍历全文，取最后匹配的）
       const charLayer = document.getElementById('sp-house-char-layer');
       if (charLayer) {
-        if (matched && matched.image) {
-          charLayer.innerHTML = `<img src="${matched.image}" alt="${matched.name || ''}" />`;
+        let finalExpr = null;
+        if (settings.houseExpressions && settings.houseExpressions.length > 0) {
+          const lowerText = lastReply.content.toLowerCase();
+          for (const expr of settings.houseExpressions) {
+            if (!expr.keywords || !expr.image) continue;
+            const keywords = expr.keywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+            for (const kw of keywords) {
+              if (lowerText.includes(kw)) {
+                finalExpr = expr;
+              }
+            }
+          }
+        }
+        if (finalExpr && finalExpr.image) {
+          charLayer.innerHTML = `<img src="${finalExpr.image}" alt="${finalExpr.name || ''}" />`;
         } else if (settings.houseCharacter) {
           charLayer.innerHTML = `<img src="${settings.houseCharacter}" alt="立绘" />`;
         }
       }
-      typewriterEffect(dialogueText, lastReply.content);
+
+      // 直接显示完整内容，不走打字机
+      dialogueText.innerHTML = renderMarkdown(lastReply.content);
+      dialogueText.classList.add('sp-house-typing-done');
+      dialogueText.scrollTop = dialogueText.scrollHeight;
     } else {
       dialogueText.textContent = '主人来看我啦～有什么想说的吗？';
+      dialogueText.classList.add('sp-house-typing-done');
     }
   }
 
 
-  function typewriterEffect(element, text) {
-    element.textContent = '';
+  function typewriterEffect(element, text, onKeywordMatch) {
+    element.innerHTML = '';
+    element.classList.remove('sp-house-typing-done');
     let idx = 0;
+    let currentText = '';
+    let lastMatchedExpr = null;
     const interval = setInterval(() => {
       if (idx < text.length) {
-        element.textContent += text[idx];
+        currentText += text[idx];
+        element.innerHTML = renderMarkdown(currentText);
+        element.scrollTop = element.scrollHeight;
         idx++;
+
+        // 实时关键词匹配：每打出一个字就检测当前已输出文本
+        if (onKeywordMatch && settings.houseExpressions && settings.houseExpressions.length > 0) {
+          const matched = matchHouseExpression(currentText);
+          if (matched && matched !== lastMatchedExpr) {
+            lastMatchedExpr = matched;
+            onKeywordMatch(matched);
+          }
+        }
       } else {
         clearInterval(interval);
+        element.classList.add('sp-house-typing-done');
       }
     }, 50);
   }
+
 
   async function sendHouseMessage(text) {
     state.petChatHistory.push({ role: 'user', content: text, timestamp: Date.now() });
@@ -4290,9 +4405,14 @@ async function refreshWorldPreview() {
         }
       }
 
-      // 打字机效果
+      // 打字机效果（实时关键词切换立绘）
       if (dialogueText) {
-        typewriterEffect(dialogueText, reply);
+        typewriterEffect(dialogueText, reply, (matched) => {
+          const charLayer = document.getElementById('sp-house-char-layer');
+          if (charLayer && matched.image) {
+            charLayer.innerHTML = `<img src="${matched.image}" alt="${matched.name || ''}" />`;
+          }
+        });
       }
 
       showBubble(reply.slice(0, 50) + (reply.length > 50 ? '…' : ''), 4000);
