@@ -1166,7 +1166,7 @@
     if (!overlay) {
       overlay = document.createElement('div');
       overlay.id = 'sp-migrate-progress-overlay';
-      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:2147483650;';
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:flex-start;padding-top:20vh;z-index:2147483650;';
       overlay.innerHTML = `
         <div id="sp-migrate-progress-box" style="background:var(--sp-bg-secondary);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--sp-border);border-radius:14px;padding:24px;width:300px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,0.4);text-align:center;">
           <div style="font-size:24px;margin-bottom:12px;">☁️</div>
