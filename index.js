@@ -9532,140 +9532,164 @@ function refreshCharPreview() {
   const LOTTERY_POOLS = [
     {
       id: 'small',
-      id: 'small',
       name: '🎲 小试牛刀',
       cost: 10,
       dailyLimit: 10,
       desc: '10金币一抽，适合日常（每日限10次）',
       items: [
-        // 金币奖励
-        { type: 'gold', value: 1,  label: '1 🪙',     weight: 300 },
-        { type: 'gold', value: 2,  label: '2 🪙',     weight: 200 },
-        { type: 'gold', value: 3,  label: '3 🪙',     weight: 150 },
-        { type: 'gold', value: 5,  label: '5 🪙',     weight: 100 },
-        { type: 'gold', value: 8,  label: '8 🪙',     weight: 60  },
-        { type: 'gold', value: 10, label: '10 🪙',    weight: 30  },
-        // 消消看道具
+        // ===== 🪙 金币 =====
+        { type: 'gold', value: 1,  label: '1 🪙',  weight: 300 },
+        { type: 'gold', value: 2,  label: '2 🪙',  weight: 200 },
+        { type: 'gold', value: 3,  label: '3 🪙',  weight: 150 },
+        { type: 'gold', value: 5,  label: '5 🪙',  weight: 100 },
+        { type: 'gold', value: 8,  label: '8 🪙',  weight: 60  },
+        { type: 'gold', value: 10, label: '10 🪙', weight: 30  },
+
+        // ===== 🃏 消消看道具 =====
         { type: 'match3prop', key: 'shuffle', label: '🌀 混沌风暴 ×1', weight: 25 },
         { type: 'match3prop', key: 'expand',  label: '🪜 扩充神架 ×1', weight: 15 },
         { type: 'match3prop', key: 'sweep',   label: '🧹 魔法扫帚 ×1', weight: 10 },
-        // 工坊道具（低级）
-        { type: 'shopitem', category: 'food',   idx: 0, label: '🐟 小鱼干 ×1',  weight: 20 },
-        { type: 'shopitem', category: 'clean',  idx: 0, label: '🧻 湿纸巾 ×1',  weight: 20 },
-        { type: 'shopitem', category: 'energy', idx: 0, label: '🌿 猫薄荷枕 ×1', weight: 20 },
-        // 连连看道具
-        { type: 'linkprop', key: 'hint', label: '🔍 寻路放大镜 ×1', weight: 20 },
-        { type: 'linkprop', key: 'shuffle', label: '🌀 重组旋风 ×1', weight: 15 },
-        { type: 'linkprop', key: 'bomb', label: '💣 友情炸弹 ×1', weight: 8 },
-        { type: 'linkprop', key: 'compass', label: '🧭 罗盘透视 ×1', weight: 10 },
-        // 体力道具
-        { type: 'staminaitem', key: 'stamina30', label: '🧃 小能量瓶 ×1', weight: 15 },
-        // 冰箱道具
+
+        // ===== 🔗 连连看道具 =====
+        { type: 'linkprop', key: 'hint',    label: '🔍 寻路放大镜 ×1', weight: 20 },
+        { type: 'linkprop', key: 'shuffle', label: '🌀 重组旋风 ×1',   weight: 15 },
+        { type: 'linkprop', key: 'bomb',    label: '💣 友情炸弹 ×1',   weight: 8  },
+        { type: 'linkprop', key: 'compass', label: '🧭 罗盘透视 ×1',   weight: 10 },
+
+        // ===== 🛒 货架整理道具 =====
+        { type: 'shelfprop', key: 'shuffle',   label: '🔄 货架大洗牌 ×1', weight: 20 },
+        { type: 'shelfprop', key: 'autoMatch', label: '🧹 喵喵爪理货 ×1', weight: 15 },
+
+        // ===== 🧊 冰箱道具 =====
         { type: 'fridgeprop', key: 'organize', label: '🧹 一键整理 ×1', weight: 20 },
         { type: 'fridgeprop', key: 'compress', label: '🧃 压缩魔法 ×1', weight: 15 },
-        // 糖葫芦道具
-        { type: 'tanghuluprop', key: 'undo', label: '↩️ 悔步撤销 ×1', weight: 20 },
-        { type: 'tanghuluprop', key: 'lubricant', label: '🌀 顺滑剂 ×1', weight: 15 },
-        // 新增：工坊新道具
-        { type: 'shopitem', category: 'food',   idx: 4, label: '🍙 秘制猫饭团 ×1', weight: 18 },
-        { type: 'shopitem', category: 'clean',  idx: 4, label: '🪻 薰衣草香氛球 ×1', weight: 18 },
-        { type: 'shopitem', category: 'energy', idx: 4, label: '🕯️ 安神小夜灯 ×1', weight: 18 },
-        // 货架整理道具
-        { type: 'shelfprop', key: 'shuffle', label: '🔄 货架大洗牌 ×1', weight: 20 },
-        { type: 'shelfprop', key: 'autoMatch', label: '🧹 喵喵爪理货 ×1', weight: 15 },
-        // 合成棋盘物品（低级）- 小档补全
-        { type: 'boarditem', chain: 'toy',    level: 1, label: '🧶 线团 (Lv1)',       weight: 8  },
-        { type: 'boarditem', chain: 'food',   level: 1, label: '🌾 面粉 (Lv1)',       weight: 8  },
-        { type: 'boarditem', chain: 'gem',    level: 1, label: '✨ 碎晶 (Lv1)',       weight: 8  },
-        { type: 'boarditem', chain: 'potion', level: 1, label: '🌿 杂草 (Lv1)',       weight: 8  },
-        { type: 'boarditem', chain: 'music',  level: 1, label: '🔔 小铃铛 (Lv1)',     weight: 8  },
-        { type: 'boarditem', chain: 'flower', level: 1, label: '🌱 小嫩芽 (Lv1)',     weight: 8  },
-        { type: 'boarditem', chain: 'star',   level: 1, label: '💧 露水珠 (Lv1)',     weight: 8  },
-        { type: 'boarditem', chain: 'music',  level: 2, label: '🎶 音符碎片 (Lv2)',   weight: 5  },
-        { type: 'boarditem', chain: 'flower', level: 2, label: '🌼 雏菊 (Lv2)',       weight: 5  },
-        { type: 'boarditem', chain: 'star',   level: 2, label: '❄️ 霜晶 (Lv2)',       weight: 5  },
-        // 调料链（低级）
-        { type: 'boarditem', chain: 'seasoning', level: 1, label: '🧂 粗盐粒 (Lv1)', weight: 8 },
-        { type: 'boarditem', chain: 'seasoning', level: 2, label: '🫙 酿造酱油 (Lv2)', weight: 5 },
-        // 基础蔬菜
-        { type: 'groceryitem', foodId: 'potato',   label: '🥔 土豆 ×2', count: 2, weight: 15 },
-        { type: 'groceryitem', foodId: 'onion',    label: '🧅 洋葱 ×2', count: 2, weight: 15 },
-        { type: 'groceryitem', foodId: 'garlic',   label: '🧄 大蒜 ×3', count: 3, weight: 18 },
-        { type: 'groceryitem', foodId: 'leek',     label: '🌿 大葱 ×3', count: 3, weight: 18 },
 
+        // ===== 🍢 糖葫芦道具 =====
+        { type: 'tanghuluprop', key: 'undo',      label: '↩️ 悔步撤销 ×1', weight: 20 },
+        { type: 'tanghuluprop', key: 'lubricant', label: '🌀 顺滑剂 ×1',   weight: 15 },
+
+        // ===== ⚡ 体力道具 =====
+        { type: 'staminaitem', key: 'stamina30', label: '🧃 小能量瓶 ×1', weight: 15 },
+
+        // ===== 🍖 工坊道具（喂食/清洁/睡眠）=====
+        { type: 'shopitem', category: 'food',   idx: 0, label: '🐟 小鱼干 ×1',      weight: 20 },
+        { type: 'shopitem', category: 'clean',  idx: 0, label: '🧻 湿纸巾 ×1',      weight: 20 },
+        { type: 'shopitem', category: 'energy', idx: 0, label: '🌿 猫薄荷枕 ×1',    weight: 20 },
+        { type: 'shopitem', category: 'food',   idx: 4, label: '🍙 秘制猫饭团 ×1',  weight: 18 },
+        { type: 'shopitem', category: 'clean',  idx: 4, label: '🪻 薰衣草香氛球 ×1', weight: 18 },
+        { type: 'shopitem', category: 'energy', idx: 4, label: '🕯️ 安神小夜灯 ×1',  weight: 18 },
+
+        // ===== 🧶 合成棋盘物品（Lv1~2）=====
+        { type: 'boarditem', chain: 'toy',       level: 1, label: '🧶 线团 (Lv1)',       weight: 8 },
+        { type: 'boarditem', chain: 'food',      level: 1, label: '🌾 面粉 (Lv1)',       weight: 8 },
+        { type: 'boarditem', chain: 'gem',       level: 1, label: '✨ 碎晶 (Lv1)',       weight: 8 },
+        { type: 'boarditem', chain: 'potion',    level: 1, label: '🌿 杂草 (Lv1)',       weight: 8 },
+        { type: 'boarditem', chain: 'music',     level: 1, label: '🔔 小铃铛 (Lv1)',     weight: 8 },
+        { type: 'boarditem', chain: 'flower',    level: 1, label: '🌱 小嫩芽 (Lv1)',     weight: 8 },
+        { type: 'boarditem', chain: 'star',      level: 1, label: '💧 露水珠 (Lv1)',     weight: 8 },
+        { type: 'boarditem', chain: 'seasoning', level: 1, label: '🧂 粗盐粒 (Lv1)',     weight: 8 },
+        { type: 'boarditem', chain: 'music',     level: 2, label: '🎶 音符碎片 (Lv2)',   weight: 5 },
+        { type: 'boarditem', chain: 'flower',    level: 2, label: '🌼 雏菊 (Lv2)',       weight: 5 },
+        { type: 'boarditem', chain: 'star',      level: 2, label: '❄️ 霜晶 (Lv2)',       weight: 5 },
+        { type: 'boarditem', chain: 'seasoning', level: 2, label: '🫙 酿造酱油 (Lv2)',   weight: 5 },
+
+        // ===== 🥬 基础蔬菜 =====
+        { type: 'groceryitem', foodId: 'potato', label: '🥔 土豆 ×2', count: 2, weight: 15 },
+        { type: 'groceryitem', foodId: 'onion',  label: '🧅 洋葱 ×2', count: 2, weight: 15 },
+        { type: 'groceryitem', foodId: 'garlic', label: '🧄 大蒜 ×3', count: 3, weight: 18 },
+        { type: 'groceryitem', foodId: 'leek',   label: '🌿 大葱 ×3', count: 3, weight: 18 },
+
+        // ===== 🍢 糖葫芦（基础品种）=====
+        { type: 'tanghuluItem', fruitKey: 'strawberry', label: '🍓 甜心草莓糖葫芦 ×1',   count: 1, weight: 12 },
+        { type: 'tanghuluItem', fruitKey: 'orange',     label: '🍊 蜜桔瓣儿糖葫芦 ×1',   count: 1, weight: 12 },
+        { type: 'tanghuluItem', fruitKey: 'banana',     label: '🍌 香蕉片儿糖葫芦 ×1',   count: 1, weight: 12 },
+        { type: 'tanghuluItem', fruitKey: 'tomato',     label: '🍅 经典圣女果糖葫芦 ×1', count: 1, weight: 12 },
       ]
     },
+
     {
-      id: 'medium',
       id: 'medium',
       name: '✨ 锦鲤附体',
       cost: 30,
       dailyLimit: 5,
       desc: '30金币一抽，中等奖励（每日限5次）',
       items: [
-        // 金币
-        { type: 'gold', value: 5,  label: '5 🪙',     weight: 200 },
-        { type: 'gold', value: 8,  label: '8 🪙',     weight: 150 },
-        { type: 'gold', value: 10, label: '10 🪙',    weight: 100 },
-        { type: 'gold', value: 15, label: '15 🪙',    weight: 60  },
-        { type: 'gold', value: 20, label: '20 🪙',    weight: 30  },
-        // 消消看道具
+        // ===== 🪙 金币 =====
+        { type: 'gold', value: 5,  label: '5 🪙',  weight: 200 },
+        { type: 'gold', value: 8,  label: '8 🪙',  weight: 150 },
+        { type: 'gold', value: 10, label: '10 🪙', weight: 100 },
+        { type: 'gold', value: 15, label: '15 🪙', weight: 60  },
+        { type: 'gold', value: 20, label: '20 🪙', weight: 30  },
+
+        // ===== 🃏 消消看道具 =====
         { type: 'match3prop', key: 'shuffle', label: '🌀 混沌风暴 ×2', count: 2, weight: 40 },
         { type: 'match3prop', key: 'expand',  label: '🪜 扩充神架 ×2', count: 2, weight: 25 },
         { type: 'match3prop', key: 'sweep',   label: '🧹 魔法扫帚 ×2', count: 2, weight: 15 },
-        // 工坊道具（中级）
-        { type: 'shopitem', category: 'food',   idx: 1, label: '🥫 猫罐头 ×1',       weight: 30 },
-        { type: 'shopitem', category: 'clean',  idx: 1, label: '🧴 猫咪沐浴露 ×1',   weight: 30 },
-        { type: 'shopitem', category: 'energy', idx: 1, label: '🧣 温暖毛毯 ×1',     weight: 30 },
-        // 合成棋盘物品
-        { type: 'boarditem', chain: 'toy',  level: 2, label: '🐭 逗猫棒 (Lv2)',     weight: 20 },
-        { type: 'boarditem', chain: 'food', level: 2, label: '🍞 面包 (Lv2)',        weight: 20 },
-        { type: 'boarditem', chain: 'gem',  level: 2, label: '🔮 魔法水晶 (Lv2)',   weight: 20 },
-        { type: 'boarditem', chain: 'toy',  level: 3, label: '🧸 毛绒小熊 (Lv3)',   weight: 8  },
-        { type: 'boarditem', chain: 'food', level: 3, label: '🍰 草莓蛋糕 (Lv3)',   weight: 8  },
-        { type: 'boarditem', chain: 'gem',  level: 3, label: '💍 灵力戒指 (Lv3)',   weight: 8  },
-        { type: 'boarditem', chain: 'potion', level: 2, label: '🍀 四叶草 (Lv2)',     weight: 20 },
-        { type: 'boarditem', chain: 'potion', level: 3, label: '🧪 初级药水 (Lv3)',   weight: 8  },
-        // 体力道具
-        { type: 'staminaitem', key: 'stamina50', label: '🥤 中能量罐 ×1', weight: 20 },
-        // 冰箱道具
+
+        // ===== 🛒 货架整理道具 =====
+        { type: 'shelfprop', key: 'shuffle',   label: '🔄 货架大洗牌 ×2', count: 2, weight: 25 },
+        { type: 'shelfprop', key: 'autoMatch', label: '🧹 喵喵爪理货 ×2', count: 2, weight: 20 },
+        { type: 'shelfprop', key: 'basket',    label: '🪵 临时扩展篮 ×1', weight: 12 },
+
+        // ===== 🧊 冰箱道具 =====
         { type: 'fridgeprop', key: 'organize', label: '🧹 一键整理 ×2', count: 2, weight: 25 },
         { type: 'fridgeprop', key: 'compress', label: '🧃 压缩魔法 ×2', count: 2, weight: 20 },
         { type: 'fridgeprop', key: 'backpack', label: '🎒 放进背包 ×1', weight: 12 },
-        // 糖葫芦道具
-        { type: 'tanghuluprop', key: 'undo', label: '↩️ 悔步撤销 ×2', count: 2, weight: 25 },
-        { type: 'tanghuluprop', key: 'lubricant', label: '🌀 顺滑剂 ×2', count: 2, weight: 20 },
+
+        // ===== 🍢 糖葫芦道具 =====
+        { type: 'tanghuluprop', key: 'undo',       label: '↩️ 悔步撤销 ×2', count: 2, weight: 25 },
+        { type: 'tanghuluprop', key: 'lubricant',  label: '🌀 顺滑剂 ×2',   count: 2, weight: 20 },
         { type: 'tanghuluprop', key: 'extraStick', label: '🥢 赠送竹签 ×1', weight: 12 },
-        // 新增：工坊新道具（中级）
-        { type: 'shopitem', category: 'food',   idx: 5, label: '🥮 鲷鱼烧点心 ×1', weight: 15 },
-        { type: 'shopitem', category: 'clean',  idx: 5, label: '🧪 温泉浴盐罐 ×1', weight: 15 },
+
+        // ===== ⚡ 体力道具 =====
+        { type: 'staminaitem', key: 'stamina50', label: '🥤 中能量罐 ×1', weight: 20 },
+
+        // ===== 🍖 工坊道具（中级）=====
+        { type: 'shopitem', category: 'food',   idx: 1, label: '🥫 猫罐头 ×1',       weight: 30 },
+        { type: 'shopitem', category: 'clean',  idx: 1, label: '🧴 猫咪沐浴露 ×1',   weight: 30 },
+        { type: 'shopitem', category: 'energy', idx: 1, label: '🧣 温暖毛毯 ×1',     weight: 30 },
+        { type: 'shopitem', category: 'food',   idx: 5, label: '🥮 鲷鱼烧点心 ×1',   weight: 15 },
+        { type: 'shopitem', category: 'clean',  idx: 5, label: '🧪 温泉浴盐罐 ×1',   weight: 15 },
         { type: 'shopitem', category: 'energy', idx: 5, label: '🎶 星空催眠曲盒 ×1', weight: 15 },
-        // 新增：糖葫芦新品种
-        { type: 'tanghuluItem', fruitKey: 'blueberry', label: '🫐 冰晶蓝莓糖葫芦 ×1', count: 1, weight: 10 },
-        { type: 'tanghuluItem', fruitKey: 'coconut', label: '🥥 椰子奶球糖葫芦 ×1', count: 1, weight: 10 },
-        // 货架整理道具
-        { type: 'shelfprop', key: 'shuffle', label: '🔄 货架大洗牌 ×2', count: 2, weight: 25 },
-        { type: 'shelfprop', key: 'autoMatch', label: '🧹 喵喵爪理货 ×2', count: 2, weight: 20 },
-        { type: 'shelfprop', key: 'basket', label: '🪵 临时扩展篮 ×1', weight: 12 },
-        // 新链合成棋盘物品
-        { type: 'boarditem', chain: 'music',  level: 2, label: '🎶 音符碎片 (Lv2)',   weight: 20 },
-        { type: 'boarditem', chain: 'flower', level: 2, label: '🌼 雏菊 (Lv2)',       weight: 20 },
-        { type: 'boarditem', chain: 'star',   level: 2, label: '❄️ 霜晶 (Lv2)',       weight: 20 },
-        { type: 'boarditem', chain: 'music',  level: 3, label: '🎸 迷你吉他 (Lv3)',   weight: 8  },
-        { type: 'boarditem', chain: 'flower', level: 3, label: '🌷 郁金香 (Lv3)',     weight: 8  },
-        { type: 'boarditem', chain: 'star',   level: 3, label: '🌙 月光碎片 (Lv3)',   weight: 8  },
-        // 调料链
-        { type: 'boarditem', chain: 'seasoning', level: 2, label: '🫙 酿造酱油 (Lv2)', weight: 20 },
-        { type: 'boarditem', chain: 'seasoning', level: 3, label: '🌶️ 研磨胡椒 (Lv3)', weight: 8 },
-        // 基础蔬菜
-        { type: 'groceryitem', foodId: 'potato',   label: '🥔 土豆 ×5', count: 5, weight: 15 },
-        { type: 'groceryitem', foodId: 'eggplant', label: '🍆 茄子 ×3', count: 3, weight: 12 },
+
+        // ===== 🧶 合成棋盘物品（Lv2~3）=====
+        { type: 'boarditem', chain: 'toy',       level: 2, label: '🐭 逗猫棒 (Lv2)',     weight: 20 },
+        { type: 'boarditem', chain: 'food',      level: 2, label: '🍞 面包 (Lv2)',        weight: 20 },
+        { type: 'boarditem', chain: 'gem',       level: 2, label: '🔮 魔法水晶 (Lv2)',   weight: 20 },
+        { type: 'boarditem', chain: 'potion',    level: 2, label: '🍀 四叶草 (Lv2)',     weight: 20 },
+        { type: 'boarditem', chain: 'music',     level: 2, label: '🎶 音符碎片 (Lv2)',   weight: 20 },
+        { type: 'boarditem', chain: 'flower',    level: 2, label: '🌼 雏菊 (Lv2)',       weight: 20 },
+        { type: 'boarditem', chain: 'star',      level: 2, label: '❄️ 霜晶 (Lv2)',       weight: 20 },
+        { type: 'boarditem', chain: 'seasoning', level: 2, label: '🫙 酿造酱油 (Lv2)',   weight: 20 },
+        { type: 'boarditem', chain: 'toy',       level: 3, label: '🧸 毛绒小熊 (Lv3)',   weight: 8  },
+        { type: 'boarditem', chain: 'food',      level: 3, label: '🍰 草莓蛋糕 (Lv3)',   weight: 8  },
+        { type: 'boarditem', chain: 'gem',       level: 3, label: '💍 灵力戒指 (Lv3)',   weight: 8  },
+        { type: 'boarditem', chain: 'potion',    level: 3, label: '🧪 初级药水 (Lv3)',   weight: 8  },
+        { type: 'boarditem', chain: 'music',     level: 3, label: '🎸 迷你吉他 (Lv3)',   weight: 8  },
+        { type: 'boarditem', chain: 'flower',    level: 3, label: '🌷 郁金香 (Lv3)',     weight: 8  },
+        { type: 'boarditem', chain: 'star',      level: 3, label: '🌙 月光碎片 (Lv3)',   weight: 8  },
+        { type: 'boarditem', chain: 'seasoning', level: 3, label: '🌶️ 研磨胡椒 (Lv3)',   weight: 8  },
+
+        // ===== 🥬 基础蔬菜 =====
+        { type: 'groceryitem', foodId: 'potato',   label: '🥔 土豆 ×5',   count: 5, weight: 15 },
+        { type: 'groceryitem', foodId: 'eggplant', label: '🍆 茄子 ×3',   count: 3, weight: 12 },
         { type: 'groceryitem', foodId: 'broccoli', label: '🥦 西兰花 ×3', count: 3, weight: 12 },
         { type: 'groceryitem', foodId: 'cabbage',  label: '🥬 卷心菜 ×3', count: 3, weight: 12 },
-        { type: 'groceryitem', foodId: 'ginger',   label: '🫚 生姜 ×4', count: 4, weight: 15 },
+        { type: 'groceryitem', foodId: 'ginger',   label: '🫚 生姜 ×4',   count: 4, weight: 15 },
 
+        // ===== 🍢 糖葫芦（中档品种）=====
+        { type: 'tanghuluItem', fruitKey: 'strawberry',  label: '🍓 甜心草莓糖葫芦 ×2',   count: 2, weight: 10 },
+        { type: 'tanghuluItem', fruitKey: 'orange',      label: '🍊 蜜桔瓣儿糖葫芦 ×2',   count: 2, weight: 8  },
+        { type: 'tanghuluItem', fruitKey: 'kiwi',        label: '🥝 翡翠猕猴桃糖葫芦 ×1', count: 1, weight: 10 },
+        { type: 'tanghuluItem', fruitKey: 'grape',       label: '🍇 晶莹葡萄糖葫芦 ×1',   count: 1, weight: 10 },
+        { type: 'tanghuluItem', fruitKey: 'cherry',      label: '🍒 玛瑙樱桃糖葫芦 ×1',   count: 1, weight: 10 },
+        { type: 'tanghuluItem', fruitKey: 'blueberry',   label: '🫐 冰晶蓝莓糖葫芦 ×1',   count: 1, weight: 10 },
+        { type: 'tanghuluItem', fruitKey: 'coconut',     label: '🥥 椰子奶球糖葫芦 ×1',   count: 1, weight: 10 },
+        { type: 'tanghuluItem', fruitKey: 'pineapple',   label: '🍍 金菠萝块糖葫芦 ×1',   count: 1, weight: 10 },
+        { type: 'tanghuluItem', fruitKey: 'watermelon',  label: '🍉 迷你西瓜球糖葫芦 ×1', count: 1, weight: 10 },
       ]
     },
+
     {
       id: 'large',
       name: '💫 欧皇时刻',
@@ -9673,84 +9697,99 @@ function refreshCharPreview() {
       dailyLimit: 3,
       desc: '50金币一抽，高价值奖励（每日限3次）',
       items: [
-        // 金币
-        { type: 'gold', value: 10, label: '10 🪙',   weight: 200 },
-        { type: 'gold', value: 15, label: '15 🪙',   weight: 150 },
-        { type: 'gold', value: 20, label: '20 🪙',   weight: 100 },
-        { type: 'gold', value: 30, label: '30 🪙',   weight: 50  },
-        { type: 'gold', value: 50, label: '50 🪙',   weight: 15  },
-        // 消消看道具大包
+        // ===== 🪙 金币 =====
+        { type: 'gold', value: 10, label: '10 🪙', weight: 200 },
+        { type: 'gold', value: 15, label: '15 🪙', weight: 150 },
+        { type: 'gold', value: 20, label: '20 🪙', weight: 100 },
+        { type: 'gold', value: 30, label: '30 🪙', weight: 50  },
+        { type: 'gold', value: 50, label: '50 🪙', weight: 15  },
+
+        // ===== 🃏 消消看道具（大包）=====
         { type: 'match3prop', key: 'shuffle', label: '🌀 混沌风暴 ×3', count: 3, weight: 50 },
         { type: 'match3prop', key: 'expand',  label: '🪜 扩充神架 ×3', count: 3, weight: 30 },
         { type: 'match3prop', key: 'sweep',   label: '🧹 魔法扫帚 ×3', count: 3, weight: 20 },
-        // 工坊道具（高级）
+
+        // ===== 🛒 货架整理道具 =====
+        { type: 'shelfprop', key: 'shuffle',   label: '🔄 货架大洗牌 ×3', count: 3, weight: 30 },
+        { type: 'shelfprop', key: 'autoMatch', label: '🧹 喵喵爪理货 ×3', count: 3, weight: 25 },
+        { type: 'shelfprop', key: 'basket',    label: '🪵 临时扩展篮 ×2', count: 2, weight: 15 },
+
+        // ===== 🧊 冰箱道具 =====
+        { type: 'fridgeprop', key: 'organize', label: '🧹 一键整理 ×3', count: 3, weight: 30 },
+        { type: 'fridgeprop', key: 'compress', label: '🧃 压缩魔法 ×3', count: 3, weight: 25 },
+        { type: 'fridgeprop', key: 'backpack', label: '🎒 放进背包 ×2', count: 2, weight: 15 },
+
+        // ===== 🍢 糖葫芦道具 =====
+        { type: 'tanghuluprop', key: 'undo',       label: '↩️ 悔步撤销 ×3', count: 3, weight: 30 },
+        { type: 'tanghuluprop', key: 'lubricant',  label: '🌀 顺滑剂 ×3',   count: 3, weight: 25 },
+        { type: 'tanghuluprop', key: 'extraStick', label: '🥢 赠送竹签 ×2', count: 2, weight: 15 },
+
+        // ===== ⚡ 体力道具 =====
+        { type: 'staminaitem', key: 'stamina100', label: '🪫 满能量桶 ×1', weight: 10 },
+        { type: 'staminaitem', key: 'stamina50',  label: '🥤 中能量罐 ×2', count: 2, weight: 20 },
+
+        // ===== 🍖 工坊道具（高级）=====
         { type: 'shopitem', category: 'food',   idx: 2, label: '🍗 豪华猫粮 ×1',    weight: 25 },
         { type: 'shopitem', category: 'clean',  idx: 2, label: '🫧 自动清洁机 ×1',  weight: 25 },
         { type: 'shopitem', category: 'energy', idx: 2, label: '🛏️ 舒适猫窝 ×1',   weight: 25 },
         { type: 'shopitem', category: 'food',   idx: 3, label: '🍱 满汉全席 ×1',    weight: 5  },
         { type: 'shopitem', category: 'clean',  idx: 3, label: '🛁 SPA豪华套餐 ×1', weight: 5  },
         { type: 'shopitem', category: 'energy', idx: 3, label: '💊 梦境胶囊 ×1',    weight: 5  },
-        // 合成棋盘物品（高级）
-        { type: 'boarditem', chain: 'toy',  level: 3, label: '🧸 毛绒小熊 (Lv3)',  weight: 30 },
-        { type: 'boarditem', chain: 'food', level: 3, label: '🍰 草莓蛋糕 (Lv3)', weight: 30 },
-        { type: 'boarditem', chain: 'gem',  level: 3, label: '💍 灵力戒指 (Lv3)', weight: 30 },
-        { type: 'boarditem', chain: 'toy',  level: 4, label: '🎮 复古掌机 (Lv4)',  weight: 12 },
-        { type: 'boarditem', chain: 'food', level: 4, label: '🍬 豪华糖果罐 (Lv4)', weight: 12 },
-        { type: 'boarditem', chain: 'gem',  level: 4, label: '👑 璀璨王冠 (Lv4)',  weight: 12 },
-        { type: 'boarditem', chain: 'toy',  level: 5, label: '🏰 黄金猫爬架 (Lv5)', weight: 3 },
-        { type: 'boarditem', chain: 'food', level: 5, label: '🧪 极品猫薄荷 (Lv5)', weight: 3 },
-        { type: 'boarditem', chain: 'gem',  level: 5, label: '🐉 龙之心宝石 (Lv5)', weight: 3 },
-        { type: 'boarditem', chain: 'potion', level: 3, label: '🧪 初级药水 (Lv3)',   weight: 30 },
-        { type: 'boarditem', chain: 'potion', level: 4, label: '⚗️ 炼金溶液 (Lv4)',   weight: 12 },
-        { type: 'boarditem', chain: 'potion', level: 5, label: '🪄 魔法精华 (Lv5)',   weight: 3  },
-        // 体力道具
-        { type: 'staminaitem', key: 'stamina100', label: '🪫 满能量桶 ×1', weight: 10 },
-        { type: 'staminaitem', key: 'stamina50', label: '🥤 中能量罐 ×2', count: 2, weight: 20 },
-        // 冰箱道具
-        { type: 'fridgeprop', key: 'organize', label: '🧹 一键整理 ×3', count: 3, weight: 30 },
-        { type: 'fridgeprop', key: 'compress', label: '🧃 压缩魔法 ×3', count: 3, weight: 25 },
-        { type: 'fridgeprop', key: 'backpack', label: '🎒 放进背包 ×2', count: 2, weight: 15 },
-        // 糖葫芦道具
-        { type: 'tanghuluprop', key: 'undo', label: '↩️ 悔步撤销 ×3', count: 3, weight: 30 },
-        { type: 'tanghuluprop', key: 'lubricant', label: '🌀 顺滑剂 ×3', count: 3, weight: 25 },
-        { type: 'tanghuluprop', key: 'extraStick', label: '🥢 赠送竹签 ×2', count: 2, weight: 15 },
-        { type: 'tanghuluItem', fruitKey: 'peach', label: '🍑 蜜汁水蜜桃糖葫芦 ×2', count: 2, weight: 8 },
-        { type: 'tanghuluItem', fruitKey: 'mango', label: '🥭 热带金芒果糖葫芦 ×2', count: 2, weight: 5 },
-        // 新增：工坊高级道具
         { type: 'shopitem', category: 'food',   idx: 5, label: '🥮 鲷鱼烧点心 ×2', count: 2, weight: 8 },
         { type: 'shopitem', category: 'clean',  idx: 5, label: '🧪 温泉浴盐罐 ×2', count: 2, weight: 8 },
         { type: 'shopitem', category: 'energy', idx: 5, label: '🎶 星空催眠曲盒 ×2', count: 2, weight: 8 },
-        // 新增：糖葫芦稀有品种
-        { type: 'tanghuluItem', fruitKey: 'lychee', label: '🪷 玲珑荔枝糖葫芦 ×2', count: 2, weight: 4 },
-        { type: 'tanghuluItem', fruitKey: 'blueberry', label: '🫐 冰晶蓝莓糖葫芦 ×3', count: 3, weight: 3 },
-        // 货架整理道具
-        { type: 'shelfprop', key: 'shuffle', label: '🔄 货架大洗牌 ×3', count: 3, weight: 30 },
-        { type: 'shelfprop', key: 'autoMatch', label: '🧹 喵喵爪理货 ×3', count: 3, weight: 25 },
-        { type: 'shelfprop', key: 'basket', label: '🪵 临时扩展篮 ×2', count: 2, weight: 15 },
-        // 新链合成棋盘物品
-        { type: 'boarditem', chain: 'music',  level: 3, label: '🎸 迷你吉他 (Lv3)',   weight: 30 },
-        { type: 'boarditem', chain: 'flower', level: 3, label: '🌷 郁金香 (Lv3)',     weight: 30 },
-        { type: 'boarditem', chain: 'star',   level: 3, label: '🌙 月光碎片 (Lv3)',   weight: 30 },
-        { type: 'boarditem', chain: 'music',  level: 4, label: '🎹 水晶钢琴 (Lv4)',   weight: 12 },
-        { type: 'boarditem', chain: 'flower', level: 4, label: '🌹 红玫瑰 (Lv4)',     weight: 12 },
-        { type: 'boarditem', chain: 'star',   level: 4, label: '☀️ 日耀石 (Lv4)',     weight: 12 },
-        { type: 'boarditem', chain: 'music',  level: 5, label: '🎺 黄金号角 (Lv5)',   weight: 3  },
-        { type: 'boarditem', chain: 'flower', level: 5, label: '🪷 七色莲花 (Lv5)',   weight: 3  },
-        { type: 'boarditem', chain: 'star',   level: 5, label: '🌠 流星核心 (Lv5)',   weight: 3  },
-        // 调料链
-        { type: 'boarditem', chain: 'seasoning', level: 3, label: '🌶️ 研磨胡椒 (Lv3)', weight: 30 },
-        { type: 'boarditem', chain: 'seasoning', level: 4, label: '🧈 发酵黄油 (Lv4)', weight: 12 },
-        { type: 'boarditem', chain: 'seasoning', level: 5, label: '🍯 百花蜂蜜 (Lv5)', weight: 3 },
-        // 基础蔬菜大礼包
-        { type: 'groceryitem', foodId: 'pumpkin',   label: '🎃 南瓜 ×3', count: 3, weight: 10 },
-        { type: 'groceryitem', foodId: 'broccoli',  label: '🥦 西兰花 ×5', count: 5, weight: 12 },
-        { type: 'groceryitem', foodId: 'eggplant',  label: '🍆 茄子 ×5', count: 5, weight: 12 },
-        { type: 'groceryitem', foodId: 'potato',    label: '🥔 土豆 ×8', count: 8, weight: 8  },
-        { type: 'groceryitem', foodId: 'cabbage',   label: '🥬 卷心菜 ×5', count: 5, weight: 10 },
 
+        // ===== 🧶 合成棋盘物品（Lv3~5）=====
+        { type: 'boarditem', chain: 'toy',       level: 3, label: '🧸 毛绒小熊 (Lv3)', weight: 30 },
+        { type: 'boarditem', chain: 'food',      level: 3, label: '🍰 草莓蛋糕 (Lv3)', weight: 30 },
+        { type: 'boarditem', chain: 'gem',       level: 3, label: '💍 灵力戒指 (Lv3)', weight: 30 },
+        { type: 'boarditem', chain: 'potion',    level: 3, label: '🧪 初级药水 (Lv3)',  weight: 30 },
+        { type: 'boarditem', chain: 'music',     level: 3, label: '🎸 迷你吉他 (Lv3)', weight: 30 },
+        { type: 'boarditem', chain: 'flower',    level: 3, label: '🌷 郁金香 (Lv3)',   weight: 30 },
+        { type: 'boarditem', chain: 'star',      level: 3, label: '🌙 月光碎片 (Lv3)', weight: 30 },
+        { type: 'boarditem', chain: 'seasoning', level: 3, label: '🌶️ 研磨胡椒 (Lv3)', weight: 30 },
+        { type: 'boarditem', chain: 'toy',       level: 4, label: '🎮 复古掌机 (Lv4)',   weight: 12 },
+        { type: 'boarditem', chain: 'food',      level: 4, label: '🍬 豪华糖果罐 (Lv4)', weight: 12 },
+        { type: 'boarditem', chain: 'gem',       level: 4, label: '👑 璀璨王冠 (Lv4)',   weight: 12 },
+        { type: 'boarditem', chain: 'potion',    level: 4, label: '⚗️ 炼金溶液 (Lv4)',   weight: 12 },
+        { type: 'boarditem', chain: 'music',     level: 4, label: '🎹 水晶钢琴 (Lv4)',   weight: 12 },
+        { type: 'boarditem', chain: 'flower',    level: 4, label: '🌹 红玫瑰 (Lv4)',     weight: 12 },
+        { type: 'boarditem', chain: 'star',      level: 4, label: '☀️ 日耀石 (Lv4)',     weight: 12 },
+        { type: 'boarditem', chain: 'seasoning', level: 4, label: '🧈 发酵黄油 (Lv4)',   weight: 12 },
+        { type: 'boarditem', chain: 'toy',       level: 5, label: '🏰 黄金猫爬架 (Lv5)', weight: 3 },
+        { type: 'boarditem', chain: 'food',      level: 5, label: '🧪 极品猫薄荷 (Lv5)', weight: 3 },
+        { type: 'boarditem', chain: 'gem',       level: 5, label: '🐉 龙之心宝石 (Lv5)', weight: 3 },
+        { type: 'boarditem', chain: 'potion',    level: 5, label: '🪄 魔法精华 (Lv5)',   weight: 3 },
+        { type: 'boarditem', chain: 'music',     level: 5, label: '🎺 黄金号角 (Lv5)',   weight: 3 },
+        { type: 'boarditem', chain: 'flower',    level: 5, label: '🪷 七色莲花 (Lv5)',   weight: 3 },
+        { type: 'boarditem', chain: 'star',      level: 5, label: '🌠 流星核心 (Lv5)',   weight: 3 },
+        { type: 'boarditem', chain: 'seasoning', level: 5, label: '🍯 百花蜂蜜 (Lv5)', weight: 3 },
+
+        // ===== 🥬 基础蔬菜（大礼包）=====
+        { type: 'groceryitem', foodId: 'pumpkin',  label: '🎃 南瓜 ×3',   count: 3, weight: 10 },
+        { type: 'groceryitem', foodId: 'broccoli', label: '🥦 西兰花 ×5', count: 5, weight: 12 },
+        { type: 'groceryitem', foodId: 'eggplant', label: '🍆 茄子 ×5',   count: 5, weight: 12 },
+        { type: 'groceryitem', foodId: 'potato',   label: '🥔 土豆 ×8',   count: 8, weight: 8  },
+        { type: 'groceryitem', foodId: 'cabbage',  label: '🥬 卷心菜 ×5', count: 5, weight: 10 },
+
+        // ===== 🍢 糖葫芦（稀有 & 高价品种）=====
+        { type: 'tanghuluItem', fruitKey: 'peach',       label: '🍑 蜜汁水蜜桃糖葫芦 ×2',   count: 2, weight: 8 },
+        { type: 'tanghuluItem', fruitKey: 'mango',       label: '🥭 热带金芒果糖葫芦 ×2',   count: 2, weight: 5 },
+        { type: 'tanghuluItem', fruitKey: 'lychee',      label: '🪷 玲珑荔枝糖葫芦 ×2',     count: 2, weight: 4 },
+        { type: 'tanghuluItem', fruitKey: 'blueberry',   label: '🫐 冰晶蓝莓糖葫芦 ×3',     count: 3, weight: 3 },
+        { type: 'tanghuluItem', fruitKey: 'dragonfruit', label: '🐲 火龙果晶球糖葫芦 ×2',   count: 2, weight: 6 },
+        { type: 'tanghuluItem', fruitKey: 'fig',         label: '🫒 蜜糖无花果糖葫芦 ×2',   count: 2, weight: 5 },
+        { type: 'tanghuluItem', fruitKey: 'starfruit',   label: '⭐ 星星杨桃糖葫芦 ×2',     count: 2, weight: 6 },
+        // ===== 🍢 糖葫芦（经典品种大包）=====
+        { type: 'tanghuluItem', fruitKey: 'cherry',      label: '🍒 玛瑙樱桃糖葫芦 ×3',     count: 3, weight: 6 },
+        { type: 'tanghuluItem', fruitKey: 'kiwi',        label: '🥝 翡翠猕猴桃糖葫芦 ×3',   count: 3, weight: 6 },
+        { type: 'tanghuluItem', fruitKey: 'grape',       label: '🍇 晶莹葡萄糖葫芦 ×3',     count: 3, weight: 5 },
+        { type: 'tanghuluItem', fruitKey: 'strawberry',  label: '🍓 甜心草莓糖葫芦 ×3',     count: 3, weight: 5 },
       ]
     }
   ];
+
+
 
   let isLotteryOpen = false;
 
@@ -12717,6 +12756,12 @@ function refreshCharPreview() {
     { key: 'blueberry', emoji: '🫐', name: '冰晶蓝莓',   color: '#4169e1', sellPrice: 24, feedAmount: 14 },
     { key: 'coconut',   emoji: '🥥', name: '椰子奶球',   color: '#f5f5dc', sellPrice: 20, feedAmount: 12 },
     { key: 'lychee',    emoji: '🪷', name: '玲珑荔枝',   color: '#ff6b6b', sellPrice: 26, feedAmount: 15 },
+    { key: 'watermelon', emoji: '🍉', name: '迷你西瓜球', color: '#2e8b57', sellPrice: 18, feedAmount: 11 },
+    { key: 'pineapple',  emoji: '🍍', name: '金菠萝块',   color: '#daa520', sellPrice: 22, feedAmount: 13 },
+    { key: 'dragonfruit', emoji: '🐲', name: '火龙果晶球', color: '#ff1493', sellPrice: 30, feedAmount: 17 },
+    { key: 'melon',      emoji: '🍈', name: '翠玉哈密瓜', color: '#98fb98', sellPrice: 24, feedAmount: 14 },
+    { key: 'fig',        emoji: '🫒', name: '蜜糖无花果', color: '#800080', sellPrice: 32, feedAmount: 18 },
+    { key: 'starfruit',  emoji: '⭐', name: '星星杨桃',   color: '#ffd700', sellPrice: 28, feedAmount: 16 },
   ];
 
   // ============================================================
@@ -12999,13 +13044,14 @@ function refreshCharPreview() {
 
   // ===== 难度配置 =====
   const TANGHULU_DIFFICULTIES = [
-    { name: '简单', fruitTypes: 3, stickCount: 5, shuffleMoves: 50,  energyCost: 3,  goldReward: [10, 25]  },
-    { name: '普通', fruitTypes: 4, stickCount: 6, shuffleMoves: 70,  energyCost: 5,  goldReward: [20, 45]  },
-    { name: '困难', fruitTypes: 5, stickCount: 7, shuffleMoves: 90,  energyCost: 7,  goldReward: [35, 65]  },
-    { name: '噩梦', fruitTypes: 6, stickCount: 8, shuffleMoves: 110, energyCost: 10, goldReward: [50, 80]  },
-    { name: '地狱', fruitTypes: 7, stickCount: 9, shuffleMoves: 130, energyCost: 12, goldReward: [70, 100] },
-    { name: '炼狱', fruitTypes: 8, stickCount: 10, shuffleMoves: 160, energyCost: 15, goldReward: [90, 130] },
-    { name: '至尊', fruitTypes: 9, stickCount: 11, shuffleMoves: 200, energyCost: 18, goldReward: [120, 180] },
+    { name: '简单', fruitTypes: 4, stickCount: 6, shuffleMoves: 80,  energyCost: 4,  goldReward: [15, 30]  },
+    { name: '普通', fruitTypes: 5, stickCount: 7, shuffleMoves: 100, energyCost: 6,  goldReward: [25, 50]  },
+    { name: '困难', fruitTypes: 6, stickCount: 8, shuffleMoves: 130, energyCost: 9,  goldReward: [40, 70]  },
+    { name: '噩梦', fruitTypes: 7, stickCount: 9, shuffleMoves: 160, energyCost: 12, goldReward: [60, 95]  },
+    { name: '地狱', fruitTypes: 8, stickCount: 10, shuffleMoves: 200, energyCost: 15, goldReward: [80, 120] },
+    { name: '炼狱', fruitTypes: 9, stickCount: 11, shuffleMoves: 250, energyCost: 18, goldReward: [100, 150] },
+    { name: '至尊', fruitTypes: 10, stickCount: 12, shuffleMoves: 300, energyCost: 22, goldReward: [130, 200] },
+    { name: '修罗', fruitTypes: 11, stickCount: 13, shuffleMoves: 360, energyCost: 26, goldReward: [170, 260] },
   ];
 
   // ===== 运行时状态 =====
