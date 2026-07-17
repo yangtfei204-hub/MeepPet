@@ -11558,6 +11558,13 @@ function refreshCharPreview() {
     { id: 'pumpkin',   name: '南瓜',     emoji: '🎃', w: 2, h: 2, value: 6,  feed: 6  },
     { id: 'leek',      name: '大葱',     emoji: '🌿', w: 1, h: 2, value: 3,  feed: 2  },
     { id: 'ginger',    name: '生姜',     emoji: '🫚', w: 1, h: 1, value: 3,  feed: 2  },
+    { id: 'celery',      name: '芹菜',     emoji: '🌿', w: 1, h: 2, value: 3,  feed: 3  },
+    { id: 'chili',       name: '辣椒',     emoji: '🌶️', w: 1, h: 1, value: 3,  feed: 3  },
+    { id: 'bean',        name: '四季豆',   emoji: '🫛', w: 1, h: 2, value: 3,  feed: 3  },
+    { id: 'radish',      name: '白萝卜',   emoji: '🥕', w: 1, h: 2, value: 4,  feed: 4  },
+    { id: 'lettuce',     name: '生菜',     emoji: '🥬', w: 1, h: 1, value: 2,  feed: 2  },
+    { id: 'sweetpotato', name: '红薯',     emoji: '🍠', w: 2, h: 1, value: 4,  feed: 4  },
+
     // ===== 异形物品（不规则形状）=====
     { id: 'lshape_meat',  name: 'L形肉排',     emoji: '🥓', w: 2, h: 3, value: 9,  feed: 9,  shape: [[1,0],[1,0],[1,1]] },
     { id: 'tshape_cheese', name: 'T形芝士块', emoji: '🧀', w: 3, h: 2, value: 10, feed: 10, shape: [[1,1,1],[0,1,0]] },
@@ -12930,6 +12937,12 @@ function refreshCharPreview() {
     { id: 'pumpkin',   name: '南瓜',     emoji: '🎃', price: 5,  reputationRequired: 8  },
     { id: 'leek',      name: '大葱',     emoji: '🌿', price: 2,  reputationRequired: 0  },
     { id: 'ginger',    name: '生姜',     emoji: '🫚', price: 3,  reputationRequired: 5  },
+    { id: 'celery',    name: '芹菜',     emoji: '🌿', price: 3,  reputationRequired: 0  },
+    { id: 'chili',     name: '辣椒',     emoji: '🌶️', price: 4,  reputationRequired: 5  },
+    { id: 'bean',      name: '四季豆',   emoji: '🫛', price: 3,  reputationRequired: 0  },
+    { id: 'radish',    name: '白萝卜',   emoji: '🥕', price: 3,  reputationRequired: 5  },
+    { id: 'lettuce',   name: '生菜',     emoji: '🥬', price: 2,  reputationRequired: 0  },
+    { id: 'sweetpotato', name: '红薯',   emoji: '🍠', price: 4,  reputationRequired: 8  },
   ];
 
   // ===== 调料定义 =====
@@ -12946,6 +12959,9 @@ function refreshCharPreview() {
     { id: 'chili',   name: '辣椒油', emoji: '🌶️', price: 12, reputationRequired: 8  },
     { id: 'wasabi',  name: '芥末',   emoji: '💚', price: 18, reputationRequired: 12 },
     { id: 'cream',   name: '奶油',   emoji: '🍦', price: 14, reputationRequired: 8  },
+    { id: 'cumin',   name: '孜然',   emoji: '🌰', price: 12, reputationRequired: 10 },
+    { id: 'miso',    name: '味噌',   emoji: '🫘', price: 15, reputationRequired: 12 },
+
   ];
 
   // ===== 食谱定义 =====
@@ -13193,6 +13209,83 @@ function refreshCharPreview() {
       ingredients: [{ foodId: 'bread', count: 1 }, { foodId: 'eggs', count: 1 }], seasonings: [{ id: 'butter', count: 2 }, { id: 'honey', count: 2 }, { id: 'cream', count: 1 }],
       cookTime: 6, sellPrice: 45, feedAmount: 28, energyAmount: 0, reputationRequired: 140 },
 
+    // --- 使用新增蔬菜的菜品 ---
+    { id: 'dish_celery_shrimp',   name: '芹菜虾仁',       emoji: '🌿🦐', category: 'dish',
+      ingredients: [{ foodId: 'celery', count: 2 }, { foodId: 'shrimp', count: 1 }], seasonings: [{ id: 'salt', count: 1 }, { id: 'pepper', count: 1 }],
+      cookTime: 5, sellPrice: 28, feedAmount: 20, energyAmount: 0, reputationRequired: 5 },
+    { id: 'dish_spicy_chicken',   name: '辣子鸡丁',       emoji: '🌶️🍗', category: 'dish',
+      ingredients: [{ foodId: 'chicken', count: 1 }, { foodId: 'chili', count: 3 }], seasonings: [{ id: 'chili', count: 2 }, { id: 'soy', count: 1 }, { id: 'vinegar', count: 1 }],
+      cookTime: 7, sellPrice: 38, feedAmount: 26, energyAmount: 0, reputationRequired: 10 },
+    { id: 'dish_dry_fried_bean',  name: '干煸四季豆',     emoji: '🫛🔥', category: 'dish',
+      ingredients: [{ foodId: 'bean', count: 3 }], seasonings: [{ id: 'chili', count: 1 }, { id: 'soy', count: 1 }, { id: 'salt', count: 1 }],
+      cookTime: 5, sellPrice: 22, feedAmount: 16, energyAmount: 0, reputationRequired: 5 },
+    { id: 'dish_radish_stew',     name: '萝卜炖排骨',     emoji: '🥕🍖', category: 'dish',
+      ingredients: [{ foodId: 'radish', count: 2 }, { foodId: 'chicken', count: 1 }], seasonings: [{ id: 'salt', count: 2 }, { id: 'soy', count: 1 }],
+      cookTime: 8, sellPrice: 35, feedAmount: 24, energyAmount: 0, reputationRequired: 8 },
+    { id: 'snack_lettuce_wrap',   name: '生菜包肉',       emoji: '🥬🍖', category: 'snack',
+      ingredients: [{ foodId: 'lettuce', count: 2 }, { foodId: 'chicken', count: 1 }], seasonings: [{ id: 'sesame', count: 1 }, { id: 'soy', count: 1 }],
+      cookTime: 3, sellPrice: 20, feedAmount: 14, energyAmount: 0, reputationRequired: 5 },
+    { id: 'dish_roast_sweetpotato', name: '蜜烤红薯',     emoji: '🍠🍯', category: 'snack',
+      ingredients: [{ foodId: 'sweetpotato', count: 2 }], seasonings: [{ id: 'honey', count: 2 }, { id: 'butter', count: 1 }],
+      cookTime: 6, sellPrice: 24, feedAmount: 16, energyAmount: 3, reputationRequired: 8 },
+    { id: 'dish_mapo_tofu',       name: '麻婆豆腐',       emoji: '🧊🌶️', category: 'dish',
+      ingredients: [{ foodId: 'tofu', count: 2 }, { foodId: 'chili', count: 2 }], seasonings: [{ id: 'chili', count: 2 }, { id: 'soy', count: 1 }, { id: 'pepper', count: 1 }],
+      cookTime: 6, sellPrice: 30, feedAmount: 20, energyAmount: 0, reputationRequired: 10 },
+    { id: 'dish_veggie_salad',    name: '田园蔬菜沙拉',   emoji: '🥬🥗', category: 'snack',
+      ingredients: [{ foodId: 'lettuce', count: 2 }, { foodId: 'tomato', count: 1 }, { foodId: 'cucumber', count: 1 }], seasonings: [{ id: 'vinegar', count: 1 }, { id: 'salt', count: 1 }],
+      cookTime: 3, sellPrice: 18, feedAmount: 14, energyAmount: 0, reputationRequired: 5 },
+    { id: 'dish_bean_beef',       name: '四季豆炒牛肉',   emoji: '🫛🥩', category: 'dish',
+      ingredients: [{ foodId: 'bean', count: 2 }, { foodId: 'steak', count: 1 }], seasonings: [{ id: 'soy', count: 2 }, { id: 'pepper', count: 1 }],
+      cookTime: 7, sellPrice: 44, feedAmount: 30, energyAmount: 0, reputationRequired: 12 },
+    { id: 'dish_sweetpotato_soup', name: '红薯甜汤',      emoji: '🍠🫕', category: 'drink',
+      ingredients: [{ foodId: 'sweetpotato', count: 2 }], seasonings: [{ id: 'honey', count: 1 }],
+      cookTime: 4, sellPrice: 14, feedAmount: 8, energyAmount: 5, reputationRequired: 8 },
+    // --- 高级菜（声望35+）---
+    { id: 'dish_kung_pao',        name: '宫保鸡丁',       emoji: '🥜🍗', category: 'dish',
+      ingredients: [{ foodId: 'chicken', count: 1 }, { foodId: 'chili', count: 2 }], seasonings: [{ id: 'soy', count: 2 }, { id: 'vinegar', count: 1 }, { id: 'sesame', count: 1 }],
+      cookTime: 7, sellPrice: 40, feedAmount: 28, energyAmount: 0, reputationRequired: 35 },
+    { id: 'dish_steamed_egg',     name: '日式茶碗蒸',     emoji: '🥚✨', category: 'dish',
+      ingredients: [{ foodId: 'eggs', count: 2 }, { foodId: 'shrimp', count: 1 }], seasonings: [{ id: 'soy', count: 1 }, { id: 'salt', count: 1 }],
+      cookTime: 5, sellPrice: 26, feedAmount: 18, energyAmount: 3, reputationRequired: 35 },
+    // --- 高级菜（声望50+）---
+    { id: 'dish_double_pepper_fish', name: '双椒鱼头',    emoji: '🐟🌶️', category: 'dish',
+      ingredients: [{ foodId: 'fish', count: 1 }, { foodId: 'chili', count: 3 }], seasonings: [{ id: 'chili', count: 2 }, { id: 'soy', count: 1 }, { id: 'vinegar', count: 1 }],
+      cookTime: 9, sellPrice: 52, feedAmount: 32, energyAmount: 0, reputationRequired: 50 },
+    { id: 'dish_buddha_jumps_wall', name: '佛跳墙',       emoji: '🏺✨', category: 'dish',
+      ingredients: [{ foodId: 'chicken', count: 1 }, { foodId: 'shrimp', count: 2 }, { foodId: 'mushroom', count: 2 }], seasonings: [{ id: 'spice', count: 2 }, { id: 'soy', count: 2 }, { id: 'salt', count: 1 }],
+      cookTime: 14, sellPrice: 88, feedAmount: 48, energyAmount: 0, reputationRequired: 50 },
+    // --- 异形食材进阶联动菜品 ---
+    { id: 'dish_lmeat_pepper_steak', name: 'L形黑椒铁板',   emoji: '🥓🔥', category: 'dish',
+      ingredients: [{ foodId: 'lshape_meat', count: 1 }, { foodId: 'onion', count: 2 }], seasonings: [{ id: 'pepper', count: 2 }, { id: 'butter', count: 1 }, { id: 'soy', count: 1 }],
+      cookTime: 8, sellPrice: 42, feedAmount: 28, energyAmount: 0, reputationRequired: 15 },
+    { id: 'dish_tcheese_fondue',     name: 'T形芝士火锅',   emoji: '🧀🫕', category: 'dish',
+      ingredients: [{ foodId: 'tshape_cheese', count: 1 }, { foodId: 'bread', count: 1 }, { foodId: 'broccoli', count: 1 }], seasonings: [{ id: 'butter', count: 2 }, { id: 'pepper', count: 1 }],
+      cookTime: 7, sellPrice: 38, feedAmount: 24, energyAmount: 0, reputationRequired: 15 },
+    { id: 'dish_zsushi_tempura',     name: 'Z形天妇罗卷',   emoji: '🍣🍤', category: 'dish',
+      ingredients: [{ foodId: 'zshape_sushi', count: 1 }, { foodId: 'shrimp', count: 2 }], seasonings: [{ id: 'salt', count: 1 }, { id: 'soy', count: 2 }],
+      cookTime: 6, sellPrice: 36, feedAmount: 22, energyAmount: 0, reputationRequired: 12 },
+    { id: 'dish_ubread_pizza',       name: 'U形法棍披萨',   emoji: '🥖🍕', category: 'dish',
+      ingredients: [{ foodId: 'ushape_bread', count: 1 }, { foodId: 'tomato', count: 2 }, { foodId: 'cheese', count: 1 }], seasonings: [{ id: 'sauce', count: 2 }, { id: 'salt', count: 1 }],
+      cookTime: 7, sellPrice: 40, feedAmount: 26, energyAmount: 0, reputationRequired: 15 },
+    { id: 'dish_cross_cake_royal',   name: '十字皇冠蛋糕',   emoji: '🎂👑', category: 'dish',
+      ingredients: [{ foodId: 'cross_cake', count: 1 }, { foodId: 'eggs', count: 2 }], seasonings: [{ id: 'cream', count: 3 }, { id: 'honey', count: 2 }, { id: 'butter', count: 1 }],
+      cookTime: 12, sellPrice: 72, feedAmount: 42, energyAmount: 8, reputationRequired: 50 },
+    { id: 'dish_sfish_curry',        name: 'S形咖喱鱼排',   emoji: '🐡🍛', category: 'dish',
+      ingredients: [{ foodId: 'sshape_fish', count: 1 }, { foodId: 'potato', count: 2 }, { foodId: 'onion', count: 1 }], seasonings: [{ id: 'spice', count: 2 }, { id: 'butter', count: 1 }, { id: 'salt', count: 1 }],
+      cookTime: 9, sellPrice: 48, feedAmount: 30, energyAmount: 0, reputationRequired: 35 },
+    { id: 'dish_lmeat_lettuce_wrap', name: 'L形肉排生菜卷', emoji: '🥓🥬', category: 'snack',
+      ingredients: [{ foodId: 'lshape_meat', count: 1 }, { foodId: 'lettuce', count: 2 }], seasonings: [{ id: 'sesame', count: 1 }, { id: 'vinegar', count: 1 }],
+      cookTime: 4, sellPrice: 28, feedAmount: 20, energyAmount: 0, reputationRequired: 10 },
+    { id: 'dish_ubread_lobster',     name: 'U形龙虾堡',     emoji: '🥖🦞', category: 'dish',
+      ingredients: [{ foodId: 'ushape_bread', count: 1 }, { foodId: 'lobster', count: 1 }], seasonings: [{ id: 'butter', count: 2 }, { id: 'pepper', count: 1 }, { id: 'cream', count: 1 }],
+      cookTime: 10, sellPrice: 68, feedAmount: 38, energyAmount: 0, reputationRequired: 50 },
+    { id: 'dish_sfish_sweetpotato',  name: 'S形鱼排配烤薯', emoji: '🐡🍠', category: 'dish',
+      ingredients: [{ foodId: 'sshape_fish', count: 1 }, { foodId: 'sweetpotato', count: 2 }], seasonings: [{ id: 'salt', count: 1 }, { id: 'butter', count: 1 }, { id: 'honey', count: 1 }],
+      cookTime: 8, sellPrice: 44, feedAmount: 28, energyAmount: 0, reputationRequired: 35 },
+    { id: 'dish_tcheese_mushroom',   name: 'T形芝士焗蘑菇', emoji: '🧀🍄', category: 'dish',
+      ingredients: [{ foodId: 'tshape_cheese', count: 1 }, { foodId: 'mushroom', count: 3 }], seasonings: [{ id: 'cream', count: 1 }, { id: 'pepper', count: 1 }, { id: 'salt', count: 1 }],
+      cookTime: 7, sellPrice: 40, feedAmount: 26, energyAmount: 0, reputationRequired: 35 },
+
   ];
 
   // ===== 客人定义 =====
@@ -13296,6 +13389,60 @@ function refreshCharPreview() {
     { id: 'demon_cat',       name: '暗黑美食魔猫', emoji: '🐱😈',
       wantsCategory: 'premium', patience: 25, tipMulti: 7.0, reputationGive: 18, reputationRequired: 120,
       dialogue: '十秒。否则本魔给差评。', bonusGold: 80 },
+
+    // --- 新增普通客人（声望0）---
+    { id: 'student_cat',    name: '学生猫',       emoji: '🐱📚',
+      wantsCategory: 'snack', patience: 50, tipMulti: 0.9, reputationGive: 1, reputationRequired: 0,
+      dialogue: '课间十分钟…有快餐吗？' },
+    { id: 'grandma_cat',    name: '猫奶奶',       emoji: '🐱👵',
+      wantsCategory: 'dish', patience: 120, tipMulti: 1.2, reputationGive: 2, reputationRequired: 0,
+      dialogue: '不急不急，老婆子等得起～', bonusGold: 5 },
+    { id: 'delivery_cat',   name: '外卖猫',       emoji: '🐱📦',
+      wantsCategory: 'snack', patience: 20, tipMulti: 1.0, reputationGive: 1, reputationRequired: 0,
+      dialogue: '快快快！单子要超时了！' },
+
+    // --- 新增中级客人（声望10）---
+    { id: 'artist_cat',     name: '画家猫',       emoji: '🐱🎨',
+      wantsCategory: 'drink', patience: 80, tipMulti: 1.5, reputationGive: 2, reputationRequired: 10,
+      dialogue: '来杯能激发灵感的饮品吧～' },
+    { id: 'doctor_cat',     name: '医生猫',       emoji: '🐱🩺',
+      wantsCategory: 'dish', patience: 40, tipMulti: 1.8, reputationGive: 3, reputationRequired: 10,
+      dialogue: '手术间隙，来份营养餐。' },
+    { id: 'twins_cat',      name: '双胞胎猫',     emoji: '🐱🐱',
+      wantsCategory: 'snack', patience: 60, tipMulti: 1.5, reputationGive: 3, reputationRequired: 10,
+      dialogue: '我们要一模一样的！', orderCount: 2 },
+
+    // --- 新增高级客人（声望20）---
+    { id: 'detective_cat',  name: '侦探猫',       emoji: '🐱🔍',
+      wantsCategory: 'specific', patience: 45, tipMulti: 2.5, reputationGive: 4, reputationRequired: 20,
+      dialogue: '我要推理出最好吃的那道菜…' },
+    { id: 'pirate_cat',     name: '海盗猫',       emoji: '🐱🏴‍☠️',
+      wantsCategory: 'dish', patience: 35, tipMulti: 2.0, reputationGive: 4, reputationRequired: 20,
+      dialogue: '把你的宝藏美食交出来！', bonusGold: 15 },
+
+    // --- 新增大师级客人（声望50）---
+    { id: 'samurai_cat',    name: '武士猫',       emoji: '🐱⚔️',
+      wantsCategory: 'dish', patience: 30, tipMulti: 3.5, reputationGive: 6, reputationRequired: 50,
+      dialogue: '一食入魂！上你最强的料理！', bonusGold: 30 },
+    { id: 'mermaid_cat',    name: '人鱼猫',       emoji: '🐱🧜',
+      wantsCategory: 'drink', patience: 60, tipMulti: 3.0, reputationGive: 5, reputationRequired: 50,
+      dialogue: '来杯蓝色的…像大海一样的饮品♪' },
+    { id: 'wizard_cat',     name: '魔法师猫',     emoji: '🐱🧙',
+      wantsCategory: 'premium', patience: 45, tipMulti: 4.0, reputationGive: 7, reputationRequired: 50,
+      dialogue: '让我看看你的秘制魔法料理！', bonusGold: 35 },
+
+    // --- 新增传奇级客人（声望80）---
+    { id: 'phoenix_cat',    name: '凤凰猫',       emoji: '🐱🔥',
+      wantsCategory: 'premium', patience: 40, tipMulti: 5.5, reputationGive: 12, reputationRequired: 80,
+      dialogue: '浴火而来…献上配得上不死鸟的佳肴！', bonusGold: 50 },
+    { id: 'dream_cat',      name: '梦境旅者猫',   emoji: '🐱💭',
+      wantsCategory: 'any', patience: 150, tipMulti: 3.5, reputationGive: 8, reputationRequired: 80,
+      dialogue: '嗯…我好像在梦里来过这里…', bonusGold: 25 },
+
+    // --- 新增神话级客人（声望120）---
+    { id: 'star_cat',       name: '星之使者猫',   emoji: '🐱💫',
+      wantsCategory: 'premium', patience: 50, tipMulti: 7.0, reputationGive: 16, reputationRequired: 120,
+      dialogue: '来自遥远银河的问候…上最顶级的！', bonusGold: 90 },
 
   ];
 
@@ -14535,7 +14682,7 @@ function refreshCharPreview() {
     // 扣食材
     restaurantConsumeIngredients(recipe);
 
-    // 开始烹饪计时
+    // 开始烹饪计时（烹饪完成由 setInterval 检测，不用 setTimeout）
     restaurantRuntime.cooking = {
       recipeId: recipe.id,
       startTime: Date.now(),
@@ -14545,12 +14692,6 @@ function refreshCharPreview() {
     saveDataDebounced('餐厅开始烹饪');
     restaurantRender();
     restaurantShowNotice(`🔥 开始烹饪「${recipe.name}」…${recipe.cookTime}秒后出锅`);
-
-    // 烹饪完成定时器
-    if (restaurantCookTimer) clearTimeout(restaurantCookTimer);
-    restaurantCookTimer = setTimeout(() => {
-      restaurantFinishCooking();
-    }, recipe.cookTime * 1000);
   }
 
   // ===== 烹饪完成 =====
@@ -14874,8 +15015,20 @@ function refreshCharPreview() {
     if (repEl) repEl.textContent = state.restaurantReputation;
     if (lvlEl) lvlEl.textContent = `${levelData.emoji}Lv.${levelData.level}`;
 
+    // 更新下一级声望提示
+    const nextLvlEl = document.getElementById('sp-restaurant-next-lvl');
+    if (nextLvlEl) {
+      const nextLevel = RESTAURANT_LEVELS.find(l => l.reputationRequired > state.restaurantReputation);
+      if (nextLevel) {
+        const needed = nextLevel.reputationRequired - state.restaurantReputation;
+        nextLvlEl.textContent = `→${needed}⭐升级`;
+      } else {
+        nextLvlEl.textContent = '满级✨';
+      }
+    }
+
     // 渲染当前激活的标签页
-    const activeTab = panel.querySelector('.sp-game-tab.active')?.dataset.rtab || 'kitchen';
+    const activeTab = panel.querySelector('.sp-game-tab.active[data-rtab]')?.dataset.rtab || 'kitchen';
     if (activeTab === 'kitchen') restaurantRenderKitchen();
     else if (activeTab === 'menu') restaurantRenderMenu();
     else if (activeTab === 'supply') restaurantRenderSupply();
@@ -15067,57 +15220,100 @@ function refreshCharPreview() {
 
     const allRecipes = RESTAURANT_RECIPES;
     const categories = [
-      { key: 'drink', label: '🧃 饮品', emoji: '🧃' },
-      { key: 'snack', label: '🥗 小食', emoji: '🥗' },
-      { key: 'dish',  label: '🍽️ 菜品', emoji: '🍽️' },
+      { key: 'drink',  label: '🧃 饮品', emoji: '🧃' },
+      { key: 'snack',  label: '🥗 小食', emoji: '🥗' },
+      { key: 'dish',   label: '🍽️ 菜品', emoji: '🍽️' },
+    ];
+
+    // 按等级分组显示食谱
+    const levelGroups = [
+      { label: '🏕️ Lv.1 基础菜单',    minRep: 0,   maxRep: 29  },
+      { label: '🏠 Lv.2 温馨小店',      minRep: 30,  maxRep: 49  },
+      { label: '🏪 Lv.3 特色餐厅',      minRep: 50,  maxRep: 69  },
+      { label: '🏨 Lv.4 星级餐厅',      minRep: 70,  maxRep: 99  },
+      { label: '🏰 Lv.5 猫界传奇',      minRep: 100, maxRep: 139 },
+      { label: '🏛️ Lv.6 美食殿堂',      minRep: 140, maxRep: 199 },  // 注：这里用实际的 reputationRequired 区间
     ];
 
     let html = '';
-    categories.forEach(cat => {
-      const recipes = allRecipes.filter(r => r.category === cat.key);
+
+    // 按 reputationRequired 分组渲染
+    const grouped = {};
+    allRecipes.forEach(r => {
+      const key = r.reputationRequired;
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(r);
+    });
+
+    const repKeys = Object.keys(grouped).map(Number).sort((a, b) => a - b);
+
+    repKeys.forEach(repReq => {
+      const recipes = grouped[repReq];
+      const unlocked = state.restaurantReputation >= repReq;
+
+      // 分组标题
+      let groupLabel = '';
+      if (repReq === 0) groupLabel = '🏕️ 基础菜单（无需声望）';
+      else groupLabel = `🔓 声望 ${repReq} 解锁`;
+
       html += `
-        <div style="margin-bottom:12px;">
-          <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--sp-border-light);">${cat.label}</div>
-          ${recipes.map(r => {
-            const unlocked = state.restaurantReputation >= r.reputationRequired;
-            const ingText = r.ingredients.map(ing => {
-              const fd = FRIDGE_FOODS.find(f => f.id === ing.foodId);
-              return `${fd?.emoji || '?'}×${ing.count}`;
-            }).join('+');
-            const seaText = r.seasonings.map(s => {
-              const sd = RESTAURANT_SEASONINGS.find(x => x.id === s.id);
-              return `${sd?.emoji || '?'}×${s.count}`;
-            }).join('+');
-            const materials = [ingText, seaText].filter(Boolean).join(' 🧂');
-            return `
-              <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:${unlocked ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.1)'};border:1px solid ${unlocked ? 'var(--sp-border-light)' : 'rgba(255,255,255,0.04)'};border-radius:6px;margin-bottom:3px;opacity:${unlocked ? '1' : '0.45'};">
-                <span style="font-size:16px;flex-shrink:0;">${r.emoji}</span>
-                <div style="flex:1;min-width:0;">
-                  <div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);">${r.name} ${!unlocked ? `<span style="font-size:9px;color:#f66;">🔒声望${r.reputationRequired}</span>` : ''}</div>
-                  <div style="font-size:9px;color:var(--sp-text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${materials} | ⏱️${r.cookTime}s</div>
+        <details ${unlocked ? 'open' : ''} style="margin-bottom:10px;border:1px solid ${unlocked ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.04)'};border-radius:8px;overflow:hidden;">
+          <summary style="padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;background:rgba(255,255,255,0.04);color:${unlocked ? 'var(--sp-text-primary)' : 'var(--sp-text-muted)'};list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none;">
+            <span>${groupLabel}</span>
+            <span style="font-size:10px;color:${unlocked ? 'rgba(100,220,100,0.8)' : '#f66'};">${unlocked ? '✅ 已解锁' : '🔒 未解锁'}</span>
+          </summary>
+          <div style="padding:6px;">
+            ${recipes.map(r => {
+              const ingText = r.ingredients.map(ing => {
+                const fd = FRIDGE_FOODS.find(f => f.id === ing.foodId);
+                const have = (state.fridgeInventory || []).find(i => i.foodId === ing.foodId);
+                const haveCount = have ? have.count : 0;
+                const ok = unlocked && haveCount >= ing.count;
+                return `<span style="color:${unlocked ? (ok ? 'rgba(100,220,100,0.8)' : '#f66') : 'var(--sp-text-muted)'};">${fd?.emoji || '?'}×${ing.count}</span>`;
+              }).join(' ');
+              const seaText = r.seasonings.map(s => {
+                const sd = RESTAURANT_SEASONINGS.find(x => x.id === s.id);
+                const have = (state.restaurantSeasonings && state.restaurantSeasonings[s.id]) || 0;
+                const ok = unlocked && have >= s.count;
+                return `<span style="color:${unlocked ? (ok ? 'rgba(100,220,100,0.8)' : '#f66') : 'var(--sp-text-muted)'};">${sd?.emoji || '?'}×${s.count}</span>`;
+              }).join(' ');
+              const canMake = unlocked && restaurantCheckIngredients(r);
+              return `
+                <div style="display:flex;align-items:center;gap:6px;padding:5px 6px;background:${canMake ? 'rgba(100,220,100,0.05)' : 'rgba(255,255,255,0.03)'};border-radius:6px;margin-bottom:2px;">
+                  <span style="font-size:15px;flex-shrink:0;">${r.emoji}</span>
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-size:11px;font-weight:600;color:${unlocked ? 'var(--sp-text-primary)' : 'var(--sp-text-muted)'};">${r.name}</div>
+                    <div style="font-size:9px;display:flex;flex-wrap:wrap;gap:3px;align-items:center;margin-top:1px;">
+                      ${ingText}
+                      ${r.seasonings.length > 0 ? `<span style="color:var(--sp-text-muted);">🧂</span>${seaText}` : ''}
+                      <span style="color:var(--sp-text-muted);">⏱️${r.cookTime}s</span>
+                    </div>
+                  </div>
+                  <div style="text-align:right;flex-shrink:0;">
+                    <div style="font-size:11px;color:#ffb347;font-weight:600;">🪙${r.sellPrice}</div>
+                    <div style="font-size:9px;color:var(--sp-status-hunger);">+${r.feedAmount}饱</div>
+                  </div>
                 </div>
-                <div style="text-align:right;flex-shrink:0;">
-                  <div style="font-size:11px;color:#ffb347;font-weight:600;">🪙${r.sellPrice}</div>
-                  <div style="font-size:9px;color:var(--sp-status-hunger);">+${r.feedAmount}饱</div>
-                </div>
-              </div>
-            `;
-          }).join('')}
-        </div>
+              `;
+            }).join('')}
+          </div>
+        </details>
       `;
     });
 
-    // 甜品区（来自库存）
+    // 甜品说明
     html += `
-      <div style="margin-bottom:12px;">
-        <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--sp-border-light);">🍰 甜品/点心（来自库存，直接上架）</div>
-        <div style="font-size:10px;color:var(--sp-text-muted);line-height:1.6;padding:6px 8px;background:rgba(255,150,200,0.05);border-radius:6px;border:1px solid rgba(255,150,200,0.15);">
+      <details style="margin-bottom:10px;border:1px solid rgba(255,150,200,0.2);border-radius:8px;overflow:hidden;">
+        <summary style="padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;background:rgba(255,150,200,0.05);color:var(--sp-text-primary);list-style:none;user-select:none;">
+          🍰 甜品/点心（来自库存，直接上架）
+        </summary>
+        <div style="padding:8px 12px;font-size:10px;color:var(--sp-text-muted);line-height:1.8;">
           🍢 糖葫芦（来自糖葫芦工坊）→ 售出价 = 原价×1.8<br/>
           🍦🎂 冰淇淋/蛋糕（来自冰箱整理）→ 售出价 = 原价×1.5<br/>
           ✨ 完美糖砂甜品 → 售出价 150🪙<br/>
-          以上均在厨房标签页的「甜品快捷上菜」区操作
+          以上在厨房标签页的桌子格子里可快捷上菜
         </div>
-      </div>
+      </details>
     `;
 
     container.innerHTML = html;
@@ -15539,6 +15735,7 @@ function refreshCharPreview() {
           <span style="font-size:11px;color:#a0d4ff;" id="sp-restaurant-lvl">🏕️Lv.1</span>
           <span style="font-size:11px;color:#ffdd80;font-weight:600;">⭐<span id="sp-restaurant-rep">0</span></span>
           <span style="font-size:11px;color:#ffb347;font-weight:600;">🪙<span id="sp-restaurant-gold">0</span></span>
+          <span id="sp-restaurant-next-lvl" style="font-size:9px;color:var(--sp-text-muted);white-space:nowrap;"></span>
         </div>
       </div>
       <div id="sp-restaurant-notice" style="position:absolute;top:52px;left:12px;right:12px;padding:5px 12px;font-size:11px;color:#fff;background:rgba(30,30,40,0.92);border:1px solid var(--sp-primary-border);border-radius:7px;text-align:center;opacity:0;pointer-events:none;transform:translateY(-5px);transition:opacity 0.2s,transform 0.2s;z-index:10;"></div>
@@ -15590,7 +15787,13 @@ function refreshCharPreview() {
           const el = document.getElementById(`sp-restaurant-${name}`);
           if (el) el.style.display = tab.dataset.rtab === name ? '' : 'none';
         });
-        restaurantRender();
+        // 切换到对应标签时渲染对应内容
+        const rtab = tab.dataset.rtab;
+        if (rtab === 'kitchen') restaurantRenderKitchen();
+        else if (rtab === 'menu') restaurantRenderMenu();
+        else if (rtab === 'supply') restaurantRenderSupply();
+        else if (rtab === 'stock') restaurantRenderStock();
+        else if (rtab === 'atlas') restaurantRenderAtlas();
       };
     });
 
@@ -15719,10 +15922,17 @@ function refreshCharPreview() {
     restaurantCountdownTimer = setInterval(() => {
       if (!isRestaurantOpen) return;
       restaurantCheckTimeout();
-      // 每秒刷新厨房界面（更新倒计时显示）
+      // 每秒刷新厨房界面（更新倒计时显示 + 桌子状态）
       const activeTab = document.querySelector('#sp-restaurant-panel .sp-game-tab.active[data-rtab]');
       if (activeTab && activeTab.dataset.rtab === 'kitchen') {
         restaurantRenderKitchen();
+      }
+      // 烹饪完成后也刷新烹饪台倒计时
+      if (restaurantRuntime.cooking) {
+        const elapsed = Date.now() - restaurantRuntime.cooking.startTime;
+        if (elapsed >= restaurantRuntime.cooking.duration) {
+          restaurantFinishCooking();
+        }
       }
     }, 1000);
   }
