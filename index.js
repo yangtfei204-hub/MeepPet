@@ -701,8 +701,6 @@
     }
   }
 
-let _isSaving = false;
-
 function saveData() {
   state.lastOnlineTimestamp = Date.now();
   if (state.petChatArchive && state.petChatArchive.length > 10) {
