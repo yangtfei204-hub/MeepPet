@@ -12761,7 +12761,7 @@ function refreshCharPreview() {
     { key: 'dragonfruit', emoji: '🐲', name: '火龙果晶球', color: '#ff1493', sellPrice: 30, feedAmount: 17 },
     { key: 'melon',      emoji: '🍈', name: '翠玉哈密瓜', color: '#98fb98', sellPrice: 24, feedAmount: 14 },
     { key: 'fig',        emoji: '🫒', name: '蜜糖无花果', color: '#800080', sellPrice: 32, feedAmount: 18 },
-    { key: 'starfruit',  emoji: '⭐', name: '星星杨桃',   color: '#ffd700', sellPrice: 28, feedAmount: 16 },
+    { key: 'starfruit',  emoji: '🌟', name: '星星杨桃',   color: '#b8860b', sellPrice: 28, feedAmount: 16 },
   ];
 
   // ============================================================
@@ -13043,15 +13043,18 @@ function refreshCharPreview() {
   };
 
   // ===== 难度配置 =====
+  // ===== 难度配置 =====
   const TANGHULU_DIFFICULTIES = [
-    { name: '简单', fruitTypes: 4, stickCount: 6, shuffleMoves: 80,  energyCost: 4,  goldReward: [15, 30]  },
-    { name: '普通', fruitTypes: 5, stickCount: 7, shuffleMoves: 100, energyCost: 6,  goldReward: [25, 50]  },
-    { name: '困难', fruitTypes: 6, stickCount: 8, shuffleMoves: 130, energyCost: 9,  goldReward: [40, 70]  },
-    { name: '噩梦', fruitTypes: 7, stickCount: 9, shuffleMoves: 160, energyCost: 12, goldReward: [60, 95]  },
-    { name: '地狱', fruitTypes: 8, stickCount: 10, shuffleMoves: 200, energyCost: 15, goldReward: [80, 120] },
-    { name: '炼狱', fruitTypes: 9, stickCount: 11, shuffleMoves: 250, energyCost: 18, goldReward: [100, 150] },
-    { name: '至尊', fruitTypes: 10, stickCount: 12, shuffleMoves: 300, energyCost: 22, goldReward: [130, 200] },
-    { name: '修罗', fruitTypes: 11, stickCount: 13, shuffleMoves: 360, energyCost: 26, goldReward: [170, 260] },
+    { name: '入门', fruitTypes: 3, stickCount: 5, capacity: 4, shuffleMoves: 60,   energyCost: 3,  goldReward: [10, 20]  },
+    { name: '简单', fruitTypes: 4, stickCount: 6, capacity: 4, shuffleMoves: 100,  energyCost: 5,  goldReward: [20, 35]  },
+    { name: '普通', fruitTypes: 5, stickCount: 7, capacity: 5, shuffleMoves: 150,  energyCost: 7,  goldReward: [30, 55]  },
+    { name: '困难', fruitTypes: 6, stickCount: 8, capacity: 5, shuffleMoves: 220,  energyCost: 10, goldReward: [45, 75]  },
+    { name: '噩梦', fruitTypes: 7, stickCount: 8, capacity: 6, shuffleMoves: 300,  energyCost: 13, goldReward: [65, 100] },
+    { name: '地狱', fruitTypes: 8, stickCount: 9, capacity: 6, shuffleMoves: 400,  energyCost: 16, goldReward: [85, 130] },
+    { name: '炼狱', fruitTypes: 9, stickCount: 10, capacity: 7, shuffleMoves: 500, energyCost: 20, goldReward: [110, 170] },
+    { name: '至尊', fruitTypes: 10, stickCount: 11, capacity: 7, shuffleMoves: 650, energyCost: 24, goldReward: [140, 220] },
+    { name: '修罗', fruitTypes: 11, stickCount: 12, capacity: 8, shuffleMoves: 800, energyCost: 28, goldReward: [180, 280] },
+    { name: '天道', fruitTypes: 12, stickCount: 13, capacity: 8, shuffleMoves: 1000, energyCost: 32, goldReward: [230, 350] },
   ];
 
   // ===== 运行时状态 =====
@@ -13091,10 +13094,13 @@ function refreshCharPreview() {
     }
     tanghuluState.fruitTypes = selectedFruits.map(f => f.key);
 
-    // 步骤1：创建完美状态（前K根各穿4颗同色，后2根空）
+    // 步骤1：创建完美状态（前K根各穿capacity颗同色，后面空签）
+    const cap = diff.capacity || 4;
     const sticks = [];
     for (let i = 0; i < K; i++) {
-      sticks.push({ fruits: [selectedFruits[i].key, selectedFruits[i].key, selectedFruits[i].key, selectedFruits[i].key] });
+      const fruitArr = [];
+      for (let j = 0; j < cap; j++) fruitArr.push(selectedFruits[i].key);
+      sticks.push({ fruits: fruitArr });
     }
     // 空竹签（至少2根）
     const emptyCount = totalSticks - K;
@@ -13119,7 +13125,7 @@ function refreshCharPreview() {
       const targets = [];
       for (let i = 0; i < sticks.length; i++) {
         if (i === fromIdx) continue;
-        if (sticks[i].fruits.length < 4) targets.push(i);
+      if (sticks[i].fruits.length < cap) targets.push(i);
       }
       if (targets.length === 0) continue;
 
@@ -13145,7 +13151,8 @@ function refreshCharPreview() {
   function tanghuluCheckWin() {
     for (const stick of tanghuluState.sticks) {
       if (stick.fruits.length === 0) continue;
-      if (stick.fruits.length !== 4) return false;
+      const cap = tanghuluState.difficulty?.capacity || 4;
+      if (stick.fruits.length !== cap) return false;
       const first = stick.fruits[0];
       if (!stick.fruits.every(f => f === first)) return false;
     }
@@ -13159,7 +13166,8 @@ function refreshCharPreview() {
     const to = tanghuluState.sticks[toIdx];
 
     if (from.fruits.length === 0) return false;
-    if (to.fruits.length >= 4) return false;
+    const cap = tanghuluState.difficulty?.capacity || 4;
+    if (to.fruits.length >= cap) return false;
 
     const topFruit = from.fruits[0];
 
@@ -13174,7 +13182,7 @@ function refreshCharPreview() {
     }
 
     // 目标竹签空位
-    const availableSlots = 4 - to.fruits.length;
+    const availableSlots = cap - to.fruits.length;
     moveCount = Math.min(moveCount, availableSlots);
 
     // 执行移动（从数组头部取出，插入目标头部）
@@ -13195,7 +13203,8 @@ function refreshCharPreview() {
     const to = tanghuluState.sticks[toIdx];
 
     if (from.fruits.length === 0) return false;
-    if (to.fruits.length >= 4) return false;
+    const cap = tanghuluState.difficulty?.capacity || 4;
+    if (to.fruits.length >= cap) return false;
 
     // 只移动一颗（顶端），无视颜色规则
     const fruit = from.fruits.shift();
@@ -13686,7 +13695,8 @@ function refreshCharPreview() {
       }).join('');
 
       // 空位占位
-      const emptySlots = 4 - stick.fruits.length;
+      const cap = tanghuluState.difficulty?.capacity || 4;
+      const emptySlots = cap - stick.fruits.length;
       let emptyHtml = '';
       for (let i = 0; i < emptySlots; i++) {
         emptyHtml += '<div class="sp-tanghulu-slot-empty"></div>';
@@ -13699,7 +13709,7 @@ function refreshCharPreview() {
             ${fruitsHtml}
           </div>
           <div class="sp-tanghulu-stick-base"></div>
-          <div class="sp-tanghulu-stick-label">${stick.fruits.length}/4</div>
+          <div class="sp-tanghulu-stick-label">${stick.fruits.length}/${tanghuluState.difficulty?.capacity || 4}</div>
         </div>
       `;
     }).join('');
