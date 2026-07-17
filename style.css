@@ -6776,6 +6776,16 @@
   gap: 6px;
 }
 
+#sp-house-char-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+  margin-bottom: 4px;
+}
 
 #sp-house-dialogue-text {
   font-size: 14px;
