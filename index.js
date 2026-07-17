@@ -4061,6 +4061,15 @@ async function refreshWorldPreview() {
       });
       // 打开时渲染聊天记录
       renderHouseChatHistory();
+
+    // 刷新按钮图标（防止设置面板保存后小屋按钮未同步）
+    const _feedBtn = document.getElementById('sp-house-feed-btn');
+    if (_feedBtn) _feedBtn.innerHTML = settings.houseButtonFeed ? `<img src="${settings.houseButtonFeed}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '🍖';
+    const _bathBtn = document.getElementById('sp-house-bath-btn');
+    if (_bathBtn) _bathBtn.innerHTML = settings.houseButtonBath ? `<img src="${settings.houseButtonBath}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '🛁';
+    const _sleepBtn = document.getElementById('sp-house-sleep-btn');
+    if (_sleepBtn) _sleepBtn.innerHTML = settings.houseButtonSleep ? `<img src="${settings.houseButtonSleep}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '🛏️';
+
     }
   }
 
@@ -4105,9 +4114,9 @@ async function refreshWorldPreview() {
         <div id="sp-house-bg-layer"></div>
         <div id="sp-house-char-layer"></div>
         <div id="sp-house-actions" style="position:absolute;top:10px;right:10px;z-index:4;display:flex;flex-direction:column;gap:6px;">
-          <button id="sp-house-feed-btn" style="width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.4);backdrop-filter:blur(4px);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;overflow:hidden;padding:0;" title="喂食">${settings.houseButtonFeed ? `<img src="${settings.houseButtonFeed}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '🍖'}</button>
-          <button id="sp-house-bath-btn" style="width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.4);backdrop-filter:blur(4px);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;overflow:hidden;padding:0;" title="洗澡">${settings.houseButtonBath ? `<img src="${settings.houseButtonBath}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '🛁'}</button>
-          <button id="sp-house-sleep-btn" style="width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.4);backdrop-filter:blur(4px);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;overflow:hidden;padding:0;" title="睡觉">${settings.houseButtonSleep ? `<img src="${settings.houseButtonSleep}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '🛏️'}</button>
+          <button id="sp-house-feed-btn" style="width:36px;height:36px;border-radius:50%;border:${settings.houseButtonFeed ? 'none' : '1px solid rgba(255,255,255,0.3)'};background:${settings.houseButtonFeed ? 'transparent' : 'rgba(0,0,0,0.4)'};backdrop-filter:${settings.houseButtonFeed ? 'none' : 'blur(4px)'};cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;overflow:hidden;padding:0;" title="喂食">${settings.houseButtonFeed ? `<img src="${settings.houseButtonFeed}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '🍖'}</button>
+          <button id="sp-house-bath-btn" style="width:36px;height:36px;border-radius:50%;border:${settings.houseButtonBath ? 'none' : '1px solid rgba(255,255,255,0.3)'};background:${settings.houseButtonBath ? 'transparent' : 'rgba(0,0,0,0.4)'};backdrop-filter:${settings.houseButtonBath ? 'none' : 'blur(4px)'};cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;overflow:hidden;padding:0;" title="洗澡">${settings.houseButtonBath ? `<img src="${settings.houseButtonBath}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '🛁'}</button>
+          <button id="sp-house-sleep-btn" style="width:36px;height:36px;border-radius:50%;border:${settings.houseButtonSleep ? 'none' : '1px solid rgba(255,255,255,0.3)'};background:${settings.houseButtonSleep ? 'transparent' : 'rgba(0,0,0,0.4)'};backdrop-filter:${settings.houseButtonSleep ? 'none' : 'blur(4px)'};cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;overflow:hidden;padding:0;" title="睡觉">${settings.houseButtonSleep ? `<img src="${settings.houseButtonSleep}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '🛏️'}</button>
         </div>
         <div id="sp-house-dialogue-overlay">
           <div id="sp-house-dialogue-box">
@@ -4198,8 +4207,12 @@ async function refreshWorldPreview() {
     if (avatarEl) {
       if (settings.houseCharacterAvatar) {
         avatarEl.innerHTML = `<img src="${settings.houseCharacterAvatar}" alt="头像" />`;
+        avatarEl.style.background = 'none';
+        avatarEl.style.border = 'none';
       } else {
         avatarEl.textContent = '🗣️';
+        avatarEl.style.background = 'rgba(255,255,255,0.1)';
+        avatarEl.style.border = '1px solid rgba(255,255,255,0.2)';
       }
     }
 
@@ -7130,6 +7143,26 @@ function updateUploadPreview(key, dataUrl) {
   // 👇 新增：如果是小屋图片，刷新小屋场景
   if (key === 'houseBackground' || key === 'houseCharacter' || key === 'houseCharacterAvatar') {
     updateHouseScene();
+  }
+
+  // 👇 新增：如果是小屋按钮图标，刷新按钮显示
+  if (key === 'houseButtonFeed' || key === 'houseButtonBath' || key === 'houseButtonSleep') {
+    const _btnIdMap = { houseButtonFeed: 'sp-house-feed-btn', houseButtonBath: 'sp-house-bath-btn', houseButtonSleep: 'sp-house-sleep-btn' };
+    const _emojiMap = { houseButtonFeed: '🍖', houseButtonBath: '🛁', houseButtonSleep: '🛏️' };
+    const _btnEl = document.getElementById(_btnIdMap[key]);
+    if (_btnEl) {
+      if (dataUrl) {
+        _btnEl.innerHTML = `<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
+        _btnEl.style.border = 'none';
+        _btnEl.style.background = 'transparent';
+        _btnEl.style.backdropFilter = 'none';
+      } else {
+        _btnEl.innerHTML = _emojiMap[key];
+        _btnEl.style.border = '1px solid rgba(255,255,255,0.3)';
+        _btnEl.style.background = 'rgba(0,0,0,0.4)';
+        _btnEl.style.backdropFilter = 'blur(4px)';
+      }
+    }
   }
 
 }
