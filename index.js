@@ -2137,7 +2137,7 @@ function showInventoryPopup(category, quickKey, onUse) {
 
     const isMobile = window.innerWidth <= 768;
     const isSmall = window.innerWidth <= 480;
-    let radius = isSmall ? 76 : (isMobile ? 95 : 120);
+    let radius = isSmall ? 88 : (isMobile ? 110 : 120);
 
     // 判断桌宠靠哪边
     const threshold = 80; // 判定阈值像素
