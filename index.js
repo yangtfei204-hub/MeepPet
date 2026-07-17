@@ -2750,21 +2750,37 @@ function showInventoryPopup(category, quickKey, onUse) {
             <div class="sp-total-inv-section-content">${renderShelfItems()}</div>
           </div>
           <div class="sp-total-inv-section">
-            <div class="sp-total-inv-section-title">🛒 货架消除联动说明</div>
+            <div class="sp-total-inv-section-title">🔗 游戏物品联动说明</div>
             <div class="sp-total-inv-section-content">
               <div style="font-size:11px;color:var(--sp-text-muted);line-height:1.7;">
-                🥤 饮品消除 → 冰箱库存（可乐）<br/>
-                🍪 零食消除 → 冰箱库存（面包）<br/>
-                🐟 宠物消除 → 冰箱库存（猫罐头）<br/>
-                🧸 玩具消除 → 工坊睡眠道具<br/>
-                🧴 清洁消除 → 工坊清洁道具<br/>
-                🍄🦐🌽🥑🥟🍜 食物消除 → 冰箱库存（对应食材，可投喂+餐厅烹饪）<br/>
-                🍰🍦 甜品消除 → 冰箱库存（蛋糕/冰淇淋，可给餐厅客人）<br/>
-                🍡 糖葫芦串消除 → 糖葫芦工坊库存<br/>
-                🧂🫙🌶️🧈🍯 调料消除 → 餐厅调料库存（每组+2份）<br/>
-                🫧🪻 沐浴用品消除 → 工坊清洁道具（给桌宠洗澡）<br/>
-                🕯️🧣 睡眠用品消除 → 工坊睡眠道具（给桌宠睡觉）<br/>
-                💰 所有消除 → 额外+1~2金币
+                <strong style="color:var(--sp-text-secondary);">🧶 合成工坊</strong><br/>
+                🧂调料链物品 → 餐厅调料库存（实时同步）<br/>
+                餐厅烹饪用调料 → 棋盘对应调料格消失<br/>
+                售卖调料 → 餐厅调料库存同步扣除<br/><br/>
+                <strong style="color:var(--sp-text-secondary);">🧊 冰箱整理</strong><br/>
+                塞进冰箱的食材 → 冰箱库存（投喂桌宠 + 餐厅烹饪）<br/>
+                酱油瓶🫙 → 餐厅可转换为酱油调料<br/><br/>
+                <strong style="color:var(--sp-text-secondary);">🍢 糖葫芦工坊</strong><br/>
+                通关糖葫芦 → 库存（可卖金币 / 投喂桌宠 / 餐厅甜品上菜）<br/>
+                完美糖砂✨ → 投喂桌宠+50饱食 / 餐厅甜品上菜 / 卖150🪙<br/><br/>
+                <strong style="color:var(--sp-text-secondary);">🛒 货架整理</strong><br/>
+                🥤饮品 → 冰箱可乐 | 🍪零食 → 冰箱面包 | 🐟宠物 → 冰箱猫罐头<br/>
+                🧸玩具 → 工坊睡眠道具 | 🧴清洁 → 工坊清洁道具<br/>
+                🍄🦐🌽🥑🥟🍜食物 → 冰箱食材（投喂+餐厅）<br/>
+                🍰🍦甜品 → 冰箱 | 🍡糖葫芦串 → 糖葫芦库存<br/>
+                🧂🫙🌶️🧈🍯调料 → 餐厅调料（每组+2份）<br/>
+                🫧🪻沐浴 → 清洁道具 | 🕯️🧣睡眠 → 睡眠道具<br/><br/>
+                <strong style="color:var(--sp-text-secondary);">🐱 小猫餐厅</strong><br/>
+                烹饪消耗调料 → 合成棋盘调料格同步消失<br/>
+                出餐台菜品 → 可直接投喂桌宠<br/>
+                进货区蔬菜 → 冰箱库存（可投喂+烹饪）<br/><br/>
+                <strong style="color:var(--sp-text-secondary);">🎰 抽奖</strong><br/>
+                棋盘物品 → 合成工坊棋盘 + 调料同步餐厅<br/>
+                蔬菜 → 冰箱库存 | 糖葫芦 → 糖葫芦库存<br/>
+                各类道具 → 对应游戏背包<br/><br/>
+                <strong style="color:var(--sp-text-secondary);">💰 通用</strong><br/>
+                所有游戏共享金币🪙和体力⚡<br/>
+                投喂/洗澡/睡觉 → 从工坊背包+冰箱+糖葫芦+餐厅出餐台选用
               </div>
             </div>
           </div>
@@ -14511,6 +14527,7 @@ function refreshCharPreview() {
     else if (activeTab === 'menu') restaurantRenderMenu();
     else if (activeTab === 'supply') restaurantRenderSupply();
     else if (activeTab === 'stock') restaurantRenderStock();
+    else if (activeTab === 'atlas') restaurantRenderAtlas();
   }
 
   // ===== 渲染厨房标签页 =====
@@ -14980,6 +14997,141 @@ function refreshCharPreview() {
     `;
   }
 
+  // ===== 渲染图鉴标签页 =====
+  function restaurantRenderAtlas() {
+    const container = document.getElementById('sp-restaurant-atlas');
+    if (!container) return;
+    if (!state.gameCustomImages) state.gameCustomImages = {};
+
+    // 分类：食材、调料、菜品
+    let html = '';
+
+    // --- 食材图鉴 ---
+    html += `<div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:6px;">🥬 食材图鉴</div>`;
+    html += `<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-bottom:14px;">`;
+    FRIDGE_FOODS.forEach(food => {
+      const key = `restaurant_food_${food.id}`;
+      const custom = state.gameCustomImages[key];
+      const display = custom
+        ? `<img src="${custom}" style="width:22px;height:22px;object-fit:contain;border-radius:3px;" />`
+        : `<span style="font-size:18px;">${food.emoji}</span>`;
+      html += `
+        <div style="aspect-ratio:1;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;position:relative;cursor:pointer;overflow:hidden;" data-ratlas-key="${key}" data-ratlas-name="${food.name}">
+          ${display}
+          <span style="font-size:7px;color:var(--sp-text-muted);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90%;">${food.name}</span>
+          <div class="sp-ratlas-upload" data-key="${key}" data-name="${food.name}" style="position:absolute;top:1px;right:1px;width:14px;height:14px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;font-size:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity 0.2s;">📷</div>
+        </div>
+      `;
+    });
+    html += `</div>`;
+
+    // --- 调料图鉴 ---
+    html += `<div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:6px;">🧂 调料图鉴</div>`;
+    html += `<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-bottom:14px;">`;
+    RESTAURANT_SEASONINGS.forEach(s => {
+      const key = `restaurant_sea_${s.id}`;
+      const custom = state.gameCustomImages[key];
+      const display = custom
+        ? `<img src="${custom}" style="width:22px;height:22px;object-fit:contain;border-radius:3px;" />`
+        : `<span style="font-size:18px;">${s.emoji}</span>`;
+      html += `
+        <div style="aspect-ratio:1;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;position:relative;cursor:pointer;overflow:hidden;" data-ratlas-key="${key}" data-ratlas-name="${s.name}">
+          ${display}
+          <span style="font-size:7px;color:var(--sp-text-muted);">${s.name}</span>
+          <div class="sp-ratlas-upload" data-key="${key}" data-name="${s.name}" style="position:absolute;top:1px;right:1px;width:14px;height:14px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;font-size:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity 0.2s;">📷</div>
+        </div>
+      `;
+    });
+    html += `</div>`;
+
+    // --- 菜品图鉴 ---
+    html += `<div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:6px;">🍽️ 菜品图鉴</div>`;
+    html += `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:14px;">`;
+    RESTAURANT_RECIPES.forEach(r => {
+      const key = `restaurant_recipe_${r.id}`;
+      const custom = state.gameCustomImages[key];
+      const display = custom
+        ? `<img src="${custom}" style="width:24px;height:24px;object-fit:contain;border-radius:4px;" />`
+        : `<span style="font-size:18px;">${r.emoji}</span>`;
+      const unlocked = state.restaurantReputation >= r.reputationRequired;
+      html += `
+        <div style="aspect-ratio:1;border-radius:6px;border:1px solid ${unlocked ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)'};background:rgba(255,255,255,0.04);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;position:relative;cursor:pointer;overflow:hidden;opacity:${unlocked ? '1' : '0.4'};" data-ratlas-key="${key}" data-ratlas-name="${r.name}">
+          ${unlocked ? display : '<span style="font-size:14px;color:var(--sp-text-muted);">🔒</span>'}
+          <span style="font-size:7px;color:var(--sp-text-muted);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90%;">${unlocked ? r.name : '???'}</span>
+          ${unlocked ? `<div class="sp-ratlas-upload" data-key="${key}" data-name="${r.name}" style="position:absolute;top:1px;right:1px;width:14px;height:14px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;font-size:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity 0.2s;">📷</div>` : ''}
+        </div>
+      `;
+    });
+    html += `</div>`;
+
+    html += `<div style="font-size:10px;color:var(--sp-text-muted);text-align:center;margin-top:6px;">💡 hover 显示上传按钮，⭐推荐使用图片链接节省存储空间</div>`;
+
+    container.innerHTML = html;
+
+    // hover 显示上传按钮
+    container.querySelectorAll('[data-ratlas-key]').forEach(item => {
+      item.addEventListener('mouseenter', () => {
+        const btn = item.querySelector('.sp-ratlas-upload');
+        if (btn) btn.style.opacity = '1';
+      });
+      item.addEventListener('mouseleave', () => {
+        const btn = item.querySelector('.sp-ratlas-upload');
+        if (btn) btn.style.opacity = '0';
+      });
+    });
+
+    // 上传按钮点击
+    container.querySelectorAll('.sp-ratlas-upload').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        restaurantPromptAtlasUpload(btn.dataset.key, btn.dataset.name);
+      });
+    });
+  }
+
+  // ===== 餐厅图鉴图片上传 =====
+  function restaurantPromptAtlasUpload(key, name) {
+    const currentImg = state.gameCustomImages?.[key];
+
+    const choice = confirm(`设置「${name}」的自定义图片\n\n⭐ 推荐：点「确定」→ 输入图片链接（节省内存）\n点「取消」→ 选择本地文件上传`);
+
+    if (choice) {
+      const url = prompt('输入图片链接（推荐，不占存储空间）：', currentImg?.startsWith('http') ? currentImg : '');
+      if (url && url.trim().startsWith('http')) {
+        if (!state.gameCustomImages) state.gameCustomImages = {};
+        state.gameCustomImages[key] = url.trim();
+        saveDataImmediate('餐厅图鉴图片链接');
+        restaurantRenderAtlas();
+        restaurantShowNotice(`${name} 图片已设置！`);
+      } else if (url !== null && url !== '') {
+        restaurantShowNotice('请输入以 http 开头的链接');
+      }
+    } else {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) {
+          restaurantShowNotice('图片不能超过2MB，推荐使用图片链接');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          const compressed = await compressImage(ev.target.result, 80, 0.7);
+          if (!state.gameCustomImages) state.gameCustomImages = {};
+          state.gameCustomImages[key] = compressed;
+          saveDataImmediate('餐厅图鉴图片上传');
+          restaurantRenderAtlas();
+          restaurantShowNotice(`${name} 图片已设置！（提示：使用链接可节省存储空间）`);
+        };
+        reader.readAsDataURL(file);
+      };
+      input.click();
+    }
+  }
+
   // ===== 渲染面板框架 =====
   function restaurantRenderPanel() {
     let panel = document.getElementById('sp-restaurant-panel');
@@ -15021,12 +15173,14 @@ function refreshCharPreview() {
         <button class="sp-game-tab" data-rtab="menu">📋 菜单</button>
         <button class="sp-game-tab" data-rtab="supply">🛒 补货</button>
         <button class="sp-game-tab" data-rtab="stock">🎒 库存</button>
+        <button class="sp-game-tab" data-rtab="atlas">📖 图鉴</button>
       </div>
       <div id="sp-restaurant-body" style="flex:1;overflow-y:auto;padding:10px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.2) transparent;">
         <div id="sp-restaurant-kitchen"></div>
         <div id="sp-restaurant-menu" style="display:none;"></div>
         <div id="sp-restaurant-supply" style="display:none;"></div>
         <div id="sp-restaurant-stock" style="display:none;"></div>
+        <div id="sp-restaurant-atlas" style="display:none;"></div>
       </div>
     `;
 
@@ -15058,7 +15212,7 @@ function refreshCharPreview() {
       tab.onclick = () => {
         panel.querySelectorAll('.sp-game-tab[data-rtab]').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
-        ['kitchen', 'menu', 'supply', 'stock'].forEach(name => {
+        ['kitchen', 'menu', 'supply', 'stock', 'atlas'].forEach(name => {
           const el = document.getElementById(`sp-restaurant-${name}`);
           if (el) el.style.display = tab.dataset.rtab === name ? '' : 'none';
         });
