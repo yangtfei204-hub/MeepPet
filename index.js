@@ -8,6 +8,47 @@
   const PLUGIN_NAME = 'meep-pet';
   const STORAGE_KEY = 'meep_pet_data';
 
+  // ============================================================
+  // IndexedDB 存储层
+  // ============================================================
+  const DB_NAME = 'meep_pet_db';
+  const DB_VERSION = 1;
+  const DB_STORE = 'data';
+  let _db = null;
+
+  function openDB() {
+    return new Promise((resolve, reject) => {
+      if (_db) { resolve(_db); return; }
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(DB_STORE)) {
+          db.createObjectStore(DB_STORE);
+        }
+      };
+      req.onsuccess = (e) => { _db = e.target.result; resolve(_db); };
+      req.onerror = (e) => { reject(e.target.error); };
+    });
+  }
+
+  function idbGet(key) {
+    return openDB().then(db => new Promise((resolve, reject) => {
+      const tx = db.transaction(DB_STORE, 'readonly');
+      const req = tx.objectStore(DB_STORE).get(key);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = (e) => reject(e.target.error);
+    }));
+  }
+
+  function idbSet(key, value) {
+    return openDB().then(db => new Promise((resolve, reject) => {
+      const tx = db.transaction(DB_STORE, 'readwrite');
+      const req = tx.objectStore(DB_STORE).put(value, key);
+      req.onsuccess = () => resolve();
+      req.onerror = (e) => reject(e.target.error);
+    }));
+  }
+
     // ============================================================
   // 预设主题库
   // ============================================================
@@ -509,12 +550,14 @@
   // ============================================================
   async function init() {
     loadData();
+    await loadDataAsync();
     applyTheme(settings.currentTheme || 'default'); 
     applyOfflineDecay();
     renderPetUI();
     renderSettingsUI();
     bindEvents();
     registerSlashCommands(); 
+
 
     requestAnimationFrame(() => {
       updateMoodDisplay();
@@ -588,27 +631,47 @@
   // 数据持久化
   // ============================================================
   function loadData() {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw);
+    // 同步先赋默认值，防止 init 期间数据为空
+    settings = { ...DEFAULT_SETTINGS };
+    state = { ...DEFAULT_STATE };
+    emojiStickers = [];
+    isOfflineMode = false;
+  }
+
+  async function loadDataAsync() {
+    try {
+      const parsed = await idbGet(STORAGE_KEY);
+      if (parsed) {
         settings = { ...DEFAULT_SETTINGS, ...parsed.settings };
         settings.reactions = { ...DEFAULT_SETTINGS.reactions, ...(parsed.settings?.reactions || {}) };
         settings.moodImages = { ...DEFAULT_SETTINGS.moodImages, ...(parsed.settings?.moodImages || {}) };
         state = { ...DEFAULT_STATE, ...parsed.state };
         emojiStickers = settings.emojiStickers || [];
         isOfflineMode = state.isOfflineMode || false;
-      } catch (e) {
-        settings = { ...DEFAULT_SETTINGS };
-        state = { ...DEFAULT_STATE };
       }
-    } else {
-      settings = { ...DEFAULT_SETTINGS };
-      state = { ...DEFAULT_STATE };
-      emojiStickers = [];
-      isOfflineMode = false;
+      // 顺便把旧的 localStorage 数据迁移过来（只做一次）
+      const oldRaw = localStorage.getItem(STORAGE_KEY);
+      if (oldRaw && !parsed) {
+        try {
+          const oldParsed = JSON.parse(oldRaw);
+          settings = { ...DEFAULT_SETTINGS, ...oldParsed.settings };
+          settings.reactions = { ...DEFAULT_SETTINGS.reactions, ...(oldParsed.settings?.reactions || {}) };
+          settings.moodImages = { ...DEFAULT_SETTINGS.moodImages, ...(oldParsed.settings?.moodImages || {}) };
+          state = { ...DEFAULT_STATE, ...oldParsed.state };
+          emojiStickers = settings.emojiStickers || [];
+          isOfflineMode = state.isOfflineMode || false;
+          await idbSet(STORAGE_KEY, { settings, state });
+          localStorage.removeItem(STORAGE_KEY);
+          console.log(`[${PLUGIN_NAME}] 已从 localStorage 迁移数据到 IndexedDB`);
+        } catch (e) {
+          console.warn(`[${PLUGIN_NAME}] 旧数据迁移失败`, e);
+        }
+      }
+    } catch (e) {
+      console.warn(`[${PLUGIN_NAME}] IndexedDB 读取失败，使用默认值`, e);
     }
   }
+
 
 
   function saveData() {
@@ -627,28 +690,17 @@
         if (k < today.slice(0, 8)) delete state.gameShopBuyLog[k];
       });
     }
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings, state }));
-    } catch (e) {
-      if (e.name === 'QuotaExceededError' || e.code === 22) {
-        console.warn(`[${PLUGIN_NAME}] 存储空间不足，尝试压缩...`);
-      if (state.petChatHistory.length > 200) { // 改为 200 条
-          state.petChatHistory = state.petChatHistory.slice(-200);
-        }
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings, state }));
-        } catch (e2) {
-          console.error(`[${PLUGIN_NAME}] 存储满了`, e2);
-          // 每5分钟最多提醒一次，避免刷屏
-          const now = Date.now();
-          if (!saveData._lastFullWarning || now - saveData._lastFullWarning > 5 * 60 * 1000) {
-            saveData._lastFullWarning = now;
-            showBubble('⚠️ 存储满了！请减少图片或导出备份', 6000);
-          }
-        }
+    idbSet(STORAGE_KEY, { settings, state }).catch(e => {
+      console.error(`[${PLUGIN_NAME}] IndexedDB 保存失败`, e);
+      const now = Date.now();
+      if (!saveData._lastWarning || now - saveData._lastWarning > 5 * 60 * 1000) {
+        saveData._lastWarning = now;
+        showBubble('⚠️ 数据保存失败！请检查浏览器存储权限', 6000);
       }
-    }
+    });
+
   }
+
 
   // 防抖版保存（高频调用场景用这个）
   function saveDataDebounced(reason = '') {
