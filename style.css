@@ -4922,6 +4922,27 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(150,220,255,0.3) rgba(0,0,0,0.15);
+}
+
+#sp-fridge-body::-webkit-scrollbar {
+  width: 5px;
+}
+
+#sp-fridge-body::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.15);
+  border-radius: 3px;
+}
+
+#sp-fridge-body::-webkit-scrollbar-thumb {
+  background: rgba(150,220,255,0.3);
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+
+#sp-fridge-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(150,220,255,0.5);
 }
 
 /* 冰箱网格 */
@@ -5031,13 +5052,28 @@
   overflow-y: auto;
 }
 
+.sp-fridge-basket {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(150,220,255,0.3) rgba(0,0,0,0.1);
+}
+
 .sp-fridge-basket::-webkit-scrollbar {
-  width: 4px;
+  width: 5px;
+}
+
+.sp-fridge-basket::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.1);
+  border-radius: 3px;
 }
 
 .sp-fridge-basket::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.2);
-  border-radius: 2px;
+  background: rgba(150,220,255,0.3);
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+
+.sp-fridge-basket::-webkit-scrollbar-thumb:hover {
+  background: rgba(150,220,255,0.5);
 }
 
 .sp-fridge-basket-item {
@@ -5348,6 +5384,31 @@
   opacity: 1;
   pointer-events: auto;
   transform: translateY(0);
+}
+
+/* 糖葫芦工坊滚动条美化 */
+#sp-tanghulu-body {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139,90,43,0.4) rgba(0,0,0,0.15);
+}
+
+#sp-tanghulu-body::-webkit-scrollbar {
+  width: 5px;
+}
+
+#sp-tanghulu-body::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.15);
+  border-radius: 3px;
+}
+
+#sp-tanghulu-body::-webkit-scrollbar-thumb {
+  background: rgba(139,90,43,0.4);
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+
+#sp-tanghulu-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(139,90,43,0.6);
 }
 
 /* 竹签棋盘 */
@@ -6326,5 +6387,191 @@
   .sp-shelf-bag-slot {
     min-height: 40px;
     font-size: 20px;
+  }
+}
+
+/* ===== 小猫餐厅等候区桌子网格 ===== */
+.sp-restaurant-tables {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  padding: 6px;
+  background: rgba(139,90,43,0.08);
+  border-radius: 10px;
+  border: 1px solid rgba(139,90,43,0.2);
+}
+
+.sp-restaurant-table {
+  position: relative;
+  padding: 10px 8px;
+  background: rgba(255,255,255,0.04);
+  border: 2px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 80px;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.sp-restaurant-table-empty {
+  border-style: dashed;
+  border-color: rgba(255,255,255,0.06);
+  justify-content: center;
+}
+
+.sp-restaurant-table-empty::after {
+  content: '🪑';
+  font-size: 20px;
+  opacity: 0.25;
+}
+
+.sp-restaurant-table-occupied {
+  border-color: rgba(255,180,100,0.3);
+  background: rgba(255,180,100,0.05);
+}
+
+.sp-restaurant-table-occupied:hover {
+  border-color: rgba(255,180,100,0.5);
+  background: rgba(255,180,100,0.1);
+}
+
+.sp-restaurant-table-urgent {
+  border-color: rgba(239,83,80,0.5) !important;
+  background: rgba(239,83,80,0.06) !important;
+  animation: sp-restaurant-urgent-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes sp-restaurant-urgent-pulse {
+  0%, 100% { box-shadow: 0 0 4px rgba(239,83,80,0.2); }
+  50% { box-shadow: 0 0 12px rgba(239,83,80,0.5); }
+}
+
+.sp-restaurant-table-emoji {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.sp-restaurant-table-name {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--sp-text-primary);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.sp-restaurant-table-dialogue {
+  font-size: 9px;
+  color: var(--sp-text-muted);
+  text-align: center;
+  line-height: 1.3;
+  max-height: 24px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.sp-restaurant-table-timer {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--sp-text-muted);
+}
+
+.sp-restaurant-table-timer.urgent {
+  color: #f66;
+}
+
+.sp-restaurant-table-wants {
+  font-size: 9px;
+  color: rgba(100,180,255,0.8);
+  background: rgba(100,180,255,0.08);
+  padding: 1px 6px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.sp-restaurant-table-actions {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 2px;
+}
+
+.sp-restaurant-table-serve-btn {
+  padding: 2px 6px;
+  font-size: 9px;
+  border-radius: 4px;
+  border: 1px solid rgba(100,220,100,0.5);
+  background: rgba(100,220,100,0.12);
+  color: #6f6;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.sp-restaurant-table-serve-btn:hover {
+  background: rgba(100,220,100,0.25);
+  color: #fff;
+}
+
+.sp-restaurant-table-dessert-btn {
+  padding: 2px 6px;
+  font-size: 9px;
+  border-radius: 4px;
+  border: 1px solid rgba(255,150,200,0.5);
+  background: rgba(255,150,200,0.1);
+  color: #ffb;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.sp-restaurant-table-dessert-btn:hover {
+  background: rgba(255,150,200,0.25);
+  color: #fff;
+}
+
+.sp-restaurant-table-number {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  font-size: 8px;
+  color: var(--sp-text-muted);
+  opacity: 0.6;
+}
+
+/* 移动端适配 */
+@media (max-width: 480px) {
+  .sp-restaurant-tables {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 4px;
+    padding: 4px;
+  }
+
+  .sp-restaurant-table {
+    padding: 8px 6px;
+    min-height: 70px;
+  }
+
+  .sp-restaurant-table-emoji {
+    font-size: 18px;
+  }
+
+  .sp-restaurant-table-name {
+    font-size: 9px;
+  }
+
+  .sp-restaurant-table-dialogue {
+    font-size: 8px;
   }
 }

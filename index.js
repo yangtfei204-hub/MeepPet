@@ -2321,26 +2321,30 @@ function showInventoryPopup(category, quickKey, onUse) {
         </div>
         <div id="sp-game-help-body">
           <details class="sp-guide-details" open>
+            <summary class="sp-guide-summary">🐱 小猫餐厅</summary>
+            <div class="sp-guide-details-content">
+              <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
+                经营一家猫咪餐厅，烹饪菜品招待客人赚金币。<br/><br/>
+                • 客人会随机到来，坐在餐桌上等候点餐<br/>
+                • 在烹饪台选择食谱，消耗食材和调料烹饪<br/>
+                • 菜品出锅后点击对应客人的上菜按钮完成服务<br/>
+                • 服务客人获得金币和声望，声望升级解锁新菜谱和新客人<br/>
+                • 客人耐心耗尽会离开并扣声望<br/>
+                • 出餐台的菜品也可以直接投喂桌宠<br/><br/>
+                <strong style="color:var(--sp-text-primary);">食材来源：</strong>冰箱整理、货架消除、补货商店<br/>
+                <strong style="color:var(--sp-text-primary);">调料来源：</strong>合成工坊调料链、补货商店
+              </p>
+            </div>
+          </details>
+
+          <details class="sp-guide-details">
             <summary class="sp-guide-summary">🧶 合成工坊</summary>
             <div class="sp-guide-details-content">
               <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                合成工坊是一个合成+经营小游戏。<br/><br/>
-                <strong style="color:var(--sp-text-primary);">核心玩法：</strong><br/>
-                • 点击「🐾 猫爪生成器」消耗 1 点体力，随机生成物品到棋盘<br/>
-                • 将两个<strong>相同种类、相同等级</strong>的物品拖到一起即可合成升级<br/>
-                • 完成订单交付指定物品可获得金币奖励<br/>
-                • 多余的物品可以拖到「💰 售卖区」换取少量金币<br/><br/>
-                <strong style="color:var(--sp-text-primary);">三条合成链：</strong><br/>
-                🧶 玩具链：线团 → 逗猫棒 → 毛绒小熊 → ... → 喵星飞船<br/>
-                🍪 零食链：面粉 → 面包 → 草莓蛋糕 → ... → 永恒盛宴<br/>
-                💎 宝石链：碎晶 → 魔法水晶 → 灵力戒指 → ... → 哲人之石<br/><br/>
-                <strong style="color:var(--sp-text-primary);">操作方式：</strong><br/>
-                • 电脑端：拖拽物品到目标格子，或点击选中再点击目标<br/>
-                • 手机端：轻触选中物品，再轻触目标格子<br/><br/>
-                <strong style="color:var(--sp-text-primary);">商店说明：</strong><br/>
-                用金币在商店购买食物🍖/洗护🧴/睡眠🛏️道具，存入背包。<br/>
-                点击桌宠菜单投喂/洗澡/睡觉时会从背包消耗道具。<br/>
-                还可以购买体力⚡道具恢复游戏体力。
+                点击猫爪生成器消耗1体力生成物品，将两个相同种类+等级的物品合成升级。完成订单交付物品赚金币，多余物品可售卖。<br/><br/>
+                共8条合成链（玩具/零食/宝石/药剂/音律/花卉/星辰/调料），每链8级。<br/><br/>
+                商店可购买投喂/洗护/睡眠道具存入背包，桌宠互动时消耗。<br/>
+                调料链物品会同步到餐厅调料库存。
               </p>
             </div>
           </details>
@@ -2349,21 +2353,9 @@ function showInventoryPopup(category, quickKey, onUse) {
             <summary class="sp-guide-summary">🃏 消消看</summary>
             <div class="sp-guide-details-content">
               <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                消消看是一个三消类益智游戏。<br/><br/>
-                <strong style="color:var(--sp-text-primary);">核心玩法：</strong><br/>
-                • 场景中有多层堆叠的图案牌<br/>
-                • 点击未被遮挡的牌，收集到下方暂存栏<br/>
-                • 暂存栏中凑齐<strong>3个相同图案</strong>即可消除<br/>
-                • 消除所有牌即通关<br/>
-                • 暂存栏满了且没有可消除的三连 → 游戏失败<br/><br/>
-                <strong style="color:var(--sp-text-primary);">道具说明：</strong><br/>
-                🪜 扩充神架：临时增加1个暂存格（上限10）<br/>
-                🧹 魔法扫帚：随机消除场景中3个相同图案<br/>
-                🌀 混沌风暴：打乱场景中所有图案位置<br/>
-                ⚠️ 每局最多使用3个道具，需要在商店提前购买存入背包<br/><br/>
-                <strong style="color:var(--sp-text-primary);">费用：</strong><br/>
-                开局消耗 5 点体力⚡<br/>
-                通关奖励 30~60 金币🪙 + 消除组数奖励
+                多层堆叠的图案牌，点击未被遮挡的牌收集到暂存栏，凑齐3个相同即消除。清空所有牌通关，暂存栏满则失败。<br/><br/>
+                道具：🪜扩充暂存格 / 🧹随机消3个 / 🌀打乱位置（每局限用3个）<br/>
+                开局5体力，通关奖30~60🪙
               </p>
             </div>
           </details>
@@ -2372,100 +2364,43 @@ function showInventoryPopup(category, quickKey, onUse) {
             <summary class="sp-guide-summary">🔗 连连看</summary>
             <div class="sp-guide-details-content">
               <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                连连看是经典的配对消除游戏。<br/><br/>
-                <strong style="color:var(--sp-text-primary);">核心玩法：</strong><br/>
-                •棋盘上有成对的图案方块<br/>
-                • 点击两个相同图案的方块<br/>
-                • 如果它们之间可以用<strong>不超过2次转折</strong>的折线连通<br/>
-                 （线路上不能有其他方块阻挡），就能消除这一对<br/>
-                • 消除所有方块即通关<br/><br/>
-                <strong style="color:var(--sp-text-primary);">道具说明：</strong><br/>
-                🔍 寻路放大镜：高亮一对可消除的方块（每局3次）<br/>
-                🌀 重组旋风：打乱所有方块位置（每局3次）<br/>
-                💣 友情炸弹：无视通路强制消除两个相同方块（每局2次）<br/>
-                🧭 罗盘透视：10秒内点击方块显示可连通的同伴（每局1次）<br/><br/>
-                <strong style="color:var(--sp-text-primary);">难度与费用：</strong><br/>
-                棋盘大小随机（8×8 / 10×10 / 12×12 / 14×14 / 16×16 / 18×18）<br/>
-                体力消耗 5~16 点，通关奖励 40~500 金币🪙
+                选两个相同图案方块，若能用不超过2次转折的折线连通则消除。清空通关。<br/><br/>
+                道具：🔍提示 / 🌀洗牌 / 💣强制消除 / 🧭透视同伴<br/>
+                棋盘8×8~18×18随机，体力5~16，通关奖40~500🪙
               </p>
             </div>
           </details>
+
           <details class="sp-guide-details">
             <summary class="sp-guide-summary">🧊 冰箱整理</summary>
             <div class="sp-guide-details-content">
               <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                冰箱整理是一个空间规划小游戏。<br/><br/>
-                <strong style="color:var(--sp-text-primary);">核心玩法：</strong><br/>
-                • 随机获得一个冰箱（大小随机）和一筐食材<br/>
-                • 从购物筐中选择食材，拖入冰箱网格中摆放<br/>
-                • 食材有不同尺寸，可以点击「🔄 旋转」横竖切换<br/>
-                • 尽量把所有食材都塞进冰箱！<br/><br/>
-                <strong style="color:var(--sp-text-primary);">道具说明：</strong><br/>
-                🧃 压缩魔法：缩小一个食材的尺寸（每局2次，50🪙/个）<br/>
-                🎒 放进背包：跳过一个食材不扣完成率（每局1次，70🪙/个）<br/>
-                🧹 一键整理：自动将冰箱里的物品靠左靠上码放（每局3次，30🪙/个）<br/>
-                ⚠️ 道具需要在冰箱商店提前购买存入背包，也可以通过抽奖获得<br/><br/>
-                <strong style="color:var(--sp-text-primary);">结算规则：</strong><br/>
-                • 100% 完美收纳 → 额外奖励金币<br/>
-                • 90%以上 → 正常通关奖励<br/>
-                • 低于90% → 基础奖励<br/>
-                • 塞进冰箱的食物会存入冰箱库存，可用于投喂桌宠🍖<br/><br/>
-                <strong style="color:var(--sp-text-primary);">冰箱类型：</strong><br/>
-                🧊 小单门 5×5 | ❄️ 中型 6×6 | 🏔️ 双开门 7×7<br/>
-                🌨️ 超大 8×8 | 🎪 巨无霸 10×10<br/>
-                🏭 仓库级 12×12 | 🌌 极限挑战 14×14<br/>
-                ⚠️ 开局前不会告诉你冰箱大小和体力消耗！
+                把购物筐里的食材塞进随机大小的冰箱网格。食材有不同尺寸（含异形），可旋转。填充率越高奖励越多。<br/><br/>
+                道具：🧃压缩缩小 / 🎒跳过不扣率 / 🧹自动码放<br/>
+                塞进去的食材存入冰箱库存，可投喂桌宠或餐厅烹饪用。<br/>
+                冰箱大小和体力消耗开局前未知。
               </p>
             </div>
           </details>
+
           <details class="sp-guide-details">
             <summary class="sp-guide-summary">🍢 糖葫芦工坊</summary>
             <div class="sp-guide-details-content">
               <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                糖葫芦工坊是一个水果排序归类小游戏。<br/><br/>
-                <strong style="color:var(--sp-text-primary);">核心玩法：</strong><br/>
-                • 每局有若干根竹签，上面穿着乱序的彩色水果<br/>
-                • 另有2根空竹签作为中转<br/>
-                • 每根竹签最多穿4颗水果<br/>
-                • 点击竹签A再点击竹签B，顶端水果会从A移到B<br/>
-                • 目标：让每根有水果的竹签上都是4颗完全相同的水果<br/><br/>
-                <strong style="color:var(--sp-text-primary);">移动规则：</strong><br/>
-                • 目标竹签未满（少于4颗）<br/>
-                • 目标竹签为空，或顶端水果与移动的水果相同<br/>
-                • 连续相同的顶端水果可以一次性批量移动<br/><br/>
-                <strong style="color:var(--sp-text-primary);">道具说明：</strong><br/>
-                🥢 赠送竹签：额外增加一根空竹签（每局限1次，50🪙）<br/>
-                ↩️ 悔步撤销：撤销上一步操作（每局限3次，10🪙）<br/>
-                🌀 顺滑剂：无视规则强行移动一颗水果（每局限2次，30🪙）<br/><br/>
-                <strong style="color:var(--sp-text-primary);">结算规则：</strong><br/>
-                • 通关后做好的糖葫芦存入库存，可卖出赚金币或投喂桌宠<br/>
-                • 通关奖励 10~100 金币（根据水果种类数）<br/>
-                • 通关增加桌宠心情 +1<br/>
-                • 低概率掉落「✨完美的亮晶晶糖砂」（价值150🪙，可投喂桌宠）
+                竹签上穿着乱序水果，目标让每根签上都是同色水果。点选源签再点目标签移动顶端水果（同色可批量移）。<br/><br/>
+                道具：🥢加空签 / ↩️撤销 / 🌀强行移动<br/>
+                通关后糖葫芦存入库存，可卖金币或投喂桌宠。有概率掉✨糖砂。
               </p>
             </div>
           </details>
+
           <details class="sp-guide-details">
             <summary class="sp-guide-summary">🛒 整理货架</summary>
             <div class="sp-guide-details-content">
               <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                整理货架是一个三消类益智游戏。<br/><br/>
-                <strong style="color:var(--sp-text-primary);">核心玩法：</strong><br/>
-                • 货架由 2×4 个隔间组成，每个隔间最多放 3 件相同商品<br/>
-                • 点击或拖动商品到同类型隔间，凑满3个即可消除<br/>
-                • 消除后后排被遮挡的商品自动向前补位<br/>
-                • 目标：清空所有货架隔间！<br/><br/>
-                <strong style="color:var(--sp-text-primary);">道具说明：</strong><br/>
-                🪵 临时扩展篮：额外挂载3格临时收纳区（每局1次）<br/>
-                🧹 喵喵爪理货：自动找一组三个相同并消除（每局2次）<br/>
-                🔄 货架大洗牌：将所有已露出商品重新随机排列（每局3次）<br/><br/>
-                <strong style="color:var(--sp-text-primary);">操作方式：</strong><br/>
-                • 点击商品选中 → 再点击目标隔间放入<br/>
-                • 也支持拖拽操作（PC端）<br/>
-                • 底部总背包区可临时存放最多2件商品<br/><br/>
-                <strong style="color:var(--sp-text-primary);">费用与奖励：</strong><br/>
-                开局消耗 5 点体力⚡<br/>
-                通关奖励金币🪙 + 消除奖励，商品进入餐厅后厨和桌宠物资
+                货架隔间里有各种商品，每隔间3格。把相同商品凑到同一隔间的3格即三消消除，后排自动补位。清空通关。<br/><br/>
+                道具：🪵解锁底部背包 / 🧹自动消一组 / 🔄洗牌<br/>
+                消除的商品会联动到冰箱/餐厅/工坊背包。开局5~20体力。
               </p>
             </div>
           </details>
@@ -2474,57 +2409,23 @@ function showInventoryPopup(category, quickKey, onUse) {
             <summary class="sp-guide-summary">🎰 幸运抽奖</summary>
             <div class="sp-guide-details-content">
               <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                消耗金币进行抽奖，获得各种道具和物品。<br/><br/>
-                <strong style="color:var(--sp-text-primary);">三个奖池：</strong><br/>
-                🎲 小试牛刀：10金币/次，每日限10次<br/>
-                ✨ 锦鲤附体：30金币/次，每日限5次<br/>
-                💫 欧皇时刻：50金币/次，每日限3次<br/><br/>
-                <strong style="color:var(--sp-text-primary);">可能奖励：</strong><br/>
-                • 金币🪙（直接入账）<br/>
-                • 消消看/连连看道具（存入对应背包）<br/>
-                • 工坊道具-食物/洗护/睡眠（存入工坊背包）<br/>
-                • 体力道具⚡（存入体力背包）<br/>
-                • 合成棋盘物品🧶（直接放入棋盘空格）<br/><br/>
-                💡 花费越高的奖池，获得高价值奖励的概率越大！
+                花金币抽奖获得各类道具和物品。<br/><br/>
+                🎲 10🪙/次（日限10）| ✨ 30🪙/次（日限5）| 💫 50🪙/次（日限3）<br/><br/>
+                奖励包括：金币、各游戏道具、工坊背包物品、棋盘物品、食材、糖葫芦等。高价池出好东西概率更大。
               </p>
             </div>
           </details>
 
           <details class="sp-guide-details">
-            <summary class="sp-guide-summary">🎒 总背包</summary>
+            <summary class="sp-guide-summary">💡 通用机制</summary>
             <div class="sp-guide-details-content">
               <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                总背包汇总显示你在所有游戏中获得的道具。<br/><br/>
-                <strong style="color:var(--sp-text-primary);">包含以下类别：</strong><br/>
-                • 🍖 喂食道具（投喂桌宠时消耗）<br/>
-                • 🧴 洗澡道具（给桌宠洗澡时消耗）<br/>
-                • 🛏️ 睡觉道具（让桌宠睡觉时消耗）<br/>
-                • ⚡ 体力道具（恢复游戏体力）<br/>
-                • 🃏 消消看道具<br/>
-                • 🔗 连连看道具<br/><br/>
-                💡 道具通过商店购买或抽奖获得。<br/>
-                💡 喂食/洗澡/睡觉时可设置快捷物品，下次直接使用不弹窗。
-              </p>
-            </div>
-          </details>
-
-          <details class="sp-guide-details">
-            <summary class="sp-guide-summary">💡 通用说明</summary>
-            <div class="sp-guide-details-content">
-              <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                <strong style="color:var(--sp-text-primary);">金币系统：</strong><br/>
-                所有游戏共享同一个金币池🪙。<br/>
-                合成工坊赚金币最稳定，抽奖消耗金币。<br/><br/>
-                <strong style="color:var(--sp-text-primary);">体力系统：</strong><br/>
-                所有游戏共享同一个体力池⚡。<br/>
-                体力每 8 分钟自动恢复 1 点。<br/>
-                也可以使用体力道具快速恢复。<br/>
-                点击体力数值旁的 ⊕ 按钮可使用体力道具。<br/><br/>
-                <strong style="color:var(--sp-text-primary);">图鉴系统：</strong><br/>
-                合成工坊、消消看、连连看都支持自定义图案图片。<br/>
-                在图鉴中点击 📷 按钮上传图片或输入链接。<br/><br/>
-                <strong style="color:var(--sp-text-primary);">数据重置：</strong><br/>
-                在合成工坊设置⚙️中可重置所有游戏数据（24小时冷却）。
+                <strong style="color:var(--sp-text-primary);">金币🪙</strong> — 所有游戏共享，合成工坊最稳定产出<br/>
+                <strong style="color:var(--sp-text-primary);">体力⚡</strong> — 所有游戏共享，每5分钟恢复1点，点⊕用道具<br/>
+                <strong style="color:var(--sp-text-primary);">图鉴📖</strong> — 各游戏均支持自定义图片（📷按钮，推荐链接）<br/>
+                <strong style="color:var(--sp-text-primary);">背包🎒</strong> — 总背包汇总所有道具，投喂/洗澡/睡觉可设快捷<br/>
+                <strong style="color:var(--sp-text-primary);">联动🔗</strong> — 各游戏产出互通：调料→餐厅、食材→冰箱→投喂、糖葫芦→投喂/卖、货架消除→各种库存<br/>
+                <strong style="color:var(--sp-text-primary);">重置⚠️</strong> — 合成工坊设置⚙️中可重置所有游戏数据（24h冷却）
               </p>
             </div>
           </details>
@@ -8778,6 +8679,26 @@ function refreshCharPreview() {
   function match3CheckEliminate() {
     let eliminated = false;
 
+    // 消消看图案→餐厅联动映射表
+    // key: MATCH3_DEFAULT_ICONS 中的 emoji
+    // value: { type: 'fridge'|'seasoning'|'tanghulu', id: string }
+    const MATCH3_RESTAURANT_LINK = {
+      '🧂': { type: 'seasoning', id: 'salt' },
+      '🫗': { type: 'seasoning', id: 'vinegar' },
+      '🌶️': { type: 'seasoning', id: 'chili' },
+      '🥟': { type: 'fridge', id: 'dumpling' },
+      '🦞': { type: 'fridge', id: 'lobster' },
+      '🍜': { type: 'fridge', id: 'noodle' },
+      '🥧': { type: 'fridge', id: 'cake' },
+      '🍄': { type: 'fridge', id: 'mushroom' },
+      '🍰': { type: 'fridge', id: 'cake' },
+      '🍇': { type: 'fridge', id: 'grape' },
+      '🌙': { type: 'seasoning', id: 'honey' },
+      '🥜': { type: 'seasoning', id: 'sesame' },
+      '🐳': { type: 'fridge', id: 'fish' },
+      '🍬': { type: 'fridge', id: 'icecream' },
+    };
+
     while (true) {
       // 查找连续三个相同
       let foundIdx = -1;
@@ -8797,12 +8718,32 @@ function refreshCharPreview() {
 
       // 消除
       const removed = match3State.slots.splice(foundIdx, MATCH3_MATCH_COUNT);
+      const eliminatedType = removed[0].type; // 被消除的图案 emoji
       removed.forEach(s => {
         const card = match3State.cards.find(c => c.id === s.id);
         if (card) card.state = 'eliminated';
       });
       match3State.eliminatedGroups++;
       eliminated = true;
+
+      // ===== 消消看→餐厅联动产出 =====
+      const link = MATCH3_RESTAURANT_LINK[eliminatedType];
+      if (link) {
+        if (link.type === 'fridge') {
+          if (!state.fridgeInventory) state.fridgeInventory = [];
+          const existing = state.fridgeInventory.find(i => i.foodId === link.id);
+          if (existing) existing.count++;
+          else state.fridgeInventory.push({ foodId: link.id, count: 1 });
+        } else if (link.type === 'seasoning') {
+          if (!state.restaurantSeasonings) state.restaurantSeasonings = {};
+          state.restaurantSeasonings[link.id] = (state.restaurantSeasonings[link.id] || 0) + 1;
+        } else if (link.type === 'tanghulu') {
+          if (!state.tanghuluInventory) state.tanghuluInventory = [];
+          const existing = state.tanghuluInventory.find(i => i.fruitKey === link.id);
+          if (existing) existing.count++;
+          else state.tanghuluInventory.push({ fruitKey: link.id, count: 1 });
+        }
+      }
     }
 
     if (eliminated) {
@@ -8814,6 +8755,7 @@ function refreshCharPreview() {
       }
     }
   }
+
 
   // ===== 道具使用 =====
   function match3UseProp(propKey) {
@@ -10663,14 +10605,61 @@ function refreshCharPreview() {
   // ===== 消除一对 =====
   function linkEliminatePair(r1, c1, r2, c2, path) {
     const {board} = linkState;
+
+    // 记录被消除方块的图案类型（在清除前取值）
+    const eliminatedType = board[r1][c1]; // 类型编号 1~N
+    const eliminatedIconIdx = eliminatedType - 1;
+    const eliminatedEmoji = LINK_DEFAULT_ICONS[eliminatedIconIdx] || null;
+
     board[r1][c1] = 0;
     board[r2][c2] = 0;
     linkState.pairsEliminated++;
     linkState.selected = null;
 
-    // 金币奖励 1~3
+    // 金币奖励 0~1
     const goldReward = Math.floor(Math.random() * 2);
     state.gameGold += goldReward;
+
+    // ===== 连连看→餐厅联动产出 =====
+    // 映射表：连连看图案 emoji → 产出物品
+    const LINK_RESTAURANT_LINK = {
+      '🥟': { type: 'fridge', id: 'dumpling' },
+      '🦐': { type: 'fridge', id: 'shrimp' },
+      '🌽': { type: 'fridge', id: 'corn' },
+      '🥑': { type: 'fridge', id: 'avocado' },
+      '🍄': { type: 'fridge', id: 'mushroom' },
+      '🧁': { type: 'fridge', id: 'cake' },
+      '🍡': { type: 'tanghulu', id: 'strawberry' },
+      '🥧': { type: 'fridge', id: 'cake' },
+      '🍎': { type: 'fridge', id: 'apple' },
+      '🍰': { type: 'fridge', id: 'cake' },
+      '🍩': { type: 'fridge', id: 'icecream' },
+      '🍬': { type: 'fridge', id: 'icecream' },
+      '🌙': { type: 'seasoning', id: 'honey' },
+      '🔔': { type: 'seasoning', id: 'salt' },
+      '🔥': { type: 'seasoning', id: 'chili' },
+      '🍀': { type: 'seasoning', id: 'butter' },
+    };
+
+    if (eliminatedEmoji) {
+      const link = LINK_RESTAURANT_LINK[eliminatedEmoji];
+      if (link) {
+        if (link.type === 'fridge') {
+          if (!state.fridgeInventory) state.fridgeInventory = [];
+          const existing = state.fridgeInventory.find(i => i.foodId === link.id);
+          if (existing) existing.count++;
+          else state.fridgeInventory.push({ foodId: link.id, count: 1 });
+        } else if (link.type === 'seasoning') {
+          if (!state.restaurantSeasonings) state.restaurantSeasonings = {};
+          state.restaurantSeasonings[link.id] = (state.restaurantSeasonings[link.id] || 0) + 1;
+        } else if (link.type === 'tanghulu') {
+          if (!state.tanghuluInventory) state.tanghuluInventory = [];
+          const existing = state.tanghuluInventory.find(i => i.fruitKey === link.id);
+          if (existing) existing.count++;
+          else state.tanghuluInventory.push({ fruitKey: link.id, count: 1 });
+        }
+      }
+    }
 
     // 检查胜利
     let remaining = 0;
@@ -11569,6 +11558,13 @@ function refreshCharPreview() {
     { id: 'pumpkin',   name: '南瓜',     emoji: '🎃', w: 2, h: 2, value: 6,  feed: 6  },
     { id: 'leek',      name: '大葱',     emoji: '🌿', w: 1, h: 2, value: 3,  feed: 2  },
     { id: 'ginger',    name: '生姜',     emoji: '🫚', w: 1, h: 1, value: 3,  feed: 2  },
+    // ===== 异形物品（不规则形状）=====
+    { id: 'lshape_meat',  name: 'L形肉排',     emoji: '🥓', w: 2, h: 3, value: 9,  feed: 9,  shape: [[1,0],[1,0],[1,1]] },
+    { id: 'tshape_cheese', name: 'T形芝士块', emoji: '🧀', w: 3, h: 2, value: 10, feed: 10, shape: [[1,1,1],[0,1,0]] },
+    { id: 'zshape_sushi',  name: 'Z形寿司条', emoji: '🍣', w: 3, h: 2, value: 11, feed: 11, shape: [[1,1,0],[0,1,1]] },
+    { id: 'ushape_bread',  name: 'U形法棍',   emoji: '🥖', w: 3, h: 2, value: 10, feed: 10, shape: [[1,0,1],[1,1,1]] },
+    { id: 'cross_cake',    name: '十字蛋糕',   emoji: '🎂', w: 3, h: 3, value: 14, feed: 14, noRotate: true, shape: [[0,1,0],[1,1,1],[0,1,0]] },
+    { id: 'sshape_fish',   name: 'S形鱼排',   emoji: '🐡', w: 2, h: 3, value: 11, feed: 11, shape: [[0,1],[1,1],[1,0]] },
 
   ];
 
@@ -11648,7 +11644,14 @@ function refreshCharPreview() {
         const fallback = medium.filter(f => f.w <= gridCols && f.h <= gridRows);
         if (fallback.length === 0) continue;
         const food = fallback[Math.floor(Math.random() * fallback.length)];
-        basket.push({ instanceId: id++, foodId: food.id, w: food.w, h: food.h, rotated: false });
+        basket.push({
+          instanceId: id++,
+          foodId: food.id,
+          w: food.w,
+          h: food.h,
+          rotated: false,
+          shape: food.shape ? food.shape.map(row => [...row]) : null,
+        });
         totalArea += food.w * food.h;
         continue;
       }
@@ -11660,6 +11663,7 @@ function refreshCharPreview() {
         w: food.w,
         h: food.h,
         rotated: false,
+        shape: food.shape ? food.shape.map(row => [...row]) : null,
       });
       totalArea += food.w * food.h;
     }
@@ -11709,34 +11713,57 @@ function refreshCharPreview() {
     return true;
   }
 
-  // ===== 检查是否可以放置 =====
-  function fridgeCanPlace(row, col, w, h) {
+  // ===== 检查是否可以放置（支持异形）=====
+  function fridgeCanPlace(row, col, w, h, shape) {
     if (row < 0 || col < 0 || row + h > fridgeState.rows || col + w > fridgeState.cols) return false;
-    for (let r = row; r < row + h; r++) {
-      for (let c = col; c < col + w; c++) {
-        if (fridgeState.grid[r][c] !== 0) return false;
+    if (shape) {
+      // 异形物品：按 shape 遮罩逐格检查
+      for (let r = 0; r < shape.length; r++) {
+        for (let c = 0; c < shape[r].length; c++) {
+          if (shape[r][c] === 1) {
+            if (fridgeState.grid[row + r][col + c] !== 0) return false;
+          }
+        }
+      }
+    } else {
+      // 矩形物品：原有逻辑
+      for (let r = row; r < row + h; r++) {
+        for (let c = col; c < col + w; c++) {
+          if (fridgeState.grid[r][c] !== 0) return false;
+        }
       }
     }
     return true;
   }
 
-  // ===== 放置物品 =====
+  // ===== 放置物品（支持异形）=====
   function fridgePlaceItem(instanceId, row, col) {
     const item = fridgeState.basket.find(i => i.instanceId === instanceId);
     if (!item) return false;
 
     const w = item.w;
     const h = item.h;
+    const shape = item.shape || null;
 
-    if (!fridgeCanPlace(row, col, w, h)) {
+    if (!fridgeCanPlace(row, col, w, h, shape)) {
       fridgeShowNotice('放不下！空间不够或有重叠');
       return false;
     }
 
     // 写入网格
-    for (let r = row; r < row + h; r++) {
-      for (let c = col; c < col + w; c++) {
-        fridgeState.grid[r][c] = instanceId;
+    if (shape) {
+      for (let r = 0; r < shape.length; r++) {
+        for (let c = 0; c < shape[r].length; c++) {
+          if (shape[r][c] === 1) {
+            fridgeState.grid[row + r][col + c] = instanceId;
+          }
+        }
+      }
+    } else {
+      for (let r = row; r < row + h; r++) {
+        for (let c = col; c < col + w; c++) {
+          fridgeState.grid[r][c] = instanceId;
+        }
       }
     }
 
@@ -11746,6 +11773,7 @@ function refreshCharPreview() {
       instanceId,
       foodId: item.foodId,
       row, col, w, h,
+      shape: shape || null,
     });
 
     // 更新已放置价值
@@ -11757,7 +11785,7 @@ function refreshCharPreview() {
     return true;
   }
 
-  // ===== 旋转选中物品 =====
+  // ===== 旋转选中物品（支持异形）=====
   function fridgeRotateSelected() {
     if (!fridgeState.selectedItem) {
       fridgeShowNotice('请先选择一个食材');
@@ -11773,13 +11801,47 @@ function refreshCharPreview() {
       return;
     }
 
-    // 正方形不需要旋转
-    if (item.w === item.h) {
+    // 正方形且无异形 shape 不需要旋转
+    if (item.w === item.h && !item.shape) {
       fridgeShowNotice('正方形食材旋转无效果');
       return;
     }
 
-    // 检查旋转后是否还能放进冰箱
+    // 异形物品：旋转 shape 矩阵（顺时针90度）
+    if (item.shape) {
+      const oldShape = item.shape;
+      const oldH = oldShape.length;
+      const oldW = oldShape[0].length;
+      const newShape = [];
+      for (let c = 0; c < oldW; c++) {
+        const newRow = [];
+        for (let r = oldH - 1; r >= 0; r--) {
+          newRow.push(oldShape[r][c]);
+        }
+        newShape.push(newRow);
+      }
+      item.shape = newShape;
+      item.w = newShape[0].length;
+      item.h = newShape.length;
+      item.rotated = !item.rotated;
+
+      // 检查旋转后是否还能放进冰箱
+      if (item.w > fridgeState.cols || item.h > fridgeState.rows) {
+        // 旋转回去
+        item.shape = oldShape;
+        item.w = oldW;
+        item.h = oldH;
+        item.rotated = !item.rotated;
+        fridgeShowNotice('旋转后太大了，放不进冰箱');
+        return;
+      }
+
+      fridgeShowNotice(`🔄 ${foodData?.name || '食材'} 已旋转 → ${item.w}×${item.h}（异形）`);
+      fridgeRender();
+      return;
+    }
+
+    // 普通矩形物品：检查旋转后是否还能放进冰箱
     if (item.h > fridgeState.cols || item.w > fridgeState.rows) {
       fridgeShowNotice('旋转后太大了，放不进冰箱');
       return;
@@ -11902,10 +11964,20 @@ function refreshCharPreview() {
       // 贪心：从上到下、从左到右找第一个能放的位置
       for (let r = 0; r <= fridgeState.rows - item.h && !placed; r++) {
         for (let c = 0; c <= fridgeState.cols - item.w && !placed; c++) {
-          if (fridgeCanPlace(r, c, item.w, item.h)) {
-            for (let rr = r; rr < r + item.h; rr++) {
-              for (let cc = c; cc < c + item.w; cc++) {
-                fridgeState.grid[rr][cc] = item.instanceId;
+          if (fridgeCanPlace(r, c, item.w, item.h, item.shape)) {
+            if (item.shape) {
+              for (let sr = 0; sr < item.shape.length; sr++) {
+                for (let sc = 0; sc < item.shape[sr].length; sc++) {
+                  if (item.shape[sr][sc] === 1) {
+                    fridgeState.grid[r + sr][c + sc] = item.instanceId;
+                  }
+                }
+              }
+            } else {
+              for (let rr = r; rr < r + item.h; rr++) {
+                for (let cc = c; cc < c + item.w; cc++) {
+                  fridgeState.grid[rr][cc] = item.instanceId;
+                }
               }
             }
             newPlaced.push({ ...item, row: r, col: c });
@@ -12087,9 +12159,7 @@ function refreshCharPreview() {
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const occupied = grid[r][c] !== 0;
-        // 如果有选中物品，高亮预览区域
-        let previewClass = '';
-        html += `<div class="sp-fridge-cell ${occupied ? 'sp-fridge-cell-occupied' : ''} ${previewClass}" data-row="${r}" data-col="${c}" style="grid-column:${c + 1};grid-row:${r + 1};"></div>`;
+        html += `<div class="sp-fridge-cell ${occupied ? 'sp-fridge-cell-occupied' : ''}" data-row="${r}" data-col="${c}" style="grid-column:${c + 1};grid-row:${r + 1};"></div>`;
       }
     }
 
@@ -12098,12 +12168,32 @@ function refreshCharPreview() {
       const data = FRIDGE_FOODS.find(f => f.id === item.foodId);
       const emoji = data ? data.emoji : '?';
       const name = data ? data.name : '?';
-      html += `<div class="sp-fridge-placed-item" data-placed-instance="${item.instanceId}" style="grid-column:${item.col + 1}/span ${item.w};grid-row:${item.row + 1}/span ${item.h};" title="${name} (${item.w}×${item.h}) - 点击取出"><span class="sp-fridge-placed-emoji">${emoji}</span><span class="sp-fridge-placed-name">${name}</span></div>`;
+
+      if (item.shape) {
+        // 异形物品：外层容器占据 bounding box 但 pointer-events:none
+        // 内部按 shape 逐格渲染，shape=1 的格子可点击，shape=0 的格子穿透
+        html += `<div style="grid-column:${item.col + 1}/span ${item.w};grid-row:${item.row + 1}/span ${item.h};display:grid;grid-template-columns:repeat(${item.w},1fr);grid-template-rows:repeat(${item.h},1fr);gap:1px;pointer-events:none;background:transparent;border:none;z-index:2;position:relative;" title="${name} (异形) - 点击取出">`;
+        for (let r = 0; r < item.shape.length; r++) {
+          for (let c = 0; c < item.shape[r].length; c++) {
+            if (item.shape[r][c] === 1) {
+              html += `<div class="sp-fridge-placed-cell" data-placed-instance="${item.instanceId}" style="pointer-events:auto;background:rgba(100,180,255,0.15);border:1px solid rgba(100,180,255,0.3);border-radius:3px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background 0.15s,border-color 0.15s;box-sizing:border-box;"></div>`;
+            } else {
+              html += `<div style="pointer-events:none;background:transparent;"></div>`;
+            }
+          }
+        }
+        // emoji 用绝对定位浮在中心，不影响点击穿透
+        html += `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:18px;line-height:1;">${emoji}</div>`;
+        html += `</div>`;
+      } else {
+        // 普通矩形物品：保持原来的渲染方式
+        html += `<div class="sp-fridge-placed-item" data-placed-instance="${item.instanceId}" style="grid-column:${item.col + 1}/span ${item.w};grid-row:${item.row + 1}/span ${item.h};" title="${name} (${item.w}×${item.h}) - 点击取出"><span class="sp-fridge-placed-emoji">${emoji}</span><span class="sp-fridge-placed-name">${name}</span></div>`;
+      }
     });
 
     gridEl.innerHTML = html;
 
-    // 绑定格子点击事件（放置物品）
+    // ===== 绑定背景格子点击事件（放置物品）=====
     gridEl.querySelectorAll('.sp-fridge-cell').forEach(cell => {
       cell.addEventListener('click', () => {
         if (!fridgeState.active || !fridgeState.selectedItem) return;
@@ -12112,14 +12202,28 @@ function refreshCharPreview() {
         const success = fridgePlaceItem(fridgeState.selectedItem, row, col);
         if (success) {
           fridgeRender();
-          // 自动检查是否全部放完
           if (fridgeState.basket.length === 0) {
             fridgeShowNotice('🎉 所有食材都放进去了！点击「关上冰箱门」结算');
           }
         }
       });
-    // 绑定已放置物品点击事件（取出放回购物筐）
-    gridEl.querySelectorAll('.sp-fridge-placed-item').forEach(el => {
+
+      // 鼠标悬停预览
+      cell.addEventListener('mouseenter', () => {
+        if (!fridgeState.active || !fridgeState.selectedItem) return;
+        const item = fridgeState.basket.find(i => i.instanceId === fridgeState.selectedItem);
+        if (!item) return;
+        const row = parseInt(cell.dataset.row);
+        const col = parseInt(cell.dataset.col);
+        fridgeShowPreview(row, col, item.w, item.h, item.shape);
+      });
+      cell.addEventListener('mouseleave', () => {
+        fridgeClearPreview();
+      });
+    });
+
+    // ===== 绑定已放置物品取出事件（统一用 [data-placed-instance] 覆盖普通和异形）=====
+    gridEl.querySelectorAll('[data-placed-instance]').forEach(el => {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         if (!fridgeState.active) return;
@@ -12132,11 +12236,25 @@ function refreshCharPreview() {
         const item = fridgeState.placed[placedIdx];
         const data = FRIDGE_FOODS.find(f => f.id === item.foodId);
 
-        // 从网格中清除
-        for (let r = item.row; r < item.row + item.h; r++) {
-          for (let c = item.col; c < item.col + item.w; c++) {
-            if (r < fridgeState.rows && c < fridgeState.cols) {
-              fridgeState.grid[r][c] = 0;
+        // 从网格中清除（支持异形）
+        if (item.shape) {
+          for (let r = 0; r < item.shape.length; r++) {
+            for (let c = 0; c < item.shape[r].length; c++) {
+              if (item.shape[r][c] === 1) {
+                const gr = item.row + r;
+                const gc = item.col + c;
+                if (gr < fridgeState.rows && gc < fridgeState.cols) {
+                  fridgeState.grid[gr][gc] = 0;
+                }
+              }
+            }
+          }
+        } else {
+          for (let r = item.row; r < item.row + item.h; r++) {
+            for (let c = item.col; c < item.col + item.w; c++) {
+              if (r < fridgeState.rows && c < fridgeState.cols) {
+                fridgeState.grid[r][c] = 0;
+              }
             }
           }
         }
@@ -12144,13 +12262,17 @@ function refreshCharPreview() {
         // 从已放置列表中移除
         fridgeState.placed.splice(placedIdx, 1);
 
-        // 放回购物筐
+        // 放回购物筐（恢复原始 shape）
+        const originalFood = FRIDGE_FOODS.find(f => f.id === item.foodId);
         fridgeState.basket.push({
           instanceId: item.instanceId,
           foodId: item.foodId,
           w: item.w,
           h: item.h,
           rotated: false,
+          shape: item.shape
+            ? item.shape.map(row => [...row])
+            : (originalFood && originalFood.shape ? originalFood.shape.map(row => [...row]) : null),
         });
 
         // 更新已放置价值
@@ -12161,21 +12283,32 @@ function refreshCharPreview() {
         fridgeRender();
       });
     });
-      // 鼠标悬停预览
-      cell.addEventListener('mouseenter', () => {
-        if (!fridgeState.active || !fridgeState.selectedItem) return;
-        const item = fridgeState.basket.find(i => i.instanceId === fridgeState.selectedItem);
-        if (!item) return;
-        const row = parseInt(cell.dataset.row);
-        const col = parseInt(cell.dataset.col);
-        fridgeShowPreview(row, col, item.w, item.h);
-      });
-      cell.addEventListener('mouseleave', () => {
-        fridgeClearPreview();
+
+    // ===== 异形物品 hover 联动高亮（所有同 instanceId 的格子一起变色）=====
+    const seenInstances = new Set();
+    gridEl.querySelectorAll('[data-placed-instance]').forEach(el => {
+      const instanceId = el.dataset.placedInstance;
+      if (seenInstances.has(instanceId)) return;
+      seenInstances.add(instanceId);
+
+      const cells = gridEl.querySelectorAll(`[data-placed-instance="${instanceId}"]`);
+      cells.forEach(cell => {
+        cell.addEventListener('mouseenter', () => {
+          cells.forEach(c => {
+            c.style.background = 'rgba(239,83,80,0.2)';
+            c.style.borderColor = 'rgba(239,83,80,0.6)';
+          });
+        });
+        cell.addEventListener('mouseleave', () => {
+          cells.forEach(c => {
+            c.style.background = 'rgba(100,180,255,0.15)';
+            c.style.borderColor = 'rgba(100,180,255,0.3)';
+          });
+        });
       });
     });
 
-    // 渲染购物筐
+    // ===== 渲染购物筐 =====
     if (basketEl) {
       if (basket.length === 0) {
         basketEl.innerHTML = '<div class="sp-fridge-basket-empty">购物筐已清空！🎉</div>';
@@ -12184,7 +12317,8 @@ function refreshCharPreview() {
           const data = FRIDGE_FOODS.find(f => f.id === item.foodId);
           const isSelected = item.instanceId === selectedItem;
           const noRotateTag = (data && data.noRotate) ? '<span style="font-size:8px;color:#f66;margin-left:2px;">🔒</span>' : '';
-          return `<div class="sp-fridge-basket-item ${isSelected ? 'sp-fridge-basket-selected' : ''}" data-instance="${item.instanceId}"><span class="sp-fridge-basket-emoji">${data?.emoji || '?'}</span><span class="sp-fridge-basket-info"><span class="sp-fridge-basket-name">${data?.name || '?'}${noRotateTag}</span><span class="sp-fridge-basket-size">${item.w}×${item.h}</span></span></div>`;
+          const shapeTag = item.shape ? '<span style="font-size:8px;color:#c87fff;margin-left:2px;">◆异形</span>' : '';
+          return `<div class="sp-fridge-basket-item ${isSelected ? 'sp-fridge-basket-selected' : ''}" data-instance="${item.instanceId}"><span class="sp-fridge-basket-emoji">${data?.emoji || '?'}</span><span class="sp-fridge-basket-info"><span class="sp-fridge-basket-name">${data?.name || '?'}${noRotateTag}${shapeTag}</span><span class="sp-fridge-basket-size">${item.w}×${item.h}${item.shape ? '(异形)' : ''}</span></span></div>`;
         }).join('');
 
         basketEl.querySelectorAll('.sp-fridge-basket-item').forEach(el => {
@@ -12197,7 +12331,7 @@ function refreshCharPreview() {
       }
     }
 
-    // 信息栏
+    // ===== 信息栏 =====
     if (infoEl) {
       const fillPct = fridgeGetFillPercent();
       const valuePct = fridgeState.totalValue > 0 ? Math.round((fridgeState.placedValue / fridgeState.totalValue) * 100) : 0;
@@ -12209,7 +12343,7 @@ function refreshCharPreview() {
       `;
     }
 
-    // 道具按钮状态（显示背包库存 + 本局已用/限额）
+    // ===== 道具按钮状态 =====
     if (!state.fridgePropInventory) state.fridgePropInventory = { compress: 0, backpack: 0, organize: 0 };
     const compressEl = document.getElementById('sp-fridge-compress-count');
     const backpackEl = document.getElementById('sp-fridge-backpack-count');
@@ -12218,34 +12352,50 @@ function refreshCharPreview() {
     if (backpackEl) backpackEl.textContent = `×${state.fridgePropInventory.backpack || 0} (${fridgeState.propsUsed.backpack}/${FRIDGE_PROP_ITEMS.backpack.perGameLimit})`;
     if (organizeEl) organizeEl.textContent = `×${state.fridgePropInventory.organize || 0} (${fridgeState.propsUsed.organize}/${FRIDGE_PROP_ITEMS.organize.perGameLimit})`;
 
-    // 本局道具使用情况提示
     const propsUsedEl = document.getElementById('sp-fridge-props-used');
     if (propsUsedEl) {
-      const totalUsed = fridgeState.propsUsed.compress + fridgeState.propsUsed.backpack + fridgeState.propsUsed.organize;
       propsUsedEl.textContent = `本局已用道具: 压缩${fridgeState.propsUsed.compress}次 跳过${fridgeState.propsUsed.backpack}次 整理${fridgeState.propsUsed.organize}次`;
     }
 
-    // 金币显示
+    // ===== 金币显示 =====
     const goldEl = document.getElementById('sp-fridge-gold');
     if (goldEl) goldEl.textContent = state.gameGold;
 
-    // 控制开始按钮显示/隐藏
+    // ===== 控制开始按钮显示/隐藏 =====
     const startWrapper = document.getElementById('sp-fridge-start-wrapper');
     if (startWrapper) startWrapper.style.display = fridgeState.active ? 'none' : 'flex';
-
   }
 
-  // ===== 预览高亮 =====
-  function fridgeShowPreview(row, col, w, h) {
+  // ===== 预览高亮（支持异形）=====
+  function fridgeShowPreview(row, col, w, h, shape) {
     fridgeClearPreview();
     const gridEl = document.getElementById('sp-fridge-grid');
     if (!gridEl) return;
-    const canPlace = fridgeCanPlace(row, col, w, h);
-    for (let r = row; r < row + h && r < fridgeState.rows; r++) {
-      for (let c = col; c < col + w && c < fridgeState.cols; c++) {
-        const cell = gridEl.querySelector(`.sp-fridge-cell[data-row="${r}"][data-col="${c}"]`);
-        if (cell) {
-          cell.classList.add(canPlace ? 'sp-fridge-preview-ok' : 'sp-fridge-preview-bad');
+
+    const canPlace = fridgeCanPlace(row, col, w, h, shape || null);
+
+    if (shape) {
+      for (let r = 0; r < shape.length; r++) {
+        for (let c = 0; c < shape[r].length; c++) {
+          if (shape[r][c] === 1) {
+            const targetR = row + r;
+            const targetC = col + c;
+            if (targetR < fridgeState.rows && targetC < fridgeState.cols) {
+              const cell = gridEl.querySelector(`.sp-fridge-cell[data-row="${targetR}"][data-col="${targetC}"]`);
+              if (cell) {
+                cell.classList.add(canPlace ? 'sp-fridge-preview-ok' : 'sp-fridge-preview-bad');
+              }
+            }
+          }
+        }
+      }
+    } else {
+      for (let r = row; r < row + h && r < fridgeState.rows; r++) {
+        for (let c = col; c < col + w && c < fridgeState.cols; c++) {
+          const cell = gridEl.querySelector(`.sp-fridge-cell[data-row="${r}"][data-col="${c}"]`);
+          if (cell) {
+            cell.classList.add(canPlace ? 'sp-fridge-preview-ok' : 'sp-fridge-preview-bad');
+          }
         }
       }
     }
@@ -12945,6 +13095,103 @@ function refreshCharPreview() {
     { id: 'dish_ginger_fish',     name: '姜葱蒸鱼',     emoji: '🫚🐟', category: 'dish',
       ingredients: [{ foodId: 'fish', count: 1 }, { foodId: 'ginger', count: 2 }, { foodId: 'leek', count: 1 }], seasonings: [{ id: 'soy', count: 2 }, { id: 'salt', count: 1 }],
       cookTime: 7, sellPrice: 36, feedAmount: 26, energyAmount: 0, reputationRequired: 12 },
+    // --- 使用异形食材的菜品 ---
+    { id: 'dish_lmeat_grill',     name: '炭烤L形肉排',     emoji: '🥓🔥', category: 'dish',
+      ingredients: [{ foodId: 'lshape_meat', count: 1 }], seasonings: [{ id: 'pepper', count: 1 }, { id: 'salt', count: 1 }],
+      cookTime: 6, sellPrice: 32, feedAmount: 22, energyAmount: 0, reputationRequired: 8 },
+    { id: 'dish_tcheese_toast',   name: 'T形芝士焗吐司',   emoji: '🧀🍞', category: 'snack',
+      ingredients: [{ foodId: 'tshape_cheese', count: 1 }, { foodId: 'bread', count: 1 }], seasonings: [{ id: 'butter', count: 1 }],
+      cookTime: 4, sellPrice: 26, feedAmount: 18, energyAmount: 0, reputationRequired: 10 },
+    { id: 'dish_zsushi_platter',  name: 'Z形创意寿司拼',   emoji: '🍣✨', category: 'dish',
+      ingredients: [{ foodId: 'zshape_sushi', count: 1 }, { foodId: 'fish', count: 1 }], seasonings: [{ id: 'soy', count: 2 }, { id: 'wasabi', count: 1 }],
+      cookTime: 7, sellPrice: 42, feedAmount: 28, energyAmount: 0, reputationRequired: 12 },
+    { id: 'dish_ubread_sandwich', name: 'U形法棍三明治',   emoji: '🥖🥬', category: 'snack',
+      ingredients: [{ foodId: 'ushape_bread', count: 1 }, { foodId: 'cheese', count: 1 }], seasonings: [{ id: 'butter', count: 1 }, { id: 'salt', count: 1 }],
+      cookTime: 4, sellPrice: 28, feedAmount: 20, energyAmount: 0, reputationRequired: 10 },
+    { id: 'dish_cross_cake_party', name: '十字庆典蛋糕',   emoji: '🎂🎉', category: 'dish',
+      ingredients: [{ foodId: 'cross_cake', count: 1 }], seasonings: [{ id: 'cream', count: 2 }, { id: 'honey', count: 1 }],
+      cookTime: 10, sellPrice: 55, feedAmount: 35, energyAmount: 5, reputationRequired: 18 },
+    { id: 'dish_sfish_stew',      name: 'S形鱼排炖汤',     emoji: '🐡🫕', category: 'dish',
+      ingredients: [{ foodId: 'sshape_fish', count: 1 }, { foodId: 'potato', count: 2 }], seasonings: [{ id: 'salt', count: 2 }, { id: 'pepper', count: 1 }],
+      cookTime: 8, sellPrice: 38, feedAmount: 26, energyAmount: 0, reputationRequired: 12 },
+    // --- Lv.6 美食殿堂解锁（声望500）---
+    { id: 'dish_truffle_risotto', name: '松露烩饭',       emoji: '🍄🍚', category: 'dish',
+      ingredients: [{ foodId: 'mushroom', count: 3 }, { foodId: 'cheese', count: 1 }], seasonings: [{ id: 'butter', count: 2 }, { id: 'salt', count: 1 }],
+      cookTime: 10, sellPrice: 55, feedAmount: 32, energyAmount: 0, reputationRequired: 35 },
+    { id: 'dish_seafood_pasta',   name: '海鲜意面',       emoji: '🦐🍝', category: 'dish',
+      ingredients: [{ foodId: 'shrimp', count: 2 }, { foodId: 'noodle', count: 1 }], seasonings: [{ id: 'butter', count: 1 }, { id: 'pepper', count: 1 }, { id: 'salt', count: 1 }],
+      cookTime: 8, sellPrice: 48, feedAmount: 28, energyAmount: 0, reputationRequired: 35 },
+    { id: 'dish_honey_chicken',   name: '蜜汁鸡翅',       emoji: '🍗🍯', category: 'dish',
+      ingredients: [{ foodId: 'chicken', count: 1 }], seasonings: [{ id: 'honey', count: 2 }, { id: 'soy', count: 1 }, { id: 'pepper', count: 1 }],
+      cookTime: 7, sellPrice: 42, feedAmount: 26, energyAmount: 0, reputationRequired: 35 },
+    { id: 'drink_matcha_latte',   name: '抹茶拿铁',       emoji: '🍵🥛', category: 'drink',
+      ingredients: [{ foodId: 'milk', count: 1 }], seasonings: [{ id: 'honey', count: 1 }],
+      cookTime: 3, sellPrice: 20, feedAmount: 10, energyAmount: 6, reputationRequired: 35 },
+    { id: 'snack_spring_roll',    name: '酥脆春卷',       emoji: '🥟🔥', category: 'snack',
+      ingredients: [{ foodId: 'cabbage', count: 1 }, { foodId: 'carrot', count: 1 }], seasonings: [{ id: 'vinegar', count: 1 }, { id: 'soy', count: 1 }],
+      cookTime: 4, sellPrice: 24, feedAmount: 16, energyAmount: 0, reputationRequired: 35 },
+
+    // --- Lv.7 皇家御膳房解锁（声望50）---
+    { id: 'dish_royal_steak',     name: '皇家黑松露牛排', emoji: '🥩👑', category: 'dish',
+      ingredients: [{ foodId: 'steak', count: 1 }, { foodId: 'mushroom', count: 2 }], seasonings: [{ id: 'butter', count: 2 }, { id: 'pepper', count: 2 }, { id: 'spice', count: 1 }],
+      cookTime: 12, sellPrice: 85, feedAmount: 45, energyAmount: 0, reputationRequired: 50 },
+    { id: 'dish_dragon_lobster',  name: '龙虾刺身拼盘',   emoji: '🦞🐲', category: 'dish',
+      ingredients: [{ foodId: 'lobster', count: 1 }, { foodId: 'fish', count: 1 }], seasonings: [{ id: 'wasabi', count: 2 }, { id: 'soy', count: 2 }],
+      cookTime: 10, sellPrice: 78, feedAmount: 40, energyAmount: 0, reputationRequired: 50 },
+    { id: 'dish_emperor_hotpot',  name: '帝王鸳鸯锅',     emoji: '🫕👑', category: 'dish',
+      ingredients: [{ foodId: 'pot', count: 1 }, { foodId: 'lobster', count: 1 }, { foodId: 'steak', count: 1 }], seasonings: [{ id: 'chili', count: 2 }, { id: 'spice', count: 2 }, { id: 'sesame', count: 1 }],
+      cookTime: 15, sellPrice: 110, feedAmount: 55, energyAmount: 0, reputationRequired: 50 },
+    { id: 'drink_royal_tea',      name: '御前贡茶',       emoji: '🍵👑', category: 'drink',
+      ingredients: [{ foodId: 'milk', count: 1 }], seasonings: [{ id: 'honey', count: 2 }, { id: 'cream', count: 1 }],
+      cookTime: 4, sellPrice: 28, feedAmount: 14, energyAmount: 8, reputationRequired: 50 },
+    { id: 'snack_foie_gras',      name: '鹅肝酱配面包',   emoji: '🍞✨', category: 'snack',
+      ingredients: [{ foodId: 'bread', count: 1 }], seasonings: [{ id: 'butter', count: 2 }, { id: 'honey', count: 1 }, { id: 'salt', count: 1 }],
+      cookTime: 5, sellPrice: 38, feedAmount: 22, energyAmount: 0, reputationRequired: 50 },
+
+    // --- Lv.8 世界名店解锁（声望70）---
+    { id: 'dish_wagyu_bowl',      name: '和牛寿喜烧盖饭', emoji: '🥩🍚', category: 'dish',
+      ingredients: [{ foodId: 'steak', count: 1 }, { foodId: 'eggs', count: 1 }, { foodId: 'onion', count: 2 }], seasonings: [{ id: 'soy', count: 2 }, { id: 'honey', count: 1 }],
+      cookTime: 10, sellPrice: 72, feedAmount: 42, energyAmount: 0, reputationRequired: 70 },
+    { id: 'dish_bouillabaisse',   name: '马赛鱼汤',       emoji: '🐟🫕', category: 'dish',
+      ingredients: [{ foodId: 'fish', count: 2 }, { foodId: 'shrimp', count: 2 }, { foodId: 'potato', count: 2 }], seasonings: [{ id: 'butter', count: 1 }, { id: 'spice', count: 2 }, { id: 'salt', count: 2 }],
+      cookTime: 12, sellPrice: 88, feedAmount: 48, energyAmount: 0, reputationRequired: 70 },
+    { id: 'dish_peking_duck',     name: '北京烤鸭',       emoji: '🦆🔥', category: 'dish',
+      ingredients: [{ foodId: 'chicken', count: 2 }], seasonings: [{ id: 'honey', count: 2 }, { id: 'spice', count: 2 }, { id: 'vinegar', count: 1 }],
+      cookTime: 14, sellPrice: 95, feedAmount: 50, energyAmount: 0, reputationRequired: 70 },
+    { id: 'drink_champagne',      name: '猫咪香槟',       emoji: '🥂✨', category: 'drink',
+      ingredients: [{ foodId: 'grape', count: 2 }, { foodId: 'juice', count: 1 }], seasonings: [{ id: 'honey', count: 1 }],
+      cookTime: 5, sellPrice: 35, feedAmount: 12, energyAmount: 10, reputationRequired: 70 },
+
+    // --- Lv.9 银河食府解锁（声望100）---
+    { id: 'dish_galaxy_sushi',    name: '银河寿司船',     emoji: '🍣🌌', category: 'dish',
+      ingredients: [{ foodId: 'sushi', count: 1 }, { foodId: 'lobster', count: 1 }, { foodId: 'fish', count: 1 }], seasonings: [{ id: 'wasabi', count: 2 }, { id: 'soy', count: 2 }, { id: 'vinegar', count: 1 }],
+      cookTime: 12, sellPrice: 105, feedAmount: 52, energyAmount: 0, reputationRequired: 100 },
+    { id: 'dish_nebula_stew',     name: '星云炖菜',       emoji: '🌠🫕', category: 'dish',
+      ingredients: [{ foodId: 'pot', count: 1 }, { foodId: 'pumpkin', count: 1 }, { foodId: 'mushroom', count: 3 }], seasonings: [{ id: 'cream', count: 2 }, { id: 'spice', count: 2 }, { id: 'butter', count: 2 }],
+      cookTime: 15, sellPrice: 120, feedAmount: 58, energyAmount: 5, reputationRequired: 100 },
+    { id: 'dish_aurora_salmon',   name: '极光三文鱼',     emoji: '🐟💫', category: 'dish',
+      ingredients: [{ foodId: 'fish', count: 2 }], seasonings: [{ id: 'wasabi', count: 1 }, { id: 'cream', count: 2 }, { id: 'honey', count: 1 }],
+      cookTime: 8, sellPrice: 68, feedAmount: 38, energyAmount: 0, reputationRequired: 100 },
+    { id: 'drink_galaxy_cocktail', name: '银河气泡酒',    emoji: '🍸🌌', category: 'drink',
+      ingredients: [{ foodId: 'juice', count: 1 }, { foodId: 'grape', count: 1 }], seasonings: [{ id: 'honey', count: 2 }],
+      cookTime: 4, sellPrice: 40, feedAmount: 15, energyAmount: 12, reputationRequired: 100 },
+
+    // --- Lv.10 传说·喵神殿解锁（声望140）---
+    { id: 'dish_divine_feast',    name: '神殿圣宴',       emoji: '✨🍽️', category: 'dish',
+      ingredients: [{ foodId: 'turkey', count: 1 }, { foodId: 'lobster', count: 1 }, { foodId: 'steak', count: 1 }], seasonings: [{ id: 'spice', count: 3 }, { id: 'butter', count: 2 }, { id: 'honey', count: 2 }],
+      cookTime: 20, sellPrice: 180, feedAmount: 80, energyAmount: 10, reputationRequired: 140 },
+    { id: 'dish_phoenix_soup',    name: '凤凰浓汤',       emoji: '🔥🫕', category: 'dish',
+      ingredients: [{ foodId: 'chicken', count: 2 }, { foodId: 'mushroom', count: 3 }], seasonings: [{ id: 'spice', count: 3 }, { id: 'cream', count: 2 }, { id: 'salt', count: 2 }],
+      cookTime: 16, sellPrice: 135, feedAmount: 65, energyAmount: 5, reputationRequired: 140 },
+    { id: 'dish_dragon_roll',     name: '龙卷至尊',       emoji: '🐉🍣', category: 'dish',
+      ingredients: [{ foodId: 'zshape_sushi', count: 1 }, { foodId: 'lobster', count: 1 }, { foodId: 'avocado', count: 2 }], seasonings: [{ id: 'wasabi', count: 2 }, { id: 'soy', count: 2 }, { id: 'sesame', count: 2 }],
+      cookTime: 14, sellPrice: 150, feedAmount: 70, energyAmount: 0, reputationRequired: 140 },
+    { id: 'drink_elixir',         name: '传说仙露',       emoji: '💧✨', category: 'drink',
+      ingredients: [{ foodId: 'milk', count: 1 }, { foodId: 'juice', count: 1 }], seasonings: [{ id: 'honey', count: 3 }, { id: 'cream', count: 2 }],
+      cookTime: 6, sellPrice: 55, feedAmount: 25, energyAmount: 20, reputationRequired: 140 },
+    { id: 'snack_golden_toast',   name: '黄金法式吐司',   emoji: '🍞💛', category: 'snack',
+      ingredients: [{ foodId: 'bread', count: 1 }, { foodId: 'eggs', count: 1 }], seasonings: [{ id: 'butter', count: 2 }, { id: 'honey', count: 2 }, { id: 'cream', count: 1 }],
+      cookTime: 6, sellPrice: 45, feedAmount: 28, energyAmount: 0, reputationRequired: 140 },
 
   ];
 
@@ -13006,15 +13253,65 @@ function refreshCharPreview() {
     { id: 'cat_idol',       name: '猫咪偶像',     emoji: '🐱⭐',
       wantsCategory: 'dish', patience: 55, tipMulti: 3.0, reputationGive: 5, reputationRequired: 20,
       dialogue: '低调低调…来份招牌菜。', bonusGold: 20 },
+    // --- 高级客人（声望30解锁）---
+    { id: 'gourmet_critic',  name: '美食评论大师', emoji: '🐱📰',
+      wantsCategory: 'premium', patience: 35, tipMulti: 3.5, reputationGive: 6, reputationRequired: 30,
+      dialogue: '听说这里新出了好菜？让我尝尝！' },
+    { id: 'family_cats',     name: '猫咪一家四口', emoji: '🐱👨‍👩‍👧‍👦',
+      wantsCategory: 'dish', patience: 100, tipMulti: 2.0, reputationGive: 4, reputationRequired: 30,
+      dialogue: '我们一家人想好好吃顿饭～', orderCount: 4 },
+
+    // --- 大师级客人（声望50解锁 → 对应Lv.6~7）---
+    { id: 'foreign_chef',    name: '法国名厨猫',   emoji: '🐱🇫🇷',
+      wantsCategory: 'premium', patience: 40, tipMulti: 4.0, reputationGive: 7, reputationRequired: 50,
+      dialogue: '我来见识一下东方料理的实力！', bonusGold: 25 },
+    { id: 'king_cat',        name: '猫国国王',     emoji: '🐱👑',
+      wantsCategory: 'premium', patience: 50, tipMulti: 5.0, reputationGive: 10, reputationRequired: 50,
+      dialogue: '朕要尝尝你的招牌菜。', bonusGold: 50 },
+    { id: 'ninja_cat',       name: '忍者猫',       emoji: '🐱🥷',
+      wantsCategory: 'dish', patience: 20, tipMulti: 3.0, reputationGive: 5, reputationRequired: 50,
+      dialogue: '快！十秒内上菜！（夸张了）' },
+
+    // --- 传奇级客人（声望80解锁 → 对应Lv.8~9）---
+    { id: 'dragon_cat',      name: '龙裔猫',       emoji: '🐱🐲',
+      wantsCategory: 'premium', patience: 45, tipMulti: 5.0, reputationGive: 12, reputationRequired: 80,
+      dialogue: '本龙饿了，上最好的。', bonusGold: 40 },
+    { id: 'ghost_cat',       name: '幽灵美食家猫', emoji: '🐱👻',
+      wantsCategory: 'any', patience: 200, tipMulti: 4.0, reputationGive: 8, reputationRequired: 80,
+      dialogue: '我在这家店等了一百年…终于开门了…', bonusGold: 30 },
+    { id: 'time_cat',        name: '时间旅行者猫', emoji: '🐱⏰',
+      wantsCategory: 'dish', patience: 30, tipMulti: 4.5, reputationGive: 9, reputationRequired: 80,
+      dialogue: '未来的人都说你这里好吃！' },
+    { id: 'celebrity_cats',  name: '猫界明星团',   emoji: '🐱🌟🌟',
+      wantsCategory: 'dish', patience: 60, tipMulti: 3.5, reputationGive: 8, reputationRequired: 80,
+      dialogue: '我们要包场！来3份拿手菜！', orderCount: 3 },
+
+    // --- 神话级客人（声望120解锁 → 对应Lv.10）---
+    { id: 'god_cat',         name: '猫之神',       emoji: '🐱🔱',
+      wantsCategory: 'premium', patience: 60, tipMulti: 8.0, reputationGive: 20, reputationRequired: 120,
+      dialogue: '吾降临于此，献上你最得意之作。', bonusGold: 100 },
+    { id: 'angel_cat',       name: '天使猫',       emoji: '🐱😇',
+      wantsCategory: 'any', patience: 120, tipMulti: 6.0, reputationGive: 15, reputationRequired: 120,
+      dialogue: '嗯…来份温暖心灵的料理吧♪', bonusGold: 60 },
+    { id: 'demon_cat',       name: '暗黑美食魔猫', emoji: '🐱😈',
+      wantsCategory: 'premium', patience: 25, tipMulti: 7.0, reputationGive: 18, reputationRequired: 120,
+      dialogue: '十秒。否则本魔给差评。', bonusGold: 80 },
+
   ];
 
   // ===== 餐厅等级定义 =====
+  // ===== 餐厅等级定义 =====
   const RESTAURANT_LEVELS = [
-    { level: 1, name: '路边小摊',   reputationRequired: 0,   maxCustomers: 2, emoji: '🏕️' },
-    { level: 2, name: '温馨小店',   reputationRequired: 15,  maxCustomers: 3, emoji: '🏠' },
-    { level: 3, name: '特色餐厅',   reputationRequired: 35,  maxCustomers: 4, emoji: '🏪' },
-    { level: 4, name: '星级餐厅',   reputationRequired: 60,  maxCustomers: 5, emoji: '🏨' },
-    { level: 5, name: '猫界传奇',   reputationRequired: 100, maxCustomers: 6, emoji: '🏰' },
+    { level: 1,  name: '路边小摊',   reputationRequired: 0,    maxCustomers: 2,  emoji: '🏕️' },
+    { level: 2,  name: '温馨小店',   reputationRequired: 30,   maxCustomers: 3,  emoji: '🏠' },
+    { level: 3,  name: '特色餐厅',   reputationRequired: 80,   maxCustomers: 4,  emoji: '🏪' },
+    { level: 4,  name: '星级餐厅',   reputationRequired: 160,  maxCustomers: 5,  emoji: '🏨' },
+    { level: 5,  name: '猫界传奇',   reputationRequired: 300,  maxCustomers: 6,  emoji: '🏰' },
+    { level: 6,  name: '美食殿堂',   reputationRequired: 500,  maxCustomers: 7,  emoji: '🏛️' },
+    { level: 7,  name: '皇家御膳房', reputationRequired: 800,  maxCustomers: 8,  emoji: '👑' },
+    { level: 8,  name: '世界名店',   reputationRequired: 1200, maxCustomers: 9,  emoji: '🌍' },
+    { level: 9,  name: '银河食府',   reputationRequired: 1800, maxCustomers: 10, emoji: '🌌' },
+    { level: 10, name: '传说·喵神殿', reputationRequired: 2500, maxCustomers: 12, emoji: '✨' },
   ];
 
   // ===== 道具定义 =====
@@ -14594,31 +14891,83 @@ function refreshCharPreview() {
     const levelData = restaurantGetLevel();
     const customers = restaurantRuntime.customers;
     const now = Date.now();
+    const maxTables = levelData.maxCustomers;
 
-    // 客人等候区
-    let customersHtml = '';
-    if (customers.length === 0) {
-      customersHtml = '<div style="text-align:center;padding:12px;color:var(--sp-text-muted);font-size:11px;">暂无客人…等待中</div>';
-    } else {
-      customersHtml = customers.map((c, idx) => {
-        const elapsed = Math.floor((now - c.arriveTime) / 1000);
-        const remaining = Math.max(0, c.patience - elapsed);
-        const urgentClass = remaining < 10 ? 'color:#f66;font-weight:700;' : '';
-        const wantText = c.wantsCategory === 'specific' ? `指定：${c.dialogue}` : c.dialogue;
-        return `
-          <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:rgba(255,255,255,0.05);border:1px solid var(--sp-border-light);border-radius:8px;">
-            <span style="font-size:18px;">${c.emoji}</span>
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);">${c.name}</div>
-              <div style="font-size:10px;color:var(--sp-text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${wantText}</div>
-            </div>
-            <span style="font-size:10px;${urgentClass}">⏱️${remaining}s</span>
+    // ===== 桌子网格区 =====
+    let tablesHtml = '';
+    for (let i = 0; i < maxTables; i++) {
+      const customer = customers[i] || null;
+
+      if (!customer) {
+        // 空桌
+        tablesHtml += `
+          <div class="sp-restaurant-table sp-restaurant-table-empty">
+            <span class="sp-restaurant-table-number">#${i + 1}</span>
           </div>
         `;
-      }).join('');
+      } else {
+        // 有客人
+        const elapsed = Math.floor((now - customer.arriveTime) / 1000);
+        const remaining = Math.max(0, customer.patience - elapsed);
+        const isUrgent = remaining < 10;
+        const urgentClass = isUrgent ? ' sp-restaurant-table-urgent' : '';
+        const timerClass = isUrgent ? ' urgent' : '';
+
+        // 客人想要的类型文字
+        const wantMap = {
+          drink: '🧃饮品', snack: '🥗小食', dish: '🍽️菜品',
+          premium: '👑高级菜', dessert: '🍰甜品', any: '🎲随便',
+          specific: '📌指定'
+        };
+        const wantText = wantMap[customer.wantsCategory] || '🍽️菜品';
+
+        // 上菜按钮（只显示出餐台里客人能接受的菜）
+        let serveButtonsHtml = '';
+        const cookedDishes = state.restaurantCookedDishes || [];
+        cookedDishes.forEach(d => {
+          const recipe = RESTAURANT_RECIPES.find(r => r.id === d.recipeId);
+          if (!recipe || d.count <= 0) return;
+          if (!restaurantCustomerAccepts(customer, recipe)) return;
+          serveButtonsHtml += `<button class="sp-restaurant-table-serve-btn" data-customer="${i}" data-recipe="${d.recipeId}" title="${recipe.name}">${recipe.emoji}</button>`;
+        });
+
+        // 甜品按钮（如果客人要甜品或 any）
+        let dessertButtonsHtml = '';
+        if (customer.wantsCategory === 'dessert' || customer.wantsCategory === 'any') {
+          const tangInv = (state.tanghuluInventory || []).filter(inv => inv.count > 0);
+          tangInv.slice(0, 2).forEach(inv => {
+            const data = TANGHULU_FRUITS.find(f => f.key === inv.fruitKey);
+            if (!data) return;
+            dessertButtonsHtml += `<button class="sp-restaurant-table-dessert-btn" data-customer="${i}" data-type="tanghulu" data-key="${inv.fruitKey}" title="${data.name}糖葫芦">${data.emoji}</button>`;
+          });
+          if ((state.tanghuluSugarCrystal || 0) > 0) {
+            dessertButtonsHtml += `<button class="sp-restaurant-table-dessert-btn" data-customer="${i}" data-type="crystal" data-key="crystal" title="糖砂甜品">✨</button>`;
+          }
+          const fridgeDesserts = (state.fridgeInventory || []).filter(inv => (inv.foodId === 'icecream' || inv.foodId === 'cake') && inv.count > 0);
+          fridgeDesserts.forEach(inv => {
+            const data = FRIDGE_FOODS.find(f => f.id === inv.foodId);
+            if (!data) return;
+            dessertButtonsHtml += `<button class="sp-restaurant-table-dessert-btn" data-customer="${i}" data-type="fridge" data-key="${inv.foodId}" title="${data.name}">${data.emoji}</button>`;
+          });
+        }
+
+        const hasActions = serveButtonsHtml || dessertButtonsHtml;
+
+        tablesHtml += `
+          <div class="sp-restaurant-table sp-restaurant-table-occupied${urgentClass}" data-table-idx="${i}">
+            <span class="sp-restaurant-table-number">#${i + 1}</span>
+            <span class="sp-restaurant-table-timer${timerClass}">⏱️${remaining}s</span>
+            <span class="sp-restaurant-table-emoji">${customer.emoji}</span>
+            <span class="sp-restaurant-table-name">${customer.name}</span>
+            <span class="sp-restaurant-table-wants">${wantText}</span>
+            <span class="sp-restaurant-table-dialogue">${customer.dialogue}</span>
+            ${hasActions ? `<div class="sp-restaurant-table-actions">${serveButtonsHtml}${dessertButtonsHtml}</div>` : ''}
+          </div>
+        `;
+      }
     }
 
-    // 烹饪台
+    // ===== 烹饪台 =====
     let cookingHtml = '';
     if (restaurantRuntime.cooking) {
       const recipe = RESTAURANT_RECIPES.find(r => r.id === restaurantRuntime.cooking.recipeId);
@@ -14638,97 +14987,41 @@ function refreshCharPreview() {
           <button id="sp-restaurant-cook-btn" style="width:100%;padding:9px;font-size:12px;font-weight:600;border-radius:6px;border:1px solid var(--sp-primary-border);background:var(--sp-primary);color:#fff;cursor:pointer;">📋 选择食谱并烹饪</button>
         </div>
       `;
-
     }
 
-    // 出餐台
+    // ===== 出餐台 =====
     let dishesHtml = '';
     const cookedDishes = state.restaurantCookedDishes || [];
     if (cookedDishes.length === 0) {
-      dishesHtml = '<div style="text-align:center;padding:10px;color:var(--sp-text-muted);font-size:11px;">出餐台空空如也～</div>';
+      dishesHtml = '<div style="text-align:center;padding:8px;color:var(--sp-text-muted);font-size:11px;">出餐台空空如也～</div>';
     } else {
       dishesHtml = cookedDishes.map(d => {
         const recipe = RESTAURANT_RECIPES.find(r => r.id === d.recipeId);
         if (!recipe) return '';
-
-        // 生成上菜按钮（对每个客人）
-        const serveButtons = customers.map((c, cidx) => {
-          const accepts = restaurantCustomerAccepts(c, recipe);
-          if (!accepts) return '';
-          return `<button class="sp-restaurant-serve-btn" data-customer="${cidx}" data-recipe="${d.recipeId}" style="padding:2px 6px;font-size:9px;border-radius:4px;border:1px solid rgba(100,220,100,0.5);background:rgba(100,220,100,0.15);color:#6f6;cursor:pointer;">🍽️${c.name.slice(0, 3)}</button>`;
-        }).filter(Boolean).join('');
-
         return `
-          <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:rgba(255,255,255,0.04);border:1px solid var(--sp-border-light);border-radius:6px;margin-bottom:4px;flex-wrap:wrap;">
-            <span style="font-size:14px;">${recipe.emoji}</span>
-            <span style="font-size:11px;font-weight:600;color:var(--sp-text-primary);flex:1;">${recipe.name} ×${d.count}</span>
-            <div style="display:flex;gap:3px;flex-wrap:wrap;">
-              ${serveButtons}
-              <button class="sp-restaurant-feed-btn" data-recipe="${d.recipeId}" style="padding:2px 6px;font-size:9px;border-radius:4px;border:1px solid rgba(255,180,50,0.5);background:rgba(255,180,50,0.15);color:#ffb347;cursor:pointer;">🍖喂宠</button>
-            </div>
+          <div style="display:inline-flex;align-items:center;gap:3px;padding:3px 8px;background:rgba(255,255,255,0.06);border:1px solid var(--sp-border-light);border-radius:6px;font-size:11px;">
+            <span>${recipe.emoji}</span>
+            <span style="color:var(--sp-text-primary);">${recipe.name}</span>
+            <span style="color:var(--sp-text-muted);">×${d.count}</span>
+            <button class="sp-restaurant-feed-btn" data-recipe="${d.recipeId}" style="padding:1px 5px;font-size:9px;border-radius:3px;border:1px solid rgba(255,180,50,0.4);background:rgba(255,180,50,0.1);color:#ffb347;cursor:pointer;margin-left:2px;">🍖</button>
           </div>
         `;
-      }).join('');
-    }
-
-    // 甜品/糖葫芦快捷上菜（如果有客人要甜品）
-    let dessertHtml = '';
-    const dessertCustomers = customers.filter(c => c.wantsCategory === 'dessert' || c.wantsCategory === 'any');
-    if (dessertCustomers.length > 0) {
-      const tangInv = (state.tanghuluInventory || []).filter(i => i.count > 0);
-      const fridgeDesserts = (state.fridgeInventory || []).filter(i => {
-        const fd = FRIDGE_FOODS.find(f => f.id === i.foodId);
-        return fd && (i.foodId === 'icecream' || i.foodId === 'cake') && i.count > 0;
-      });
-      const hasCrystal = (state.tanghuluSugarCrystal || 0) > 0;
-
-      if (tangInv.length > 0 || fridgeDesserts.length > 0 || hasCrystal) {
-        let items = '';
-        tangInv.forEach(inv => {
-          const data = TANGHULU_FRUITS.find(f => f.key === inv.fruitKey);
-          if (!data) return;
-          dessertCustomers.forEach((c, relIdx) => {
-            const cidx = customers.indexOf(c);
-            items += `<button class="sp-restaurant-dessert-btn" data-customer="${cidx}" data-type="tanghulu" data-key="${inv.fruitKey}" style="padding:3px 6px;font-size:9px;border-radius:4px;border:1px solid rgba(255,150,200,0.5);background:rgba(255,150,200,0.1);color:#ffb;cursor:pointer;">${data.emoji}→${c.name.slice(0, 2)}</button>`;
-          });
-        });
-        fridgeDesserts.forEach(inv => {
-          const data = FRIDGE_FOODS.find(f => f.id === inv.foodId);
-          if (!data) return;
-          dessertCustomers.forEach((c, relIdx) => {
-            const cidx = customers.indexOf(c);
-            items += `<button class="sp-restaurant-dessert-btn" data-customer="${cidx}" data-type="fridge" data-key="${inv.foodId}" style="padding:3px 6px;font-size:9px;border-radius:4px;border:1px solid rgba(255,150,200,0.5);background:rgba(255,150,200,0.1);color:#ffb;cursor:pointer;">${data.emoji}→${c.name.slice(0, 2)}</button>`;
-          });
-        });
-        if (hasCrystal) {
-          dessertCustomers.forEach((c) => {
-            const cidx = customers.indexOf(c);
-            items += `<button class="sp-restaurant-dessert-btn" data-customer="${cidx}" data-type="crystal" data-key="crystal" style="padding:3px 6px;font-size:9px;border-radius:4px;border:1px solid rgba(255,200,50,0.5);background:rgba(255,200,50,0.1);color:#ffb347;cursor:pointer;">✨→${c.name.slice(0, 2)}</button>`;
-          });
-        }
-        dessertHtml = `
-          <div style="margin-top:6px;padding:6px 8px;background:rgba(255,150,200,0.05);border:1px solid rgba(255,150,200,0.2);border-radius:6px;">
-            <div style="font-size:10px;color:var(--sp-text-muted);margin-bottom:4px;">🍰 甜品/点心快捷上菜：</div>
-            <div style="display:flex;gap:3px;flex-wrap:wrap;">${items}</div>
-          </div>
-        `;
-      }
+      }).join(' ');
     }
 
     container.innerHTML = `
       <div style="margin-bottom:8px;">
-        <div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin-bottom:4px;">👥 等候区 (${customers.length}/${levelData.maxCustomers})</div>
-        <div style="display:flex;flex-direction:column;gap:4px;">${customersHtml}</div>
+        <div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin-bottom:6px;">🪑 餐桌区 (${customers.length}/${maxTables}位客人)</div>
+        <div class="sp-restaurant-tables">${tablesHtml}</div>
       </div>
       ${cookingHtml}
       <div style="margin-top:8px;">
         <div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin-bottom:4px;">🍽️ 出餐台</div>
-        ${dishesHtml}
-        ${dessertHtml}
+        <div style="display:flex;flex-wrap:wrap;gap:4px;">${dishesHtml}</div>
       </div>
     `;
 
-    // 绑定事件
+    // ===== 绑定事件 =====
     const cookBtn = document.getElementById('sp-restaurant-cook-btn');
     if (cookBtn) {
       cookBtn.onclick = () => {
@@ -14736,31 +15029,33 @@ function refreshCharPreview() {
       };
     }
 
-
-    // 上菜给客人按钮
-    container.querySelectorAll('.sp-restaurant-serve-btn').forEach(btn => {
-      btn.onclick = () => {
+    // 上菜按钮
+    container.querySelectorAll('.sp-restaurant-table-serve-btn').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
         const customerIdx = parseInt(btn.dataset.customer);
         const recipeId = btn.dataset.recipe;
         restaurantServeCustomer(customerIdx, recipeId);
       };
     });
 
-    // 喂桌宠按钮
-    container.querySelectorAll('.sp-restaurant-feed-btn').forEach(btn => {
-      btn.onclick = () => {
-        const recipeId = btn.dataset.recipe;
-        restaurantFeedPet(recipeId);
-      };
-    });
-
-    // 甜品上菜按钮
-    container.querySelectorAll('.sp-restaurant-dessert-btn').forEach(btn => {
-      btn.onclick = () => {
+    // 甜品按钮
+    container.querySelectorAll('.sp-restaurant-table-dessert-btn').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
         const customerIdx = parseInt(btn.dataset.customer);
         const type = btn.dataset.type;
         const key = btn.dataset.key;
         restaurantServeDessert(customerIdx, type, key);
+      };
+    });
+
+    // 喂桌宠按钮
+    container.querySelectorAll('.sp-restaurant-feed-btn').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const recipeId = btn.dataset.recipe;
+        restaurantFeedPet(recipeId);
       };
     });
   }
@@ -15120,6 +15415,29 @@ function refreshCharPreview() {
     });
     html += `</div>`;
 
+    // --- 客人图鉴 ---
+    html += `<div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:6px;">😺 客人图鉴</div>`;
+    html += `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:14px;">`;
+    RESTAURANT_CUSTOMERS.forEach(c => {
+      const key = `restaurant_customer_${c.id}`;
+      const custom = state.gameCustomImages[key];
+      const unlocked = state.restaurantReputation >= c.reputationRequired;
+      const display = unlocked
+        ? (custom
+          ? `<img src="${custom}" style="width:28px;height:28px;object-fit:contain;border-radius:50%;" />`
+          : `<span style="font-size:20px;">${c.emoji}</span>`)
+        : '<span style="font-size:16px;color:var(--sp-text-muted);">🔒</span>';
+      html += `
+        <div style="border-radius:8px;border:1px solid ${unlocked ? 'rgba(255,180,100,0.2)' : 'rgba(255,255,255,0.05)'};background:${unlocked ? 'rgba(255,180,100,0.04)' : 'rgba(0,0,0,0.05)'};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:8px 4px;position:relative;cursor:pointer;overflow:hidden;opacity:${unlocked ? '1' : '0.4'};" data-ratlas-key="${key}" data-ratlas-name="${c.name}">
+          ${display}
+          <span style="font-size:8px;color:var(--sp-text-muted);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90%;">${unlocked ? c.name : '???'}</span>
+          ${unlocked ? `<span style="font-size:7px;color:var(--sp-text-muted);">⭐+${c.reputationGive} | 💰×${c.tipMulti}</span>` : `<span style="font-size:7px;color:#f66;">声望${c.reputationRequired}</span>`}
+          ${unlocked ? `<div class="sp-ratlas-upload" data-key="${key}" data-name="${c.name}" style="position:absolute;top:2px;right:2px;width:14px;height:14px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;font-size:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity 0.2s;">📷</div>` : ''}
+        </div>
+      `;
+    });
+    html += `</div>`;
+
     html += `<div style="font-size:10px;color:var(--sp-text-muted);text-align:center;margin-top:6px;">💡 hover 显示上传按钮，⭐推荐使用图片链接节省存储空间</div>`;
 
     container.innerHTML = html;
@@ -15414,6 +15732,11 @@ function refreshCharPreview() {
     document.getElementById('sp-restaurant-recipe-modal-overlay')?.remove();
 
     const recipes = restaurantGetUnlockedRecipes();
+    recipes.sort((a, b) => {
+      const canA = restaurantCheckIngredients(a) ? 0 : 1;
+      const canB = restaurantCheckIngredients(b) ? 0 : 1;
+      return canA - canB;
+    });
 
     const overlay = document.createElement('div');
     overlay.id = 'sp-restaurant-recipe-modal-overlay';
