@@ -154,6 +154,8 @@
 .sp-menu-btn:nth-child(4) { animation-delay: 0.9s; }
 .sp-menu-btn:nth-child(5) { animation-delay: 1.2s; }
 .sp-menu-btn:nth-child(6) { animation-delay: 1.5s; }
+.sp-menu-btn:nth-child(7) { animation-delay: 1.8s; }
+.sp-menu-btn:nth-child(8) { animation-delay: 2.1s; }
 
 #silly-pet-menu.visible .sp-menu-btn {
   opacity: 1;
@@ -231,6 +233,10 @@
 
 .sp-menu-btn[data-action="settings"] {
   transition-delay: 0.3s;
+}
+
+.sp-menu-btn[data-action="house"] {
+  transition-delay: 0.35s;
 }
 
 /* 移动端适配 */
@@ -2922,10 +2928,6 @@
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.2) transparent;
-}
-
-.sp-game-selector-card[data-game="inventory"] {
-  grid-column: 1 / -1;
 }
 
 .sp-game-selector-card {
@@ -6573,5 +6575,362 @@
 
   .sp-restaurant-table-dialogue {
     font-size: 8px;
+  }
+}
+
+/* ===== 成就弹窗修复 ===== */
+#sp-achievements-overlay .sp-total-inv-body {
+  max-height: 60vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,200,50,0.3) transparent;
+}
+
+#sp-achievements-overlay .sp-total-inv-body::-webkit-scrollbar {
+  width: 5px;
+}
+
+#sp-achievements-overlay .sp-total-inv-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#sp-achievements-overlay .sp-total-inv-body::-webkit-scrollbar-thumb {
+  background: rgba(255,200,50,0.3);
+  border-radius: 3px;
+}
+
+#sp-achievements-overlay .sp-total-inv-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,200,50,0.5);
+}
+
+#sp-achievements-overlay details {
+  margin-bottom: 8px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+#sp-achievements-overlay details[open] {
+  border-color: rgba(255,200,50,0.3);
+}
+
+#sp-achievements-overlay details summary {
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: rgba(255,255,255,0.04);
+  color: var(--sp-text-primary);
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  user-select: none;
+  flex-shrink: 0;
+  min-height: 36px;
+}
+
+#sp-achievements-overlay details summary::-webkit-details-marker {
+  display: none;
+}
+
+#sp-achievements-overlay details > div {
+  padding: 6px 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,200,50,0.3) transparent;
+}
+
+#sp-achievements-overlay details > div::-webkit-scrollbar {
+  width: 4px;
+}
+
+#sp-achievements-overlay details > div::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#sp-achievements-overlay details > div::-webkit-scrollbar-thumb {
+  background: rgba(255,200,50,0.3);
+  border-radius: 2px;
+}
+
+#sp-achievements-overlay details > div::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,200,50,0.5);
+}
+
+/* ============================================================ */
+/* 🏠 桌宠小屋样式                                              */
+/* ============================================================ */
+
+#silly-pet-house {
+  position: fixed;
+  width: 360px;
+  max-width: 95vw;
+  background: var(--sp-bg-main);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--sp-border);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  display: none;
+  flex-direction: column;
+  z-index: 2147483646;
+  overflow: hidden;
+}
+
+#silly-pet-house.visible {
+  display: flex;
+}
+
+#silly-pet-house.sp-house-minimized #sp-house-scene {
+  display: none;
+}
+
+#silly-pet-house.sp-house-minimized #sp-house-header {
+  border-bottom: none;
+  border-radius: 16px;
+}
+
+#sp-house-header {
+  padding: 10px 14px;
+  background: var(--sp-bg-light);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sp-text-primary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  cursor: grab;
+  flex-shrink: 0;
+}
+
+#sp-house-header:active {
+  cursor: grabbing;
+}
+
+/* 场景区域（2:3 竖向比例） */
+#sp-house-scene {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  background: #111;
+}
+
+/* 房间背景层 */
+#sp-house-bg-layer {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: 1;
+}
+
+/* 人物立绘层 */
+#sp-house-char-layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 2;
+  pointer-events: none;
+  padding-bottom: 35%;
+}
+
+#sp-house-char-layer img {
+  max-width: 70%;
+  max-height: 75%;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 16px rgba(0,0,0,0.5));
+  transition: opacity 0.3s ease;
+}
+
+/* 底部大面积毛玻璃对话覆盖层 */
+#sp-house-dialogue-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  background: rgba(10,10,20,0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding: 14px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 35%;
+}
+
+/* 对话框 */
+#sp-house-dialogue-box {
+  flex: 1;
+  min-height: 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+
+#sp-house-dialogue-text {
+  font-size: 14px;
+  line-height: 1.7;
+  color: rgba(255,255,255,0.88);
+  word-break: break-word;
+  min-height: 24px;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+
+
+#sp-house-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+#sp-house-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+#sp-house-name-text {
+  line-height: 1;
+}
+
+/* 输入区域 */
+#sp-house-input-area {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+#sp-house-input-field {
+  flex: 1;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #fff;
+  border-radius: 20px;
+  padding: 9px 14px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+#sp-house-input-field:focus {
+  border-color: rgba(100,180,255,0.5);
+  background: rgba(255,255,255,0.12);
+}
+
+#sp-house-input-field::placeholder {
+  color: rgba(255,255,255,0.4);
+}
+
+#sp-house-send-btn {
+  background: var(--sp-primary);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+  cursor: pointer;
+  font-size: 16px;
+  flex-shrink: 0;
+  transition: background 0.2s, transform 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#sp-house-send-btn:hover {
+  background: var(--sp-primary-hover);
+  transform: scale(1.05);
+}
+
+#sp-house-send-btn:active {
+  transform: scale(0.95);
+}
+
+/* 打字机光标闪烁效果 */
+#sp-house-dialogue-text::after {
+  content: '▎';
+  animation: sp-house-cursor-blink 1s step-end infinite;
+  color: rgba(255,255,255,0.6);
+  font-weight: 300;
+}
+
+@keyframes sp-house-cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* 打字完成后隐藏光标（通过JS添加class） */
+#sp-house-dialogue-text.sp-house-typing-done::after {
+  display: none;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  #silly-pet-house {
+    width: calc(100vw - 16px);
+    max-width: 360px;
+  }
+
+  #sp-house-scene {
+    aspect-ratio: 2 / 3;
+  }
+
+  #sp-house-dialogue-overlay {
+    padding: 10px 12px 10px;
+    min-height: 30%;
+  }
+
+  #sp-house-dialogue-text {
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  #sp-house-input-field {
+    padding: 7px 12px;
+    font-size: 12px;
+  }
+
+  #sp-house-send-btn {
+    width: 34px;
+    height: 34px;
+    font-size: 14px;
+  }
+
+  #sp-house-char-layer {
+    padding-bottom: 30%;
+  }
+}
+
+@media (max-width: 480px) {
+  #sp-house-dialogue-overlay {
+    min-height: 28%;
+    padding: 8px 10px;
+  }
+
+  #sp-house-dialogue-text {
+    font-size: 12px;
+  }
+
+  #sp-house-char-layer img {
+    max-width: 65%;
+    max-height: 70%;
   }
 }

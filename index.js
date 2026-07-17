@@ -239,7 +239,18 @@
     foodImage: '',
     bathImage: '',
     bedImage: '', 
-
+    // 桌宠小屋
+    houseBackground: '',         // 房间背景图（2:3）
+    houseCharacter: '',          // 默认人物立绘
+    houseExpressions: [],        // [{keywords: '笑,开心,哈哈', image: 'base64...', name: '笑'}]
+    houseCharacterAvatar: '',   // 小屋对话框角色头像
+    houseActionFeed: '',           // 小屋喂食动作立绘
+    houseActionBath: '',           // 小屋洗澡动作立绘
+    houseActionSleep: '',          // 小屋睡觉动作立绘
+    houseButtonFeed: '',           // 小屋喂食按钮图标
+    houseButtonBath: '',           // 小屋洗澡按钮图标
+    houseButtonSleep: '',          // 小屋睡觉按钮图标
+    
     spriteHangLeft: '',       // 挂在左边缘
     spriteHangRight: '',      // 挂在右边缘
     spriteHangTop: '',        // 挂在顶部
@@ -274,6 +285,7 @@
      chat: '',
      diary: '',
      game: '',
+     house: '',
      settings: ''
    },
 
@@ -366,6 +378,10 @@
     restaurantCookedDishes: [],      // [{recipeId, count}]
     restaurantSeasonings: {},        // {salt: 5, pepper: 2, ...}
     restaurantServedCount: 0,
+    // ===== 成就系统 =====
+    achievements: [],             // 已解锁的成就ID列表
+    achievementNotified: [],      // 已弹窗通知过的成就ID（防重复弹窗）
+
   };
 
   // ============================================================
@@ -380,6 +396,7 @@
   let isDragging = false;
   let dragOffset = { x: 0, y: 0 };
   let isMenuOpen = false;
+  let isHouseOpen = false;
   let isChatOpen = false;
   let petUnsummarizedCount = 0;
   let saveDebounceTimer = null;
@@ -504,6 +521,9 @@
     } else {
       hidePet();
     }
+
+    // 启动时检查一次成就
+    setTimeout(() => checkAchievements(), 3000);
 
     console.log(`[${PLUGIN_NAME}] 初始化完成，启用状态: ${settings.enabled}`);
   }
@@ -833,6 +853,7 @@
         { action: 'chat', emoji: '💬', title: '聊天' },
         { action: 'diary', emoji: '📔', title: '日记' },
         { action: 'game', emoji: '🎮', title: '合成游戏' },
+        { action: 'house', emoji: '🏠', title: '桌宠小屋' },
         { action: 'settings', emoji: '⚙️', title: '设置' }
       ];
   
@@ -1724,7 +1745,7 @@ function feedPet() {
       setSpriteWithLock('eat', actionSprite, dur);
     }
     showBubble(settings.reactions.feed, 3000);
-    updateMood(); updateStatusBars(); saveData();
+    updateMood(); updateStatusBars(); saveData();checkAchievements();
   });
 }
 
@@ -1741,7 +1762,7 @@ function bathPet() {
       setSpriteWithLock('bath', settings.spriteBath, dur);
     }
     showBubble(settings.reactions.bath, 3000);
-    updateMood(); updateStatusBars(); saveData();
+    updateMood(); updateStatusBars(); saveData();checkAchievements();
   });
 }
 
@@ -1758,7 +1779,7 @@ function sleepPet() {
       setSpriteWithLock('sleep', settings.spriteSleep, dur);
     }
     showBubble(settings.reactions.sleep, 4000);
-    updateMood(); updateStatusBars(); saveData();
+    updateMood(); updateStatusBars(); saveData();checkAchievements();
   });
 }
 
@@ -1899,7 +1920,6 @@ function showInventoryPopup(category, quickKey, onUse) {
           </div>
         `;
       }
-    }
 
       // 追加餐厅出餐台菜品到投喂列表
       const cookedDishes = (state.restaurantCookedDishes || []).filter(d => d.count > 0);
@@ -1919,6 +1939,9 @@ function showInventoryPopup(category, quickKey, onUse) {
           </div>
         `;
       });
+    }
+
+
 
     overlay.innerHTML = `
       <div class="sp-inv-popup-box">
@@ -2165,6 +2188,20 @@ function showInventoryPopup(category, quickKey, onUse) {
     toggleMenu();
   }
 
+   function handleMenuAction(action) {
+    switch (action) {
+      case 'feed': feedPet(); break;
+      case 'bath': bathPet(); break;
+      case 'sleep': sleepPet(); break;
+      case 'chat': toggleChat(); break;
+      case 'diary': toggleDiary(); break;
+      case 'game': showGameSelector(); break;
+      case 'house': toggleHouse(); break;
+      case 'settings': toggleSettings(); break;
+    }
+    toggleMenu();
+  }
+
   // ============================================================
   // 游戏选择弹窗
   // ============================================================
@@ -2248,6 +2285,13 @@ function showInventoryPopup(category, quickKey, onUse) {
               <div class="sp-game-selector-desc">查看所有道具、体力和物资</div>
             </div>
           </div>
+          <div class="sp-game-selector-card" data-game="achievements">
+            <div class="sp-game-selector-icon">🏆</div>
+            <div class="sp-game-selector-info">
+              <div class="sp-game-selector-name">成就</div>
+              <div class="sp-game-selector-desc">查看已解锁的成就和进度</div>
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -2299,6 +2343,8 @@ function showInventoryPopup(category, quickKey, onUse) {
           toggleShelfGame();
         } else if (game === 'inventory') {
           showTotalInventory();
+        } else if (game === 'achievements') {
+          showAchievementsPanel();
         }
       };
     });
@@ -3266,6 +3312,7 @@ function toggleChat() {
         renderChatHistory();
         showBubble(reply.slice(0, 50) + (reply.length > 50 ? '…' : ''), 4000);
         saveData();
+        checkAchievements();
       petUnsummarizedCount++;
       if (settings.summaryTrigger === 'auto' && settings.autoSummaryRounds > 0 && petUnsummarizedCount >= settings.autoSummaryRounds) {
         showBubble('💭 记忆有点满了，帮我整理一下？', 5000);
@@ -3990,6 +4037,298 @@ async function refreshWorldPreview() {
     }
   }
 
+  // ============================================================
+  // 桌宠小屋
+  // ============================================================
+  function toggleHouse() {
+    const houseEl = document.getElementById('silly-pet-house');
+    if (!houseEl) {
+      renderHousePanel();
+    }
+    const panel = document.getElementById('silly-pet-house');
+    if (!panel) return;
+    isHouseOpen = !isHouseOpen;
+    panel.classList.toggle('visible', isHouseOpen);
+    if (isHouseOpen) {
+      const w = Math.min(400, window.innerWidth - 20);
+      panel.style.width = w + 'px';
+      requestAnimationFrame(() => {
+        const h = panel.offsetHeight;
+        const maxTop = window.innerHeight - h - 20;
+        const centerTop = Math.floor((window.innerHeight - h) / 2);
+        panel.style.left = Math.floor((window.innerWidth - w) / 2) + 'px';
+        panel.style.top = Math.max(10, Math.min(centerTop, maxTop)) + 'px';
+      });
+      // 打开时渲染聊天记录
+      renderHouseChatHistory();
+    }
+  }
+
+  // ============================================================
+  // 小屋表情关键词匹配
+  // ============================================================
+  function matchHouseExpression(text) {
+    if (!settings.houseExpressions || settings.houseExpressions.length === 0) return null;
+    if (!text) return null;
+
+    const lowerText = text.toLowerCase();
+
+    // 遍历所有表情，按配置顺序，返回第一个匹配的
+    for (const expr of settings.houseExpressions) {
+      if (!expr.keywords || !expr.image) continue;
+      const keywords = expr.keywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+      for (const kw of keywords) {
+        if (lowerText.includes(kw)) {
+          return expr;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  function renderHousePanel() {
+    document.getElementById('silly-pet-house')?.remove();
+
+    const house = document.createElement('div');
+    house.id = 'silly-pet-house';
+    house.style.zIndex = '2147483646';
+    house.innerHTML = `
+      <div id="sp-house-header">
+        <span>🏠 ${settings.petName || '咪噗'}的小屋</span>
+        <div style="display:flex;gap:6px;">
+          <button id="sp-house-minimize" style="background:none;border:none;font-size:14px;cursor:pointer;color:#aaa;" title="缩小悬挂">─</button>
+          <button id="sp-house-close" style="background:none;border:none;font-size:16px;cursor:pointer;color:#aaa;" title="关闭">✕</button>
+        </div>
+      </div>
+      <div id="sp-house-scene">
+        <div id="sp-house-bg-layer"></div>
+        <div id="sp-house-char-layer"></div>
+        <div id="sp-house-actions" style="position:absolute;top:10px;right:10px;z-index:4;display:flex;flex-direction:column;gap:6px;">
+          <button id="sp-house-feed-btn" style="width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.4);backdrop-filter:blur(4px);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;overflow:hidden;padding:0;" title="喂食">${settings.houseButtonFeed ? `<img src="${settings.houseButtonFeed}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '🍖'}</button>
+          <button id="sp-house-bath-btn" style="width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.4);backdrop-filter:blur(4px);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;overflow:hidden;padding:0;" title="洗澡">${settings.houseButtonBath ? `<img src="${settings.houseButtonBath}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '🛁'}</button>
+          <button id="sp-house-sleep-btn" style="width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.4);backdrop-filter:blur(4px);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;overflow:hidden;padding:0;" title="睡觉">${settings.houseButtonSleep ? `<img src="${settings.houseButtonSleep}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '🛏️'}</button>
+        </div>
+        <div id="sp-house-dialogue-overlay">
+          <div id="sp-house-dialogue-box">
+            <div id="sp-house-char-name"><span id="sp-house-avatar"></span><span id="sp-house-name-text">${settings.petName || '咪噗'}</span></div>
+            <div id="sp-house-dialogue-text"></div>
+          </div>
+          <div id="sp-house-input-area">
+            <input type="text" id="sp-house-input-field" placeholder="请输入你想对${settings.petName || '他'}说的话..." />
+            <button id="sp-house-send-btn" title="发送">➤</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(house);
+
+    // 绑定事件
+    document.getElementById('sp-house-close').onclick = () => toggleHouse();
+    document.getElementById('sp-house-feed-btn').onclick = () => {
+      if (settings.houseActionFeed) {
+        const charLayer = document.getElementById('sp-house-char-layer');
+        if (charLayer) charLayer.innerHTML = `<img src="${settings.houseActionFeed}" alt="喂食" />`;
+        setTimeout(() => updateHouseScene(), 3000);
+      }
+      feedPet();
+    };
+    document.getElementById('sp-house-bath-btn').onclick = () => {
+      if (settings.houseActionBath) {
+        const charLayer = document.getElementById('sp-house-char-layer');
+        if (charLayer) charLayer.innerHTML = `<img src="${settings.houseActionBath}" alt="洗澡" />`;
+        setTimeout(() => updateHouseScene(), 3000);
+      }
+      bathPet();
+    };
+    document.getElementById('sp-house-sleep-btn').onclick = () => {
+      if (settings.houseActionSleep) {
+        const charLayer = document.getElementById('sp-house-char-layer');
+        if (charLayer) charLayer.innerHTML = `<img src="${settings.houseActionSleep}" alt="睡觉" />`;
+        setTimeout(() => updateHouseScene(), 5000);
+      }
+      sleepPet();
+    };
+    document.getElementById('sp-house-minimize').onclick = () => {
+      const panel = document.getElementById('silly-pet-house');
+      if (!panel) return;
+      panel.classList.toggle('sp-house-minimized');
+      const minBtn = document.getElementById('sp-house-minimize');
+      if (minBtn) minBtn.textContent = panel.classList.contains('sp-house-minimized') ? '□' : '─';
+    };
+
+    document.getElementById('sp-house-send-btn').onclick = () => {
+      const input = document.getElementById('sp-house-input-field');
+      const text = input?.value?.trim();
+      if (!text) return;
+      input.value = '';
+      sendHouseMessage(text);
+    };
+
+    document.getElementById('sp-house-input-field').onkeydown = (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        document.getElementById('sp-house-send-btn').click();
+      }
+    };
+
+    updateHouseScene();
+    bindHouseDrag();
+  }
+
+  function updateHouseScene() {
+    const bgLayer = document.getElementById('sp-house-bg-layer');
+    const charLayer = document.getElementById('sp-house-char-layer');
+    if (bgLayer) {
+      if (settings.houseBackground) {
+        bgLayer.style.backgroundImage = `url(${settings.houseBackground})`;
+      } else {
+        bgLayer.style.backgroundImage = 'none';
+      }
+    }
+    if (charLayer) {
+      if (settings.houseCharacter) {
+        charLayer.innerHTML = `<img src="${settings.houseCharacter}" alt="立绘" />`;
+      } else {
+        charLayer.innerHTML = `<span style="font-size:64px;">🐱</span>`;
+      }
+    }
+
+    const avatarEl = document.getElementById('sp-house-avatar');
+    if (avatarEl) {
+      if (settings.houseCharacterAvatar) {
+        avatarEl.innerHTML = `<img src="${settings.houseCharacterAvatar}" alt="头像" />`;
+      } else {
+        avatarEl.textContent = '🗣️';
+      }
+    }
+
+  }
+
+  function renderHouseChatHistory() {
+    const lastReply = [...state.petChatHistory].reverse().find(m => m.role === 'assistant');
+    const dialogueText = document.getElementById('sp-house-dialogue-text');
+    if (!dialogueText) return;
+
+    if (lastReply) {
+      // 尝试匹配表情
+      const matched = matchHouseExpression(lastReply.content);
+      const charLayer = document.getElementById('sp-house-char-layer');
+      if (charLayer) {
+        if (matched && matched.image) {
+          charLayer.innerHTML = `<img src="${matched.image}" alt="${matched.name || ''}" />`;
+        } else if (settings.houseCharacter) {
+          charLayer.innerHTML = `<img src="${settings.houseCharacter}" alt="立绘" />`;
+        }
+      }
+      typewriterEffect(dialogueText, lastReply.content);
+    } else {
+      dialogueText.textContent = '主人来看我啦～有什么想说的吗？';
+    }
+  }
+
+
+  function typewriterEffect(element, text) {
+    element.textContent = '';
+    let idx = 0;
+    const interval = setInterval(() => {
+      if (idx < text.length) {
+        element.textContent += text[idx];
+        idx++;
+      } else {
+        clearInterval(interval);
+      }
+    }, 50);
+  }
+
+  async function sendHouseMessage(text) {
+    state.petChatHistory.push({ role: 'user', content: text, timestamp: Date.now() });
+    saveData();
+
+    // 显示思考中
+    const dialogueText = document.getElementById('sp-house-dialogue-text');
+    if (dialogueText) {
+      dialogueText.textContent = '';
+      dialogueText.innerHTML = '<span class="sp-thinking-dots">●●●</span>';
+    }
+
+    if (settings.spriteThink) setSpriteWithLock('think', settings.spriteThink, null);
+
+    // 临时开启线下模式让提示词注入 offlinePrompt
+    const prevOffline = isOfflineMode;
+    isOfflineMode = true;
+    const reply = await callPetAPI('chat', text);
+    isOfflineMode = prevOffline;
+
+    if (spriteStateLock === 'think') clearSpriteLock();
+
+    if (reply) {
+      state.petChatHistory.push({ role: 'assistant', content: reply, timestamp: Date.now() });
+      saveData();
+
+      // 关键词匹配切换立绘
+      const matched = matchHouseExpression(reply);
+      const charLayer = document.getElementById('sp-house-char-layer');
+      if (charLayer) {
+        if (matched && matched.image) {
+          charLayer.innerHTML = `<img src="${matched.image}" alt="${matched.name || ''}" />`;
+        } else if (settings.houseCharacter) {
+          charLayer.innerHTML = `<img src="${settings.houseCharacter}" alt="立绘" />`;
+        }
+      }
+
+      // 打字机效果
+      if (dialogueText) {
+        typewriterEffect(dialogueText, reply);
+      }
+
+      showBubble(reply.slice(0, 50) + (reply.length > 50 ? '…' : ''), 4000);
+    } else {
+      if (dialogueText) {
+        dialogueText.innerHTML = '';
+        dialogueText.textContent = '呜…没听到回应…检查一下API？';
+      }
+    }
+  }
+
+  function bindHouseDrag() {
+    const header = document.getElementById('sp-house-header');
+    const panel = document.getElementById('silly-pet-house');
+    if (!header || !panel) return;
+
+    let dragging = false, offX = 0, offY = 0;
+
+    const down = (e) => {
+      if (e.target.closest('#sp-house-close') || e.target.closest('#sp-house-minimize')) return;
+      dragging = true;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const rect = panel.getBoundingClientRect();
+      offX = clientX - rect.left;
+      offY = clientY - rect.top;
+    };
+    const move = (e) => {
+      if (!dragging) return;
+      if (e.cancelable) e.preventDefault();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      let x = clientX - offX;
+      let y = clientY - offY;
+      x = Math.max(0, Math.min(window.innerWidth - panel.offsetWidth, x));
+      y = Math.max(0, Math.min(window.innerHeight - panel.offsetHeight, y));
+      panel.style.left = x + 'px';
+      panel.style.top = y + 'px';
+    };
+    const up = () => { dragging = false; };
+
+    header.addEventListener('mousedown', down);
+    header.addEventListener('touchstart', down, { passive: true });
+    document.addEventListener('mousemove', move);
+    document.addEventListener('touchmove', move, { passive: false });
+    document.addEventListener('mouseup', up);
+    document.addEventListener('touchend', up);
+  }
+
   function populateDiaryRanges() {
     const memFrom = document.getElementById('sp-diary-mem-from');
     const memTo = document.getElementById('sp-diary-mem-to');
@@ -4384,6 +4723,7 @@ async function refreshWorldPreview() {
       }
 
       saveData();
+      checkAchievements();
       diarySelectedDate = dateStr;
       renderDiaryCalendar();
       renderDiaryContent();
@@ -4928,6 +5268,22 @@ async function refreshWorldPreview() {
                 <option value="2d" ${settings.displayMode === '2d' ? 'selected' : ''}>2D 精灵图</option>
                 <option value="3d" ${settings.displayMode === '3d' ? 'selected' : ''}>3D (Live2D)</option>
               </select>
+            </div>
+            <div class="sp-section">
+              <div class="sp-section-title">🏠 桌宠小屋</div>
+              <p style="font-size:11px;color:#999;margin-bottom:8px;">上传房间背景（推荐2:3竖向比例）和默认角色立绘（透明底PNG最佳）</p>
+              <div id="sp-upload-area-house"></div>
+            </div>
+            <div class="sp-section">
+              <div class="sp-section-title">🏠 小屋动作立绘</div>
+              <p style="font-size:11px;color:#999;margin-bottom:8px;">上传桌宠在小屋中执行喂食、洗澡、睡觉动作时显示的立绘（透明底PNG最佳）</p>
+              <div id="sp-upload-area-house-actions"></div>
+            </div>
+            <div class="sp-section">
+              <div class="sp-section-title">🎭 小屋表情立绘</div>
+              <p style="font-size:11px;color:#999;margin-bottom:8px;">根据AI回复中的关键词自动切换立绘。多个关键词用逗号分隔。<br/>例如关键词填「笑,开心,哈哈」，AI说"*开心地笑了*"时自动切换到对应图片。</p>
+              <div id="sp-house-expressions-list"></div>
+              <button class="sp-btn" id="sp-add-house-expression" type="button">+ 添加表情立绘</button>
             </div>
             <div class="sp-section">
               <div class="sp-section-title">🎯 菜单图标</div>
@@ -5530,6 +5886,7 @@ async function refreshWorldPreview() {
       ['menuIconChat', '聊天 💬'],
       ['menuIconDiary', '日记 📔'],
       ['menuIconGame', '游戏 🎮'],
+      ['menuIconHouse', '小屋 🏠'],
       ['menuIconSettings', '设置 ⚙️']
     ];
     if (menuArea) {
@@ -5540,9 +5897,170 @@ async function refreshWorldPreview() {
       }).join('');
     }
 
+    // 桌宠小屋上传区
+    const houseArea = document.getElementById('sp-upload-area-house');
+    const houseConfigs = [
+      ['houseBackground', '房间背景'],
+      ['houseCharacter', '人物立绘'],
+      ['houseCharacterAvatar', '对话框头像'],
+    ];
+
+    if (houseArea) {
+      houseArea.innerHTML = houseConfigs.map(([key, label]) =>
+        buildUploadGroup(key, label, settings[key])
+      ).join('');
+    }
+
+    // 小屋动作立绘和按钮图标上传区
+    const houseActionsArea = document.getElementById('sp-upload-area-house-actions');
+    const houseActionConfigs = [
+      ['houseActionFeed', '喂食立绘'],
+      ['houseActionBath', '洗澡立绘'],
+      ['houseActionSleep', '睡觉立绘'],
+      ['houseButtonFeed', '喂食按钮图标'],
+      ['houseButtonBath', '洗澡按钮图标'],
+      ['houseButtonSleep', '睡觉按钮图标'],
+    ];
+
+    if (houseActionsArea) {
+      houseActionsArea.innerHTML = houseActionConfigs.map(([key, label]) =>
+        buildUploadGroup(key, label, settings[key])
+      ).join('');
+    }
 
     bindAllImageUploads();
     renderCustomSprites();
+    renderHouseExpressionSettings();
+  }
+
+  // ============================================================
+  // 小屋表情立绘管理（设置面板）
+  // ============================================================
+  function renderHouseExpressionSettings() {
+    const container = document.getElementById('sp-house-expressions-list');
+    if (!container) return;
+
+    if (!settings.houseExpressions) settings.houseExpressions = [];
+
+    container.innerHTML = '';
+    settings.houseExpressions.forEach((expr, idx) => {
+      const div = document.createElement('div');
+      div.className = 'sp-custom-sprite-item';
+      div.innerHTML = `
+        <div class="sp-custom-sprite-preview" data-house-expr-idx="${idx}">
+          ${expr.image ? `<img src="${expr.image}" alt="${expr.name || ''}" />` : '<span class="sp-upload-placeholder">＋</span>'}
+        </div>
+        <div class="sp-custom-sprite-info">
+          <input type="text" class="sp-house-expr-name" data-idx="${idx}" value="${expr.name || ''}" placeholder="表情名（如：笑）" style="margin-bottom:4px;" />
+          <input type="text" class="sp-house-expr-keywords" data-idx="${idx}" value="${expr.keywords || ''}" placeholder="关键词（逗号分隔，如：笑,开心,哈哈）" />
+          <div class="sp-custom-sprite-actions" style="margin-top:6px;">
+            <button class="sp-btn sp-house-expr-upload" data-idx="${idx}" type="button">📁 图片</button>
+            <button class="sp-btn sp-house-expr-url" data-idx="${idx}" type="button">🔗 链接</button>
+            <button class="sp-btn sp-btn-danger sp-house-expr-delete" data-idx="${idx}" type="button">✕</button>
+            <input type="file" class="sp-house-expr-file" data-idx="${idx}" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none;" />
+          </div>
+        </div>
+      `;
+      container.appendChild(div);
+    });
+
+    bindHouseExpressionEvents();
+  }
+
+  function bindHouseExpressionEvents() {
+    // 名称编辑
+    document.querySelectorAll('.sp-house-expr-name').forEach(input => {
+      input.onchange = () => {
+        const idx = parseInt(input.dataset.idx);
+        if (settings.houseExpressions[idx]) {
+          settings.houseExpressions[idx].name = input.value.trim();
+          saveDataDebounced('小屋表情名称');
+        }
+      };
+    });
+
+    // 关键词编辑
+    document.querySelectorAll('.sp-house-expr-keywords').forEach(input => {
+      input.onchange = () => {
+        const idx = parseInt(input.dataset.idx);
+        if (settings.houseExpressions[idx]) {
+          settings.houseExpressions[idx].keywords = input.value.trim();
+          saveDataDebounced('小屋表情关键词');
+        }
+      };
+    });
+
+    // 预览区点击上传
+    document.querySelectorAll('[data-house-expr-idx]').forEach(preview => {
+      preview.onclick = () => {
+        const idx = parseInt(preview.dataset.houseExprIdx);
+        const fileInput = document.querySelector(`.sp-house-expr-file[data-idx="${idx}"]`);
+        if (fileInput) fileInput.click();
+      };
+    });
+
+    // 上传按钮
+    document.querySelectorAll('.sp-house-expr-upload').forEach(btn => {
+      btn.onclick = () => {
+        const idx = parseInt(btn.dataset.idx);
+        const fileInput = document.querySelector(`.sp-house-expr-file[data-idx="${idx}"]`);
+        if (fileInput) fileInput.click();
+      };
+    });
+
+    // 文件选择
+    document.querySelectorAll('.sp-house-expr-file').forEach(input => {
+      input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) { showBubble('图片超过2MB了～', 3000); return; }
+        const idx = parseInt(input.dataset.idx);
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          const compressed = await compressImage(ev.target.result, 400, 0.75);
+          if (settings.houseExpressions[idx]) {
+            settings.houseExpressions[idx].image = compressed;
+            saveDataImmediate('小屋表情图片');
+            renderHouseExpressionSettings();
+            showBubble('表情立绘设置好啦～', 2000);
+          }
+        };
+        reader.readAsDataURL(file);
+        input.value = '';
+      };
+    });
+
+    // 链接输入
+    document.querySelectorAll('.sp-house-expr-url').forEach(btn => {
+      btn.onclick = () => {
+        const idx = parseInt(btn.dataset.idx);
+        if (!settings.houseExpressions[idx]) return;
+        const current = settings.houseExpressions[idx].image || '';
+        const url = prompt(
+          `设置第 ${idx + 1} 个表情的图片链接（支持 GIF）：\n留空确认 = 清除`,
+          current.startsWith('http') ? current : ''
+        );
+        if (url === null) return;
+        const trimmed = url.trim();
+        if (trimmed && !trimmed.startsWith('http')) {
+          showBubble('链接需要以 http 开头', 3000);
+          return;
+        }
+        settings.houseExpressions[idx].image = trimmed;
+        saveDataImmediate('小屋表情图片链接');
+        renderHouseExpressionSettings();showBubble(trimmed ? '表情链接已设置！' : '已清除', 2000);
+      };
+    });
+
+    // 删除
+    document.querySelectorAll('.sp-house-expr-delete').forEach(btn => {
+      btn.onclick = () => {
+        const idx = parseInt(btn.dataset.idx);
+        settings.houseExpressions.splice(idx, 1);
+        saveDataImmediate('删除小屋表情');
+        renderHouseExpressionSettings();
+      };
+    });
   }
 
   // ============================================================
@@ -5865,6 +6383,14 @@ async function refreshWorldPreview() {
       settings.customSprites.push({ name: '', image: '', duration: 2500 });
       saveData();
       renderCustomSprites();
+    });
+
+    // 小屋表情立绘添加
+    document.getElementById('sp-add-house-expression')?.addEventListener('click', () => {
+      if (!settings.houseExpressions) settings.houseExpressions = [];
+      settings.houseExpressions.push({ name: '', keywords: '', image: '' });
+      saveData();
+      renderHouseExpressionSettings();
     });
 
     document.getElementById('sp-clear-chat-history')?.addEventListener('click', () => {
@@ -6435,13 +6961,14 @@ function buildUploadGroup(key, label, currentValue) {
       </div>
       <div class="sp-upload-actions">
         <button class="sp-btn sp-upload-btn" data-key="${key}" type="button">📁 选择</button>
+        <button class="sp-btn sp-upload-url-btn" data-key="${key}" type="button">🔗 链接</button>
         <input type="file" id="sp-file-${key}" data-key="${key}" accept="image/png,image/jpeg,image/gif,image/webp" />
       </div>
       <div class="sp-duration-row">
         <span class="sp-duration-label">⏱️ <span class="sp-duration-val" data-key="${key}">${(duration/1000).toFixed(1)}s</span></span>
         <input type="range" class="sp-duration-slider" data-key="${key}" min="500" max="10000" step="500" value="${duration}" />
       </div>
-      <div class="sp-upload-hint">PNG/JPG/GIF(动图)/WebP 2MB内</div>
+      <div class="sp-upload-hint">PNG/JPG/GIF(动图)/WebP 2MB内· 或粘贴链接</div>
     </div>`;
 }
 
@@ -6480,9 +7007,14 @@ function bindAllImageUploads() {
       const reader = new FileReader();
       reader.onload = async (ev) => {
         const key = input.dataset.key;
-        const compressed = await compressImage(ev.target.result, 200, 0.7);
-        setSettingsImage(key, compressed);
-        updateUploadPreview(key, compressed);
+        let processed;
+        if (key === 'houseBackground' || key === 'houseCharacter' || key.startsWith('houseAction') || key.startsWith('houseButton')) {
+          processed = ev.target.result; // 小屋相关图片不压缩
+        } else {
+          processed = await compressImage(ev.target.result, 200, 0.7);
+        }
+        setSettingsImage(key, processed);
+        updateUploadPreview(key, processed);
         updateSpriteImage();
         updateMoodDisplay();
         saveData();
@@ -6506,6 +7038,41 @@ function bindAllImageUploads() {
   });
 }
 
+  // 链接输入按钮
+  document.querySelectorAll('#silly-pet-settings .sp-upload-url-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      const key = btn.dataset.key;
+      //读取当前值（区分 mood/menuIcon 等特殊 key）
+      let currentVal = '';
+      if (key.startsWith('mood')) {
+        const moodKey = key.replace('mood', '').toLowerCase();
+        currentVal = (settings.moodImages && settings.moodImages[moodKey]) || '';
+      } else if (key.startsWith('menuIcon')) {
+        const actionKey = key.replace('menuIcon', '').toLowerCase();
+        currentVal = (settings.menuIcons && settings.menuIcons[actionKey]) || '';
+      } else {
+        currentVal = settings[key] || '';
+      }
+      const url = prompt(
+        '输入图片链接（支持 GIF 动图）：\n留空并确认 = 清除当前图片',
+        currentVal.startsWith('http') ? currentVal : ''
+      );
+      if (url === null) return; // 点了取消
+      const trimmed = url.trim();
+      if (trimmed && !trimmed.startsWith('http')) {
+        showBubble('链接需要以 http 开头', 3000);
+        return;
+      }
+      setSettingsImage(key, trimmed);
+      updateUploadPreview(key, trimmed);
+      updateSpriteImage();
+      updateMoodDisplay();
+      saveData();
+      showBubble(trimmed ? '图片链接已设置！' : '已清除图片', 2000);
+    };
+  });
+
 function setSettingsImage(key, value) {
   if (key.startsWith('mood')) {
     if (!settings.moodImages) settings.moodImages = {};
@@ -6516,6 +7083,8 @@ function setSettingsImage(key, value) {
     if (!settings.menuIcons) settings.menuIcons = {};
     const actionKey = key.replace('menuIcon', '').toLowerCase();
     settings.menuIcons[actionKey] = value;
+  } else if (key.startsWith('houseAction') || key.startsWith('houseButton')) {
+    settings[key] = value;
   } else {
     settings[key] = value;
   }
@@ -6557,6 +7126,10 @@ function updateUploadPreview(key, dataUrl) {
         });
       }
     }
+  }
+  // 👇 新增：如果是小屋图片，刷新小屋场景
+  if (key === 'houseBackground' || key === 'houseCharacter' || key === 'houseCharacterAvatar') {
+    updateHouseScene();
   }
 
 }
@@ -7431,6 +8004,8 @@ function refreshCharPreview() {
     saveDataDebounced('游戏商店购买');
     gameRenderStatus();
     gameRenderShop();
+    checkAchievements();
+
   }
 
 
@@ -12084,6 +12659,7 @@ function refreshCharPreview() {
     updateStatusBars();
 
     saveDataImmediate('冰箱整理结算');
+    checkAchievements();
 
     // 显示结算弹窗
     const panel = document.getElementById('sp-fridge-panel');
@@ -13447,7 +14023,6 @@ function refreshCharPreview() {
   ];
 
   // ===== 餐厅等级定义 =====
-  // ===== 餐厅等级定义 =====
   const RESTAURANT_LEVELS = [
     { level: 1,  name: '路边小摊',   reputationRequired: 0,    maxCustomers: 2,  emoji: '🏕️' },
     { level: 2,  name: '温馨小店',   reputationRequired: 30,   maxCustomers: 3,  emoji: '🏠' },
@@ -13460,6 +14035,585 @@ function refreshCharPreview() {
     { level: 9,  name: '银河食府',   reputationRequired: 1800, maxCustomers: 10, emoji: '🌌' },
     { level: 10, name: '传说·喵神殿', reputationRequired: 2500, maxCustomers: 12, emoji: '✨' },
   ];
+
+  // ============================================================
+  // 🏆 成就系统定义
+  // ============================================================
+  const ACHIEVEMENTS = [
+    // ===================== 互动类 =====================
+    { id: 'first_feed',       name: '第一口猫粮',       emoji: '🍖', desc: '第一次投喂桌宠', category: 'interact', tier: 1,
+      check: () => state.totalInteractions >= 1 },
+    { id: 'feed_10',          name: '贴心铲屎官',       emoji: '🥄', desc: '累计互动10次', category: 'interact', tier: 1,
+      check: () => state.totalInteractions >= 10 },
+    { id: 'feed_50',          name: '美食供养者',       emoji: '🍽️', desc: '累计互动50次', category: 'interact', tier: 2,
+      check: () => state.totalInteractions >= 50 },
+    { id: 'feed_100',         name: '百次宠爱',         emoji: '💝', desc: '累计互动100次', category: 'interact', tier: 3,
+      check: () => state.totalInteractions >= 100 },
+    { id: 'feed_200',         name: '传说级饲养员',     emoji: '👑', desc: '累计互动200次', category: 'interact', tier: 4,
+      check: () => state.totalInteractions >= 200 },
+    { id: 'feed_500',         name: '千手观音铲屎官',   emoji: '🙏', desc: '累计互动500次', category: 'interact', tier: 5,
+      check: () => state.totalInteractions >= 500 },
+    { id: 'chat_first',       name: '破冰对话',         emoji: '💬', desc: '第一次和桌宠聊天', category: 'interact', tier: 1,
+      check: () => state.petChatHistory.length >= 1 },
+    { id: 'chat_20',          name: '话匣子打开了',     emoji: '📢', desc: '累计聊天20条', category: 'interact', tier: 1,
+      check: () => state.petChatHistory.length >= 20 },
+    { id: 'chat_50',          name: '话唠搭档',         emoji: '🗣️', desc: '累计聊天50条', category: 'interact', tier: 2,
+      check: () => state.petChatHistory.length >= 50 },
+    { id: 'chat_100',         name: '百句絮语',         emoji: '📜', desc: '累计聊天100条', category: 'interact', tier: 3,
+      check: () => state.petChatHistory.length >= 100 },
+    { id: 'chat_200',         name: '灵魂伴侣',         emoji: '💕', desc: '累计聊天200条', category: 'interact', tier: 4,
+      check: () => state.petChatHistory.length >= 200 },
+    { id: 'chat_500',         name: '千言万语',         emoji: '📖', desc: '累计聊天500条', category: 'interact', tier: 5,
+      check: () => state.petChatHistory.length >= 500 },
+    { id: 'diary_first',      name: '今日份记录',       emoji: '📔', desc: '生成第一篇日记', category: 'interact', tier: 1,
+      check: () => (state.diaryEntries || []).length >= 1 },
+    { id: 'diary_7',          name: '一周不间断',       emoji: '📅', desc: '累计写7篇日记', category: 'interact', tier: 2,
+      check: () => (state.diaryEntries || []).length >= 7 },
+    { id: 'diary_14',         name: '两周坚持',         emoji: '🗓️', desc: '累计写14篇日记', category: 'interact', tier: 3,
+      check: () => (state.diaryEntries || []).length >= 14 },
+    { id: 'diary_30',         name: '月度回忆录',       emoji: '📖', desc: '累计写30篇日记', category: 'interact', tier: 4,
+      check: () => (state.diaryEntries || []).length >= 30 },
+    { id: 'diary_60',         name: '季度编年史',       emoji: '📚', desc: '累计写60篇日记', category: 'interact', tier: 5,
+      check: () => (state.diaryEntries || []).length >= 60 },
+    { id: 'memory_3',         name: '初识记忆',         emoji: '💭', desc: '记忆池达到3条', category: 'interact', tier: 1,
+      check: () => state.memories.length >= 3 },
+    { id: 'memory_5',         name: '记忆收藏家',       emoji: '🧠', desc: '记忆池达到5条', category: 'interact', tier: 2,
+      check: () => state.memories.length >= 5 },
+    { id: 'memory_10',        name: '记忆编织者',       emoji: '🕸️', desc: '记忆池达到10条', category: 'interact', tier: 3,
+      check: () => state.memories.length >= 10 },
+    { id: 'memory_15',        name: '记忆大师',         emoji: '🌟', desc: '记忆池达到15条', category: 'interact', tier: 4,
+      check: () => state.memories.length >= 15 },
+    { id: 'summary_first',    name: '第一次总结',       emoji: '📝', desc: '生成过对话总结', category: 'interact', tier: 1,
+      check: () => !!state.summary && state.summary.length > 0 },
+
+    // ===================== 经济类 =====================
+    { id: 'gold_50',          name: '有点零花钱',       emoji: '🪙', desc: '拥有50金币', category: 'economy', tier: 1,
+      check: () => state.gameGold >= 50 },
+    { id: 'gold_100',         name: '小有积蓄',         emoji: '💰', desc: '拥有100金币', category: 'economy', tier: 1,
+      check: () => state.gameGold >= 100 },
+    { id: 'gold_300',         name: '猫咪小金库',       emoji: '🏧', desc: '拥有300金币', category: 'economy', tier: 2,
+      check: () => state.gameGold >= 300 },
+    { id: 'gold_500',         name: '小富猫',           emoji: '💵', desc: '拥有500金币', category: 'economy', tier: 2,
+      check: () => state.gameGold >= 500 },
+    { id: 'gold_1000',        name: '千金猫',           emoji: '🤑', desc: '拥有1000金币', category: 'economy', tier: 3,
+      check: () => state.gameGold >= 1000 },
+    { id: 'gold_2000',        name: '金库管理员',       emoji: '🏦', desc: '拥有2000金币', category: 'economy', tier: 3,
+      check: () => state.gameGold >= 2000 },
+    { id: 'gold_5000',        name: '身价不菲',         emoji: '💳', desc: '拥有5000金币', category: 'economy', tier: 4,
+      check: () => state.gameGold >= 5000 },
+    { id: 'gold_10000',       name: '富可敌国',         emoji: '💎', desc: '拥有10000金币', category: 'economy', tier: 4,
+      check: () => state.gameGold >= 10000 },
+    { id: 'gold_50000',       name: '传说·猫界首富',    emoji: '🏆', desc: '拥有50000金币', category: 'economy', tier: 5,
+      check: () => state.gameGold >= 50000 },
+
+    // ===================== 合成工坊类 =====================
+    { id: 'merge_first',      name: '合成新手',         emoji: '🧶', desc: '图鉴解锁2种以上', category: 'merge', tier: 1,
+      check: () => (state.gameCollection || []).length >= 2 },
+    { id: 'merge_collection_10', name: '初级图鉴',      emoji: '📒', desc: '合成图鉴解锁10种', category: 'merge', tier: 2,
+      check: () => (state.gameCollection || []).length >= 10 },
+    { id: 'merge_collection_20', name: '图鉴达人',      emoji: '📖', desc: '合成图鉴解锁20种', category: 'merge', tier: 3,
+      check: () => (state.gameCollection || []).length >= 20 },
+    { id: 'merge_collection_35', name: '高级图鉴',      emoji: '📗', desc: '合成图鉴解锁35种', category: 'merge', tier: 4,
+      check: () => (state.gameCollection || []).length >= 35 },
+    { id: 'merge_collection_50', name: '百科全书',      emoji: '📚', desc: '合成图鉴解锁50种', category: 'merge', tier: 4,
+      check: () => (state.gameCollection || []).length >= 50 },
+    { id: 'merge_collection_64', name: '全图鉴大师',    emoji: '🌈', desc: '合成图鉴全部解锁（64种）', category: 'merge', tier: 5,
+      check: () => (state.gameCollection || []).length >= 64 },
+    { id: 'merge_lv5',        name: '高阶炼金术',       emoji: '⚗️', desc: '合成出任意Lv5物品', category: 'merge', tier: 3,
+      check: () => (state.gameCollection || []).some(k => k.endsWith('_5')) },
+    { id: 'merge_lv7',        name: '大师锻造',         emoji: '🔨', desc: '合成出任意Lv7物品', category: 'merge', tier: 4,
+      check: () => (state.gameCollection || []).some(k => k.endsWith('_7')) },
+    { id: 'merge_max_level',  name: '传说锻造师',       emoji: '⚒️', desc: '合成出任意Lv8物品', category: 'merge', tier: 5,
+      check: () => (state.gameCollection || []).some(k => k.endsWith('_8')) },
+    { id: 'merge_all_chains_lv3', name: '八链均衡',     emoji: '⚖️', desc: '8条链各解锁到Lv3以上', category: 'merge', tier: 3,
+      check: () => {
+        const chains = ['toy', 'food', 'gem', 'potion', 'music', 'flower', 'star', 'seasoning'];
+        return chains.every(chain => (state.gameCollection || []).includes(`${chain}_3`));
+      }},
+    { id: 'merge_seasoning_lv5', name: '调料链大师',    emoji: '🧂', desc: '调料链达到Lv5', category: 'merge', tier: 3,
+      check: () => (state.gameCollection || []).includes('seasoning_5') },
+
+    // ===================== 餐厅类 =====================
+    { id: 'restaurant_open',  name: '开张大吉',         emoji: '🐱', desc: '餐厅声望达到1', category: 'restaurant', tier: 1,
+      check: () => state.restaurantReputation >= 1 },
+    { id: 'restaurant_lv2',   name: '温馨小店',         emoji: '🏠', desc: '餐厅升到Lv.2', category: 'restaurant', tier: 1,
+      check: () => state.restaurantLevel >= 2 },
+    { id: 'restaurant_lv3',   name: '特色餐厅',         emoji: '🏪', desc: '餐厅升到Lv.3', category: 'restaurant', tier: 2,
+      check: () => state.restaurantLevel >= 3 },
+    { id: 'restaurant_lv4',   name: '星级餐厅',         emoji: '🏨', desc: '餐厅升到Lv.4', category: 'restaurant', tier: 3,
+      check: () => state.restaurantLevel >= 4 },
+    { id: 'restaurant_lv5',   name: '猫界传奇',         emoji: '🏰', desc: '餐厅升到Lv.5', category: 'restaurant', tier: 3,
+      check: () => state.restaurantLevel >= 5 },
+    { id: 'restaurant_lv6',   name: '美食殿堂',         emoji: '🏛️', desc: '餐厅升到Lv.6', category: 'restaurant', tier: 4,
+      check: () => state.restaurantLevel >= 6 },
+    { id: 'restaurant_lv7',   name: '皇家御膳房',       emoji: '👑', desc: '餐厅升到Lv.7', category: 'restaurant', tier: 4,
+      check: () => state.restaurantLevel >= 7 },
+    { id: 'restaurant_lv8',   name: '世界名店',         emoji: '🌍', desc: '餐厅升到Lv.8', category: 'restaurant', tier: 4,
+      check: () => state.restaurantLevel >= 8 },
+    { id: 'restaurant_lv9',   name: '银河食府',         emoji: '🌌', desc: '餐厅升到Lv.9', category: 'restaurant', tier: 5,
+      check: () => state.restaurantLevel >= 9 },
+    { id: 'restaurant_lv10',  name: '传说·喵神殿',      emoji: '✨', desc: '餐厅升到Lv.10', category: 'restaurant', tier: 5,
+      check: () => state.restaurantLevel >= 10 },
+    { id: 'restaurant_serve_5', name: '开始营业',       emoji: '🙋', desc: '累计服务5位客人', category: 'restaurant', tier: 1,
+      check: () => state.restaurantServedCount >= 5 },
+    { id: 'restaurant_serve_10', name: '初级服务员',    emoji: '🍽️', desc: '累计服务10位客人', category: 'restaurant', tier: 2,
+      check: () => state.restaurantServedCount >= 10 },
+    { id: 'restaurant_serve_30', name: '熟练服务员',    emoji: '🎀', desc: '累计服务30位客人', category: 'restaurant', tier: 2,
+      check: () => state.restaurantServedCount >= 30 },
+    { id: 'restaurant_serve_50', name: '金牌服务',      emoji: '⭐', desc: '累计服务50位客人', category: 'restaurant', tier: 3,
+      check: () => state.restaurantServedCount >= 50 },
+    { id: 'restaurant_serve_100', name: '百客盈门',     emoji: '🎊', desc: '累计服务100位客人', category: 'restaurant', tier: 4,
+      check: () => state.restaurantServedCount >= 100 },
+    { id: 'restaurant_serve_200', name: '传说服务之神', emoji: '🌟', desc: '累计服务200位客人', category: 'restaurant', tier: 5,
+      check: () => state.restaurantServedCount >= 200 },
+    { id: 'restaurant_serve_500', name: '永不打烊',     emoji: '🏆', desc: '累计服务500位客人', category: 'restaurant', tier: 5,
+      check: () => state.restaurantServedCount >= 500 },
+    { id: 'restaurant_earn_100', name: '第一桶金',      emoji: '🪣', desc: '餐厅累计收入100金币', category: 'restaurant', tier: 2,
+      check: () => state.restaurantTotalEarnings >= 100 },
+    { id: 'restaurant_earn_500', name: '餐厅小赚',      emoji: '💵', desc: '餐厅累计收入500金币', category: 'restaurant', tier: 3,
+      check: () => state.restaurantTotalEarnings >= 500 },
+    { id: 'restaurant_earn_2000', name: '稳定盈利',     emoji: '📈', desc: '餐厅累计收入2000金币', category: 'restaurant', tier: 3,
+      check: () => state.restaurantTotalEarnings >= 2000 },
+    { id: 'restaurant_earn_5000', name: '餐饮大亨',     emoji: '🤑', desc: '餐厅累计收入5000金币', category: 'restaurant', tier: 4,
+      check: () => state.restaurantTotalEarnings >= 5000 },
+    { id: 'restaurant_earn_20000', name: '餐饮帝国',    emoji: '🏰', desc: '餐厅累计收入20000金币', category: 'restaurant', tier: 5,
+      check: () => state.restaurantTotalEarnings >= 20000 },
+    { id: 'restaurant_rep_50', name: '小有名气',        emoji: '📣', desc: '声望达到50', category: 'restaurant', tier: 2,
+      check: () => state.restaurantReputation >= 50 },
+    { id: 'restaurant_rep_100', name: '远近闻名',       emoji: '📰', desc: '声望达到100', category: 'restaurant', tier: 3,
+      check: () => state.restaurantReputation >= 100 },
+    { id: 'restaurant_rep_500', name: '猫界名厨',       emoji: '👨‍🍳', desc: '声望达到500', category: 'restaurant', tier: 5,
+      check: () => state.restaurantReputation >= 500 },
+
+    // ===================== 小游戏类 =====================
+    { id: 'fridge_first',     name: '冰箱初体验',       emoji: '🧊', desc: '冰箱库存获得第一件食材', category: 'minigame', tier: 1,
+      check: () => (state.fridgeInventory || []).filter(i => i.count > 0).length >= 1 },
+    { id: 'fridge_stock_5',   name: '冰箱有货了',       emoji: '❄️', desc: '冰箱库存种类达到5种', category: 'minigame', tier: 2,
+      check: () => (state.fridgeInventory || []).filter(i => i.count > 0).length >= 5 },
+    { id: 'fridge_stock_10',  name: '食材丰富',         emoji: '🥗', desc: '冰箱库存种类达到10种', category: 'minigame', tier: 3,
+      check: () => (state.fridgeInventory || []).filter(i => i.count > 0).length >= 10 },
+    { id: 'fridge_stock_20',  name: '囤货达人',         emoji: '📦', desc: '冰箱库存种类达到20种', category: 'minigame', tier: 4,
+      check: () => (state.fridgeInventory || []).filter(i => i.count > 0).length >= 20 },
+    { id: 'fridge_total_50',  name: '仓储管理员',       emoji: '🏭', desc: '冰箱总件数达到50', category: 'minigame', tier: 4,
+      check: () => (state.fridgeInventory || []).reduce((s, i) => s + i.count, 0) >= 50 },
+    { id: 'tanghulu_first',   name: '糖葫芦学徒',       emoji: '🍢', desc: '完成第一串糖葫芦', category: 'minigame', tier: 1,
+      check: () => (state.tanghuluInventory || []).filter(i => i.count > 0).length >= 1 },
+    { id: 'tanghulu_5_types', name: '五味糖葫芦',       emoji: '🌈', desc: '糖葫芦库存种类达到5种', category: 'minigame', tier: 2,
+      check: () => (state.tanghuluInventory || []).filter(i => i.count > 0).length >= 5 },
+    { id: 'tanghulu_10_types', name: '糖葫芦大师',      emoji: '🍡', desc: '糖葫芦库存种类达到10种', category: 'minigame', tier: 3,
+      check: () => (state.tanghuluInventory || []).filter(i => i.count > 0).length >= 10 },
+    { id: 'tanghulu_crystal', name: '糖砂幸运儿',       emoji: '✨', desc: '获得第一颗完美糖砂', category: 'minigame', tier: 2,
+      check: () => (state.tanghuluSugarCrystal || 0) >= 1 },
+    { id: 'tanghulu_crystal_3', name: '糖砂收藏',       emoji: '💫', desc: '累计获得3颗完美糖砂', category: 'minigame', tier: 3,
+      check: () => (state.tanghuluSugarCrystal || 0) >= 3 },
+    { id: 'tanghulu_crystal_5', name: '糖砂收藏家',     emoji: '💎', desc: '累计获得5颗完美糖砂', category: 'minigame', tier: 4,
+      check: () => (state.tanghuluSugarCrystal || 0) >= 5 },
+    { id: 'tanghulu_crystal_10', name: '糖砂之王',      emoji: '👑', desc: '累计获得10颗完美糖砂', category: 'minigame', tier: 5,
+      check: () => (state.tanghuluSugarCrystal || 0) >= 10 },
+    { id: 'match3_prop_use',  name: '消消看道具初体验', emoji: '🃏', desc: '消消看道具背包曾有过道具', category: 'minigame', tier: 1,
+      check: () => {
+        const inv = state.match3Inventory || {};
+        return (inv.expand || 0) + (inv.sweep || 0) + (inv.shuffle || 0) > 0 ||
+               (state.match3ItemPurchaseLog && Object.keys(state.match3ItemPurchaseLog).length > 0);
+      }},
+    { id: 'link_prop_use',    name: '连连看道具收集',   emoji: '🔗', desc: '连连看道具背包曾有过道具', category: 'minigame', tier: 1,
+      check: () => {
+        const inv = state.linkInventory || {};
+        return (inv.hint || 0) + (inv.shuffle || 0) + (inv.bomb || 0) + (inv.compass || 0) > 0 ||
+               (state.linkItemPurchaseLog && Object.keys(state.linkItemPurchaseLog).length > 0);
+      }},
+    { id: 'shelf_eliminate_5', name: '货架消除新手',    emoji: '🛒', desc: '单局货架消除5组以上', category: 'minigame', tier: 2,
+      check: () => shelfState.eliminatedGroups >= 5 },
+
+    // ===================== 收集类 =====================
+    { id: 'all_food_items',   name: '美食收藏家',       emoji: '🎒', desc: '工坊背包同时拥有3种以上食物', category: 'collect', tier: 2,
+      check: () => (state.gameInventory || []).filter(i => i.category === 'food' && i.count > 0).length >= 3 },
+    { id: 'all_clean_items',  name: '清洁大师',         emoji: '🧴', desc: '工坊背包同时拥有3种以上洗护', category: 'collect', tier: 2,
+      check: () => (state.gameInventory || []).filter(i => i.category === 'clean' && i.count > 0).length >= 3 },
+    { id: 'all_energy_items', name: '睡眠专家',         emoji: '🛏️', desc: '工坊背包同时拥有3种以上睡眠道具', category: 'collect', tier: 2,
+      check: () => (state.gameInventory || []).filter(i => i.category === 'energy' && i.count > 0).length >= 3 },
+    { id: 'seasoning_3',      name: '调料入门',         emoji: '🫙', desc: '同时拥有3种调料', category: 'collect', tier: 2,
+      check: () => Object.values(state.restaurantSeasonings || {}).filter(v => v > 0).length >= 3 },
+    { id: 'seasoning_6',      name: '调料达人',         emoji: '🧂', desc: '同时拥有6种调料', category: 'collect', tier: 3,
+      check: () => Object.values(state.restaurantSeasonings || {}).filter(v => v > 0).length >= 6 },
+    { id: 'seasoning_10',     name: '调料大师',         emoji: '✨', desc: '同时拥有10种以上调料', category: 'collect', tier: 4,
+      check: () => Object.values(state.restaurantSeasonings || {}).filter(v => v > 0).length >= 10 },
+    { id: 'emoji_3',          name: '表情包初收集',     emoji: '😸', desc: '上传3个表情包', category: 'collect', tier: 1,
+      check: () => (settings.emojiStickers || []).length >= 3 },
+    { id: 'emoji_5',          name: '表情包达人',       emoji: '😺', desc: '上传5个表情包', category: 'collect', tier: 2,
+      check: () => (settings.emojiStickers || []).length >= 5 },
+    { id: 'emoji_10',         name: '表情包狂热',       emoji: '🤪', desc: '上传10个表情包', category: 'collect', tier: 3,
+      check: () => (settings.emojiStickers || []).length >= 10 },
+    { id: 'custom_sprite',    name: '形象设计师',       emoji: '🎨', desc: '上传了桌宠闲置精灵图', category: 'collect', tier: 1,
+      check: () => !!settings.spriteIdle },
+    { id: 'custom_sprites_3', name: '动作导演',         emoji: '🎬', desc: '添加3个以上自定义动作', category: 'collect', tier: 2,
+      check: () => (settings.customSprites || []).filter(s => s.image).length >= 3 },
+    { id: 'custom_sprites_5', name: '动画大师',         emoji: '🎞️', desc: '添加5个以上自定义动作', category: 'collect', tier: 3,
+      check: () => (settings.customSprites || []).filter(s => s.image).length >= 5 },
+    { id: 'game_images_5',    name: '图鉴美化师',       emoji: '📷', desc: '上传5张游戏自定义图片', category: 'collect', tier: 2,
+      check: () => Object.keys(state.gameCustomImages || {}).length >= 5 },
+    { id: 'game_images_20',   name: '视觉艺术家',       emoji: '🖼️', desc: '上传20张游戏自定义图片', category: 'collect', tier: 3,
+      check: () => Object.keys(state.gameCustomImages || {}).length >= 20 },
+    { id: 'stamina_item_use', name: '能量充沛',         emoji: '⚡', desc: '体力道具背包曾有过道具', category: 'collect', tier: 1,
+      check: () => {
+        const inv = state.gameStaminaInventory || {};
+        return (inv.stamina30 || 0) + (inv.stamina50 || 0) + (inv.stamina100 || 0) > 0;
+      }},
+    { id: 'profile_saved',    name: '存档管理者',       emoji: '💾', desc: '保存过至少1个桌宠存档', category: 'collect', tier: 1,
+      check: () => (settings.petProfiles || []).length >= 1 },
+    { id: 'profile_3',        name: '多宠家庭',         emoji: '🐾', desc: '保存过3个以上桌宠存档', category: 'collect', tier: 3,
+      check: () => (settings.petProfiles || []).length >= 3 },
+
+    // ===================== 状态/隐藏类 =====================
+    { id: 'happy_always',     name: '快乐源泉',         emoji: '😊', desc: '三项状态同时超过90%', category: 'special', tier: 2,
+      check: () => state.hunger >= 90 && state.cleanliness >= 90 && state.energy >= 90 },
+    { id: 'full_status',      name: '满溢幸福',         emoji: '🌟', desc: '三项状态全部100%', category: 'special', tier: 3,
+      check: () => state.hunger >= 100 && state.cleanliness >= 100 && state.energy >= 100 },
+    { id: 'low_danger',       name: '危险边缘',         emoji: '⚠️', desc: '任意状态低于15%', category: 'special', tier: 1,
+      check: () => state.hunger < 15 || state.cleanliness < 15 || state.energy < 15 },
+    { id: 'all_low',          name: '绝境求生',         emoji: '💀', desc: '三项状态同时低于20%', category: 'special', tier: 2,
+      check: () => state.hunger < 20 && state.cleanliness < 20 && state.energy < 20 },
+    { id: 'night_owl',        name: '深夜猫奴',         emoji: '🌙', desc: '在凌晨2-5点和桌宠聊天', category: 'special', tier: 2,
+      check: () => {
+        const hour = new Date().getHours();
+        return hour >= 2 && hour < 5 && state.petChatHistory.length > 0;
+      }},
+    { id: 'early_bird',       name: '早起的喵',         emoji: '🌅', desc: '在早晨5-7点和桌宠互动', category: 'special', tier: 2,
+      check: () => {
+        const hour = new Date().getHours();
+        return hour >= 5 && hour < 7 && state.totalInteractions > 0;
+      }},
+    { id: 'weekend_warrior',  name: '周末战士',         emoji: '🎉', desc: '在周末和桌宠聊天超过10条', category: 'special', tier: 1,
+      check: () => {
+        const day = new Date().getDay();
+        return (day === 0 || day === 6) && state.petChatHistory.length >= 10;
+      }},
+    { id: 'offline_mode_used', name: '线下约会',        emoji: '🌙', desc: '使用过线下模式和桌宠互动', category: 'special', tier: 1,
+      check: () => state.isOfflineMode === true || state.petChatHistory.some(m => m.content && m.content.includes('[线下]')) },
+    { id: 'pet_named',        name: '取个好名字',       emoji: '🏷️', desc: '给桌宠起了自定义名字', category: 'special', tier: 1,
+      check: () => settings.petName && settings.petName !== '咪噗' && settings.petName.trim().length > 0 },
+    { id: 'theme_changed',    name: '换个主题',         emoji: '🎨', desc: '使用过非默认主题', category: 'special', tier: 1,
+      check: () => settings.currentTheme && settings.currentTheme !== 'default' },
+    { id: 'all_games_played', name: '全能玩家',         emoji: '🎮', desc: '合成/冰箱/糖葫芦都玩过至少一次', category: 'special', tier: 3,
+      check: () => {
+        const hasCollection = (state.gameCollection || []).length >= 1;
+        const hasFridge = (state.fridgeInventory || []).filter(i => i.count > 0).length >= 1;
+        const hasTanghulu = (state.tanghuluInventory || []).filter(i => i.count > 0).length >= 1;
+        return hasCollection && hasFridge && hasTanghulu;
+      }},
+    { id: 'all_6_games',      name: '六边形玩家',       emoji: '🌐', desc: '所有6种小游戏都体验过', category: 'special', tier: 4,
+      check: () => {
+        const hasCollection = (state.gameCollection || []).length >= 1;
+        const hasFridge = (state.fridgeInventory || []).filter(i => i.count > 0).length >= 1;
+        const hasTanghulu = (state.tanghuluInventory || []).filter(i => i.count > 0).length >= 1;
+        const hasMatch3 = (state.match3ItemPurchaseLog && Object.keys(state.match3ItemPurchaseLog).length > 0) || (state.match3Inventory && Object.values(state.match3Inventory).some(v => v > 0));
+        const hasLink = (state.linkItemPurchaseLog && Object.keys(state.linkItemPurchaseLog).length > 0) || (state.linkInventory && Object.values(state.linkInventory).some(v => v > 0));
+        const hasShelf = (state.shelfPropInventory && Object.values(state.shelfPropInventory).some(v => v > 0)) || (state.shelfPropShopLog && Object.keys(state.shelfPropShopLog).length > 0);
+        return hasCollection && hasFridge && hasTanghulu && (hasMatch3 || hasLink || hasShelf);
+      }},
+    { id: 'stamina_max',      name: '精力充沛',         emoji: '💪', desc: '体力恢复到满值', category: 'special', tier: 1,
+      check: () => state.gameStamina >= state.gameStaminaMax },
+    { id: 'first_lottery',    name: '手气不错',         emoji: '🎰', desc: '第一次使用抽奖', category: 'special', tier: 1,
+      check: () => {
+        const log = state.lotteryLog || {};
+        return Object.values(log).some(day => Object.values(day).some(v => v > 0));
+      }},
+    { id: 'lottery_10_total', name: '抽奖常客',         emoji: '🎲', desc: '累计抽奖10次', category: 'special', tier: 2,
+      check: () => {
+        const log = state.lotteryLog || {};
+        let total = 0;
+        Object.values(log).forEach(day => { Object.values(day).forEach(v => { total += v; }); });
+        return total >= 10;
+      }},
+    { id: 'lottery_50_total', name: '欧皇之路',         emoji: '🍀', desc: '累计抽奖50次', category: 'special', tier: 3,
+      check: () => {
+        const log = state.lotteryLog || {};
+        let total = 0;
+        Object.values(log).forEach(day => { Object.values(day).forEach(v => { total += v; }); });
+        return total >= 50;
+      }},
+    { id: 'drag_pet',         name: '拎起来看看',       emoji: '✋', desc: '拖拽过桌宠', category: 'special', tier: 1,
+      check: () => state.totalInteractions >= 1 },
+    { id: 'relationship_set', name: '定义关系',         emoji: '💞', desc: '填写了与主人的关系描述', category: 'special', tier: 2,
+      check: () => !!settings.relationshipPrompt && settings.relationshipPrompt.trim().length > 10 },
+    { id: 'persona_set',      name: '主人人设',         emoji: '👤', desc: '填写了用户人设', category: 'special', tier: 2,
+      check: () => (settings.userPersonaSource === 'manual' && settings.userPersonaText && settings.userPersonaText.trim().length > 10) || settings.userPersonaSource === 'card' },
+    { id: 'worldbook_linked', name: '世界观构建者',     emoji: '🌍', desc: '关联了世界书', category: 'special', tier: 2,
+      check: () => !!settings.worldBookId && settings.worldBookId.trim().length > 0 },
+    { id: 'character_linked', name: '角色卡关联',       emoji: '🎭', desc: '关联了角色卡', category: 'special', tier: 1,
+      check: () => !!settings.characterId && settings.characterId.trim().length > 0 },
+
+    // ===================== 里程碑/隐藏成就 =====================
+    { id: 'day_1',            name: '第一天',           emoji: '🌱', desc: '开始使用桌宠插件', category: 'milestone', tier: 1,
+      check: () => true },
+    { id: 'played_7_days',    name: '一周陪伴',         emoji: '📆', desc: '桌宠数据存在超过7天', category: 'milestone', tier: 2,
+      check: () => {
+        const firstChat = state.petChatHistory[0];
+        if (!firstChat || !firstChat.timestamp) return false;
+        return Date.now() - firstChat.timestamp >= 7 * 24 * 60 * 60 * 1000;
+      }},
+    { id: 'played_30_days',   name: '一月相守',         emoji: '🗓️', desc: '桌宠数据存在超过30天', category: 'milestone', tier: 3,
+      check: () => {
+        const firstChat = state.petChatHistory[0];
+        if (!firstChat || !firstChat.timestamp) return false;
+        return Date.now() - firstChat.timestamp >= 30 * 24 * 60 * 60 * 1000;
+      }},
+    { id: 'played_100_days',  name: '百日之约',         emoji: '💐', desc: '桌宠数据存在超过100天', category: 'milestone', tier: 4,
+      check: () => {
+        const firstChat = state.petChatHistory[0];
+        if (!firstChat || !firstChat.timestamp) return false;
+        return Date.now() - firstChat.timestamp >= 100 * 24 * 60 * 60 * 1000;
+      }},
+    { id: 'played_365_days',  name: '一年之恋',         emoji: '💍', desc: '桌宠数据存在超过365天', category: 'milestone', tier: 5,
+      check: () => {
+        const firstChat = state.petChatHistory[0];
+        if (!firstChat || !firstChat.timestamp) return false;
+        return Date.now() - firstChat.timestamp >= 365 * 24 * 60 * 60 * 1000;
+      }},
+    { id: 'total_1000_actions', name: '千次羁绊',       emoji: '🔗', desc: '总互动+聊天+日记超过1000次', category: 'milestone', tier: 5,
+      check: () => state.totalInteractions + state.petChatHistory.length + (state.diaryEntries || []).length >= 1000 },
+    { id: 'rich_and_full',    name: '人生赢家',         emoji: '🏅', desc: '金币>1000 且三项状态>80% 且餐厅Lv5+', category: 'milestone', tier: 4,
+      check: () => state.gameGold >= 1000 && state.hunger >= 80 && state.cleanliness >= 80 && state.energy >= 80 && state.restaurantLevel >= 5 },
+    { id: 'completionist_50', name: '半数成就',         emoji: '🥈', desc: '解锁50%以上成就', category: 'milestone', tier: 3,
+      check: () => (state.achievements || []).length >= Math.floor(ACHIEVEMENTS.length * 0.5) },
+    { id: 'completionist_80', name: '成就猎人',         emoji: '🥇', desc: '解锁80%以上成就', category: 'milestone', tier: 4,
+      check: () => (state.achievements || []).length >= Math.floor(ACHIEVEMENTS.length * 0.8) },
+    { id: 'completionist_100', name: '传说·全成就大师', emoji: '🏆', desc: '解锁全部成就', category: 'milestone', tier: 5,
+      check: () => (state.achievements || []).length >= ACHIEVEMENTS.length - 1 },
+  ];
+
+
+  // ===== 成就奖励发放 =====
+  function grantAchievementReward(achievement) {
+    const tier = achievement.tier || 1;
+    let goldReward = 0;
+    let staminaReward = 0;
+    let randomItemCount = 0;
+    let grantCrystal = false;
+
+    switch (tier) {
+      case 1:
+        goldReward = 8;
+        break;
+      case 2:
+        goldReward = 20;
+        staminaReward = 5;
+        break;
+      case 3:
+        goldReward = 50;
+        staminaReward = 10;
+        randomItemCount = 1;
+        break;
+      case 4:
+        goldReward = 120;
+        staminaReward = 20;
+        randomItemCount = 2;
+        break;
+      case 5:
+        goldReward = 300;
+        staminaReward = 50;
+        randomItemCount = 3;
+        grantCrystal = true;
+        break;
+    }
+
+    // 发放金币
+    state.gameGold += goldReward;
+
+    // 发放体力
+    if (staminaReward > 0) {
+      state.gameStamina = Math.min(state.gameStaminaMax || 100, (state.gameStamina || 0) + staminaReward);
+    }
+
+    // 发放随机道具
+    for (let i = 0; i < randomItemCount; i++) {
+      const randomPropType = Math.floor(Math.random() * 5);
+      switch (randomPropType) {
+        case 0:
+          if (!state.match3Inventory) state.match3Inventory = { expand: 0, sweep: 0, shuffle: 0 };
+          const m3Keys = ['expand', 'sweep', 'shuffle'];
+          state.match3Inventory[m3Keys[Math.floor(Math.random() * m3Keys.length)]]++;
+          break;
+        case 1:
+          if (!state.linkInventory) state.linkInventory = { hint: 0, shuffle: 0, bomb: 0, compass: 0 };
+          const linkKeys = ['hint', 'shuffle', 'bomb', 'compass'];
+          state.linkInventory[linkKeys[Math.floor(Math.random() * linkKeys.length)]]++;
+          break;
+        case 2:
+          if (!state.fridgePropInventory) state.fridgePropInventory = { compress: 0, backpack: 0, organize: 0 };
+          const fridgeKeys = ['compress', 'backpack', 'organize'];
+          state.fridgePropInventory[fridgeKeys[Math.floor(Math.random() * fridgeKeys.length)]]++;
+          break;
+        case 3:
+          if (!state.tanghuluPropInventory) state.tanghuluPropInventory = { extraStick: 0, undo: 0, lubricant: 0 };
+          const thKeys = ['extraStick', 'undo', 'lubricant'];
+          state.tanghuluPropInventory[thKeys[Math.floor(Math.random() * thKeys.length)]]++;
+          break;
+        case 4:
+          if (!state.gameStaminaInventory) state.gameStaminaInventory = { stamina30: 0, stamina50: 0, stamina100: 0 };
+          const stKeys = ['stamina30', 'stamina50', 'stamina100'];
+          state.gameStaminaInventory[stKeys[Math.floor(Math.random() * stKeys.length)]]++;
+          break;
+      }
+    }
+
+    // 发放糖砂
+    if (grantCrystal) {
+      if (!state.tanghuluSugarCrystal) state.tanghuluSugarCrystal = 0;
+      state.tanghuluSugarCrystal++;
+    }
+
+    return { goldReward, staminaReward, randomItemCount, grantCrystal };
+  }
+
+
+  // ===== 成就检查（在关键操作后调用）=====
+  function checkAchievements() {
+    if (!state.achievements) state.achievements = [];
+    if (!state.achievementNotified) state.achievementNotified = [];
+
+    let newlyUnlocked = [];
+
+    ACHIEVEMENTS.forEach(ach => {
+      if (state.achievements.includes(ach.id)) return;
+      try {
+        if (ach.check()) {
+          state.achievements.push(ach.id);
+          newlyUnlocked.push(ach);
+        }
+      } catch (e) {
+      }
+    });
+
+    if (newlyUnlocked.length > 0) {
+      // 为每个新解锁的成就发放奖励
+      let totalGold = 0;
+      let totalStamina = 0;
+      let totalItems = 0;
+      let gotCrystal = false;
+      newlyUnlocked.forEach(ach => {
+        const reward = grantAchievementReward(ach);
+        totalGold += reward.goldReward;
+        totalStamina += reward.staminaReward;
+        totalItems += reward.randomItemCount;
+        if (reward.grantCrystal) gotCrystal = true;
+      });
+
+      saveDataDebounced('成就解锁');
+      const first = newlyUnlocked[0];
+      if (!state.achievementNotified.includes(first.id)) {
+        state.achievementNotified.push(first.id);
+        // 构建奖励提示文字
+        let rewardText = `+${totalGold}🪙`;
+        if (totalStamina > 0) rewardText += ` +${totalStamina}⚡`;
+        if (totalItems > 0) rewardText += ` +${totalItems}道具`;
+        if (gotCrystal) rewardText += ` +✨糖砂`;
+        showBubble(`🏆 成就解锁！「${first.emoji} ${first.name}」 ${rewardText}`, 6000);
+        if (newlyUnlocked.length > 1) {
+          setTimeout(() => {
+            showBubble(`还有 ${newlyUnlocked.length - 1} 个新成就解锁了！去看看吧`, 4000);
+          }, 6500);
+        }
+      }
+    }
+  }
+
+
+  // ===== 成就展示弹窗 =====
+  function showAchievementsPanel() {
+    document.getElementById('sp-achievements-overlay')?.remove();
+
+    if (!state.achievements) state.achievements = [];
+
+    const categories = [
+      { key: 'interact',   label: '💬 互动' },
+      { key: 'economy',    label: '💰 经济' },
+      { key: 'merge',      label: '🧶 合成工坊' },
+      { key: 'restaurant', label: '🐱 小猫餐厅' },
+      { key: 'minigame',   label: '🎮 小游戏' },
+      { key: 'collect',    label: '📦 收集' },
+      { key: 'special',    label: '⭐ 特殊' },
+      { key: 'milestone',  label: '🏅 里程碑' },
+    ];
+
+    const unlockedCount = state.achievements.length;
+    const totalCount = ACHIEVEMENTS.length;
+    const percent = totalCount > 0 ? Math.round((unlockedCount / totalCount) * 100) : 0;
+
+    let bodyHtml = `
+      <div style="text-align:center;margin-bottom:12px;">
+        <div style="font-size:13px;color:var(--sp-text-primary);font-weight:600;">已解锁 ${unlockedCount} / ${totalCount} (${percent}%)</div>
+        <div style="width:100%;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;margin-top:6px;">
+          <div style="width:${percent}%;height:100%;background:rgba(255,200,50,0.7);border-radius:3px;transition:width 0.3s;"></div>
+        </div>
+      </div>
+    `;
+
+    categories.forEach(cat => {
+      const achs = ACHIEVEMENTS.filter(a => a.category === cat.key);
+      if (achs.length === 0) return;
+      const catUnlocked = achs.filter(a => state.achievements.includes(a.id)).length;
+
+      bodyHtml += `
+        <details style="margin-bottom:8px;border:1px solid rgba(255,255,255,0.08);border-radius:8px;overflow:hidden;">
+          <summary style="padding:8px 12px;font-size:12px;font-weight:600;cursor:pointer;background:rgba(255,255,255,0.04);color:var(--sp-text-primary);list-style:none;display:flex;justify-content:space-between;user-select:none;">
+            <span>${cat.label}</span>
+            <span style="font-size:10px;color:var(--sp-text-muted);">${catUnlocked}/${achs.length}</span>
+          </summary>
+          <div style="padding:6px 8px;display:flex;flex-direction:column;gap:4px;">
+            ${achs.map(ach => {
+              const unlocked = state.achievements.includes(ach.id);
+              return `
+                <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:${unlocked ? 'rgba(255,200,50,0.06)' : 'rgba(255,255,255,0.02)'};border:1px solid ${unlocked ? 'rgba(255,200,50,0.2)' : 'rgba(255,255,255,0.05)'};border-radius:6px;opacity:${unlocked ? '1' : '0.5'};">
+                  <span style="font-size:18px;flex-shrink:0;">${unlocked ? ach.emoji : '🔒'}</span>
+                  <div style="flex:1;">
+                    <div style="font-size:11px;font-weight:600;color:${unlocked ? 'var(--sp-text-primary)' : 'var(--sp-text-muted)'};">${ach.name}</div>
+                    <div style="font-size:10px;color:var(--sp-text-muted);">${ach.desc}</div>
+                    <div style="font-size:9px;color:${unlocked ? 'rgba(255,200,50,0.7)' : 'var(--sp-text-muted)'};margin-top:1px;">${ach.tier === 1 ? '🪙8' : ach.tier === 2 ? '🪙20+⚡5' : ach.tier === 3 ? '🪙50+⚡10+道具×1' : ach.tier === 4 ? '🪙120+⚡20+道具×2' : '🪙300+⚡50+道具×3+✨'}</div>
+                  </div>
+                  ${unlocked ? '<span style="font-size:10px;color:rgba(255,200,50,0.8);">✓</span>' : ''}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </details>
+      `;
+    });
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-achievements-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:2147483649;';
+    overlay.innerHTML = `
+      <div class="sp-total-inv-box" style="max-height:80vh;">
+        <div class="sp-total-inv-header">
+          <span>🏆 成就系统</span>
+          <button class="sp-total-inv-close" id="sp-achievements-close" title="关闭">✕</button>
+        </div>
+        <div class="sp-total-inv-body" style="padding:12px;">
+          ${bodyHtml}
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    // 居中
+    requestAnimationFrame(() => {
+      const box = overlay.querySelector('.sp-total-inv-box');
+      if (box) {
+        const boxH = box.offsetHeight || 400;
+        const boxW = box.offsetWidth || 340;
+        box.style.position = 'fixed';
+        box.style.top = Math.max(20, Math.floor((window.innerHeight - boxH) / 2)) + 'px';
+        box.style.left = Math.floor((window.innerWidth - boxW) / 2) + 'px';
+        box.style.margin = '0';
+      }
+    });
+
+    document.getElementById('sp-achievements-close').onclick = () => overlay.remove();
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    overlay.querySelector('.sp-total-inv-box').addEventListener('click', (e) => { e.stopPropagation(); });
+
+  }
 
   // ===== 道具定义 =====
   const TANGHULU_PROPS = {
@@ -13843,6 +14997,7 @@ function refreshCharPreview() {
     }
 
     saveDataImmediate('糖葫芦通关');
+    checkAchievements();
 
     // 弹出结算面板
     const panel = document.getElementById('sp-tanghulu-panel');
@@ -14766,6 +15921,7 @@ function refreshCharPreview() {
     restaurantRuntime.customers.splice(customerIdx, 1);
 
     saveDataDebounced('餐厅上菜');
+    checkAchievements();
     restaurantRender();
 
     const bonusText = bonusGold > 0 ? ` (+${bonusGold}额外)` : '';
@@ -16642,6 +17798,7 @@ function refreshCharPreview() {
     const totalGold = baseReward + bonusReward;
     state.gameGold += totalGold;
     saveDataImmediate('货架整理结算');
+    checkAchievements();
 
     const panel = document.getElementById('sp-shelf-panel');
     if (!panel) return;
