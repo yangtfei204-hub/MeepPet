@@ -632,8 +632,8 @@
     } catch (e) {
       if (e.name === 'QuotaExceededError' || e.code === 22) {
         console.warn(`[${PLUGIN_NAME}] 存储空间不足，尝试压缩...`);
-      if (state.petChatHistory.length > 50) {
-          state.petChatHistory = state.petChatHistory.slice(-50);
+      if (state.petChatHistory.length > 200) { // 改为 200 条
+          state.petChatHistory = state.petChatHistory.slice(-200);
         }
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings, state }));
@@ -1150,8 +1150,8 @@
       }
 
       const data = await res.json();
-      // 使用 jsDelivr CDN 加速（比 raw.githubusercontent.com 快）
-      const cdnUrl = `https://cdn.jsdelivr.net/gh/${settings.githubRepo}@${settings.githubBranch}/${path}`;
+      // 直接使用 GitHub raw 链接（公开仓库可直接访问，无需等待 CDN 缓存）
+      const cdnUrl = `https://raw.githubusercontent.com/${settings.githubRepo}/${settings.githubBranch}/${path}`;
       return cdnUrl;
     } catch (err) {
       console.error('[meep-pet] GitHub 上传异常:', err);
@@ -6255,12 +6255,12 @@ async function refreshWorldPreview() {
       return {
         totalBytes: total,
         myBytes: mySize,
-        maxBytes: 5 * 1024 * 1024, // 浏览器通常限制 5MB
+        maxBytes: 100 * 1024 * 1024, // 改为 100MB
         totalKB: (total / 1024).toFixed(1),
         myKB: (mySize / 1024).toFixed(1),
-        maxKB: (5 * 1024).toFixed(0),
-        percent: Math.min(100, (total / (5 * 1024 * 1024) * 100)).toFixed(1),
-        myPercent: Math.min(100, (mySize / (5 * 1024 * 1024) * 100)).toFixed(1),
+        maxKB: (100 * 1024).toFixed(0), // 这里也改
+        percent: Math.min(100, (total / (100 * 1024 * 1024) * 100)).toFixed(1), // 这里也改
+        myPercent: Math.min(100, (mySize / (100 * 1024 * 1024) * 100)).toFixed(1), // 这里也改
       };
     } catch (e) {
       return { totalBytes: 0, myBytes: 0, maxBytes: 5242880, totalKB: '0', myKB: '0', maxKB: '5120', percent: '0', myPercent: '0' };
