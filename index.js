@@ -632,7 +632,12 @@
           localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings, state }));
         } catch (e2) {
           console.error(`[${PLUGIN_NAME}] 存储满了`, e2);
-          showBubble('⚠️ 存储满了！请减少图片或导出备份', 6000);
+          // 每5分钟最多提醒一次，避免刷屏
+          const now = Date.now();
+          if (!saveData._lastFullWarning || now - saveData._lastFullWarning > 5 * 60 * 1000) {
+            saveData._lastFullWarning = now;
+            showBubble('⚠️ 存储满了！请减少图片或导出备份', 6000);
+          }
         }
       }
     }
@@ -4142,7 +4147,7 @@ async function refreshWorldPreview() {
         </div>
         <div id="sp-house-dialogue-overlay">
           <div id="sp-house-dialogue-box">
-            <div id="sp-house-char-name"><span id="sp-house-avatar"></span><span id="sp-house-name-text">${settings.petName || '咪噗'}</span></div>
+            <div id="sp-house-char-name"><span id="sp-house-avatar"></span><span id="sp-house-name-text">${settings.petName || '咪噗'}</span><button id="sp-house-expand-btn" style="margin-left:auto;background:none;border:none;font-size:12px;cursor:pointer;color:rgba(255,255,255,0.5);padding:2px 6px;border-radius:4px;transition:all 0.2s;" title="展开/收起对话">▼</button></div>
             <div id="sp-house-dialogue-text"></div>
           </div>
         <div id="sp-house-input-area">
@@ -4180,6 +4185,14 @@ async function refreshWorldPreview() {
         setTimeout(() => updateHouseScene(), 5000);
       }
       sleepPet();
+    };
+    document.getElementById('sp-house-expand-btn').onclick = () => {
+      const box = document.getElementById('sp-house-dialogue-box');
+      const btn = document.getElementById('sp-house-expand-btn');
+      if (!box || !btn) return;
+      const expanded = box.classList.toggle('sp-house-dialogue-expanded');
+      btn.textContent = expanded ? '▲' : '▼';
+      btn.style.color = expanded ? 'rgba(100,180,255,0.8)' : 'rgba(255,255,255,0.5)';
     };
     document.getElementById('sp-house-minimize').onclick = () => {
       const panel = document.getElementById('silly-pet-house');
@@ -14533,6 +14546,136 @@ function refreshCharPreview() {
       check: () => (state.achievements || []).length >= Math.floor(ACHIEVEMENTS.length * 0.8) },
     { id: 'completionist_100', name: '传说·全成就大师', emoji: '🏆', desc: '解锁全部成就', category: 'milestone', tier: 5,
       check: () => (state.achievements || []).length >= ACHIEVEMENTS.length - 1 },
+    // ===================== 新增：互动深度 =====================
+    { id: 'feed_1000',        name: '万宠集于一身',     emoji: '🌹', desc: '累计互动1000次', category: 'interact', tier: 5,
+      check: () => state.totalInteractions >= 1000 },
+    { id: 'chat_1000',        name: '万语千言',         emoji: '💌', desc: '累计聊天1000条', category: 'interact', tier: 5,
+      check: () => state.petChatHistory.length >= 1000 },
+    { id: 'archive_3',        name: '记忆归档人',       emoji: '📚', desc: '产生过3批聊天归档', category: 'interact', tier: 2,
+      check: () => (state.petChatArchive || []).length >= 3 },
+    { id: 'archive_10',       name: '编年史学家',       emoji: '🏛️', desc: '产生过10批聊天归档', category: 'interact', tier: 4,
+      check: () => (state.petChatArchive || []).length >= 10 },
+
+    // ===================== 新增：经济进阶 =====================
+    { id: 'gold_100000',      name: '猫界央行行长',     emoji: '🏦', desc: '拥有100000金币', category: 'economy', tier: 5,
+      check: () => state.gameGold >= 100000 },
+    { id: 'spend_big',        name: '挥金如土',         emoji: '💸', desc: '单次购买道具花费80金币以上', category: 'economy', tier: 2,
+      check: () => {
+        const inv = state.gameInventory || [];
+        return inv.some(i => {
+          const items = GAME_SHOP_ITEMS[i.category];
+          return items && items[i.idx] && items[i.idx].price >= 80;
+        });
+      }},
+
+    // ===================== 新增：合成工坊进阶 =====================
+    { id: 'merge_all_chains_lv5', name: '八链精通',     emoji: '🔥', desc: '8条链各解锁到Lv5以上', category: 'merge', tier: 4,
+      check: () => {
+        const chains = ['toy', 'food', 'gem', 'potion', 'music', 'flower', 'star', 'seasoning'];
+        return chains.every(chain => (state.gameCollection || []).includes(`${chain}_5`));
+      }},
+    { id: 'merge_all_chains_lv8', name: '传说·八链至尊', emoji: '🌌', desc: '8条链全部达到Lv8', category: 'merge', tier: 5,
+      check: () => {
+        const chains = ['toy', 'food', 'gem', 'potion', 'music', 'flower', 'star', 'seasoning'];
+        return chains.every(chain => (state.gameCollection || []).includes(`${chain}_8`));
+      }},
+    { id: 'merge_board_full',  name: '棋盘爆满',       emoji: '🧩', desc: '棋盘34格全部有物品（不含生成器和售卖区）', category: 'merge', tier: 3,
+      check: () => {
+        if (!state.gameBoard || state.gameBoard.length !== 36) return false;
+        let filled = 0;
+        for (let i = 0; i < 36; i++) {
+          if (i === state.gameGeneratorPos || i === state.gameSellPos) continue;
+          if (state.gameBoard[i]) filled++;
+        }
+        return filled >= 34;
+      }},
+
+    // ===================== 新增：餐厅进阶 =====================
+    { id: 'restaurant_earn_50000', name: '餐饮传说',    emoji: '💫', desc: '餐厅累计收入50000金币', category: 'restaurant', tier: 5,
+      check: () => state.restaurantTotalEarnings >= 50000 },
+    { id: 'restaurant_rep_200', name: '全城热议',       emoji: '📺', desc: '声望达到200', category: 'restaurant', tier: 3,
+      check: () => state.restaurantReputation >= 200 },
+    { id: 'restaurant_rep_300', name: '传奇名厨',       emoji: '🔪', desc: '声望达到300', category: 'restaurant', tier: 4,
+      check: () => state.restaurantReputation >= 300 },
+    { id: 'restaurant_rep_1000', name: '喵星米其林',    emoji: '⭐', desc: '声望达到1000', category: 'restaurant', tier: 5,
+      check: () => state.restaurantReputation >= 1000 },
+
+    // ===================== 新增：小游戏进阶 =====================
+    { id: 'fridge_total_100',  name: '冰箱仓库管理员', emoji: '🏭', desc: '冰箱总件数达到100', category: 'minigame', tier: 5,
+      check: () => (state.fridgeInventory || []).reduce((s, i) => s + i.count, 0) >= 100 },
+    { id: 'tanghulu_all_types', name: '糖葫芦全家福',  emoji: '🍢', desc: '糖葫芦库存种类达到15种', category: 'minigame', tier: 5,
+      check: () => (state.tanghuluInventory || []).filter(i => i.count > 0).length >= 15 },
+    { id: 'tanghulu_total_30', name: '糖葫芦批发商',   emoji: '🏪', desc: '糖葫芦库存总数达到30串', category: 'minigame', tier: 4,
+      check: () => (state.tanghuluInventory || []).reduce((s, i) => s + i.count, 0) >= 30 },
+
+    // ===================== 新增：收集进阶 =====================
+    { id: 'emoji_20',          name: '表情包仓库',     emoji: '📦', desc: '上传20个表情包', category: 'collect', tier: 4,
+      check: () => (settings.emojiStickers || []).length >= 20 },
+    { id: 'custom_sprites_10', name: '首席动画师',     emoji: '🎥', desc: '添加10个以上自定义动作', category: 'collect', tier: 4,
+      check: () => (settings.customSprites || []).filter(s => s.image).length >= 10 },
+    { id: 'game_images_50',    name: '像素艺术大师',   emoji: '🎨', desc: '上传50张游戏自定义图片', category: 'collect', tier: 4,
+      check: () => Object.keys(state.gameCustomImages || {}).length >= 50 },
+    { id: 'all_mood_images',   name: '表情全套',       emoji: '😊', desc: '6种心情图标全部自定义', category: 'collect', tier: 3,
+      check: () => {
+        const moods = ['happy', 'neutral', 'sad', 'sleepy', 'hungry', 'dirty'];
+        return moods.every(m => settings.moodImages && settings.moodImages[m]);
+      }},
+    { id: 'all_menu_icons',    name: '菜单全定制',     emoji: '🎯', desc: '8个菜单按钮全部自定义图标', category: 'collect', tier: 3,
+      check: () => {
+        const actions = ['feed', 'bath', 'sleep', 'chat', 'diary', 'game', 'house', 'settings'];
+        return actions.every(a => settings.menuIcons && settings.menuIcons[a]);
+      }},
+    { id: 'house_full_setup',  name: '小屋装修完成',   emoji: '🏠', desc: '小屋背景+立绘+头像全部设置', category: 'collect', tier: 2,
+      check: () => !!settings.houseBackground && !!settings.houseCharacter && !!settings.houseCharacterAvatar },
+    { id: 'house_expressions_3', name: '表情立绘收藏', emoji: '🎭', desc: '设置3个以上小屋表情立绘', category: 'collect', tier: 2,
+      check: () => (settings.houseExpressions || []).filter(e => e.image && e.keywords).length >= 3 },
+    { id: 'house_expressions_8', name: '千面演员',     emoji: '🎪', desc: '设置8个以上小屋表情立绘', category: 'collect', tier: 4,
+      check: () => (settings.houseExpressions || []).filter(e => e.image && e.keywords).length >= 8 },
+
+    // ===================== 新增：特殊/隐藏 =====================
+    { id: 'seasoning_all',     name: '万味俱全',       emoji: '🫙', desc: '同时拥有全部14种调料', category: 'special', tier: 5,
+      check: () => Object.values(state.restaurantSeasonings || {}).filter(v => v > 0).length >= 14 },
+    { id: 'midnight_gamer',    name: '深夜肝帝',       emoji: '🦉', desc: '在凌晨0-3点玩小游戏（有游戏数据变动）', category: 'special', tier: 2,
+      check: () => {
+        const hour = new Date().getHours();
+        return hour >= 0 && hour < 3 && (state.gameCollection || []).length > 0;
+      }},
+    { id: 'jailbreak_set',    name: '自由的猫',       emoji: '🔓', desc: '设置了破限提示词', category: 'special', tier: 1,
+      check: () => !!settings.jailbreak && settings.jailbreak.trim().length > 5 },
+    { id: 'vision_enabled',   name: '火眼金睛',       emoji: '👁️', desc: '开启了视觉识别功能', category: 'special', tier: 1,
+      check: () => settings.enableVision === true },
+    { id: 'streaming_enabled', name: '流光溢彩',      emoji: '✨', desc: '开启了流式输出', category: 'special', tier: 1,
+      check: () => settings.enableStreaming === true },
+    { id: 'time_awareness',   name: '时间掌控者',     emoji: '⏰', desc: '开启了时间感知', category: 'special', tier: 1,
+      check: () => settings.enableTimeAwareness === true },
+    { id: 'max_activity',     name: '话痨模式',       emoji: '📣', desc: '活跃度设为100%', category: 'special', tier: 1,
+      check: () => settings.activityLevel >= 100 },
+    { id: 'zero_activity',    name: '禅定模式',       emoji: '🧘', desc: '活跃度设为0%', category: 'special', tier: 1,
+      check: () => settings.activityLevel <= 0 },
+    { id: 'scale_tiny',       name: '迷你宠物',       emoji: '🔬', desc: '桌宠缩放设为0.5x', category: 'special', tier: 1,
+      check: () => settings.petScale <= 0.5 },
+    { id: 'scale_giant',      name: '巨型桌宠',       emoji: '🦕', desc: '桌宠缩放设为2.0x', category: 'special', tier: 1,
+      check: () => settings.petScale >= 2.0 },
+    { id: 'inventory_rich',   name: '道具满仓',       emoji: '🎁', desc: '工坊背包同时拥有10种以上道具', category: 'special', tier: 3,
+      check: () => (state.gameInventory || []).filter(i => i.count > 0).length >= 10 },
+    { id: 'cooked_5_types',   name: '五菜齐全',       emoji: '🍳', desc: '出餐台同时有5种以上菜品', category: 'special', tier: 3,
+      check: () => (state.restaurantCookedDishes || []).filter(d => d.count > 0).length >= 5 },
+    { id: 'cooked_10_types',  name: '满汉全席',       emoji: '🍽️', desc: '出餐台同时有10种以上菜品', category: 'special', tier: 4,
+      check: () => (state.restaurantCookedDishes || []).filter(d => d.count > 0).length >= 10 },
+
+    // ===================== 新增：里程碑 =====================
+    { id: 'total_500_actions', name: '五百里程碑',     emoji: '🚩', desc: '总互动+聊天+日记超过500次', category: 'milestone', tier: 3,
+      check: () => state.totalInteractions + state.petChatHistory.length + (state.diaryEntries || []).length >= 500 },
+    { id: 'total_2000_actions', name: '两千之约',      emoji: '💎', desc: '总互动+聊天+日记超过2000次', category: 'milestone', tier: 5,
+      check: () => state.totalInteractions + state.petChatHistory.length + (state.diaryEntries || []).length >= 2000 },
+    { id: 'played_180_days',  name: '半年之恋',       emoji: '💖', desc: '桌宠数据存在超过180天', category: 'milestone', tier: 4,
+      check: () => {
+        const firstChat = state.petChatHistory[0];
+        if (!firstChat || !firstChat.timestamp) return false;
+        return Date.now() - firstChat.timestamp >= 180 * 24 * 60 * 60 * 1000;
+      }},
+    { id: 'master_of_all',    name: '全能大师',       emoji: '🌟', desc: '餐厅Lv8+ 且 图鉴50+ 且 金币5000+', category: 'milestone', tier: 5,
+      check: () => state.restaurantLevel >= 8 && (state.gameCollection || []).length >= 50 && state.gameGold >= 5000 },
   ];
 
 
