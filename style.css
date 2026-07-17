@@ -2110,6 +2110,10 @@
   border-color: rgba(200,150,100,0.3);
 }
 
+.sp-game-cell.sp-game-chain-stamina {
+  border-color: rgba(255,230,50,0.4);
+}
+
 .sp-game-cell.sp-game-generator {
   border-color: rgba(255,215,0,0.5);
   background: rgba(255,215,0,0.1);

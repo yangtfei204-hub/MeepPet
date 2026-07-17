@@ -7815,6 +7815,19 @@ function refreshCharPreview() {
         { level: 7, emoji: '🫗', name: '陈年老醋', sell: 120, seasoningId: 'vinegar' },
         { level: 8, emoji: '🏺', name: '传说万味精华', sell: 280, seasoningId: 'spice' },
       ]
+    },
+    stamina: {
+      name: '⚡ 体力链',
+      items: [
+        { level: 1, emoji: '💧', name: '体力露珠', sell: 1, staminaRestore: 3 },
+        { level: 2, emoji: '🫧', name: '活力泡泡', sell: 2, staminaRestore: 7 },
+        { level: 3, emoji: '🔋', name: '能量电池', sell: 5, staminaRestore: 16 },
+        { level: 4, emoji: '⚡', name: '闪电瓶', sell: 11, staminaRestore: 35 },
+        { level: 5, emoji: '🌟', name: '星辰精华', sell: 25, staminaRestore: 75 },
+        { level: 6, emoji: '💥', name: '超新星核心', sell: 55, staminaRestore: 160 },
+        { level: 7, emoji: '🌀', name: '永动之源', sell: 120, staminaRestore: 340 },
+        { level: 8, emoji: '♾️', name: '传说无限体力', sell: 280, staminaRestore: 700 },
+      ]
     }
 
   };
@@ -8025,6 +8038,26 @@ function refreshCharPreview() {
       }
     }
 
+    // 小概率附赠体力链物品（5%概率）
+    if (Math.random() < 0.05) {
+      const staminaEmptySlots = [];
+      for (let i = 0; i < GAME_BOARD_CELLS; i++) {
+        if (i === state.gameGeneratorPos || i === state.gameSellPos) continue;
+        if (!state.gameBoard[i]) staminaEmptySlots.push(i);
+      }
+      if (staminaEmptySlots.length > 0) {
+        const staminaLevel = Math.random() < 0.7 ? 1 : (Math.random() < 0.8 ? 2 : 3);
+        const staminaSlot = staminaEmptySlots[Math.floor(Math.random() * staminaEmptySlots.length)];
+        state.gameBoard[staminaSlot] = { chain: 'stamina', level: staminaLevel };
+        const staminaItemKey = `stamina_${staminaLevel}`;
+        if (!state.gameCollection.includes(staminaItemKey)) {
+          state.gameCollection.push(staminaItemKey);
+        }
+        const staminaItemData = GAME_CHAINS.stamina.items[staminaLevel - 1];
+        gameShowNotice(`⚡ 幸运附赠！获得 ${staminaItemData.emoji} ${staminaItemData.name}！`);
+      }
+    }
+
     saveDataDebounced('游戏生成道具');
     gameRenderBoard();
     gameRenderStatus();
@@ -8045,8 +8078,22 @@ function refreshCharPreview() {
     if (toIdx === state.gameSellPos) {
       const chainData = GAME_CHAINS[fromItem.chain];
       const itemData = chainData.items[fromItem.level - 1];
+
+      // 体力链售卖：恢复体力而非给金币
+      if (fromItem.chain === 'stamina' && itemData.staminaRestore) {
+        state.gameStamina = Math.min(999, state.gameStamina + itemData.staminaRestore);
+        state.gameBoard[fromIdx] = null;
+        gameShowNotice(`⚡ 使用 ${itemData.emoji} ${itemData.name}，恢复 ${itemData.staminaRestore} 点体力！`);
+        saveDataDebounced('游戏售卖体力');
+        gameRenderBoard();
+        gameRenderStatus();
+        gameRenderOrders();
+        return true;
+      }
+
       state.gameGold += itemData.sell;
       state.gameBoard[fromIdx] = null;
+
 
       // 调料链联动：售卖调料时从餐厅库存扣除
       if (fromItem.chain === 'seasoning' && itemData.seasoningId) {
@@ -8142,6 +8189,26 @@ function refreshCharPreview() {
     // 替换这个订单
     const newOrders = gameGenerateOrders(1);
     state.gameOrders[orderIdx] = newOrders[0];
+
+    // 完成订单时小概率附赠体力链物品（8%概率）
+    if (Math.random() < 0.08) {
+      const staminaEmptySlots2 = [];
+      for (let i = 0; i < GAME_BOARD_CELLS; i++) {
+        if (i === state.gameGeneratorPos || i === state.gameSellPos) continue;
+        if (!state.gameBoard[i]) staminaEmptySlots2.push(i);
+      }
+      if (staminaEmptySlots2.length > 0) {
+        const staminaLevel2 = Math.random() < 0.6 ? 1 : (Math.random() < 0.75 ? 2 : 3);
+        const staminaSlot2 = staminaEmptySlots2[Math.floor(Math.random() * staminaEmptySlots2.length)];
+        state.gameBoard[staminaSlot2] = { chain: 'stamina', level: staminaLevel2 };
+        const staminaItemKey2 = `stamina_${staminaLevel2}`;
+        if (!state.gameCollection.includes(staminaItemKey2)) {
+          state.gameCollection.push(staminaItemKey2);
+        }
+        const staminaItemData2 = GAME_CHAINS.stamina.items[staminaLevel2 - 1];
+        gameShowNotice(`⚡ 订单奖励附赠！${staminaItemData2.emoji} ${staminaItemData2.name}！`);
+      }
+    }
 
     saveDataDebounced('游戏订单完成');
     gameRenderBoard();
@@ -8819,7 +8886,7 @@ function refreshCharPreview() {
     const container = document.getElementById('sp-game-collection-content');
     if (!container) return;
 
-    const chainKeys = ['toy', 'food', 'gem', 'potion', 'music', 'flower', 'star', 'seasoning'];
+    const chainKeys = ['toy', 'food', 'gem', 'potion', 'music', 'flower', 'star', 'seasoning', 'stamina'];
     container.innerHTML = chainKeys.map(chainKey => {
       const chain = GAME_CHAINS[chainKey];
       return `
@@ -10387,6 +10454,8 @@ function refreshCharPreview() {
         { type: 'tanghuluItem', fruitKey: 'orange',     label: '🍊 蜜桔瓣儿糖葫芦 ×1',   count: 1, weight: 12 },
         { type: 'tanghuluItem', fruitKey: 'banana',     label: '🍌 香蕉片儿糖葫芦 ×1',   count: 1, weight: 12 },
         { type: 'tanghuluItem', fruitKey: 'tomato',     label: '🍅 经典圣女果糖葫芦 ×1', count: 1, weight: 12 },
+        // ===== ⚡ 体力链碎片 =====
+        { type: 'boarditem', chain: 'stamina', level: 1, label: '💧 体力露珠 (Lv1)', weight: 5 },
       ]
     },
 
@@ -10470,6 +10539,9 @@ function refreshCharPreview() {
         { type: 'tanghuluItem', fruitKey: 'coconut',     label: '🥥 椰子奶球糖葫芦 ×1',   count: 1, weight: 10 },
         { type: 'tanghuluItem', fruitKey: 'pineapple',   label: '🍍 金菠萝块糖葫芦 ×1',   count: 1, weight: 10 },
         { type: 'tanghuluItem', fruitKey: 'watermelon',  label: '🍉 迷你西瓜球糖葫芦 ×1', count: 1, weight: 10 },
+        // ===== ⚡ 体力链碎片 =====
+        { type: 'boarditem', chain: 'stamina', level: 1, label: '💧 体力露珠 (Lv1)', weight: 12 },
+        { type: 'boarditem', chain: 'stamina', level: 2, label: '🫧 活力泡泡 (Lv2)', weight: 6 },
       ]
     },
 
@@ -10568,6 +10640,9 @@ function refreshCharPreview() {
         { type: 'tanghuluItem', fruitKey: 'kiwi',        label: '🥝 翡翠猕猴桃糖葫芦 ×3',   count: 3, weight: 6 },
         { type: 'tanghuluItem', fruitKey: 'grape',       label: '🍇 晶莹葡萄糖葫芦 ×3',     count: 3, weight: 5 },
         { type: 'tanghuluItem', fruitKey: 'strawberry',  label: '🍓 甜心草莓糖葫芦 ×3',     count: 3, weight: 5 },
+        // ===== ⚡ 体力链碎片 =====
+        { type: 'boarditem', chain: 'stamina', level: 2, label: '🫧 活力泡泡 (Lv2)', weight: 15 },
+        { type: 'boarditem', chain: 'stamina', level: 3, label: '🔋 能量电池 (Lv3)', weight: 6 },
       ]
     }
   ];
