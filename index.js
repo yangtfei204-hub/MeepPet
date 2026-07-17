@@ -221,6 +221,13 @@
     displayMode: '2d',
     petScale: 1.0,            // 桌宠缩放比例 0.5~2.0
     apiTimeout: 15,           // API 请求超时（秒）
+
+    // GitHub 图片托管
+    githubToken: '',           // GitHub Personal Access Token
+    githubRepo: '',            // 格式: username/repo-name
+    githubBranch: 'main',     // 分支名
+    githubPath: 'meep-images', // 存放图片的文件夹路径
+
     spriteIdle: '',
     spriteWalkLeft: '',      // 往左走
     spriteWalkRight: '',     // 往右走
@@ -1090,6 +1097,302 @@
       img.onerror = () => resolve(dataUrl);
       img.src = dataUrl;
     });
+  }
+
+  // ============================================================
+  // GitHub 图片托管
+  // ============================================================
+  async function uploadImageToGithub(base64Data, filename) {
+    if (!settings.githubToken || !settings.githubRepo) {
+      showBubble('请先在设置中配置 GitHub Token 和仓库', 3000);
+      return null;
+    }
+
+    // 去掉 data:image/xxx;base64, 前缀
+    const base64Content = base64Data.replace(/^data:image\/\w+;base64,/, '');
+    const path = `${settings.githubPath || 'meep-images'}/${filename}`;
+    const url = `https://api.github.com/repos/${settings.githubRepo}/contents/${path}`;
+
+    try {
+      // 先检查文件是否已存在（获取 sha）
+      let sha = '';
+      try {
+        const checkRes = await fetch(url, {
+          headers: { 'Authorization': `Bearer ${settings.githubToken}` }
+        });
+        if (checkRes.ok) {
+          const checkData = await checkRes.json();
+          sha = checkData.sha;
+        }
+      } catch (e) { /* 文件不存在，正常 */ }
+
+      const body = {
+        message: `meep-pet: upload ${filename}`,
+        content: base64Content,
+        branch: settings.githubBranch || 'main',
+      };
+      if (sha) body.sha = sha; // 覆盖已有文件
+
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${settings.githubToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        console.error('[meep-pet] GitHub 上传失败:', res.status, errData);
+        showBubble(`GitHub 上传失败: ${res.status}`, 3000);
+        return null;
+      }
+
+      const data = await res.json();
+      // 使用 jsDelivr CDN 加速（比 raw.githubusercontent.com 快）
+      const cdnUrl = `https://cdn.jsdelivr.net/gh/${settings.githubRepo}@${settings.githubBranch}/${path}`;
+      return cdnUrl;
+    } catch (err) {
+      console.error('[meep-pet] GitHub 上传异常:', err);
+      showBubble(`上传异常: ${err.message}`, 3000);
+      return null;
+    }
+  }
+
+  // 显示迁移进度条弹窗
+  function showMigrateProgress(current, total, currentName, status) {
+    let overlay = document.getElementById('sp-migrate-progress-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'sp-migrate-progress-overlay';
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:2147483650;';
+      overlay.innerHTML = `
+        <div id="sp-migrate-progress-box" style="background:var(--sp-bg-secondary);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--sp-border);border-radius:14px;padding:24px;width:300px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,0.4);text-align:center;">
+          <div style="font-size:24px;margin-bottom:12px;">☁️</div>
+          <div id="sp-migrate-title" style="font-size:14px;font-weight:700;color:var(--sp-text-primary);margin-bottom:6px;">正在迁移图片…</div>
+          <div id="sp-migrate-status" style="font-size:11px;color:var(--sp-text-muted);margin-bottom:12px;min-height:16px;"></div>
+          <div style="width:100%;height:8px;background:rgba(255,255,255,0.1);border-radius:4px;overflow:hidden;margin-bottom:8px;">
+            <div id="sp-migrate-bar" style="width:0%;height:100%;background:linear-gradient(90deg,rgba(100,180,255,0.7),rgba(100,220,100,0.7));border-radius:4px;transition:width 0.3s ease;"></div>
+          </div>
+          <div id="sp-migrate-count" style="font-size:12px;color:var(--sp-text-secondary);font-weight:600;">0 / 0</div>
+          <div id="sp-migrate-current" style="font-size:10px;color:var(--sp-text-muted);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;"></div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+    }
+
+    const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+    const bar = document.getElementById('sp-migrate-bar');
+    const count = document.getElementById('sp-migrate-count');
+    const currentEl = document.getElementById('sp-migrate-current');
+    const statusEl = document.getElementById('sp-migrate-status');
+    const titleEl = document.getElementById('sp-migrate-title');
+
+    if (bar) bar.style.width = percent + '%';
+    if (count) count.textContent = `${current} / ${total}`;
+    if (currentEl) currentEl.textContent = currentName ? `📁 ${currentName}` : '';
+    if (statusEl) statusEl.textContent = status || '上传中，请勿关闭页面…';
+    if (titleEl && current >= total && total > 0) titleEl.textContent = '迁移完成！';
+  }
+
+  // 关闭进度条弹窗
+  function closeMigrateProgress() {
+    const overlay = document.getElementById('sp-migrate-progress-overlay');
+    if (overlay) overlay.remove();
+  }
+
+  // 更新进度条为完成状态（显示结果 + 关闭按钮）
+  function showMigrateComplete(migrated, failed, storageKB) {
+    const box = document.getElementById('sp-migrate-progress-box');
+    if (!box) return;
+
+    box.innerHTML = `
+      <div style="font-size:32px;margin-bottom:12px;">${failed === 0 ? '✅' : '⚠️'}</div>
+      <div style="font-size:15px;font-weight:700;color:var(--sp-text-primary);margin-bottom:10px;">迁移完成！</div>
+      <div style="font-size:13px;color:var(--sp-text-secondary);line-height:1.8;margin-bottom:16px;">
+        <div>成功上传：<span style="color:rgba(100,220,100,0.9);font-weight:600;">${migrated} 张</span></div>
+        ${failed > 0 ? `<div>上传失败：<span style="color:#f66;font-weight:600;">${failed} 张</span></div>` : ''}
+        <div>当前存储占用：<span style="font-weight:600;">${storageKB} KB</span></div>
+      </div>
+      <button id="sp-migrate-close-btn" style="padding:9px 28px;font-size:13px;font-weight:600;border-radius:8px;border:1px solid var(--sp-primary-border);background:var(--sp-primary);color:#fff;cursor:pointer;transition:background 0.2s;">确定</button>
+    `;
+
+    document.getElementById('sp-migrate-close-btn')?.addEventListener('click', () => {
+      closeMigrateProgress();
+    });
+  }
+
+  // 批量迁移：将所有 base64 图片上传到 GitHub 并替换为 URL
+  async function migrateImagesToGithub() {
+    if (!settings.githubToken || !settings.githubRepo) {
+      showBubble('请先配置 GitHub Token 和仓库', 3000);
+      return;
+    }
+
+    // ===== 第一步：收集所有需要迁移的图片 =====
+    const tasks = []; // [{key, getVal, setVal, name}]
+
+    // 精灵图
+    const spriteKeys = [
+      'spriteIdle', 'spriteWalkLeft', 'spriteWalkRight', 'spriteWalkUp', 'spriteWalkDown',
+      'spriteSleep', 'spriteHappy', 'spriteSad', 'spriteDrag', 'spriteDizzy',
+      'spriteEat', 'spriteBath', 'spriteWave', 'spriteThink',
+      'spriteHangLeft', 'spriteHangRight', 'spriteHangTop',
+      'foodImage', 'bathImage', 'bedImage',
+      'houseBackground', 'houseCharacter', 'houseCharacterAvatar',
+      'houseActionFeed', 'houseActionBath', 'houseActionSleep',
+      'houseButtonFeed', 'houseButtonBath', 'houseButtonSleep',
+    ];
+    for (const key of spriteKeys) {
+      if (settings[key] && settings[key].startsWith('data:')) {
+        tasks.push({
+          name: key,
+          getVal: () => settings[key],
+          setVal: (url) => { settings[key] = url; },
+        });
+      }
+    }
+
+    // 心情图标
+    if (settings.moodImages) {
+      for (const [moodKey, val] of Object.entries(settings.moodImages)) {
+        if (val && val.startsWith('data:')) {
+          tasks.push({
+            name: `mood_${moodKey}`,
+            getVal: () => settings.moodImages[moodKey],
+            setVal: (url) => { settings.moodImages[moodKey] = url; },
+          });
+        }
+      }
+    }
+
+    // 菜单图标
+    if (settings.menuIcons) {
+      for (const [actionKey, val] of Object.entries(settings.menuIcons)) {
+        if (val && val.startsWith('data:')) {
+          tasks.push({
+            name: `menu_${actionKey}`,
+            getVal: () => settings.menuIcons[actionKey],
+            setVal: (url) => { settings.menuIcons[actionKey] = url; },
+          });
+        }
+      }
+    }
+
+    // 表情包
+    if (settings.emojiStickers) {
+      for (let i = 0; i < settings.emojiStickers.length; i++) {
+        const sticker = settings.emojiStickers[i];
+        if (sticker.image && sticker.image.startsWith('data:')) {
+          const idx = i;
+          tasks.push({
+            name: `emoji_${sticker.name || i}`,
+            getVal: () => settings.emojiStickers[idx].image,
+            setVal: (url) => { settings.emojiStickers[idx].image = url; },
+          });
+        }
+      }
+    }
+
+    // 自定义动作
+    if (settings.customSprites) {
+      for (let i = 0; i < settings.customSprites.length; i++) {
+        const sprite = settings.customSprites[i];
+        if (sprite.image && sprite.image.startsWith('data:')) {
+          const idx = i;
+          tasks.push({
+            name: `custom_${sprite.name || i}`,
+            getVal: () => settings.customSprites[idx].image,
+            setVal: (url) => { settings.customSprites[idx].image = url; },
+          });
+        }
+      }
+    }
+
+    // 小屋表情立绘
+    if (settings.houseExpressions) {
+      for (let i = 0; i < settings.houseExpressions.length; i++) {
+        const expr = settings.houseExpressions[i];
+        if (expr.image && expr.image.startsWith('data:')) {
+          const idx = i;
+          tasks.push({
+            name: `house_expr_${expr.name || i}`,
+            getVal: () => settings.houseExpressions[idx].image,
+            setVal: (url) => { settings.houseExpressions[idx].image = url; },
+          });
+        }
+      }
+    }
+
+    // 游戏自定义图片
+    if (state.gameCustomImages) {
+      for (const [imgKey, val] of Object.entries(state.gameCustomImages)) {
+        if (val && val.startsWith('data:')) {
+          const k = imgKey;
+          tasks.push({
+            name: `game_${k}`,
+            getVal: () => state.gameCustomImages[k],
+            setVal: (url) => { state.gameCustomImages[k] = url; },
+          });
+        }
+      }
+    }
+
+    // 游戏背景图
+    if (state.gameBgImage && state.gameBgImage.startsWith('data:')) {
+      tasks.push({
+        name: 'game_background',
+        getVal: () => state.gameBgImage,
+        setVal: (url) => { state.gameBgImage = url; },
+      });
+    }
+
+    // ===== 第二步：检查是否有东西要迁移 =====
+    if (tasks.length === 0) {
+      showBubble('没有需要迁移的 base64 图片，全部已经是链接了 ✨', 3000);
+      return;
+    }
+
+    // ===== 第三步：显示进度条，开始上传 =====
+    const total = tasks.length;
+    let migrated = 0;
+    let failed = 0;
+
+    showMigrateProgress(0, total, '', `共 ${total} 张图片待迁移`);
+
+    for (let i = 0; i < tasks.length; i++) {
+      const task = tasks[i];
+      const val = task.getVal();
+
+      showMigrateProgress(i, total, task.name, `上传中… (${i + 1}/${total})`);
+
+      const ext = val.includes('image/png') ? 'png' : val.includes('image/gif') ? 'gif' : 'webp';
+      const filename = `${task.name}_${Date.now().toString(36)}.${ext}`;
+      const url = await uploadImageToGithub(val, filename);
+
+      if (url) {
+        task.setVal(url);
+        migrated++;
+      } else {
+        failed++;
+      }
+
+      // 更新进度条
+      showMigrateProgress(i + 1, total, task.name, failed > 0 ? `${migrated} 成功 / ${failed} 失败` : `${migrated} 张已完成`);
+
+      // 每张间隔 500ms 避免 GitHub API 限流
+      if (i < tasks.length - 1) {
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
+
+    // ===== 第四步：保存并显示结果 =====
+    saveDataImmediate('GitHub迁移完成');
+    const storage = getStorageUsage();
+    renderStatusOverview();
+
+    showMigrateComplete(migrated, failed, storage.myKB);
   }
 
 
@@ -5530,6 +5833,22 @@ async function refreshWorldPreview() {
               </div>
             </div>
             <div class="sp-section">
+              <div class="sp-section-title">☁️ GitHub 图片托管</div>
+              <p style="font-size:11px;color:#999;margin-bottom:8px;">将 base64 图片上传到 GitHub 仓库，释放本地存储空间。<br/>需要 Personal Access Token（权限需包含 repo）</p>
+              <label>GitHub Token</label>
+              <input type="password" id="sp-github-token" value="${settings.githubToken || ''}" placeholder="ghp_xxxxxxxxxxxx" />
+              <label>仓库（格式: 用户名/仓库名）</label>
+              <input type="text" id="sp-github-repo" value="${settings.githubRepo || ''}" placeholder="myname/meep-images" />
+              <label>分支</label>
+              <input type="text" id="sp-github-branch" value="${settings.githubBranch || 'main'}" placeholder="main" />
+              <label>存储路径</label>
+              <input type="text" id="sp-github-path" value="${settings.githubPath || 'meep-images'}" placeholder="meep-images" />
+              <div class="sp-row" style="margin-top:8px;">
+                <button class="sp-btn sp-btn-primary" id="sp-github-migrate" type="button">☁️ 一键迁移所有图片</button>
+              </div>
+              <p style="font-size:10px;color:#666;margin-top:6px;">迁移后所有 base64 图片会替换为 CDN 链接，大幅节省本地空间</p>
+            </div>
+            <div class="sp-section">
               <div class="sp-section-title">导入 / 导出</div>
               <div class="sp-row">
                 <button class="sp-btn sp-btn-primary" id="sp-export">📤 导出</button>
@@ -6476,6 +6795,22 @@ async function refreshWorldPreview() {
     // 保存
     document.getElementById('sp-save-settings')?.addEventListener('click', saveAllSettings);
 
+    document.getElementById('sp-github-migrate')?.addEventListener('click', () => {
+      if (!settings.githubToken || !settings.githubRepo) {
+        showBubble('请先填写 GitHub Token 和仓库地址', 3000);
+        return;
+      }
+      showConfirmDialog({
+        title: '☁️ 一键迁移图片到 GitHub？',
+        desc: '将所有本地 base64 图片上传到你的 GitHub 仓库，<br/>并自动替换为 CDN 链接。<br/><br/>⚠️ 请确保 Token 有 repo 权限且仓库已创建。<br/>过程可能需要几分钟。',
+        confirmText: '开始迁移',
+        cancelText: '取消',
+        onConfirm: () => {
+          migrateImagesToGithub();
+        }
+      });
+    });
+
     // 导入导出
     document.getElementById('sp-export')?.addEventListener('click', exportData);
     const importBtn = document.getElementById('sp-import-btn');
@@ -6898,6 +7233,10 @@ async function refreshWorldPreview() {
     settings.apiTimeout = n('sp-api-timeout', 15);
     settings.offlineDecayRate = n('sp-decay-rate', 0.15);
     settings.safetyThreshold = n('sp-safety-threshold', 10);
+    settings.githubToken = v('sp-github-token');
+    settings.githubRepo = v('sp-github-repo');
+    settings.githubBranch = v('sp-github-branch') || 'main';
+    settings.githubPath = v('sp-github-path') || 'meep-images';
 
     settings.showStatusBar = c('sp-show-status-bar');
 

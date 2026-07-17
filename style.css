@@ -7112,3 +7112,23 @@
   background: rgba(100,220,100,0.18);
   border-color: rgba(100,220,100,0.8);
 }
+
+/* ===== GitHub 迁移进度条 ===== */
+#sp-migrate-progress-overlay {
+  animation: sp-fade-in 0.2s ease;
+}
+
+#sp-migrate-progress-box {
+  animation: sp-fade-in 0.25s ease;
+}
+
+#sp-migrate-bar {
+  background: linear-gradient(90deg, rgba(100,180,255,0.7), rgba(100,220,100,0.7));
+  background-size: 200% 100%;
+  animation: sp-migrate-bar-shimmer 2s linear infinite;
+}
+
+@keyframes sp-migrate-bar-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
