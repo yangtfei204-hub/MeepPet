@@ -501,6 +501,7 @@
     // ===== 成就系统 =====
     achievements: [],             // 已解锁的成就ID列表
     achievementNotified: [],      // 已弹窗通知过的成就ID（防重复弹窗）
+    achievementClaimed: [],       // 已领取奖励的成就ID
 
   };
 
@@ -16949,7 +16950,7 @@ window.addEventListener('beforeunload', () => {
   // ===== 成就检查（在关键操作后调用）=====
   function checkAchievements() {
     if (!state.achievements) state.achievements = [];
-    if (!state.achievementNotified) state.achievementNotified = [];
+    if (!state.achievementNotified) state.achievementNotified = [];if (!state.achievementClaimed) state.achievementClaimed = [];
 
     let newlyUnlocked = [];
 
@@ -16965,38 +16966,69 @@ window.addEventListener('beforeunload', () => {
     });
 
     if (newlyUnlocked.length > 0) {
-      // 为每个新解锁的成就发放奖励
-      let totalGold = 0;
-      let totalStamina = 0;
-      let totalItems = 0;
-      let gotCrystal = false;
-      newlyUnlocked.forEach(ach => {
-        const reward = grantAchievementReward(ach);
-        totalGold += reward.goldReward;
-        totalStamina += reward.staminaReward;
-        totalItems += reward.randomItemCount;
-        if (reward.grantCrystal) gotCrystal = true;
-      });
-
       saveDataDebounced('成就解锁');
       const first = newlyUnlocked[0];
       if (!state.achievementNotified.includes(first.id)) {
         state.achievementNotified.push(first.id);
-        // 构建奖励提示文字
-        let rewardText = `+${totalGold}🪙`;
-        if (totalStamina > 0) rewardText += ` +${totalStamina}⚡`;
-        if (totalItems > 0) rewardText += ` +${totalItems}道具`;
-        if (gotCrystal) rewardText += ` +✨糖砂`;
-        showBubble(`🏆 成就解锁！「${first.emoji} ${first.name}」 ${rewardText}`, 6000);
+        showBubble(`🏆 成就解锁！「${first.emoji} ${first.name}」 去成就页面领取奖励吧！`, 6000);
         if (newlyUnlocked.length > 1) {
           setTimeout(() => {
-            showBubble(`还有 ${newlyUnlocked.length - 1} 个新成就解锁了！去看看吧`, 4000);
+            showBubble(`还有 ${newlyUnlocked.length - 1} 个新成就解锁了！快去领取奖励`, 4000);
           }, 6500);
         }
       }
     }
   }
 
+  //===== 领取单个成就奖励 =====
+  function claimAchievementReward(achId) {
+    if (!state.achievementClaimed) state.achievementClaimed = [];
+    if (state.achievementClaimed.includes(achId)) return;
+    if (!state.achievements.includes(achId)) return;
+
+    const ach = ACHIEVEMENTS.find(a => a.id === achId);
+    if (!ach) return;
+
+    const reward = grantAchievementReward(ach);
+    state.achievementClaimed.push(achId);
+    saveDataDebounced('领取成就奖励');
+
+    let rewardText = `+${reward.goldReward}🪙`;
+    if (reward.staminaReward > 0) rewardText += ` +${reward.staminaReward}⚡`;
+    if (reward.randomItemCount > 0) rewardText += ` +${reward.randomItemCount}道具`;
+    if (reward.grantCrystal) rewardText += ` +✨糖砂`;
+    showBubble(`🎁 领取成功！「${ach.emoji} ${ach.name}」 ${rewardText}`, 4000);
+  }
+
+  // ===== 一键领取所有未领取成就奖励 =====
+  function claimAllAchievementRewards() {
+    if (!state.achievementClaimed) state.achievementClaimed = [];
+    const unclaimed = (state.achievements || []).filter(id => !state.achievementClaimed.includes(id));
+    if (unclaimed.length === 0) {
+      showBubble('没有可领取的成就奖励', 2000);
+      return;
+    }
+
+    let totalGold = 0, totalStamina = 0, totalItems = 0, gotCrystal = false;
+    unclaimed.forEach(achId => {
+      const ach = ACHIEVEMENTS.find(a => a.id === achId);
+      if (!ach) return;
+      const reward = grantAchievementReward(ach);
+      state.achievementClaimed.push(achId);
+      totalGold += reward.goldReward;
+      totalStamina += reward.staminaReward;
+      totalItems += reward.randomItemCount;
+      if (reward.grantCrystal) gotCrystal = true;
+    });
+
+    saveDataDebounced('一键领取成就奖励');
+
+    let rewardText = `+${totalGold}🪙`;
+    if (totalStamina > 0) rewardText += ` +${totalStamina}⚡`;
+    if (totalItems > 0) rewardText += ` +${totalItems}道具`;
+    if (gotCrystal) rewardText += ` +✨糖砂`;
+    showBubble(`🎁 一键领取 ${unclaimed.length} 个成就奖励！${rewardText}`, 5000);
+  }
 
   // ===== 成就展示弹窗 =====
   function showAchievementsPanel() {
@@ -17019,12 +17051,19 @@ window.addEventListener('beforeunload', () => {
     const totalCount = ACHIEVEMENTS.length;
     const percent = totalCount > 0 ? Math.round((unlockedCount / totalCount) * 100) : 0;
 
+    const unclaimedCount = (state.achievements || []).filter(id => !(state.achievementClaimed || []).includes(id)).length;
+
     let bodyHtml = `
       <div style="text-align:center;margin-bottom:12px;">
         <div style="font-size:13px;color:var(--sp-text-primary);font-weight:600;">已解锁 ${unlockedCount} / ${totalCount} (${percent}%)</div>
         <div style="width:100%;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;margin-top:6px;">
           <div style="width:${percent}%;height:100%;background:rgba(255,200,50,0.7);border-radius:3px;transition:width 0.3s;"></div>
         </div>
+        ${unclaimedCount > 0 ? `
+          <div style="margin-top:10px;">
+            <button id="sp-achievements-claim-all" style="padding:8px 20px;font-size:13px;font-weight:600;border-radius:8px;border:1px solid rgba(255,200,50,0.6);background:rgba(255,200,50,0.2);color:#ffb347;cursor:pointer;transition:all 0.2s;">🎁 一键领取全部 (${unclaimedCount}个)</button>
+          </div>
+        ` : ''}
       </div>
     `;
 
@@ -17042,15 +17081,18 @@ window.addEventListener('beforeunload', () => {
           <div style="padding:6px 8px;display:flex;flex-direction:column;gap:4px;">
             ${achs.map(ach => {
               const unlocked = state.achievements.includes(ach.id);
+              const claimed = unlocked && (state.achievementClaimed || []).includes(ach.id);
+              const canClaim = unlocked && !claimed;
               return `
-                <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:${unlocked ? 'rgba(255,200,50,0.06)' : 'rgba(255,255,255,0.02)'};border:1px solid ${unlocked ? 'rgba(255,200,50,0.2)' : 'rgba(255,255,255,0.05)'};border-radius:6px;opacity:${unlocked ? '1' : '0.5'};">
+                <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:${unlocked ? (canClaim ? 'rgba(100,220,100,0.08)' : 'rgba(255,200,50,0.06)') : 'rgba(255,255,255,0.02)'};border:1px solid ${unlocked ? (canClaim ? 'rgba(100,220,100,0.3)' : 'rgba(255,200,50,0.2)') : 'rgba(255,255,255,0.05)'};border-radius:6px;opacity:${unlocked ? '1' : '0.5'};">
                   <span style="font-size:18px;flex-shrink:0;">${unlocked ? ach.emoji : '🔒'}</span>
                   <div style="flex:1;">
                     <div style="font-size:11px;font-weight:600;color:${unlocked ? 'var(--sp-text-primary)' : 'var(--sp-text-muted)'};">${ach.name}</div>
                     <div style="font-size:10px;color:var(--sp-text-muted);">${ach.desc}</div>
                     <div style="font-size:9px;color:${unlocked ? 'rgba(255,200,50,0.7)' : 'var(--sp-text-muted)'};margin-top:1px;">${ach.tier === 1 ? '🪙8' : ach.tier === 2 ? '🪙20+⚡5' : ach.tier === 3 ? '🪙50+⚡10+道具×1' : ach.tier === 4 ? '🪙120+⚡20+道具×2' : '🪙300+⚡50+道具×3+✨'}</div>
                   </div>
-                  ${unlocked ? '<span style="font-size:10px;color:rgba(255,200,50,0.8);">✓</span>' : ''}
+                  ${claimed ? '<span style="font-size:10px;color:rgba(255,200,50,0.8);">✓已领</span>' : ''}
+                  ${canClaim ? `<button class="sp-achievement-claim-btn" data-ach-id="${ach.id}" style="padding:3px 10px;font-size:10px;font-weight:600;border-radius:6px;border:1px solid rgba(100,220,100,0.6);background:rgba(100,220,100,0.2);color:#6f6;cursor:pointer;flex-shrink:0;transition:all 0.2s;">🎁 领取</button>` : ''}
                 </div>
               `;
             }).join('')}
@@ -17091,6 +17133,27 @@ window.addEventListener('beforeunload', () => {
     document.getElementById('sp-achievements-close').onclick = () => overlay.remove();
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
     overlay.querySelector('.sp-total-inv-box').addEventListener('click', (e) => { e.stopPropagation(); });
+    // 一键领取按钮
+    const claimAllBtn = document.getElementById('sp-achievements-claim-all');
+    if (claimAllBtn) {
+      claimAllBtn.onclick = () => {
+        claimAllAchievementRewards();
+        overlay.remove();
+        showAchievementsPanel(); // 重新打开以刷新状态
+      };
+    }
+
+    // 单个领取按钮
+    overlay.querySelectorAll('.sp-achievement-claim-btn').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const achId = btn.dataset.achId;
+        claimAchievementReward(achId);
+        overlay.remove();
+        showAchievementsPanel(); // 重新打开以刷新状态
+      };
+    });
+
     // 防止 details 展开时滚动位置被重置
     const achBody = overlay.querySelector('.sp-total-inv-body');
     if (achBody) {
@@ -18272,6 +18335,7 @@ window.addEventListener('beforeunload', () => {
   let restaurantRuntime = {
     customers: [],       // 当前等候中的客人 [{...customer, arriveTime, specificRecipe}]
     cooking: null,       // 当前正在烹饪 {recipeId, startTime, duration} 或 null
+    shopOpen: false,     // 是否开门营业（控制客人是否到来）
   };
 
   // ===== 获取餐厅等级信息 =====
@@ -18524,9 +18588,25 @@ window.addEventListener('beforeunload', () => {
     return false;
   }
 
+  // ===== 开店/关店切换 =====
+  function toggleRestaurantShop() {
+    restaurantRuntime.shopOpen = !restaurantRuntime.shopOpen;
+    if (restaurantRuntime.shopOpen) {
+      restaurantShowNotice('🟢 餐厅开门营业！客人即将到来～');
+      restaurantStartCustomerTimer();
+    } else {
+      restaurantShowNotice('🔴 餐厅暂停营业，不再接待新客人');
+      if (restaurantCustomerTimer) {
+        clearTimeout(restaurantCustomerTimer);
+        restaurantCustomerTimer = null;
+      }
+    }restaurantRender();
+  }
+
   // ===== 客人到来 =====
   function restaurantSpawnCustomer() {
     if (!isRestaurantOpen) return;
+    if (!restaurantRuntime.shopOpen) return;
     const levelData = restaurantGetLevel();
     if (restaurantRuntime.customers.length >= levelData.maxCustomers) return;
 
@@ -18548,6 +18628,8 @@ window.addEventListener('beforeunload', () => {
 
     restaurantRuntime.customers.push(customer);
     restaurantRender();
+    restaurantShowNotice(`🐱 ${customer.name} 来啦！"${customer.dialogue}"`);
+
   }
 
   // ===== 客人超时检测 =====
@@ -18832,9 +18914,20 @@ window.addEventListener('beforeunload', () => {
       }).join(' ');
     }
 
+    const shopOpenBtnText = restaurantRuntime.shopOpen ? '🔴 关店' : '🟢 开店';
+    const shopOpenBtnStyle = restaurantRuntime.shopOpen
+      ? 'border:1px solid rgba(239,83,80,0.5);background:rgba(239,83,80,0.15);color:#f66;'
+      : 'border:1px solid rgba(100,220,100,0.5);background:rgba(100,220,100,0.15);color:#6f6;';
+    const shopStatusText = restaurantRuntime.shopOpen
+      ? '<span style="font-size:10px;color:rgba(100,220,100,0.8);margin-left:4px;">🟢 营业中</span>'
+      : '<span style="font-size:10px;color:rgba(239,83,80,0.7);margin-left:4px;">🔴 已关店</span>';
+
     container.innerHTML = `
       <div style="margin-bottom:8px;">
-        <div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin-bottom:6px;">🪑 餐桌区 (${customers.length}/${maxTables}位客人)</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);">🪑 餐桌区 (${customers.length}/${maxTables}位客人)${shopStatusText}</div>
+          <button id="sp-restaurant-shop-toggle" style="padding:4px 12px;font-size:11px;font-weight:600;border-radius:6px;${shopOpenBtnStyle}cursor:pointer;transition:all 0.2s;flex-shrink:0;">${shopOpenBtnText}</button>
+        </div>
         <div class="sp-restaurant-tables">${tablesHtml}</div>
       </div>
       ${cookingHtml}
@@ -18843,6 +18936,15 @@ window.addEventListener('beforeunload', () => {
         <div style="display:flex;flex-wrap:wrap;gap:4px;">${dishesHtml}</div>
       </div>
     `;
+
+    // 开店/关店按钮
+    const shopToggleBtn = document.getElementById('sp-restaurant-shop-toggle');
+    if (shopToggleBtn) {
+      shopToggleBtn.onclick = (e) => {
+        e.stopPropagation();
+        toggleRestaurantShop();
+      };
+    }
 
     // ===== 绑定事件 =====
     const cookBtn = document.getElementById('sp-restaurant-cook-btn');
@@ -19561,12 +19663,12 @@ window.addEventListener('beforeunload', () => {
       });
 
       // 初始渲染
+      // 打开面板时默认不开店，需要手动点击开店按钮
+      restaurantRuntime.shopOpen = false;
+
       restaurantRender();
 
-      // 启动客人到来定时器（15~25秒随机间隔）
-      restaurantStartCustomerTimer();
-
-      // 启动倒计时刷新定时器（每秒刷新客人耐心倒计时）
+      // 启动倒计时刷新定时器（每秒刷新客人耐心倒计时+烹饪检测）
       restaurantStartCountdownTimer();
 
     } else {
@@ -19583,6 +19685,7 @@ window.addEventListener('beforeunload', () => {
 
       // 清空等候客人
       restaurantRuntime.customers = [];
+      restaurantRuntime.shopOpen = false;
     }
   }
 
