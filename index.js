@@ -406,7 +406,10 @@
      diary: '',
      game: '',
      house: '',
-     settings: ''
+     settings: '',
+     chatsendmsg: '',
+     chatgenerate: '',
+     chatemoji: '',
    },
 
     // 表情包贴纸
@@ -888,6 +891,187 @@ function saveData() {
     }
   }
 
+  function exportImagesOnly() {
+    const imageData = {};
+
+    // 精灵图 & 小屋图片
+    const spriteKeys = [
+      'spriteIdle', 'spriteWalkLeft', 'spriteWalkRight', 'spriteWalkUp', 'spriteWalkDown',
+      'spriteSleep', 'spriteHappy', 'spriteSad', 'spriteDrag', 'spriteDizzy',
+      'spriteEat', 'spriteBath', 'spriteWave', 'spriteThink',
+      'spriteHangLeft', 'spriteHangRight', 'spriteHangTop',
+      'foodImage', 'bathImage', 'bedImage',
+      'houseBackground', 'houseCharacter', 'houseCharacterAvatar',
+      'houseActionFeed', 'houseActionBath', 'houseActionSleep',
+      'houseButtonFeed', 'houseButtonBath', 'houseButtonSleep', 'houseButtonWardrobe',
+      'houseButtonRegen', 'houseButtonSend', 'houseButtonWardrobeSettings',
+    ];
+    spriteKeys.forEach(key => {
+      if (settings[key]) imageData[key] = settings[key];
+    });
+
+    // 心情图标
+    if (settings.moodImages) {
+      const moodImgs = {};
+      Object.entries(settings.moodImages).forEach(([k, v]) => { if (v) moodImgs[k] = v; });
+      if (Object.keys(moodImgs).length > 0) imageData.moodImages = moodImgs;
+    }
+
+    // 菜单图标
+    if (settings.menuIcons) {
+      const menuImgs = {};
+      Object.entries(settings.menuIcons).forEach(([k, v]) => { if (v) menuImgs[k] = v; });
+      if (Object.keys(menuImgs).length > 0) imageData.menuIcons = menuImgs;
+    }
+
+    // 表情包
+    if (settings.emojiStickers && settings.emojiStickers.length > 0) {
+      imageData.emojiStickers = settings.emojiStickers;
+    }
+
+    // 自定义动作
+    if (settings.customSprites && settings.customSprites.length > 0) {
+      const valid = settings.customSprites.filter(s => s.image);
+      if (valid.length > 0) imageData.customSprites = valid;
+    }
+
+    // 小屋表情立绘
+    if (settings.houseExpressions && settings.houseExpressions.length > 0) {
+      const valid = settings.houseExpressions.filter(e => e.image);
+      if (valid.length > 0) imageData.houseExpressions = valid;
+    }
+
+    // 小屋服装（含服装内的立绘和表情）
+    if (settings.houseOutfits && settings.houseOutfits.length > 0) {
+      imageData.houseOutfits = settings.houseOutfits;
+    }
+
+    // 游戏自定义图片（图鉴自定义图）
+    if (state.gameCustomImages && Object.keys(state.gameCustomImages).length > 0) {
+      imageData.gameCustomImages = state.gameCustomImages;
+    }
+
+    // 游戏背景图
+    if (state.gameBgImage) {
+      imageData.gameBgImage = state.gameBgImage;
+    }
+
+    if (Object.keys(imageData).length === 0) {
+      showBubble('没有找到任何图片配置', 2000);
+      return;
+    }
+
+    // 统计数量
+    let count = 0;
+    spriteKeys.forEach(k => { if (imageData[k]) count++; });
+    if (imageData.moodImages) count += Object.keys(imageData.moodImages).length;
+    if (imageData.menuIcons) count += Object.keys(imageData.menuIcons).length;
+    if (imageData.emojiStickers) count += imageData.emojiStickers.length;
+    if (imageData.customSprites) count += imageData.customSprites.length;
+    if (imageData.houseExpressions) count += imageData.houseExpressions.length;
+    if (imageData.houseOutfits) count += imageData.houseOutfits.length;
+    if (imageData.gameCustomImages) count += Object.keys(imageData.gameCustomImages).length;
+    if (imageData.gameBgImage) count++;
+
+    const blob = new Blob([JSON.stringify(imageData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `meep-pet-images-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showBubble(`🖼️ 已导出图片配置（共约${count}项）`, 3000);
+  }
+
+  function importImagesOnly(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const imageData = JSON.parse(e.target.result);
+        let imported = 0;
+
+        // 精灵图 & 小屋图片
+        const spriteKeys = [
+          'spriteIdle', 'spriteWalkLeft', 'spriteWalkRight', 'spriteWalkUp', 'spriteWalkDown',
+          'spriteSleep', 'spriteHappy', 'spriteSad', 'spriteDrag', 'spriteDizzy',
+          'spriteEat', 'spriteBath', 'spriteWave', 'spriteThink',
+          'spriteHangLeft', 'spriteHangRight', 'spriteHangTop',
+          'foodImage', 'bathImage', 'bedImage',
+          'houseBackground', 'houseCharacter', 'houseCharacterAvatar',
+          'houseActionFeed', 'houseActionBath', 'houseActionSleep',
+          'houseButtonFeed', 'houseButtonBath', 'houseButtonSleep', 'houseButtonWardrobe',
+          'houseButtonRegen', 'houseButtonSend', 'houseButtonWardrobeSettings',
+        ];
+        spriteKeys.forEach(key => {
+          if (imageData[key]) { settings[key] = imageData[key]; imported++; }
+        });
+
+        // 心情图标
+        if (imageData.moodImages) {
+          if (!settings.moodImages) settings.moodImages = {};
+          Object.entries(imageData.moodImages).forEach(([k, v]) => {
+            if (v) { settings.moodImages[k] = v; imported++; }
+          });
+        }
+
+        // 菜单图标
+        if (imageData.menuIcons) {
+          if (!settings.menuIcons) settings.menuIcons = {};
+          Object.entries(imageData.menuIcons).forEach(([k, v]) => {
+            if (v) { settings.menuIcons[k] = v; imported++; }
+          });
+        }
+
+        // 表情包
+        if (imageData.emojiStickers && imageData.emojiStickers.length > 0) {
+          settings.emojiStickers = imageData.emojiStickers;
+          emojiStickers = imageData.emojiStickers;
+          imported += imageData.emojiStickers.length;
+        }
+
+        // 自定义动作
+        if (imageData.customSprites && imageData.customSprites.length > 0) {
+          settings.customSprites = imageData.customSprites;
+          imported += imageData.customSprites.length;
+        }
+
+        // 小屋表情立绘
+        if (imageData.houseExpressions && imageData.houseExpressions.length > 0) {
+          settings.houseExpressions = imageData.houseExpressions;
+          imported += imageData.houseExpressions.length;
+        }
+
+        // 小屋服装
+        if (imageData.houseOutfits && imageData.houseOutfits.length > 0) {
+          settings.houseOutfits = imageData.houseOutfits;
+          imported += imageData.houseOutfits.length;
+        }
+
+        // 游戏自定义图片
+        if (imageData.gameCustomImages) {
+          state.gameCustomImages = { ...(state.gameCustomImages || {}), ...imageData.gameCustomImages };
+          imported += Object.keys(imageData.gameCustomImages).length;
+        }
+
+        // 游戏背景图
+        if (imageData.gameBgImage) {
+          state.gameBgImage = imageData.gameBgImage;
+          imported++;
+        }
+
+        saveData();
+        updateSpriteImage();
+        updateMoodDisplay();
+        renderUploadAreas();
+        showBubble(`🖼️ 图片配置导入成功！共导入约${imported}项`, 3000);
+      } catch (err) {
+        console.error('[meep-pet] 图片导入失败:', err);
+        showBubble('导入失败了…文件格式不对', 3000);
+      }
+    };
+    reader.readAsText(file);
+  }
+
   function importData(file) {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -1093,10 +1277,10 @@ function saveData() {
         </div>
         <div id="sp-emoji-panel"></div>
         <div id="silly-pet-chat-input-row">
-          <button id="sp-chat-emoji-toggle" title="表情包">😺</button>
+          <button id="sp-chat-emoji-toggle" title="表情包">${(settings.menuIcons && settings.menuIcons.chatemoji) ? `<img src="${settings.menuIcons.chatemoji}" style="width:28px;height:28px;object-fit:contain;pointer-events:none;" />` : '😺'}</button>
           <input type="text" placeholder="跟咪噗说点什么..." id="sp-chat-input-field" />
-          <button id="sp-chat-send-msg-btn" title="发送消息（不生成回复）">📨</button>
-          <button id="sp-chat-generate-btn" title="生成回复">➤</button>
+          <button id="sp-chat-send-msg-btn" title="发送消息（不生成回复）">${(settings.menuIcons && settings.menuIcons.chatsendmsg) ? `<img src="${settings.menuIcons.chatsendmsg}" style="width:28px;height:28px;object-fit:contain;pointer-events:none;" />` : '📨'}</button>
+          <button id="sp-chat-generate-btn" title="生成回复">${(settings.menuIcons && settings.menuIcons.chatgenerate) ? `<img src="${settings.menuIcons.chatgenerate}" style="width:28px;height:28px;object-fit:contain;pointer-events:none;" />` : '➤'}</button>
         </div>
       </div>
     `;
@@ -3573,6 +3757,7 @@ function toggleChat() {
 
     // 确保事件绑定（每次打开重新绑，防止丢失）
     const inputField = document.getElementById('sp-chat-input-field');
+    if (inputField) inputField.placeholder = `跟${settings.petName || '咪噗'}说点什么...`;
     const sendMsgBtn = document.getElementById('sp-chat-send-msg-btn');
     const generateBtn = document.getElementById('sp-chat-generate-btn');
     const emojiToggle = document.getElementById('sp-chat-emoji-toggle');
@@ -4565,6 +4750,13 @@ async function refreshWorldPreview() {
       renderHousePanel();
     }
     const panel = document.getElementById('silly-pet-house');
+    if (!panel) return;
+    // 每次打开时同步最新名字
+    const houseTitle = panel.querySelector('#sp-house-header span');
+    if (houseTitle) houseTitle.textContent = `🏠 ${settings.petName || '咪噗'}的小屋`;
+    const houseNameText = document.getElementById('sp-house-name-text');
+    if (houseNameText) houseNameText.textContent = settings.petName || '咪噗';
+
     if (!panel) return;
     isHouseOpen = !isHouseOpen;
     // 关闭时顺手清掉快捷面板
@@ -5618,12 +5810,12 @@ async function refreshWorldPreview() {
           <button id="sp-house-wardrobe-btn" style="width:36px;height:36px;border-radius:50%;border:${settings.houseButtonWardrobe ? 'none' : '1px solid rgba(255,255,255,0.3)'};background:${settings.houseButtonWardrobe ? 'transparent' : 'rgba(0,0,0,0.4)'};backdrop-filter:${settings.houseButtonWardrobe ? 'none' : 'blur(4px)'};cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;overflow:hidden;padding:0;" title="更衣">${settings.houseButtonWardrobe ? `<img src="${settings.houseButtonWardrobe}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '👗'}</button>
         </div>
         <div id="sp-house-dialogue-overlay">
+          <div id="sp-house-char-name"><span id="sp-house-avatar"></span><span id="sp-house-name-text">${settings.petName || '咪噗'}</span><button id="sp-house-expand-btn" style="margin-left:auto;background:none;border:none;font-size:12px;cursor:pointer;color:rgba(255,255,255,0.5);padding:2px 6px;border-radius:4px;transition:all 0.2s;" title="展开/收起对话">▼</button><button id="sp-house-collapse-btn" style="background:none;border:none;font-size:12px;cursor:pointer;color:rgba(255,255,255,0.5);padding:2px 6px;border-radius:4px;transition:all 0.2s;" title="收起对话框">⬇</button></div>
           <div id="sp-house-dialogue-box">
-            <div id="sp-house-char-name"><span id="sp-house-avatar"></span><span id="sp-house-name-text">${settings.petName || '咪噗'}</span><button id="sp-house-expand-btn" style="margin-left:auto;background:none;border:none;font-size:12px;cursor:pointer;color:rgba(255,255,255,0.5);padding:2px 6px;border-radius:4px;transition:all 0.2s;" title="展开/收起对话">▼</button></div>
             <div id="sp-house-dialogue-text"></div>
           </div>
         <div id="sp-house-input-area">
-          <button id="sp-house-regen-btn" title="重新生成上一条回复" style="overflow:hidden;padding:0;${settings.houseButtonRegen ? 'background:transparent;border:none;backdrop-filter:none;' : ''}">${settings.houseButtonRegen ? `<img src="${settings.houseButtonRegen}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '🔄'}</button>
+          <button id="sp-house-regen-btn" title="重新生成上一条回复" style="overflow:hidden;padding:0;${settings.houseButtonRegen ? 'background:transparent;border:none;backdrop-filter:none;' : 'background:var(--sp-primary);border:none;border-radius:50%;width:34px;height:34px;cursor:pointer;font-size:14px;flex-shrink:0;display:flex;align-items:center;justify-content:center;'}">${settings.houseButtonRegen ? `<img src="${settings.houseButtonRegen}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '🔄'}</button>
           <input type="text" id="sp-house-input-field" placeholder="请输入你想对${settings.petName || '他'}说的话..." />
           <button id="sp-house-send-btn" title="发送" style="overflow:hidden;padding:0;${settings.houseButtonSend ? 'background:transparent;border:none;backdrop-filter:none;' : ''}">${settings.houseButtonSend ? `<img src="${settings.houseButtonSend}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '➤'}</button>
         </div>
@@ -5722,6 +5914,15 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
       btn.textContent = expanded ? '▲' : '▼';
       btn.style.color = expanded ? 'rgba(100,180,255,0.8)' : 'rgba(255,255,255,0.5)';
     };
+    document.getElementById('sp-house-collapse-btn').onclick = () => {
+      const overlay = document.getElementById('sp-house-dialogue-overlay');
+      const btn = document.getElementById('sp-house-collapse-btn');
+      if (!overlay || !btn) return;
+      const collapsed = overlay.classList.toggle('sp-house-dialogue-collapsed');
+      btn.textContent = collapsed ? '⬆' : '⬇';
+      btn.style.color = collapsed ? 'rgba(100,180,255,0.8)' : 'rgba(255,255,255,0.5)';
+    };
+
     document.getElementById('sp-house-minimize').onclick = () => {
       const panel = document.getElementById('silly-pet-house');
       if (!panel) return;
@@ -7048,7 +7249,12 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
                 <button class="sp-btn sp-btn-primary" id="sp-export">📤 导出</button>
                 <button class="sp-btn" id="sp-import-btn">📥 导入</button>
                 <input type="file" id="sp-import-file" accept=".json" style="display:none;" />
+              </div><div class="sp-row" style="margin-top:6px;">
+                <button class="sp-btn" id="sp-export-images">🖼️ 仅导出图片</button>
+                <button class="sp-btn" id="sp-import-images-btn">🖼️ 导入图片</button>
+                <input type="file" id="sp-import-images-file" accept=".json" style="display:none;" />
               </div>
+              <p style="font-size:10px;color:#666;margin-top:4px;">仅导出/导入精灵图、表情包、小屋立绘、游戏图鉴等图片配置，不含聊天记录和状态数据以及游戏进度</p>
             </div>
             <div class="sp-section">
               <div class="sp-section-title">⚠️ 危险操作</div>
@@ -7568,7 +7774,10 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
       ['menuIconDiary', '日记 📔'],
       ['menuIconGame', '游戏 🎮'],
       ['menuIconHouse', '小屋 🏠'],
-      ['menuIconSettings', '设置 ⚙️']
+      ['menuIconSettings', '设置 ⚙️'],
+      ['menuIconChatSendMsg', '发送消息 📨'],
+      ['menuIconChatGenerate', '生成回复 ➤'],
+      ['menuIconChatEmoji', '表情包 😺'],
     ];
     if (menuArea) {
       menuArea.innerHTML = menuConfigs.map(([key, label]) => {
@@ -7986,6 +8195,15 @@ document.getElementById('sp-export')?.addEventListener('click', async () => {
     if (importBtn && importFile) {
       importBtn.onclick = () => importFile.click();
       importFile.onchange = (e) => { if (e.target.files[0]) importData(e.target.files[0]); };
+    }
+
+    //仅导出/导入图片
+    document.getElementById('sp-export-images')?.addEventListener('click', exportImagesOnly);
+    const importImagesBtn = document.getElementById('sp-import-images-btn');
+    const importImagesFile = document.getElementById('sp-import-images-file');
+    if (importImagesBtn && importImagesFile) {
+      importImagesBtn.onclick = () => importImagesFile.click();
+      importImagesFile.onchange = (e) => { if (e.target.files[0]) importImagesOnly(e.target.files[0]); };
     }
 
     // 记忆
@@ -8793,6 +9011,17 @@ function updateUploadPreview(key, dataUrl) {
       }
     }
   }
+
+  // 聊天框三个按钮刷新
+  if (key === 'menuIconChatSendMsg' || key === 'menuIconChatGenerate' || key === 'menuIconChatEmoji') {
+    const emojiToggle = document.getElementById('sp-chat-emoji-toggle');
+    const sendMsgBtn = document.getElementById('sp-chat-send-msg-btn');
+    const generateBtn = document.getElementById('sp-chat-generate-btn');
+  if (emojiToggle) emojiToggle.innerHTML = (settings.menuIcons && settings.menuIcons.chatemoji) ? `<img src="${settings.menuIcons.chatemoji}" style="width:28px;height:28px;object-fit:contain;pointer-events:none;" />` : '😺';
+  if (sendMsgBtn) sendMsgBtn.innerHTML = (settings.menuIcons && settings.menuIcons.chatsendmsg) ? `<img src="${settings.menuIcons.chatsendmsg}" style="width:28px;height:28px;object-fit:contain;pointer-events:none;" />` : '📨';
+  if (generateBtn) generateBtn.innerHTML = (settings.menuIcons && settings.menuIcons.chatgenerate) ? `<img src="${settings.menuIcons.chatgenerate}" style="width:28px;height:28px;object-fit:contain;pointer-events:none;" />` : '➤';
+  }
+
   // 👇 新增：如果是小屋图片，刷新小屋场景
   if (key === 'houseBackground' || key === 'houseCharacter' || key === 'houseCharacterAvatar') {
     updateHouseScene();
@@ -17084,7 +17313,7 @@ window.addEventListener('beforeunload', () => {
               const claimed = unlocked && (state.achievementClaimed || []).includes(ach.id);
               const canClaim = unlocked && !claimed;
               return `
-                <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:${unlocked ? (canClaim ? 'rgba(100,220,100,0.08)' : 'rgba(255,200,50,0.06)') : 'rgba(255,255,255,0.02)'};border:1px solid ${unlocked ? (canClaim ? 'rgba(100,220,100,0.3)' : 'rgba(255,200,50,0.2)') : 'rgba(255,255,255,0.05)'};border-radius:6px;opacity:${unlocked ? '1' : '0.5'};">
+                <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:${unlocked ? (canClaim ? 'rgba(255,200,50,0.08)' : 'rgba(255,200,50,0.06)') : 'rgba(255,255,255,0.02)'};background:${unlocked ? (canClaim ? 'rgba(255,200,50,0.08)' : 'rgba(255,200,50,0.06)') : 'rgba(255,255,255,0.02)'};border-radius:6px;opacity:${unlocked ? '1' : '0.5'};">
                   <span style="font-size:18px;flex-shrink:0;">${unlocked ? ach.emoji : '🔒'}</span>
                   <div style="flex:1;">
                     <div style="font-size:11px;font-weight:600;color:${unlocked ? 'var(--sp-text-primary)' : 'var(--sp-text-muted)'};">${ach.name}</div>
@@ -17092,7 +17321,7 @@ window.addEventListener('beforeunload', () => {
                     <div style="font-size:9px;color:${unlocked ? 'rgba(255,200,50,0.7)' : 'var(--sp-text-muted)'};margin-top:1px;">${ach.tier === 1 ? '🪙8' : ach.tier === 2 ? '🪙20+⚡5' : ach.tier === 3 ? '🪙50+⚡10+道具×1' : ach.tier === 4 ? '🪙120+⚡20+道具×2' : '🪙300+⚡50+道具×3+✨'}</div>
                   </div>
                   ${claimed ? '<span style="font-size:10px;color:rgba(255,200,50,0.8);">✓已领</span>' : ''}
-                  ${canClaim ? `<button class="sp-achievement-claim-btn" data-ach-id="${ach.id}" style="padding:3px 10px;font-size:10px;font-weight:600;border-radius:6px;border:1px solid rgba(100,220,100,0.6);background:rgba(100,220,100,0.2);color:#6f6;cursor:pointer;flex-shrink:0;transition:all 0.2s;">🎁 领取</button>` : ''}
+                  ${canClaim ? `<button class="sp-achievement-claim-btn" data-ach-id="${ach.id}" style="padding:3px 10px;font-size:10px;font-weight:600;border-radius:6px;border:1px solid rgba(255,200,50,0.6);background:rgba(255,200,50,0.2);color:#ffb347;cursor:pointer;flex-shrink:0;transition:all 0.2s;">🎁 领取</button>` : ''}
                 </div>
               `;
             }).join('')}
@@ -19531,7 +19760,7 @@ window.addEventListener('beforeunload', () => {
           <span id="sp-restaurant-next-lvl" style="font-size:9px;color:var(--sp-text-muted);white-space:nowrap;"></span>
         </div>
       </div>
-      <div id="sp-restaurant-notice" style="position:absolute;top:52px;left:12px;right:12px;padding:5px 12px;font-size:11px;color:#fff;background:rgba(30,30,40,0.92);border:1px solid var(--sp-primary-border);border-radius:7px;text-align:center;opacity:0;pointer-events:none;transform:translateY(-5px);transition:opacity 0.2s,transform 0.2s;z-index:10;"></div>
+      <div id="sp-restaurant-notice" style="position:absolute;top:52px;left:12px;right:12px;padding:5px 12px;font-size:11px;color:var(--sp-text-primary);background:var(--sp-bg-secondary);border:1px solid var(--sp-primary-border);border-radius:7px;text-align:center;opacity:0;pointer-events:none;transform:translateY(-5px);transition:opacity 0.2s,transform 0.2s;z-index:10;"></div>
       <div style="display:flex;gap:3px;padding:5px 8px;background:rgba(255,255,255,0.03);border-bottom:1px solid var(--sp-border-light);">
         <button class="sp-game-tab active" data-rtab="kitchen">🍳 厨房</button>
         <button class="sp-game-tab" data-rtab="menu">📋 菜单</button>
