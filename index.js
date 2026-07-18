@@ -312,6 +312,7 @@
     summaryPrompt: '请将以下对话内容总结为简洁的要点，保留关键信息和情感变化，用第三人称描述：',
     extractPrompt: '从以下对话中提取3-5条关键记忆点（主人的喜好、重要事件、情感变化等）。\n每条记忆用一行表示，格式为：[标签] 内容\n例如：[喜好] 主人喜欢喝奶茶\n只输出记忆条目，不要其他内容。',
     offlinePrompt: '现在是线下模式。主人正在线下和你互动，你们不在电脑前，而是在现实中相处。请用更加亲密、放松的语气回复，可以描述动作和场景。',
+    onlinePrompt: '你现在是线上聊天模式，请像在手机上发消息一样回复。每条消息要简短自然，如果你想说多句话，请用|||来分隔不同的消息。例如格式："你好啊|||今天怎么样？|||我在吃零食呢～"。注意：|||前后不要有多余空格，每段消息保持简短（1-2句话），让对话更像真实的线上聊天。',
     diaryPrompt: '请以桌宠的第一人称视角，根据以下信息写一篇简短的日记（100-200字）。记录今天发生的有趣的事、和主人的互动、心情变化等。语气要符合桌宠的性格设定。',
 
     // 行为
@@ -453,6 +454,7 @@
     lastSlept: 0,
     petChatArchive: [],       // 已总结归档的聊天记录
     isOfflineMode: false,
+    chatMode: 'pet',              // 'pet'(桌宠模式) | 'online'(线上模式) | 'offline'(线下模式)
     diaryEntries: [],             // [{date: '2024-01-15', content: '...', timestamp: 1705...}]
     lastDiaryMemoryRange: null,   // {from: 1, to: 5}
     lastDiaryChatRange: null,     // {from: 1, to: 20}
@@ -529,7 +531,7 @@
   let saveQueue = [];
   let spriteStateLock = null;  // 当前锁定的状态名
   let spriteStateLockTimer = null; // 对应的恢复定时器
-  let isOfflineMode = false;       // 线下模式开关
+  let chatMode = 'pet';             // 'pet'(桌宠模式) | 'online'(线上模式) | 'offline'(线下模式)
   let selectedEmoji = null;        // 当前选中的表情包 (base64 或 URL)
   let emojiStickers = [];          // 用户上传的表情包列表
 
@@ -713,7 +715,7 @@
     settings = { ...DEFAULT_SETTINGS };
     state = { ...DEFAULT_STATE };
     emojiStickers = [];
-    isOfflineMode = false;
+    chatMode = 'pet';
   }
 
   async function loadDataAsync() {
@@ -725,7 +727,7 @@
         settings.moodImages = { ...DEFAULT_SETTINGS.moodImages, ...(parsed.settings?.moodImages || {}) };
         state = { ...DEFAULT_STATE, ...parsed.state };
         emojiStickers = settings.emojiStickers || [];
-        isOfflineMode = state.isOfflineMode || false;
+        chatMode = state.chatMode || (state.isOfflineMode ? 'offline' : 'pet');
 
         // 用备份修正可能丢失的最后状态
         try {
@@ -751,7 +753,7 @@
           settings.moodImages = { ...DEFAULT_SETTINGS.moodImages, ...(oldParsed.settings?.moodImages || {}) };
           state = { ...DEFAULT_STATE, ...oldParsed.state };
           emojiStickers = settings.emojiStickers || [];
-          isOfflineMode = state.isOfflineMode || false;
+          chatMode = state.chatMode || (state.isOfflineMode ? 'offline' : 'pet');
           await idbSet(STORAGE_KEY, { settings, state });
           localStorage.removeItem(STORAGE_KEY);
           console.log(`[${PLUGIN_NAME}] 已从 localStorage 迁移数据到 IndexedDB`);
@@ -771,7 +773,7 @@
           settings.moodImages = { ...DEFAULT_SETTINGS.moodImages, ...(fallback.settings?.moodImages || {}) };
           state = { ...DEFAULT_STATE, ...fallback.state };
           emojiStickers = settings.emojiStickers || [];
-          isOfflineMode = state.isOfflineMode || false;
+          chatMode = state.chatMode || (state.isOfflineMode ? 'offline' : 'pet');
           console.log(`[${PLUGIN_NAME}] 已从 localStorage 降级读取`);
         }
       } catch(e2) {}
@@ -1262,7 +1264,7 @@ function saveData() {
       <div id="silly-pet-chat-header">
         <span>🐾 <span id="sp-chat-title-name">${settings.petName || '咪噗'}</span>聊天</span>
         <div style="display:flex;gap:6px;">
-          <button id="sp-chat-offline-toggle" style="background:none;border:none;font-size:13px;cursor:pointer;color:#aaa;opacity:0.6;" title="线下模式">🌙</button>
+          <button id="sp-chat-mode-toggle" style="background:none;border:none;font-size:13px;cursor:pointer;color:#aaa;opacity:0.8;" title="桌宠模式（点击切换）">🐾</button>
           <button id="sp-chat-minimize" style="background:none;border:none;font-size:14px;cursor:pointer;color:#aaa;" title="缩小悬挂">─</button>
           <button id="sp-chat-close" style="background:none;border:none;font-size:16px;cursor:pointer;color:#aaa;" title="关闭">✕</button>
         </div>
@@ -2995,6 +2997,13 @@ function showInventoryPopup(category, quickKey, onUse) {
               <div class="sp-game-selector-desc">查看已解锁的成就和进度</div>
             </div>
           </div>
+          <div class="sp-game-selector-card" data-game="unifiedCollection" style="grid-column:span 2;">
+            <div class="sp-game-selector-icon">📖</div>
+            <div class="sp-game-selector-info">
+              <div class="sp-game-selector-name">图鉴合集</div>
+              <div class="sp-game-selector-desc">所有游戏图鉴汇总，联动物品共享图片</div>
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -3048,6 +3057,8 @@ function showInventoryPopup(category, quickKey, onUse) {
           showTotalInventory();
         } else if (game === 'achievements') {
           showAchievementsPanel();
+        } else if (game === 'unifiedCollection') {
+          showUnifiedCollection();
         }
       };
     });
@@ -3068,20 +3079,17 @@ function showInventoryPopup(category, quickKey, onUse) {
           <span>❓ 游戏帮助</span>
           <button id="sp-game-help-close" title="关闭">✕</button>
         </div>
-        <div id="sp-game-help-body">
-          <details class="sp-guide-details" open>
+        <div id="sp-game-help-body"><details class="sp-guide-details" open>
             <summary class="sp-guide-summary">🐱 小猫餐厅</summary>
             <div class="sp-guide-details-content">
               <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                经营一家猫咪餐厅，烹饪菜品招待客人赚金币。<br/><br/>
-                • 客人会随机到来，坐在餐桌上等候点餐<br/>
-                • 在烹饪台选择食谱，消耗食材和调料烹饪<br/>
-                • 菜品出锅后点击对应客人的上菜按钮完成服务<br/>
-                • 服务客人获得金币和声望，声望升级解锁新菜谱和新客人<br/>
-                • 客人耐心耗尽会离开并扣声望<br/>
-                • 出餐台的菜品也可以直接投喂桌宠<br/><br/>
-                <strong style="color:var(--sp-text-primary);">食材来源：</strong>冰箱整理、货架消除、补货商店<br/>
-                <strong style="color:var(--sp-text-primary);">调料来源：</strong>合成工坊调料链、补货商店
+                经营猫咪餐厅，烹饪上菜赚金币。<br/>
+                • 点「🟢开店」→ 客人自动到来→ 在烹饪台选食谱做菜 → 出锅后点桌子上的菜品图标上菜<br/>
+                • 客人有耐心倒计时，超时会走且扣声望<br/>
+                • 声望升级解锁新菜谱和新客人<br/>
+                • 出餐台的菜也可以直接投喂桌宠<br/><br/>
+                <strong style="color:var(--sp-text-primary);">食材来源：</strong>冰箱整理·货架消除·补货商店·抽奖<br/>
+                <strong style="color:var(--sp-text-primary);">调料来源：</strong>合成工坊调料链·补货商店·货架消除·抽奖
               </p>
             </div>
           </details>
@@ -3090,10 +3098,12 @@ function showInventoryPopup(category, quickKey, onUse) {
             <summary class="sp-guide-summary">🧶 合成工坊</summary>
             <div class="sp-guide-details-content">
               <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                点击猫爪生成器消耗1体力生成物品，将两个相同种类+等级的物品合成升级。完成订单交付物品赚金币，多余物品可售卖。<br/><br/>
-                共8条合成链（玩具/零食/宝石/药剂/音律/花卉/星辰/调料），每链8级。<br/><br/>
-                商店可购买投喂/洗护/睡眠道具存入背包，桌宠互动时消耗。<br/>
-                调料链物品会同步到餐厅调料库存。
+                点猫爪（消耗1⚡）→ 生成随机物品 → 两个相同种类+等级的物品可合成升级。<br/>
+                9条合成链（玩具/零食/宝石/药剂/音律/花卉/星辰/调料/体力），每链8级。<br/><br/>
+                • 完成订单交付指定物品赚金币（🔄可刷新订单）<br/>
+                • 多余物品拖到💰售卖区卖掉<br/>
+                • 商店买投喂/洗护/睡眠道具存入背包，桌宠互动时消耗<br/>
+                •🧂调料链物品 ↔ 餐厅调料库存实时同步
               </p>
             </div>
           </details>
@@ -3102,9 +3112,11 @@ function showInventoryPopup(category, quickKey, onUse) {
             <summary class="sp-guide-summary">🃏 消消看</summary>
             <div class="sp-guide-details-content">
               <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                多层堆叠的图案牌，点击未被遮挡的牌收集到暂存栏，凑齐3个相同即消除。清空所有牌通关，暂存栏满则失败。<br/><br/>
-                道具：🪜扩充暂存格 / 🧹随机消3个 / 🌀打乱位置（每局限用3个）<br/>
-                开局5体力，通关奖30~60🪙
+                多层堆叠的图案牌，点击未被遮挡的牌收集到暂存栏，凑齐3个相同即消除。<br/>
+                清空所有牌 = 通关，暂存栏满了 = 失败。<br/><br/>
+                道具（每局限3个）：🪜扩充暂存格/ 🧹随机消3个 / 🌀打乱位置<br/>
+                开局5⚡，通关奖30~60🪙<br/>
+                <strong style="color:var(--sp-text-primary);">联动：</strong>消除的图案会产出对应食材/调料/道具到冰箱和餐厅
               </p>
             </div>
           </details>
@@ -3113,9 +3125,10 @@ function showInventoryPopup(category, quickKey, onUse) {
             <summary class="sp-guide-summary">🔗 连连看</summary>
             <div class="sp-guide-details-content">
               <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                选两个相同图案方块，若能用不超过2次转折的折线连通则消除。清空通关。<br/><br/>
-                道具：🔍提示 / 🌀洗牌 / 💣强制消除 / 🧭透视同伴<br/>
-                棋盘8×8~18×18随机，体力5~16，通关奖40~500🪙
+                选两个相同图案，能用≤2次转折的折线连通就消除。清空通关。<br/><br/>
+                道具：🔍提示 / 🌀洗牌 / 💣强制消除 / 🧭10秒透视同伴<br/>
+                棋盘8×8~18×18随机，体力5~16⚡，通关奖40~500🪙<br/>
+                <strong style="color:var(--sp-text-primary);">联动：</strong>同消消看，消除产食材/调料/道具
               </p>
             </div>
           </details>
@@ -3124,21 +3137,22 @@ function showInventoryPopup(category, quickKey, onUse) {
             <summary class="sp-guide-summary">🧊 冰箱整理</summary>
             <div class="sp-guide-details-content">
               <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                把购物筐里的食材塞进随机大小的冰箱网格。食材有不同尺寸（含异形），可旋转。填充率越高奖励越多。<br/><br/>
+                把购物筐里的食材塞进随机大小的冰箱网格。食材有不同尺寸（含异形），可旋转。<br/>
+                填充率越高奖励越多，全塞进去有额外奖金。<br/><br/>
                 道具：🧃压缩缩小 / 🎒跳过不扣率 / 🧹自动码放<br/>
-                塞进去的食材存入冰箱库存，可投喂桌宠或餐厅烹饪用。<br/>
-                冰箱大小和体力消耗开局前未知。
+                <strong style="color:var(--sp-text-primary);">联动：</strong>塞进去的食材存入冰箱库存 → 投喂桌宠 /餐厅烹饪
               </p>
             </div>
           </details>
 
           <details class="sp-guide-details">
-            <summary class="sp-guide-summary">🍢 糖葫芦工坊</summary>
+            <summary class="sp-guide-summary">🍢糖葫芦工坊</summary>
             <div class="sp-guide-details-content">
               <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                竹签上穿着乱序水果，目标让每根签上都是同色水果。点选源签再点目标签移动顶端水果（同色可批量移）。<br/><br/>
-                道具：🥢加空签 / ↩️撤销 / 🌀强行移动<br/>
-                通关后糖葫芦存入库存，可卖金币或投喂桌宠。有概率掉✨糖砂。
+                竹签上穿着乱序水果，目标让每根签上都是同色。<br/>
+                点源签→ 点目标签移动顶端水果（同色可批量移，目标必须同色或为空）。<br/><br/>
+                道具：🥢加空签 / ↩️撤销 / 🌀强行移动（无视颜色）<br/>
+                <strong style="color:var(--sp-text-primary);">联动：</strong>通关糖葫芦存入库存 → 卖金币 / 投喂桌宠 / 餐厅甜品上菜。10%概率掉✨糖砂（投喂+50饱食）
               </p>
             </div>
           </details>
@@ -3147,37 +3161,47 @@ function showInventoryPopup(category, quickKey, onUse) {
             <summary class="sp-guide-summary">🛒 整理货架</summary>
             <div class="sp-guide-details-content">
               <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                货架隔间里有各种商品，每隔间3格。把相同商品凑到同一隔间的3格即三消消除，后排自动补位。清空通关。<br/><br/>
-                道具：🪵解锁底部背包 / 🧹自动消一组 / 🔄洗牌<br/>
-                消除的商品会联动到冰箱/餐厅/工坊背包。开局5~20体力。
+                货架隔间里有各种商品（每隔间3格），把3个相同商品凑到同一隔间即三消消除。<br/>
+                点选一个商品 → 点另一个空格移动过去。清空通关。有后排自动补位。<br/><br/>
+                道具：🪵解锁底部3格背包 / 🧹自动消一组 / 🔄洗牌<br/>
+                <strong style="color:var(--sp-text-primary);">联动：</strong>消除的商品按类型自动进入对应库存：<br/>
+                饮品/零食/宠物→冰箱 |玩具→睡眠道具 | 清洁→清洁道具<br/>
+                食物→冰箱食材 | 甜品→冰箱/糖葫芦 | 调味料→餐厅调料<br/>沐浴品→清洁道具 | 睡眠品→睡眠道具
               </p>
             </div>
           </details>
 
           <details class="sp-guide-details">
-            <summary class="sp-guide-summary">🎰 幸运抽奖</summary>
+            <summary class="sp-guide-summary">🎰幸运抽奖</summary>
             <div class="sp-guide-details-content">
               <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                花金币抽奖获得各类道具和物品。<br/><br/>
-                🎲 10🪙/次（日限10）| ✨ 30🪙/次（日限5）| 💫 50🪙/次（日限3）<br/><br/>
-                奖励包括：金币、各游戏道具、工坊背包物品、棋盘物品、食材、糖葫芦等。高价池出好东西概率更大。
+                花金币抽奖获得道具和物品：<br/>
+                🎲10🪙/次（日限10）→ 基础奖励<br/>
+                ✨ 30🪙/次（日限5）→ 中等奖励<br/>💫 50🪙/次（日限3）→ 高价值奖励<br/><br/>
+                奖品包括：金币、各游戏道具、工坊背包物品、合成棋盘物品、食材、糖葫芦等。
               </p>
             </div>
           </details>
 
           <details class="sp-guide-details">
-            <summary class="sp-guide-summary">💡 通用机制</summary>
+            <summary class="sp-guide-summary">💡 通用机制与联动总览</summary>
             <div class="sp-guide-details-content">
               <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                <strong style="color:var(--sp-text-primary);">金币🪙</strong> — 所有游戏共享，合成工坊最稳定产出<br/>
-                <strong style="color:var(--sp-text-primary);">体力⚡</strong> — 所有游戏共享，每5分钟恢复1点，点⊕用道具<br/>
-                <strong style="color:var(--sp-text-primary);">图鉴📖</strong> — 各游戏均支持自定义图片（📷按钮，推荐链接）<br/>
-                <strong style="color:var(--sp-text-primary);">背包🎒</strong> — 总背包汇总所有道具，投喂/洗澡/睡觉可设快捷<br/>
-                <strong style="color:var(--sp-text-primary);">联动🔗</strong> — 各游戏产出互通：调料→餐厅、食材→冰箱→投喂、糖葫芦→投喂/卖、货架消除→各种库存<br/>
-                <strong style="color:var(--sp-text-primary);">重置⚠️</strong> — 合成工坊设置⚙️中可重置所有游戏数据（24h冷却）
+                <strong style="color:var(--sp-text-primary);">🪙 金币</strong> — 所有游戏共享，合成工坊和餐厅最稳定产出<br/>
+                <strong style="color:var(--sp-text-primary);">⚡ 体力</strong> — 所有游戏共享，每5分钟恢复1点，点⊕用道具补充<br/>
+                <strong style="color:var(--sp-text-primary);">📖 图鉴</strong> — 各游戏支持自定义图片（📷按钮），图鉴合集可统一管理并联动同步<br/>
+                <strong style="color:var(--sp-text-primary);">🎒 背包</strong> — 投喂/洗澡/睡觉时从背包选物品消耗，可设快捷物品<br/>
+                <strong style="color:var(--sp-text-primary);">🏆 成就</strong> — 300+个成就，解锁后可领取金币/体力/道具奖励<br/>
+                <strong style="color:var(--sp-text-primary);">⚠️ 重置</strong> — 合成工坊设置⚙️中可重置所有游戏数据（24h冷却）<br/><br/>
+                <strong style="color:var(--sp-text-primary);">核心联动链路：</strong><br/>
+                🧶工坊调料链↔ 🐱餐厅调料（实时同步）<br/>🧊冰箱/🛒货架 →🐱餐厅食材 → 🍖投喂桌宠<br/>
+                🍢糖葫芦 → 💰卖金币 /🍖投喂 / 🐱餐厅甜品<br/>
+                🃏消消看+🔗连连看 → 消除产食材/调料/道具<br/>
+                🎰抽奖 → 各类物品直接进对应背包/棋盘
               </p>
             </div>
           </details>
+
         </div>
       </div>
     `;
@@ -3697,9 +3721,17 @@ if (hasEmoji) {
       if (spriteStateLock === 'think') clearSpriteLock();
 
       if (reply) {
-        state.petChatHistory.push({ role: 'assistant', content: reply, timestamp: Date.now() });
+        if (chatMode === 'online' && reply.includes('|||')) {
+          const parts = reply.split('|||').map(s => s.trim()).filter(Boolean);
+          const now = Date.now();
+          parts.forEach((part, i) => {
+            state.petChatHistory.push({ role: 'assistant', content: part, timestamp: now + i });
+          });
+        } else {
+          state.petChatHistory.push({ role: 'assistant', content: reply, timestamp: Date.now() });
+        }
         renderChatHistory();
-        showBubble(reply.slice(0, 50) + (reply.length > 50 ? '…' : ''), 4000);
+        showBubble(reply.split('|||')[0].trim().slice(0, 50) + (reply.length > 50 ? '…' : ''), 4000);
         saveData();
 
         petUnsummarizedCount++;
@@ -4011,10 +4043,18 @@ function toggleChat() {
 
 
       if (reply) {
-        state.petChatHistory.push({ role: 'assistant', content: reply, timestamp: Date.now() });
+        if (chatMode === 'online' && reply.includes('|||')) {
+          const parts = reply.split('|||').map(s => s.trim()).filter(Boolean);
+          const now = Date.now();
+          parts.forEach((part, i) => {
+            state.petChatHistory.push({ role: 'assistant', content: part, timestamp: now + i });
+          });
+        } else {
+          state.petChatHistory.push({ role: 'assistant', content: reply, timestamp: Date.now() });
+        }
         // 流式模式下已经有逐字显示的 div，重新渲染会闪一下但能保证数据一致
         renderChatHistory();
-        showBubble(reply.slice(0, 50) + (reply.length > 50 ? '…' : ''), 4000);
+        showBubble(reply.split('|||')[0].trim().slice(0, 50) + (reply.length > 50 ? '…' : ''), 4000);
         saveData();
         checkAchievements();
       petUnsummarizedCount++;
@@ -4412,8 +4452,12 @@ function toggleChat() {
       }
     }
 
-    if (isOfflineMode && settings.offlinePrompt) {
-      sys += `\n\n[线下模式]\n${settings.offlinePrompt}`;
+    if (mode !== 'summary') {
+      if (chatMode === 'offline' && settings.offlinePrompt) {
+        sys += `\n\n[线下模式]\n${settings.offlinePrompt}`;
+      } else if (chatMode === 'online' && settings.onlinePrompt) {
+        sys += `\n\n[线上模式]\n${settings.onlinePrompt}`;
+      }
     }
 
     messages.push({ role: 'system', content: sys });
@@ -5958,10 +6002,10 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 
       if (settings.spriteThink) setSpriteWithLock('think', settings.spriteThink, null);
 
-      const prevOffline = isOfflineMode;
-      isOfflineMode = true;
+      const prevMode = chatMode;
+      chatMode = 'offline';
       const reply = await callPetAPI('chat', '');
-      isOfflineMode = prevOffline;
+      chatMode = prevMode;
 
       if (spriteStateLock === 'think') clearSpriteLock();
 
@@ -6129,10 +6173,10 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
     if (settings.spriteThink) setSpriteWithLock('think', settings.spriteThink, null);
 
     // 临时开启线下模式让提示词注入 offlinePrompt
-    const prevOffline = isOfflineMode;
-    isOfflineMode = true;
+    const prevMode = chatMode;
+    chatMode = 'offline';
     const reply = await callPetAPI('chat', text);
-    isOfflineMode = prevOffline;
+    chatMode = prevMode;
 
     if (spriteStateLock === 'think') clearSpriteLock();
 
@@ -6523,7 +6567,7 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
     const messages = [];
 
     // system: 人设 + 世界书 + 日记提示词
-    let sys = settings.systemPrompt + '\n';
+    let sys = settings.systemPrompt + '\n\n' + getMoodModifier() + '\n';
     if (settings.relationshipPrompt) sys += `\n[与主人的关系]\n${settings.relationshipPrompt}\n`;
     const userPersona = getUserPersona();
     if (userPersona) sys += `\n[主人人设]\n${userPersona}\n`;
@@ -6532,6 +6576,19 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
     let worldInfo = '';
     try { worldInfo = await getWorldBookContent(); } catch(e) {}
     if (worldInfo) sys += `\n[世界设定参考]\n${worldInfo}\n`;
+    if (state.summary) sys += `\n[记忆总结]\n${state.summary}\n`;
+    if (state.memories.length > 0) {
+      const mems = state.memories
+        .map(m => typeof m === 'string' ? { content: m, importance: 3, tag: '' } : m)
+        .filter(m => m.content)
+        .sort((a, b) => (b.importance || 3) - (a.importance || 3))
+        .slice(0, 15);
+      const memText = mems.map(m => {
+        const tag = m.tag ? `[${m.tag}] ` : '';
+        return `${tag}${m.content}`;
+      }).join('\n');
+      sys += `\n[重要记忆]\n${memText}\n`;
+    }
     sys += `\n[日记写作要求]\n${settings.diaryPrompt || '请以桌宠的第一人称视角写一篇简短日记。'}`;
     sys += `\n[状态] 饱食:${Math.round(state.hunger)}% 清洁:${Math.round(state.cleanliness)}% 精力:${Math.round(state.energy)}% 心情:${state.mood}`;
     if (settings.enableTimeAwareness) {
@@ -7014,6 +7071,11 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
               <textarea id="sp-offline-prompt">${settings.offlinePrompt}</textarea>
             </div>
             <div class="sp-section">
+              <div class="sp-section-title">💬 线上提示词</div>
+              <p style="font-size:11px;color:#999;margin-bottom:8px;">开启线上模式时会追加到系统提示词中。AI回复中的 ||| 会被自动拆分为多条消息，模拟真实线上聊天效果。在聊天框右上角点模式按钮切换（🐾→💬→🌙 循环）。</p>
+              <textarea id="sp-online-prompt">${settings.onlinePrompt}</textarea>
+            </div>
+            <div class="sp-section">
               <label>破限 (Jailbreak)</label>
               <textarea id="sp-jailbreak">${settings.jailbreak}</textarea>
             </div>
@@ -7275,344 +7337,126 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
               <div class="sp-section-title">📖 使用说明</div>
               <p style="font-size:12px;color:#999;margin-bottom:12px;">点击各项展开查看详细说明</p>
 
-              <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🚀 快速开始</summary>
+              <details class="sp-guide-details" open>
+                <summary class="sp-guide-summary">🚀 快速上手</summary>
                 <div class="sp-guide-details-content">
-                  <div class="sp-guide-block">
-                    <div class="sp-guide-step"><span class="sp-guide-num">1</span><div><strong>配置 API</strong><br/>点击「🔑 API」标签页，选择使用酒馆当前 API 或填写独立 API Key。<br/>推荐新手直接选「使用酒馆当前 API 连接」，零配置开箱即用。<br/><br/>如果选「手动填写独立 API」，你需要：<br/>• 填入 API Key（通常以 sk- 开头）<br/>• 填入 Base URL（如 https://api.openai.com/v1）<br/>• 选择或输入模型名称（可以点「📡 获取」自动拉取列表）</div></div>
-                    <div class="sp-guide-step"><span class="sp-guide-num">2</span><div><strong>选一个预设性格</strong><br/>点击「💬 提示词」→「📋 提示词预设」，从内置的猫咪、傲娇精灵等预设中选一个，点「✅ 应用预设」。<br/><br/>应用后记得点底部「💾 保存所有设置」。预设会自动填充桌宠名字、系统提示词、关系描述等内容。</div></div>
-                    <div class="sp-guide-step"><span class="sp-guide-num">3</span><div><strong>开始互动</strong><br/>点击屏幕上的桌宠（或在手机上双击），弹出圆形菜单。<br/>选「💬 聊天」打开聊天框，就可以和桌宠说话了。<br/><br/>💡 小技巧：输入消息后按 Enter 只会发送消息不生成回复，点「➤」按钮才会让 AI 回复。这样你可以连续发好几条消息后再让桌宠一次性回应。</div></div>
-                  </div>
+                  <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
+                    <strong style="color:var(--sp-text-primary);">1. 配置 API</strong><br/>
+                    「🔑 API」标签页 → 选「使用酒馆当前 API」（零配置）或手动填写独立 API Key + Base URL。<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">2. 选个性格</strong><br/>
+                    「💬 提示词」→「📋 预设」→ 选一个 → 点「✅ 应用」→ 底部「💾 保存」。<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">3. 开始互动</strong><br/>
+                    点击/双击桌宠打开菜单 → 💬聊天 → 输入消息按Enter 发送，点➤ 让AI 回复。
+                  </p>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🐾 桌宠基础操作</summary>
+                <summary class="sp-guide-summary">🐾 基础操作</summary>
                 <div class="sp-guide-details-content">
                   <div class="sp-guide-table">
-                    <div class="sp-guide-row"><span class="sp-guide-key">单击桌宠</span><span class="sp-guide-val">打开圆形菜单（手机上需要双击）</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">拖拽桌宠</span><span class="sp-guide-val">按住桌宠拖动可以移动位置；拖到屏幕边缘会自动吸附挂起（需要在外观里上传对应的挂起图片）</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">🍖 投喂</span><span class="sp-guide-val">补充饱食度 +25%，触发吃东西动画</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">🛁 洗澡</span><span class="sp-guide-val">补充清洁度 +30%，触发洗澡动画</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">🛏️ 睡觉</span><span class="sp-guide-val">补充精力值 +35%，触发睡觉动画</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">💬 聊天</span><span class="sp-guide-val">打开对话窗口，和桌宠私聊</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">📔 日记</span><span class="sp-guide-val">打开日记面板，查看或生成桌宠的日记</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">⚙️ 设置</span><span class="sp-guide-val">打开本设置面板</span></div>
-                  </div>
-                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>状态系统说明：</strong></p>
-                  <p style="font-size:11px;color:#999;margin-top:4px;">状态条三个指标（🍖饱食 💧清洁 ⚡精力）会随时间缓慢下降。当某项低于 20% 时桌宠心情会变化：</p>
-                  <div class="sp-guide-table" style="margin-top:6px;">
-                    <div class="sp-guide-row"><span class="sp-guide-key">精力 < 20%</span><span class="sp-guide-val">😴 犯困状态，走路变慢，说话迷糊</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">饱食 < 20%</span><span class="sp-guide-val">🍽️ 饥饿状态，会时不时提到吃的</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">清洁 < 20%</span><span class="sp-guide-val">💦 脏脏状态，会嚷嚷想洗澡</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">全部 > 60%</span><span class="sp-guide-val">😊 开心状态，正常活跃</span></div>
-                  </div>
-                  <p style="font-size:11px;color:#999;margin-top:6px;">心情会影响桌宠的对话语气和精灵图表现。即使你关闭网页，状态也会按离线衰减率缓慢下降。</p>
+                    <div class="sp-guide-row"><span class="sp-guide-key">点击桌宠</span><span class="sp-guide-val">打开菜单（手机双击）</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">拖拽桌宠</span><span class="sp-guide-val">移动位置，拖到边缘自动吸附</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">🍖 投喂</span><span class="sp-guide-val">恢复饱食度（从背包选物品）</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">🛁 洗澡</span><span class="sp-guide-val">恢复清洁度</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">🛏️ 睡觉</span><span class="sp-guide-val">恢复精力值</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">📔 日记</span><span class="sp-guide-val">AI 以桌宠视角写日记</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">🏠 小屋</span><span class="sp-guide-val">立绘+对话+换装的沉浸空间</span></div>
+                </div>
+                  <p style="font-size:11px;color:#999;margin-top:8px;">三项状态随时间下降。低于20%时心情变差（困/饿/脏），影响对话语气。</p>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">💬 聊天框详细说明</summary>
+                <summary class="sp-guide-summary">💬 聊天框</summary>
                 <div class="sp-guide-details-content">
-                  <p style="font-size:12px;color:#ccc;line-height:1.7;margin-bottom:8px;">聊天框是你和桌宠交流的主要界面。</p>
                   <div class="sp-guide-table">
-                    <div class="sp-guide-row"><span class="sp-guide-key">😺 表情按钮</span><span class="sp-guide-val">展开/收起表情包面板，可以发送自定义贴图</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">📨 发送消息</span><span class="sp-guide-val">将文字/表情包加入聊天记录，<strong>不会触发 AI 回复</strong>。适合你想连续说几句话的场景</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">➤ 生成回复</span><span class="sp-guide-val">如果输入框有内容先发送，然后调用 AI 生成桌宠回复。这是唯一触发 AI 回复的按钮</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">Enter 键</span><span class="sp-guide-val">等同于「📨 发送消息」，只发送不回复</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">🌙 线下模式</span><span class="sp-guide-val">切换到更亲密的线下互动风格。开启后桌宠会认为你们不在电脑前，而是在现实中相处</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">─ 最小化</span><span class="sp-guide-val">收缩为小标题栏，悬挂在屏幕上不影响操作</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">✕ 关闭</span><span class="sp-guide-val">关闭聊天窗口（不会丢失聊天记录）</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">📨 发送</span><span class="sp-guide-val">只发消息不回复（可连发多条）</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">➤ 生成</span><span class="sp-guide-val">发送+触发 AI 回复</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">Enter</span><span class="sp-guide-val">等同于📨发送</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">😺 表情</span><span class="sp-guide-val">上传/发送自定义表情包</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">🐾💬🌙</span><span class="sp-guide-val">切换桌宠/线上（多条消息）/线下模式</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">右键回复</span><span class="sp-guide-val">重新生成桌宠的回复</span></div>
                   </div>
-                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>表情包使用方法：</strong></p>
-                  <div class="sp-guide-block" style="margin-top:6px;">
-                    <div class="sp-guide-step"><span class="sp-guide-num">1</span><div>点击「😺」展开表情包面板</div></div>
-                    <div class="sp-guide-step"><span class="sp-guide-num">2</span><div>点击「＋」按钮上传图片（PNG/JPG/GIF/WebP，2MB以内）</div></div>
-                    <div class="sp-guide-step"><span class="sp-guide-num">3</span><div>点击一个表情选中，会在输入框上方出现预览</div></div>
-                    <div class="sp-guide-step"><span class="sp-guide-num">4</span><div>点击「📨」或「➤」发送</div></div>
-                  </div>
-                  <p style="font-size:11px;color:#999;margin-top:8px;">💡 右键点击（手机长按）已有表情可以编辑名称或删除。给表情起描述性名字（如"委屈脸"、"开心跳舞"），AI 就能理解你发了什么表情。<br/><br/>如果在 API 设置中开启了「视觉识别」且模型支持多模态，AI 还能直接看到表情图片内容。</p>
-                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>Token 显示：</strong>聊天框底部会显示当前对话预估消耗的 token 数，帮你控制上下文长度。</p>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🧠 记忆与总结系统</summary>
+                <summary class="sp-guide-summary">🧠 记忆系统</summary>
                 <div class="sp-guide-details-content">
-                  <p style="font-size:12px;color:#ccc;line-height:1.7;margin-bottom:8px;">桌宠的记忆分三层，从短期到长期：</p>
+                  <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
+                    桌宠记忆分三层：<br/>
+                    •<strong style="color:var(--sp-text-primary);">对话记录</strong> — 最近N轮聊天，直接进上下文<br/>
+                    • <strong style="color:var(--sp-text-primary);">记忆条目</strong> — 手动添加或AI提取的关键信息（⭐1~5星优先级）<br/>
+                    • <strong style="color:var(--sp-text-primary);">对话总结</strong> — 用AI压缩旧对话，长期保留<br/><br/>
+                    在「🧠 记忆」标签页可手动管理。点「手动总结」选范围后AI生成总结，旧记录自动归档。
+                  </p>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">🎨 外观定制</summary>
+                <div class="sp-guide-details-content">
+                  <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
+                    「🎨 外观」标签页可设置：<br/>
+                    • <strong style="color:var(--sp-text-primary);">主题配色</strong> — 8种预设 + 自定义RGB<br/>
+                    • <strong style="color:var(--sp-text-primary);">精灵图</strong> — 闲置/走路/睡觉/吃东西/洗澡/拖拽/挂墙等状态图（支持GIF动图）<br/>
+                    • <strong style="color:var(--sp-text-primary);">菜单图标</strong> — 替换圆形菜单按钮的emoji<br/>
+                    • <strong style="color:var(--sp-text-primary);">互动贴图</strong> — 投喂/洗澡/睡觉时飘出的物品图<br/>
+                    • <strong style="color:var(--sp-text-primary);">心情图标</strong> — 替换右上角状态emoji<br/>
+                    • <strong style="color:var(--sp-text-primary);">桌宠大小</strong> — 0.5x~2.0x 自由缩放<br/><br/>
+                    🏠 小屋立绘在「更衣系统」中管理（小屋右侧👗按钮）。
+                  </p>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">💾 数据管理</summary>
+                <div class="sp-guide-details-content">
+                  <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
+                    • <strong style="color:var(--sp-text-primary);">多桌宠存档</strong> — 保存/加载不同桌宠配置（含聊天记录/图片/游戏进度）<br/>
+                    • <strong style="color:var(--sp-text-primary);">导出/导入</strong> — 完整备份为JSON文件，也可单独导出图片<br/>
+                    • <strong style="color:var(--sp-text-primary);">GitHub托管</strong> — 将本地图片上传到你的GitHub仓库，释放空间<br/><br/>
+                    <span style="color:#f66;">⚠️ 换浏览器/清缓存 = 数据丢失！务必定期导出备份</span>
+                  </p>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">⚡斜杠指令</summary>
+                <div class="sp-guide-details-content">
                   <div class="sp-guide-table">
-                    <div class="sp-guide-row"><span class="sp-guide-key">💬 对话记录</span><span class="sp-guide-val">最近的聊天内容（受「聊天读取轮数」限制），每次请求直接塞入上下文</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">📝 对话总结</span><span class="sp-guide-val">用 AI 压缩过的旧对话精华，始终存在于上下文中</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">⭐ 记忆条目</span><span class="sp-guide-val">手动添加或 AI 自动提取的关键信息（喜好、事件等），按重要度（星级）排序后注入上下文</span></div>
-                  </div>
-                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>如何使用总结功能：</strong></p>
-                  <div class="sp-guide-block" style="margin-top:6px;">
-                    <div class="sp-guide-step"><span class="sp-guide-num">1</span><div>去「🧠 记忆」标签页 → 点击「手动总结」按钮</div></div>
-                    <div class="sp-guide-step"><span class="sp-guide-num">2</span><div>弹窗中选择要总结的聊天范围（第几条到第几条）</div></div>
-                    <div class="sp-guide-step"><span class="sp-guide-num">3</span><div>点击「🔄 重新生成」，AI 会根据选定范围生成总结</div></div>
-                    <div class="sp-guide-step"><span class="sp-guide-num">4</span><div>你可以手动修改生成的总结内容</div></div>
-                    <div class="sp-guide-step"><span class="sp-guide-num">5</span><div>点「确认保存」，旧记录会自动归档，只保留最近 N 条（可在行为设置中调节）</div></div>
-                  </div>
-                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>总结策略说明：</strong></p>
-                  <div class="sp-guide-table" style="margin-top:4px;">
-                    <div class="sp-guide-row"><span class="sp-guide-key">增量合并</span><span class="sp-guide-val">将新对话和已有总结合并为一份完整总结（推荐，信息不丢失）</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">完全覆盖</span><span class="sp-guide-val">新总结直接替换旧总结（适合想重新开始的场景）</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">追加</span><span class="sp-guide-val">新总结追加到旧总结后面（时间线清晰但会越来越长）</span></div>
-                  </div>
-                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>AI 提取记忆：</strong></p>
-                  <p style="font-size:11px;color:#999;margin-top:4px;">点击「🤖 AI提取记忆」按钮，AI 会从最近 20 条对话中自动提取关键记忆点（你的喜好、重要事件等），以带标签的格式存入记忆池。你可以手动调整星级（1-5星），星级越高越优先注入上下文。</p>
-                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>记忆管理技巧：</strong></p>
-                  <p style="font-size:11px;color:#999;margin-top:4px;">• 重要的事情设为 5 星，日常小事 1-2 星<br/>• 定期清理过时或不准确的记忆<br/>• 记忆池建议控制在 15 条以内，过多会浪费 token<br/>• 总结完成后旧聊天会存入「历史聊天归档」，随时可以查看</p>
-                </div>
-              </details>
-
-              <details class="sp-guide-details">
-                <summary class="sp-guide-summary">📔 日记系统</summary>
-                <div class="sp-guide-details-content">
-                  <p style="font-size:12px;color:#ccc;line-height:1.7;margin-bottom:8px;">桌宠可以每天写一篇日记，记录你们的互动和它的心情。</p>
-                  <p style="font-size:11px;color:#999;margin-top:6px;"><strong>使用方法：</strong></p>
-                  <div class="sp-guide-block" style="margin-top:6px;">
-                    <div class="sp-guide-step"><span class="sp-guide-num">1</span><div>点击圆形菜单的「📔 日记」打开日记面板</div></div>
-                    <div class="sp-guide-step"><span class="sp-guide-num">2</span><div>日历上有蓝色圆点的日期表示有日记</div></div>
-                    <div class="sp-guide-step"><span class="sp-guide-num">3</span><div>底部选择记忆和聊天的范围作为日记素材</div></div>
-                    <div class="sp-guide-step"><span class="sp-guide-num">4</span><div>点击「✨ 生成今日日记」，AI 会以桌宠第一人称写日记</div></div>
-                  </div>
-                  <div class="sp-guide-table" style="margin-top:10px;">
-                    <div class="sp-guide-row"><span class="sp-guide-key">点击日历日期</span><span class="sp-guide-val">查看或编辑该日的日记</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">年月标题</span><span class="sp-guide-val">点击可快速跳转到指定年月</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">✏️ 编辑</span><span class="sp-guide-val">手动修改日记内容</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">🗑️ 删除</span><span class="sp-guide-val">删除指定日期的日记</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">📄 导出全部</span><span class="sp-guide-val">将所有日记导出为 TXT 文件</span></div>
-                  </div>
-                  <p style="font-size:11px;color:#999;margin-top:8px;">💡 同一天可以多次生成日记，会提示你选择覆盖还是追加。日记的风格由「日记提示词」控制，可以在「💬 提示词」标签页中修改。</p>
-                </div>
-              </details>
-
-              <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🎨 外观定制详解</summary>
-                <div class="sp-guide-details-content">
-                  <p style="font-size:12px;color:#ccc;line-height:1.7;margin-bottom:8px;">在「🎨 外观」标签页中可以全方位定制桌宠的外观。</p>
-                  <p style="font-size:11px;color:#999;margin-top:6px;"><strong>主题配色：</strong></p>
-                  <div class="sp-guide-table" style="margin-top:4px;">
-                    <div class="sp-guide-row"><span class="sp-guide-key">默认深色</span><span class="sp-guide-val">经典蓝黑配色</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">赛博朋克</span><span class="sp-guide-val">霓虹粉/青色，科幻风格</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">可爱粉</span><span class="sp-guide-val">浅粉色系，适合可爱桌宠</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">深海</span><span class="sp-guide-val">深蓝/青色，沉静风格</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">森林</span><span class="sp-guide-val">深绿色系，自然风格</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">自定义</span><span class="sp-guide-val">自由调配每个颜色，支持导入/导出配色方案</span></div>
-                  </div>
-                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>桌宠形象（精灵图）：</strong></p>
-                  <div class="sp-guide-table" style="margin-top:4px;">
-                    <div class="sp-guide-row"><span class="sp-guide-key">闲置</span><span class="sp-guide-val">默认站立状态，最重要的一张图</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">往左/右/上/下走</span><span class="sp-guide-val">闲逛时的行走图，没设置则用闲置图代替</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">睡觉</span><span class="sp-guide-val">点击「睡觉」或精力很低时显示</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">开心/难过</span><span class="sp-guide-val">对应心情状态时的表情</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">被拎起/晕乎乎</span><span class="sp-guide-val">拖拽过程中和松手后的状态</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">吃东西/洗澡</span><span class="sp-guide-val">投喂/洗澡时的动作图</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">打招呼</span><span class="sp-guide-val">你回来时的欢迎动作</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">思考中</span><span class="sp-guide-val">等待 AI 回复时的思考状态</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">挂左/右/顶</span><span class="sp-guide-val">拖到屏幕边缘吸附时的挂起姿势</span></div>
-                  </div>
-                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>精灵图规格建议：</strong></p>
-                  <p style="font-size:11px;color:#999;margin-top:4px;">• 推荐 PNG 透明背景，尺寸 120×160 像素左右<br/>• GIF 动图会保留动画帧不压缩（适合做走路动画）<br/>• 每张图限制 2MB，超过会被自动压缩为 WebP<br/>• 上传大量图片时注意浏览器存储空间（约 5MB 上限）</p>
-                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>⏱️ 时间滑轨：</strong>每个精灵图下方有时间滑轨，设置该动作播放多久后恢复闲置状态。例如把「吃东西」设为 3 秒，投喂后会显示吃东西图 3 秒再切回闲置。</p>
-                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>其他定制项：</strong></p>
-                  <div class="sp-guide-table" style="margin-top:4px;">
-                    <div class="sp-guide-row"><span class="sp-guide-key">菜单图标</span><span class="sp-guide-val">替换圆形菜单按钮的 emoji 为自定义图片，建议用透明底 PNG</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">互动贴图</span><span class="sp-guide-val">投喂/洗澡/睡觉时飘出的物品图片（食物、浴缸、床）</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">心情图标</span><span class="sp-guide-val">替换右上角的 emoji 心情标识为图片</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">自定义动作</span><span class="sp-guide-val">添加额外精灵图，桌宠闲逛时会随机播放并显示动作名</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">桌宠大小</span><span class="sp-guide-val">0.5x 迷你到 2.0x 巨大，自由缩放</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet status</span><span class="sp-guide-val">查看状态</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet feed</span><span class="sp-guide-val">投喂</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet bath</span><span class="sp-guide-val">洗澡</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet sleep</span><span class="sp-guide-val">睡觉</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet summon</span><span class="sp-guide-val">召唤到屏幕中心（跑飞了用这个）</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet toggle</span><span class="sp-guide-val">显示/隐藏桌宠</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet chat你好</span><span class="sp-guide-val">隔空发消息给桌宠</span></div>
                   </div>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">📖 人设与提示词详解</summary>
+                <summary class="sp-guide-summary">🎮 游戏系统概览</summary>
                 <div class="sp-guide-details-content">
-                  <p style="font-size:12px;color:#ccc;line-height:1.7;margin-bottom:8px;">提示词决定了桌宠的性格和行为方式。以下是各部分在最终发送给 AI 的消息中的位置和作用：</p>
-                  <div class="sp-guide-table">
-                    <div class="sp-guide-row"><span class="sp-guide-key">系统提示词</span><span class="sp-guide-val">桌宠的核心人设（位于 system 消息开头）。描述性格、语气、说话习惯等</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">关系描述</span><span class="sp-guide-val">桌宠和你之间的关系，附在系统提示词后面。描述称呼方式、互动习惯等</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">{{user}} 人设</span><span class="sp-guide-val">你自己的身份信息。可以从酒馆 Persona 自动获取，或手动填写</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">角色卡描述</span><span class="sp-guide-val">从酒馆角色卡读取的背景设定，作为参考信息注入</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">世界书</span><span class="sp-guide-val">从酒馆世界书读取的世界设定，可逐条勾选排除不需要的条目</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">线下提示词</span><span class="sp-guide-val">开启线下模式 🌙 时追加。让桌宠认为你们在现实中互动</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">破限 (Jailbreak)</span><span class="sp-guide-val">放在所有消息的最后面，用于解除模型限制</span></div>
-                  </div>
-                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>消息组装顺序（从上到下）：</strong></p>
-                  <div class="sp-guide-block" style="margin-top:6px;">
-                    <div class="sp-guide-step"><span class="sp-guide-num">1</span><div>[system] 系统提示词 + 心情修饰</div></div>
-                    <div class="sp-guide-step"><span class="sp-guide-num">2</span><div>[system] 关系描述</div></div>
-                    <div class="sp-guide-step"><span class="sp-guide-num">3</span><div>[system] {{user}} 人设</div></div>
-                    <div class="sp-guide-step"><span class="sp-guide-num">4</span><div>[system] 角色卡背景 + 世界书设定</div></div>
-                    <div class="sp-guide-step"><span class="sp-guide-num">5</span><div>[system] 对话总结 + 记忆条目</div></div>
-                    <div class="sp-guide-step"><span class="sp-guide-num">6</span><div>[system] 当前状态值 + 时间（如果开启）</div></div>
-                    <div class="sp-guide-step"><span class="sp-guide-num">7</span><div>[user/assistant] 最近 N 轮聊天记录</div></div>
-                    <div class="sp-guide-step"><span class="sp-guide-num">8</span><div>[system] 破限 Jailbreak（如果有）</div></div>
-                  </div>
-                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>预设系统：</strong></p>
-                  <p style="font-size:11px;color:#999;margin-top:4px;">• 内置 5 套预设人格（猫咪、傲娇精灵、忠犬、狐仙、AI助手）<br/>• 点「✅ 应用预设」会自动填充名字、系统提示词、关系描述、破限<br/>• 点「💾 保存为预设」可以把当前配置存为自定义预设<br/>• 内置预设不可删除，自定义预设支持覆盖保存和删除<br/>• 应用预设后别忘了点底部「💾 保存所有设置」</p>
-                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>角色卡和世界书：</strong></p>
-                  <p style="font-size:11px;color:#999;margin-top:4px;">• 在「📖 人设」标签页的搜索框中输入关键字可筛选<br/>• 选中后下方会出现预览，可以展开查看具体内容<br/>• 世界书支持逐条勾选/取消，被取消的条目不会注入桌宠上下文<br/>• 选「🚫 不选择」可以清除已选的角色卡或世界书</p>
+                  <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
+                    所有游戏共享<strong style="color:#ffb347;">🪙金币</strong> 和 <strong style="color:var(--sp-status-energy);">⚡体力</strong>（每5分钟恢复1点）。<br/><br/>
+                    8种小游戏 + 抽奖 + 总背包 + 成就 + 图鉴合集。<br/>
+                    游戏产出的物品可以投喂桌宠、烹饪菜品、卖金币。<br/>
+                    详细规则点游戏选择弹窗右上角的<strong style="color:var(--sp-text-primary);">❓</strong> 按钮查看。<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">联动一句话总结：</strong><br/>
+                    冰箱/货架产食材 → 餐厅烹饪 → 出菜投喂桌宠<br/>
+                    工坊产调料 → 餐厅做菜 /卖金币<br/>
+                    糖葫芦 → 卖金币 / 投喂 / 餐厅甜品上菜<br/>
+                    消消看+连连看 → 消除产联动物品（食材/调料/道具）<br/>
+                    抽奖 → 各类道具和物品<br/>
+                    金币 → 商店买道具 → 投喂/洗澡/睡觉消耗
+                  </p>
                 </div>
               </details>
-
-              <details class="sp-guide-details">
-                <summary class="sp-guide-summary">⚙️ 行为设置详解</summary>
-                <div class="sp-guide-details-content">
-                  <p style="font-size:12px;color:#ccc;line-height:1.7;margin-bottom:8px;">「⚙️ 行为」标签页控制桌宠的各种自动行为。</p>
-                  <p style="font-size:11px;color:#999;margin-top:6px;"><strong>基础行为：</strong></p>
-                  <div class="sp-guide-table" style="margin-top:4px;">
-                    <div class="sp-guide-row"><span class="sp-guide-key">活跃度 0-100%</span><span class="sp-guide-val">控制桌宠的话唠程度。0% = 安静待着不说话；50% = 偶尔冒泡；100% = 话痨模式碎碎念不停</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">自动反应</span><span class="sp-guide-val">勾选后桌宠会监听酒馆主聊天窗口，看到有趣的对话可能会插嘴评论（以气泡形式）</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">冷却时间</span><span class="sp-guide-val">两次自动反应之间的最短间隔（秒），防止刷屏</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">窥探轮数</span><span class="sp-guide-val">桌宠偷看主聊天最近几轮对话作为评论参考</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">聊天读取轮数</span><span class="sp-guide-val">每次请求发送给 AI 的桌宠私聊记录条数。越多上下文越丰富但越费 token</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">走动频率</span><span class="sp-guide-val">桌宠多久走一步。3秒 = 频繁走动；15秒 = 偶尔动动；30秒 = 基本不动</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">时间感知</span><span class="sp-guide-val">开启后上下文中会包含当前日期、时间、星期几。桌宠就能说"早上好"之类的话</span></div>
-                  </div>
-                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>总结相关：</strong></p>
-                  <div class="sp-guide-table" style="margin-top:4px;">
-                    <div class="sp-guide-row"><span class="sp-guide-key">自动总结提醒</span><span class="sp-guide-val">勾选后，聊天达到指定轮数会自动触发总结流程</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">自动总结间隔</span><span class="sp-guide-val">多少轮对话后触发自动总结（设为 0 = 关闭）</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">总结策略</span><span class="sp-guide-val">增量合并/完全覆盖/追加（详见记忆与总结章节）</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">总结后保留条数</span><span class="sp-guide-val">总结完成后保留最近几条聊天，其余归档</span></div>
-                  </div>
-                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>离线衰减：</strong></p>
-                  <div class="sp-guide-table" style="margin-top:4px;">
-                    <div class="sp-guide-row"><span class="sp-guide-key">衰减率 0.1~0.5</span><span class="sp-guide-val">关闭网页后状态下降速度。0.1 = 很慢；0.5 = 较快</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">安全阈值 %</span><span class="sp-guide-val">状态不会低于这个值，防止桌宠"饿死"。建议 10-20%</span></div>
-                  </div>
-                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>反应语言自定义：</strong></p>
-                  <p style="font-size:11px;color:#999;margin-top:4px;">每个场景都可以用 | 分隔多条语句，桌宠会随机选一条。例如：<br/><code style="background:rgba(100,180,255,0.1);padding:2px 6px;border-radius:3px;font-size:11px;">好吃！|谢谢主人～|（狼吞虎咽）|嗝～</code><br/><br/>可自定义的场景包括：投喂、洗澡、睡觉、拖拽、闲逛碎碎念、饥饿/脏了/困了时的额外碎碎念、长时间离线回归、短时间离线回归。</p>
-                </div>
-              </details>
-
-              <details class="sp-guide-details">
-                <summary class="sp-guide-summary">⚡ 斜杠指令</summary>
-                <div class="sp-guide-details-content">
-                  <p style="font-size:12px;color:#ccc;line-height:1.7;margin-bottom:8px;">在酒馆主聊天输入框中可以直接输入以下指令控制桌宠：</p>
-                  <div class="sp-guide-table">
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet</span><span class="sp-guide-val">等同于 /pet status，查看当前状态</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet status</span><span class="sp-guide-val">查看桌宠当前饱食度、清洁度、精力、心情</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet feed</span><span class="sp-guide-val">投喂食物，效果同点击 🍖 按钮</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet bath</span><span class="sp-guide-val">给桌宠洗澡，效果同点击 🛁 按钮</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet sleep</span><span class="sp-guide-val">让桌宠睡觉，效果同点击 🛏️ 按钮</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet summon</span><span class="sp-guide-val">强行将桌宠召唤到屏幕正中心（桌宠跑飞了用这个）</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet toggle</span><span class="sp-guide-val">显示/隐藏桌宠，等同于顶部开关</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet chat 你好</span><span class="sp-guide-val">直接在酒馆输入框发消息给桌宠，会自动打开聊天窗口并触发回复</span></div>
-                  </div>
-                  <p style="font-size:11px;color:#999;margin-top:8px;">💡 输入 / 时酒馆的自动补全菜单中会出现 /pet 选项。指令返回的结果只有你自己能看到，不会影响主聊天。</p>
-                </div>
-              </details>
-
-              <details class="sp-guide-details">
-                <summary class="sp-guide-summary">💾 数据与存档管理</summary>
-                <div class="sp-guide-details-content">
-                  <p style="font-size:12px;color:#ccc;line-height:1.7;margin-bottom:8px;">所有数据存储在本地浏览器 IndexedDB 中。</p>
-                  <p style="font-size:11px;color:#999;margin-top:6px;"><strong>多桌宠存档：</strong></p>
-                  <div class="sp-guide-block" style="margin-top:6px;">
-                    <div class="sp-guide-step"><span class="sp-guide-num">1</span><div>在「💾 数据」→「🐾 桌宠存档」点击「💾 保存当前」</div></div>
-                    <div class="sp-guide-step"><span class="sp-guide-num">2</span><div>输入存档名称（建议用桌宠名字）</div></div>
-                    <div class="sp-guide-step"><span class="sp-guide-num">3</span><div>之后可以在下拉菜单选择不同存档，点「📂 加载存档」一键切换</div></div>
-                  </div>
-                  <p style="font-size:11px;color:#999;margin-top:6px;">每个存档包含完整的设置+状态+聊天记录，适合养多只不同性格的桌宠。</p>
-                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>导入/导出：</strong></p>
-                  <div class="sp-guide-table" style="margin-top:4px;">
-                    <div class="sp-guide-row"><span class="sp-guide-key">📤 导出</span><span class="sp-guide-val">将全部数据（设置+状态+图片）导出为 JSON 文件</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">📥 导入</span><span class="sp-guide-val">从 JSON 文件恢复数据，会覆盖当前所有配置</span></div>
-                  </div>
-                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>存储空间说明：</strong></p>
-                  <p style="font-size:11px;color:#999;margin-top:4px;">• 如果浏览器卡顿请及时备份迁移数据 <br/>• 在「💾 数据」底部的「状态总览」可以看到当前存储占用<br/>• 上传了大量精灵图/表情包时容易接近上限<br/>• 快满时会自动提醒，建议导出备份后清理旧图片</p>
-                  <p style="font-size:11px;color:#f66;margin-top:10px;"><strong>⚠️ 重要提醒：</strong></p>
-                  <p style="font-size:11px;color:#f66;margin-top:4px;">• 换浏览器/清除缓存/卸载酒馆 = 数据丢失！务必定期导出备份<br/>• 「🗑️ 清空所有聊天数据」会删除聊天记录+归档+总结<br/>• 「💀 重置全部数据」会永久删除一切，包括设置和图片，不可撤销</p>
-                </div>
-              </details>
-
-              <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🔑 API 设置详解</summary>
-                <div class="sp-guide-details-content">
-                  <p style="font-size:12px;color:#ccc;line-height:1.7;margin-bottom:8px;">桌宠需要调用 AI 模型来生成回复。有两种连接方式：</p>
-                  <p style="font-size:11px;color:#999;margin-top:6px;"><strong>方式一：使用酒馆当前 API（推荐新手）</strong></p>
-                  <p style="font-size:11px;color:#999;margin-top:4px;">直接复用你在酒馆中已经配好的 API 连接。无需额外填写任何信息。桌宠会通过酒馆内部接口（generateQuietPrompt）发送请求，不影响主聊天。</p>
-                  <p style="font-size:11px;color:#999;margin-top:6px;">• 可选填「模型覆盖」，指定桌宠使用不同于主聊天的模型<br/>• 不支持流式输出（由酒馆控制）</p>
-                  <p style="font-size:11px;color:#999;margin-top:10px;"><strong>方式二：手动填写独立 API</strong></p>
-                  <p style="font-size:11px;color:#999;margin-top:4px;">适合想让桌宠用不同 API 供应商或独立计费的用户。</p>
-                  <div class="sp-guide-table" style="margin-top:6px;">
-                    <div class="sp-guide-row"><span class="sp-guide-key">API Key</span><span class="sp-guide-val">你的 API 密钥，通常以 sk- 开头</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">Base URL</span><span class="sp-guide-val">API 地址，必须以 /v1 结尾。例：https://api.openai.com/v1</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">模型</span><span class="sp-guide-val">手动输入或点「📡 获取」从 API 拉取可用模型列表</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">最大 Tokens</span><span class="sp-guide-val">AI 单次回复的最大长度。桌宠聊天建议 200-500</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">流式输出</span><span class="sp-guide-val">开启后回复会逐字显示出来，体验更好</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">视觉识别</span><span class="sp-guide-val">开启后表情包图片会以多模态格式发给 AI（需要模型支持，如 gpt-4o）</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">请求超时</span><span class="sp-guide-val">等待多少秒没响应就放弃，建议 15-30 秒</span></div>
-                  </div>
-                  <p style="font-size:11px;color:#999;margin-top:8px;">💡 兼容所有 OpenAI 格式的 API（包括中转站、本地部署的 Ollama 等），只要支持 /v1/chat/completions 接口即可。</p>
-                </div>
-              </details>
-
-              <details class="sp-guide-details">
-                <summary class="sp-guide-summary">❓ 常见问题 FAQ</summary>
-                <div class="sp-guide-details-content">
-                  <div class="sp-guide-block" style="gap:14px;">
-                    <div><strong style="color:var(--sp-text-primary);">Q: 桌宠跑到屏幕外面看不见了？</strong><br/><span style="font-size:12px;color:#bbb;">在酒馆聊天输入框输入 <code style="background:rgba(100,180,255,0.1);padding:1px 4px;border-radius:3px;">/pet summon</code> 强行召回屏幕中心。或者刷新页面，桌宠会回到上次保存的合法位置。</span></div>
-                    <div><strong style="color:var(--sp-text-primary);">Q: API 报错/桌宠不回复？</strong><br/><span style="font-size:12px;color:#bbb;">检查清单：<br/>① API Key 是否正确且有余额<br/>② Base URL 是否以 /v1 结尾（不是 /v1/chat/completions）<br/>③ 模型名是否拼写正确（点「📡 获取」验证连接）<br/>④ 网络是否正常，有无代理问题<br/>⑤ 超时时间是否设得太短（建议 15s 以上）<br/><br/>气泡会显示错误代码，常见的：401=Key错误，403=无权限，404=模型不存在，429=请求太频繁，500=服务器错误。</span></div>
-                    <div><strong style="color:var(--sp-text-primary);">Q: 桌宠不说话 / 不自动评论？</strong><br/><span style="font-size:12px;color:#bbb;">确认以下设置：<br/>①「活跃度」不是 0%<br/>②「自动反应」已勾选<br/>③ 冷却时间没设太长（如果设了 300 秒那就是 5 分钟才能说一次）<br/>④ 酒馆主聊天窗口有新消息产生（桌宠是监听主聊天来触发反应的）<br/><br/>如果只是想直接和桌宠聊天，不需要等自动反应，直接打开聊天框说话就行。</span></div>
-                    <div><strong style="color:var(--sp-text-primary);">Q: 图片上传失败 / 存储满了？</strong><br/><span style="font-size:12px;color:#bbb;">① 单张图片限制 2MB，超过会报错<br/>② 支持格式：PNG / JPG / GIF / WebP<br/>③ GIF 动图不会被压缩（保留动画帧）<br/>④ 其他格式会被自动压缩为 WebP<br/><br/>如果提示「存储满了」，去「💾 数据」→「状态总览」查看空间占用。解决办法：<br/>• 删除不需要的精灵图<br/>• 减少表情包数量<br/>• 清理旧的聊天归档<br/>• 导出备份后重置数据</span></div>
-                    <div><strong style="color:var(--sp-text-primary);">Q: 酒馆模式下找不到角色卡/世界书？</strong><br/><span style="font-size:12px;color:#bbb;">① 确保酒馆中已经创建/导入了角色卡或世界书<br/>② 搜索框支持模糊匹配，输入部分名字即可<br/>③ 如果列表为空，可能是酒馆版本兼容问题，尝试刷新页面后重试<br/>④ 世界书需要先在酒馆的「世界信息」面板中打开过一次才能被检测到</span></div>
-                    <div><strong style="color:var(--sp-text-primary);">Q: 表情包发给 AI，它能看到图片吗？</strong><br/><span style="font-size:12px;color:#bbb;">取决于两个条件：<br/>① 在 API 设置中勾选了「启用视觉识别」<br/>② 你使用的模型支持多模态（如 gpt-4o、claude-3 等）<br/><br/>如果两个条件都满足，AI 能直接看到图片内容。否则 AI 只能看到表情包的文字名称（如"[发送了表情包: 委屈脸]"），所以给表情起一个描述性的名字很重要。</span></div>
-                    <div><strong style="color:var(--sp-text-primary);">Q: 流式输出有什么好处？</strong><br/><span style="font-size:12px;color:#bbb;">开启后桌宠的回复会像打字一样逐字显示出来，而不是等全部生成完再一次性显示。体验更自然。<br/><br/>注意：仅在「手动填写独立 API」模式下有效，酒馆 API 模式由酒馆控制无法使用流式。</span></div>
-                    <div><strong style="color:var(--sp-text-primary);">Q: 线下模式是什么？</strong><br/><span style="font-size:12px;color:#bbb;">在聊天框右上角点 🌙 图标可以切换线下模式。开启后：<br/>• 线下提示词会追加到系统消息中<br/>• 桌宠会认为你们不在电脑前，而是在现实中相处<br/>• 语气通常更亲密、放松，可以描述动作和场景<br/><br/>适合想和桌宠玩角色扮演或模拟日常互动的场景。图标变绿色表示已开启。</span></div>
-                    <div><strong style="color:var(--sp-text-primary);">Q: 桌宠占的 token 多吗？会不会很费钱？</strong><br/><span style="font-size:12px;color:#bbb;">聊天框底部和「状态总览」都会显示预估 token 数。一般情况：<br/>• 简单闲聊：200-500 tokens/次<br/>• 带记忆+世界书：500-1500 tokens/次<br/>• 建议把「最大 Tokens」设为 200-300 来控制回复长度<br/>• 用小模型（如 gpt-4o-mini）性价比最高<br/><br/>定期总结旧聊天记录可以有效减少每次请求的上下文长度。</span></div>
-                    <div><strong style="color:var(--sp-text-primary);">Q: 如何让桌宠更有个性？</strong><br/><span style="font-size:12px;color:#bbb;">几个建议：<br/>① 系统提示词写具体：不只写"可爱"，而是描述具体行为（"说话喜欢用～结尾，经常打错字，对甜食毫无抵抗力"）<br/>② 关系描述要有细节（"你们已经认识三年了，你记得主人养了一只真猫叫橘子"）<br/>③ 添加记忆条目，让桌宠记住你的喜好和之前发生的事<br/>④ 自定义反应语言，让每句碎碎念都符合人设<br/>⑤ 上传精灵图，视觉形象让角色感更强</span></div>
-                    <div><strong style="color:var(--sp-text-primary);">Q: 桌宠和酒馆主聊天互相影响吗？</strong><br/><span style="font-size:12px;color:#bbb;">不影响。桌宠的聊天完全独立于酒馆主聊天窗口。<br/>• 桌宠可以「偷看」主聊天内容（作为自动反应的参考），但不会修改或插入消息<br/>• 桌宠使用的 API 配额与主聊天分开（如果用独立 API 的话）<br/>• 桌宠的聊天记录单独存储，不会出现在酒馆的对话历史中</span></div>
-                    <div><strong style="color:var(--sp-text-primary);">Q: 手机上操作有什么不同？</strong><br/><span style="font-size:12px;color:#bbb;">主要区别：<br/>• 双击桌宠才能打开菜单（单击是点选）<br/>• 各面板会自动缩小适配手机屏幕<br/>• 精灵图和菜单按钮尺寸会自动缩小<br/>• 建议把桌宠缩放设为 0.8x 以下<br/>• 拖拽操作正常支持，但范围更小</span></div>
-                    <div><strong style="color:var(--sp-text-primary);">Q: 能同时运行多只桌宠吗？</strong><br/><span style="font-size:12px;color:#bbb;">目前只能同时运行一只。但通过「多桌宠存档」功能可以保存多套桌宠配置，一键切换不同的桌宠（切换后前一只会"收起来"）。每只桌宠的聊天记录、记忆、设置都独立保存。</span></div>
-                  </div>
-                </div>
-              </details>
-
-              <details class="sp-guide-details">
-                <summary class="sp-guide-summary">💡 进阶技巧</summary>
-                <div class="sp-guide-details-content">
-                  <div class="sp-guide-block" style="gap:10px;">
-                    <div style="font-size:12px;color:#ccc;line-height:1.7;">
-                      <strong style="color:var(--sp-text-primary);">1. 用小模型省钱</strong><br/>
-                      桌宠聊天不需要太强的模型。gpt-4o-mini、claude-3-haiku 这类小模型足够应付日常对话，便宜很多。把「最大 Tokens」设为 200-300 即可。
-                    </div>
-                    <div style="font-size:12px;color:#ccc;line-height:1.7;">
-                      <strong style="color:var(--sp-text-primary);">2. 善用发送+生成分离</strong><br/>
-                      「📨 发送」和「➤ 生成」分开，意味着你可以连续发好几条消息描述一个场景，最后再点一次生成让桌宠统一回应。这样桌宠的回复会更连贯。
-                    </div>
-                    <div style="font-size:12px;color:#ccc;line-height:1.7;">
-                      <strong style="color:var(--sp-text-primary);">3. 记忆池精细管理</strong><br/>
-                      记忆不在多在精。5 条高质量的 5 星记忆比 20 条碎片记忆效果好得多。定期审查记忆，删掉过时的，合并相似的。
-                    </div>
-                    <div style="font-size:12px;color:#ccc;line-height:1.7;">
-                      <strong style="color:var(--sp-text-primary);">4. GIF 动图做精灵图</strong><br/>
-                      上传 GIF 格式的图片不会被压缩，动画帧完整保留。你可以用像素画工具做简单的行走动画 GIF，让桌宠走路时真的在"走"。
-                    </div>
-                    <div style="font-size:12px;color:#ccc;line-height:1.7;">
-                      <strong style="color:var(--sp-text-primary);">5. 世界书精确控制</strong><br/>
-                      如果你的世界书很大，没必要全部注入桌宠上下文。在「📖 人设」里选中世界书后，可以逐条勾选/取消，只保留和桌宠相关的条目。
-                    </div>
-                    <div style="font-size:12px;color:#ccc;line-height:1.7;">
-                      <strong style="color:var(--sp-text-primary);">6. 定期总结保持记忆新鲜</strong><br/>
-                      建议每聊 20-30 轮做一次总结。总结后旧记录归档，上下文变短，AI 回复速度更快、费用更低、而且重要信息不会被挤出上下文窗口。
-                    </div>
-                    <div style="font-size:12px;color:#ccc;line-height:1.7;">
-                      <strong style="color:var(--sp-text-primary);">7. 导出备份要养成习惯</strong><br/>
-                      每次做了大量修改（上传新图、调了很久的提示词）之后，去「💾 数据」点一下「📤 导出」。万一浏览器出问题，至少不会从头来过。
-                    </div>
-                  </div>
-                </div>
-              </details>
-
             </div>
           </div>
-
-
         </div>
         <div class="sp-settings-footer">
           <button class="sp-btn sp-btn-primary" id="sp-save-settings">💾 保存所有设置</button>
@@ -8003,6 +7847,20 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
     });
   }
 
+  function updateChatModeButton(btn) {
+    if (!btn) return;
+    const config = {
+      pet:     { emoji: '🐾', color: '#aaa',    opacity: '0.8', title: '桌宠模式（点击切换）' },
+      online:  { emoji: '💬', color: '#64b4ff', opacity: '1',   title: '线上模式（点击切换）' },
+      offline: { emoji: '🌙', color: '#90ee90', opacity: '1',   title: '线下模式（点击切换）' },
+    };
+    const c = config[chatMode] || config.pet;
+    btn.textContent = c.emoji;
+    btn.style.color = c.color;
+    btn.style.opacity = c.opacity;
+    btn.title = c.title;
+  }
+
 
   // ============================================================
   // 事件绑定
@@ -8038,20 +7896,21 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
         }
       };
     }
-    const offlineToggle = document.getElementById('sp-chat-offline-toggle');
-    if (offlineToggle && isOfflineMode) {
-      offlineToggle.style.opacity = '1';
-      offlineToggle.style.color = '#90ee90';
-      offlineToggle.title = '线下模式（已开启）';
-    }
-    if (offlineToggle) {
-      offlineToggle.onclick = () => {
-        isOfflineMode = !isOfflineMode;
-        offlineToggle.style.opacity = isOfflineMode ? '1' : '0.6';
-        offlineToggle.style.color = isOfflineMode ? '#90ee90' : '#aaa';
-        offlineToggle.title = isOfflineMode ? '线下模式（已开启）' : '线下模式';
-        showBubble(isOfflineMode ? '🌙 进入线下模式～' : '💻 回到线上模式', 2000);
-        state.isOfflineMode = isOfflineMode;
+    const modeToggle = document.getElementById('sp-chat-mode-toggle');
+    if (modeToggle) {
+      updateChatModeButton(modeToggle);
+      modeToggle.onclick = () => {
+        if (chatMode === 'pet') {
+          chatMode = 'online';
+        } else if (chatMode === 'online') {
+          chatMode = 'offline';
+        } else {
+          chatMode = 'pet';
+        }
+        updateChatModeButton(modeToggle);
+        const modeNames = { pet: '🐾 桌宠模式', online: '💬 线上模式', offline: '🌙 线下模式' };
+        showBubble(`切换到${modeNames[chatMode]}`, 2000);
+        state.chatMode = chatMode;
         saveData();
       };
     }
@@ -8589,6 +8448,7 @@ document.getElementById('sp-export')?.addEventListener('click', async () => {
     settings.summaryPrompt = v('sp-summary-prompt');
     settings.extractPrompt = v('sp-extract-prompt');
     settings.offlinePrompt = v('sp-offline-prompt');
+    settings.onlinePrompt = v('sp-online-prompt');
     settings.diaryPrompt = v('sp-diary-prompt');
     settings.summaryMode = v('sp-summary-mode') || 'incremental';
     settings.summaryTrigger = document.getElementById('sp-summary-auto')?.checked ? 'auto' : 'manual';
@@ -14268,6 +14128,7 @@ window.addEventListener('beforeunload', () => {
     { id: 'ushape_bread',  name: 'U形法棍',   emoji: '🥖', w: 3, h: 2, value: 10, feed: 10, shape: [[1,0,1],[1,1,1]] },
     { id: 'cross_cake',    name: '十字蛋糕',   emoji: '🎂', w: 3, h: 3, value: 14, feed: 14, noRotate: true, shape: [[0,1,0],[1,1,1],[0,1,0]] },
     { id: 'sshape_fish',   name: 'S形鱼排',   emoji: '🐡', w: 2, h: 3, value: 11, feed: 11, shape: [[0,1],[1,1],[1,0]] },
+    { id: 'jshape_shrimp', name: 'J形虾排',   emoji: '🦐', w: 2, h: 3, value: 12, feed: 12, shape: [[0,1],[0,1],[1,1]] },
 
   ];
 
@@ -15637,6 +15498,9 @@ window.addEventListener('beforeunload', () => {
     { key: 'melon',      emoji: '🍈', name: '翠玉哈密瓜', color: '#98fb98', sellPrice: 24, feedAmount: 14 },
     { key: 'fig',        emoji: '🫒', name: '蜜糖无花果', color: '#800080', sellPrice: 32, feedAmount: 18 },
     { key: 'starfruit',  emoji: '🌟', name: '星星杨桃',   color: '#b8860b', sellPrice: 28, feedAmount: 16 },
+    { key: 'durian',      emoji: '🫛', name: '黄金榴莲',   color: '#daa520', sellPrice: 35, feedAmount: 20 },
+    { key: 'passionfruit', emoji: '💛', name: '百香果粒',  color: '#ff8c00', sellPrice: 26, feedAmount: 15 },
+
   ];
 
   // ============================================================
@@ -15679,6 +15543,8 @@ window.addEventListener('beforeunload', () => {
     { id: 'cream',   name: '奶油',   emoji: '🍦', price: 14, reputationRequired: 8  },
     { id: 'cumin',   name: '孜然',   emoji: '🌰', price: 12, reputationRequired: 10 },
     { id: 'miso',    name: '味噌',   emoji: '🫘', price: 15, reputationRequired: 12 },
+    { id: 'curry',   name: '咖喱粉', emoji: '🍛', price: 16, reputationRequired: 15 },
+    { id: 'coconut', name: '椰浆',   emoji: '🥥', price: 14, reputationRequired: 10 },
 
   ];
 
@@ -16003,6 +15869,9 @@ window.addEventListener('beforeunload', () => {
     { id: 'dish_tcheese_mushroom',   name: 'T形芝士焗蘑菇', emoji: '🧀🍄', category: 'dish',
       ingredients: [{ foodId: 'tshape_cheese', count: 1 }, { foodId: 'mushroom', count: 3 }], seasonings: [{ id: 'cream', count: 1 }, { id: 'pepper', count: 1 }, { id: 'salt', count: 1 }],
       cookTime: 7, sellPrice: 40, feedAmount: 26, energyAmount: 0, reputationRequired: 35 },
+    { id: 'dish_jshrimp_curry',name: 'J形咖喱虾排',   emoji: '🦐🍛', category: 'dish',
+      ingredients: [{ foodId: 'jshape_shrimp', count: 1 }, { foodId: 'potato', count: 2 }], seasonings: [{ id: 'curry', count: 2 }, { id: 'coconut', count: 1 }, { id: 'salt', count: 1 }],
+      cookTime: 9, sellPrice: 52, feedAmount: 32, energyAmount: 0, reputationRequired: 35 },
 
   ];
 
@@ -16161,6 +16030,9 @@ window.addEventListener('beforeunload', () => {
     { id: 'star_cat',       name: '星之使者猫',   emoji: '🐱💫',
       wantsCategory: 'premium', patience: 50, tipMulti: 7.0, reputationGive: 16, reputationRequired: 120,
       dialogue: '来自遥远银河的问候…上最顶级的！', bonusGold: 90 },
+    { id: 'chef_master_cat', name: '隐世厨神猫', emoji: '🐱🔪',
+      wantsCategory: 'premium', patience: 35, tipMulti: 6.0, reputationGive: 14, reputationRequired: 100,
+      dialogue: '我走遍四方只为寻一道值得品味的菜。', bonusGold: 70 },
 
   ];
 
@@ -20122,6 +19994,9 @@ window.addEventListener('beforeunload', () => {
     // --- 货架专属：睡眠用品类（消除后进工坊睡眠道具背包给桌宠用）---
     { id: 29, emoji: '🕯️', name: '香薰蜡烛',   category: 'shelfSleep', linkedShopCategory: 'energy', linkedShopIdx: 4 },
     { id: 30, emoji: '🧣', name: '暖暖毛毯',   category: 'shelfSleep', linkedShopCategory: 'energy', linkedShopIdx: 1 },
+    { id: 31, emoji: '🍛', name: '咖喱块',     category: 'shelfSeasoning', linkedSeasoning: 'curry'  },
+    { id: 32, emoji: '🥥', name: '椰奶罐',     category: 'shelfSeasoning', linkedSeasoning: 'coconut' },
+
   ];
 
 
@@ -21581,6 +21456,378 @@ window.addEventListener('beforeunload', () => {
     }
   }
 
+  // ============================================================
+  // 📖 图鉴合集模块 - 所有游戏图鉴汇总 + 联动物品共享图片
+  // ============================================================
+
+  // 获取某个key 的所有联动 key（包含自身）- 使用BFS传递闭包
+  function getLinkedImageKeys(key) {
+    // 构建所有直接联动边（只在首次调用时构建，后续缓存）
+    if (!getLinkedImageKeys._edges) {
+      const edges = [];
+
+      // 1. 冰箱食材 ↔ 餐厅食材（同一食材在两个系统中）
+      FRIDGE_FOODS.forEach(food => {
+        edges.push([`fridge_food_${food.id}`, `restaurant_food_${food.id}`]);
+      });
+
+      // 2. 合成工坊调料链 ↔ 餐厅调料
+      const seasoningLinkMap = [
+        { level: 1, id: 'salt' }, { level: 2, id: 'soy' },
+        { level: 3, id: 'pepper' }, { level: 4, id: 'butter' },
+        { level: 5, id: 'honey' }, { level: 6, id: 'spice' },
+        { level: 7, id: 'vinegar' }, { level: 8, id: 'spice' },
+      ];
+      seasoningLinkMap.forEach(s => {
+        edges.push([`seasoning_${s.level}`, `restaurant_sea_${s.id}`]);
+      });
+
+      // 3. 货架商品 ↔ 冰箱食材/餐厅调料/糖葫芦
+      SHELF_ITEMS.forEach(item => {
+        const sk = `shelf_item_${item.id}`;
+        if (item.linkedFoodId) {
+          edges.push([sk, `fridge_food_${item.linkedFoodId}`]);
+        }
+        if (item.linkedSeasoning) {
+          edges.push([sk, `restaurant_sea_${item.linkedSeasoning}`]);
+        }
+        if (item.linkedTanghulu) {
+          edges.push([sk, `tanghulu_fruit_${item.linkedTanghulu}`]);
+        }
+      });
+
+      // 4. 消消看图案 ↔ 冰箱食材/餐厅调料（同概念物品共享图片）
+      const match3ConceptLinks = {
+        '🧂': 'restaurant_sea_salt',
+        '🫗': 'restaurant_sea_vinegar',
+        '🌶️': 'restaurant_sea_chili',
+        '🥜': 'restaurant_sea_sesame',
+        '🥟': 'fridge_food_dumpling',
+        '🦞': 'fridge_food_lobster',
+        '🍜': 'fridge_food_noodle',
+        '🍄': 'fridge_food_mushroom',
+        '🍇': 'fridge_food_grape',
+      };
+      MATCH3_DEFAULT_ICONS.forEach((icon, idx) => {
+        const linkedKey = match3ConceptLinks[icon];
+        if (linkedKey) edges.push([`match3_icon_${idx}`, linkedKey]);
+      });
+
+      // 5. 连连看图案 ↔ 冰箱食材/糖葫芦（同概念物品共享图片）
+      const linkConceptLinks = {
+        '🥟': 'fridge_food_dumpling',
+        '🦐': 'fridge_food_shrimp',
+        '🌽': 'fridge_food_corn',
+        '🥑': 'fridge_food_avocado',
+        '🍄': 'fridge_food_mushroom',
+        '🍎': 'fridge_food_apple',
+      };
+      LINK_DEFAULT_ICONS.forEach((icon, idx) => {
+        const linkedKey = linkConceptLinks[icon];
+        if (linkedKey) edges.push([`link_icon_${idx}`, linkedKey]);
+      });
+
+      // 6. 消消看图案与连连看图案中同emoji的互联（确保同图案共享）
+      const emojiToMatch3 = {};
+      MATCH3_DEFAULT_ICONS.forEach((icon, idx) => {
+        if (!emojiToMatch3[icon]) emojiToMatch3[icon] = [];
+        emojiToMatch3[icon].push(`match3_icon_${idx}`);
+      });
+      const emojiToLink = {};
+      LINK_DEFAULT_ICONS.forEach((icon, idx) => {
+        if (!emojiToLink[icon]) emojiToLink[icon] = [];
+        emojiToLink[icon].push(`link_icon_${idx}`);
+      });
+      // 如果消消看和连连看有相同emoji，互相关联
+      Object.keys(emojiToMatch3).forEach(emoji => {
+        if (emojiToLink[emoji]) {
+          emojiToMatch3[emoji].forEach(mk => {
+            emojiToLink[emoji].forEach(lk => {
+              edges.push([mk, lk]);
+            });
+          });
+        }
+      });
+
+      // 构建邻接表
+      const adj = {};
+      edges.forEach(([a, b]) => {
+        if (!adj[a]) adj[a] = new Set();
+        if (!adj[b]) adj[b] = new Set();
+        adj[a].add(b);
+        adj[b].add(a);
+      });
+
+      getLinkedImageKeys._adj = adj;
+      getLinkedImageKeys._edges = edges;
+    }
+
+    const adj = getLinkedImageKeys._adj;
+
+    // BFS 查找所有传递连通的key
+    if (!adj[key]) return [key];
+    const visited = new Set([key]);
+    const queue = [key];
+    while (queue.length > 0) {
+      const current = queue.shift();
+      const neighbors = adj[current];
+      if (!neighbors) continue;
+      for (const n of neighbors) {
+        if (!visited.has(n)) {
+          visited.add(n);
+          queue.push(n);
+        }
+      }
+    }
+    return [...visited];
+  }
+
+
+  // 统一设置图片（同时设置所有联动 key）
+  function unifiedSetImage(key, value) {
+    if (!state.gameCustomImages) state.gameCustomImages = {};
+    const linkedKeys = getLinkedImageKeys(key);
+    linkedKeys.forEach(k => {
+      if (value) state.gameCustomImages[k] = value;
+      else delete state.gameCustomImages[k];
+    });
+  }
+
+  // 获取图片（优先自身，再检查联动 key）
+  function getLinkedImage(key) {
+    if (!state.gameCustomImages) return '';
+    if (state.gameCustomImages[key]) return state.gameCustomImages[key];
+    const linked = getLinkedImageKeys(key);
+    for (const k of linked) {
+      if (state.gameCustomImages[k]) return state.gameCustomImages[k];
+    }
+    return '';
+  }
+
+  // 统一图鉴图片上传
+  function unifiedPromptImageUpload(key, name) {
+    if (!state.gameCustomImages) state.gameCustomImages = {};
+    const currentImg = getLinkedImage(key);
+    const linkedKeys = getLinkedImageKeys(key);
+    const linkedCount = linkedKeys.length;
+    const linkedHint = linkedCount > 1 ? `\n\n💡 此图片将同步到 ${linkedCount} 个关联位置` : '';
+
+    if (currentImg) {
+      const action = confirm(`「${name}」已有自定义图片${linkedHint}\n\n点「确定」→ 移除图片（恢复默认emoji）\n点「取消」→ 替换为新图片`);
+      if (action) {
+        unifiedSetImage(key, '');
+        saveDataImmediate('图鉴合集图片移除');
+        showUnifiedCollection();
+        showBubble(`${name} 图片已移除`, 2000);
+        return;
+      }
+    }
+
+    const choice = confirm(`设置「${name}」的自定义图片${linkedHint}\n\n⭐ 推荐：点「确定」→ 输入图片链接（节省内存）\n点「取消」→ 选择本地文件上传`);
+
+    if (choice) {
+      const url = prompt('输入图片链接（留空确认=清除）：', currentImg && currentImg.startsWith('http') ? currentImg : '');
+      if (url === null) return;
+      const trimmed = url.trim();
+      if (!trimmed) {
+        unifiedSetImage(key, '');
+        saveDataImmediate('图鉴合集图片清除');
+        showUnifiedCollection();
+        showBubble(`${name} 图片已清除`, 2000);
+        return;
+      }
+      if (!trimmed.startsWith('http')) { showBubble('请输入以 http 开头的链接', 3000); return; }
+      unifiedSetImage(key, trimmed);
+      saveDataImmediate('图鉴合集图片设置');
+      showUnifiedCollection();
+      showBubble(`${name} 图片已设置！${linkedCount > 1 ? '（已同步到' + linkedCount + '处）' : ''}`, 2500);
+    } else {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) { showBubble('图片不能超过2MB', 3000); return; }
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          const compressed = await compressImage(ev.target.result, 80, 0.7);
+          unifiedSetImage(key, compressed);
+          saveDataImmediate('图鉴合集图片上传');
+          showUnifiedCollection();
+          showBubble(`${name} 图片已设置！${linkedCount > 1 ? '（已同步到' + linkedCount + '处）' : ''}`, 2500);
+        };
+        reader.readAsDataURL(file);
+      };
+      input.click();
+    }
+  }
+
+  // 渲染统一图鉴面板
+  function showUnifiedCollection() {
+    document.getElementById('sp-unified-collection-overlay')?.remove();
+
+    if (!state.gameCustomImages) state.gameCustomImages = {};
+
+    // 构建图鉴格子
+    function renderItem(key, emoji, name, extraInfo) {
+      const custom = getLinkedImage(key);
+      const linkedKeys = getLinkedImageKeys(key);
+      const hasLink = linkedKeys.length > 1;
+      const display = custom
+        ? `<img src="${custom}" style="width:28px;height:28px;object-fit:contain;border-radius:4px;" />`
+        : `<span style="font-size:20px;">${emoji}</span>`;
+      const escapedName = name.replace(/"/g, '&quot;');
+      return `
+        <div class="sp-unified-coll-item" data-ukey="${key}" data-uname="${escapedName}" title="${escapedName}${extraInfo ? ' | ' + extraInfo : ''}${hasLink ? ' | 🔗联动' : ''}">
+          ${display}
+          <span class="sp-unified-coll-name">${name}</span>
+          ${hasLink ? '<span class="sp-unified-coll-link">🔗</span>' : ''}
+          <div class="sp-unified-coll-upload" data-ukey="${key}" data-uname="${escapedName}">📷</div>
+        </div>
+      `;
+    }
+
+    let bodyHtml = '';
+
+    // ===== 合成工坊 =====
+    const mergeChainKeys = ['toy', 'food', 'gem', 'potion', 'music', 'flower', 'star', 'seasoning', 'stamina'];
+    bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">🧶 合成工坊</summary><div class="sp-guide-details-content">';
+    mergeChainKeys.forEach(chainKey => {
+      const chain = GAME_CHAINS[chainKey];
+      bodyHtml += `<div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin:8px 0 4px;">${chain.name}</div>`;
+      bodyHtml += '<div class="sp-unified-coll-grid">';
+      chain.items.forEach((item, idx) => {
+        const key = `${chainKey}_${idx + 1}`;
+        const unlocked = (state.gameCollection || []).includes(key);
+        bodyHtml += renderItem(key, unlocked ? item.emoji : '?', unlocked ? item.name : '???', `Lv${idx + 1} 售${item.sell}🪙`);
+      });
+      bodyHtml += '</div>';
+    });
+    bodyHtml += '</div></details>';
+
+    // ===== 消消看图案 =====
+    bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">🃏 消消看图案</summary><div class="sp-guide-details-content"><div class="sp-unified-coll-grid">';
+    MATCH3_DEFAULT_ICONS.forEach((icon, idx) => {
+      bodyHtml += renderItem(`match3_icon_${idx}`, icon, `图案${idx + 1}`, icon);
+    });
+    bodyHtml += '</div></div></details>';
+
+    // ===== 连连看图案 =====
+    bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">🔗 连连看图案</summary><div class="sp-guide-details-content"><div class="sp-unified-coll-grid">';
+    LINK_DEFAULT_ICONS.forEach((icon, idx) => {
+      bodyHtml += renderItem(`link_icon_${idx}`, icon, `图案${idx + 1}`, icon);
+    });
+    bodyHtml += '</div></div></details>';
+
+    // ===== 冰箱食材（联动餐厅食材）=====
+    bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">🧊 冰箱食材 <span style="font-size:10px;color:var(--sp-text-muted);">（🔗联动餐厅食材图鉴）</span></summary><div class="sp-guide-details-content"><div class="sp-unified-coll-grid">';
+    FRIDGE_FOODS.forEach(food => {
+      bodyHtml += renderItem(`fridge_food_${food.id}`, food.emoji, food.name, `${food.w}×${food.h} 投喂+${food.feed}`);
+    });
+    bodyHtml += '</div></div></details>';
+
+    // ===== 糖葫芦水果 =====
+    bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">🍢 糖葫芦水果</summary><div class="sp-guide-details-content"><div class="sp-unified-coll-grid">';
+    TANGHULU_FRUITS.forEach(fruit => {
+      bodyHtml += renderItem(`tanghulu_fruit_${fruit.key}`, fruit.emoji, fruit.name, `售${fruit.sellPrice}🪙 投喂+${fruit.feedAmount}`);
+    });
+    bodyHtml += '</div></div></details>';
+
+    // ===== 货架商品 =====
+    bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">🛒 货架商品 <span style="font-size:10px;color:var(--sp-text-muted);">（🔗部分联动冰箱/餐厅/糖葫芦）</span></summary><div class="sp-guide-details-content"><div class="sp-unified-coll-grid">';
+    SHELF_ITEMS.forEach(item => {
+      bodyHtml += renderItem(`shelf_item_${item.id}`, item.emoji, item.name, item.category);
+    });
+    bodyHtml += '</div></div></details>';
+
+    // ===== 餐厅调料（联动合成工坊调料链）=====
+    bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">🧂 餐厅调料 <span style="font-size:10px;color:var(--sp-text-muted);">（🔗联动合成工坊调料链）</span></summary><div class="sp-guide-details-content"><div class="sp-unified-coll-grid">';
+    RESTAURANT_SEASONINGS.forEach(s => {
+      bodyHtml += renderItem(`restaurant_sea_${s.id}`, s.emoji, s.name, `${s.price}🪙`);
+    });
+    bodyHtml += '</div></div></details>';
+
+    // ===== 餐厅菜品 =====
+    bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">🍽️ 餐厅菜品</summary><div class="sp-guide-details-content"><div class="sp-unified-coll-grid">';
+    RESTAURANT_RECIPES.forEach(r => {
+      const unlocked = state.restaurantReputation >= r.reputationRequired;
+      bodyHtml += renderItem(`restaurant_recipe_${r.id}`, unlocked ? r.emoji : '🔒', unlocked ? r.name : '???', unlocked ? `售${r.sellPrice}🪙` : `需声望${r.reputationRequired}`);
+    });
+    bodyHtml += '</div></div></details>';
+
+    // ===== 餐厅客人 =====
+    bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">😺 餐厅客人</summary><div class="sp-guide-details-content"><div class="sp-unified-coll-grid">';
+    RESTAURANT_CUSTOMERS.forEach(c => {
+      const unlocked = state.restaurantReputation >= c.reputationRequired;
+      bodyHtml += renderItem(`restaurant_customer_${c.id}`, unlocked ? c.emoji : '🔒', unlocked ? c.name : '???', unlocked ? `⭐+${c.reputationGive}` : `需声望${c.reputationRequired}`);
+    });
+    bodyHtml += '</div></div></details>';
+
+    // 统计
+    const totalImages = Object.keys(state.gameCustomImages || {}).length;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-unified-collection-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:2147483649;';
+    overlay.innerHTML = `
+      <div class="sp-total-inv-box" style="height:80vh;max-height:80vh;display:flex;flex-direction:column;">
+        <div class="sp-total-inv-header">
+          <span>📖 图鉴合集</span>
+          <div class="sp-total-inv-header-right">
+            <span style="font-size:10px;color:var(--sp-text-muted);">已上传 ${totalImages} 张图片</span>
+            <button class="sp-total-inv-close" id="sp-unified-coll-close" title="关闭">✕</button>
+          </div>
+        </div>
+        <div class="sp-total-inv-body" style="padding:12px;">
+          <div style="text-align:center;font-size:11px;color:var(--sp-text-muted);margin-bottom:10px;line-height:1.6;">
+            汇总所有游戏图鉴，点击 📷 上传图片<br/>
+            🔗 标记表示该物品与其他游戏联动，上传后自动同步
+          </div>
+          ${bodyHtml}
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    // 居中定位
+    requestAnimationFrame(() => {
+      const box = overlay.querySelector('.sp-total-inv-box');
+      if (box) {
+        const boxH = box.offsetHeight || 500;
+        const boxW = box.offsetWidth || 360;
+        box.style.position = 'fixed';
+        box.style.top = Math.max(20, Math.floor((window.innerHeight - boxH) / 2)) + 'px';
+        box.style.left = Math.floor((window.innerWidth - boxW) / 2) + 'px';
+        box.style.margin = '0';
+      }
+    });
+
+    // 关闭
+    document.getElementById('sp-unified-coll-close').onclick = () => overlay.remove();
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    overlay.querySelector('.sp-total-inv-box').onclick = (e) => { e.stopPropagation(); };
+
+    // hover 显示上传按钮
+    overlay.querySelectorAll('.sp-unified-coll-item').forEach(item => {
+      item.addEventListener('mouseenter', () => {
+        const btn = item.querySelector('.sp-unified-coll-upload');
+        if (btn) btn.style.opacity = '1';
+      });
+      item.addEventListener('mouseleave', () => {
+        const btn = item.querySelector('.sp-unified-coll-upload');
+        if (btn) btn.style.opacity = '0';
+      });
+    });
+
+    // 上传按钮点击
+    overlay.querySelectorAll('.sp-unified-coll-upload').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        unifiedPromptImageUpload(btn.dataset.ukey, btn.dataset.uname);
+      });
+    });
+  }
 
 })();
 

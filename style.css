@@ -3269,8 +3269,8 @@
 }
 
 .sp-match3-slot-empty {
-  background: rgba(255,255,255,0.05);
-  border: 2px dashed rgba(255,255,255,0.15);
+  background: var(--sp-bg-light);
+  border: 2px dashed var(--sp-border);
 }
 
 .sp-match3-slot-filled {
@@ -6434,6 +6434,10 @@
   display: none;
 }
 
+#sp-shelf-panel.sp-shelf-minimized > div:nth-child(3) {
+  display: none !important;
+}
+
 #sp-shelf-panel.sp-shelf-minimized #sp-shelf-header {
   border-bottom: none;
   border-radius: 16px;
@@ -7302,4 +7306,182 @@
 .sp-game-level-badge {
   color: var(--sp-text-secondary);
   opacity: 0.9;
+}
+
+/* ============================================================ */
+/* 📖 图鉴合集样式              */
+/* ============================================================ */
+
+/* 主弹窗body：强制用height:0 + flex 方案撑出滚动条 */
+#sp-unified-collection-overlay .sp-total-inv-body {
+  height: 0;
+  flex: 1 1 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  will-change: scroll-position;
+  contain: layout style;
+  display: block;
+  padding: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100,180,255,0.3) transparent;
+}
+
+#sp-unified-collection-overlay .sp-total-inv-body::-webkit-scrollbar {
+  width: 5px;
+}
+
+#sp-unified-collection-overlay .sp-total-inv-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#sp-unified-collection-overlay .sp-total-inv-body::-webkit-scrollbar-thumb {
+  background: rgba(100,180,255,0.3);
+  border-radius: 3px;
+}
+
+#sp-unified-collection-overlay .sp-total-inv-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(100,180,255,0.5);
+}
+
+/* 每个 details 折叠栏不被压缩 */
+#sp-unified-collection-overlay .sp-guide-details {
+  flex-shrink: 0;
+  margin-bottom: 8px;
+  overflow: visible;
+}
+
+/* details 展开后内部内容限高 + 可滚动 */
+#sp-unified-collection-overlay .sp-guide-details-content {
+  max-height: 50vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 14px 14px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.2) transparent;
+}
+
+#sp-unified-collection-overlay .sp-guide-details-content::-webkit-scrollbar {
+  width: 4px;
+}
+
+#sp-unified-collection-overlay .sp-guide-details-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#sp-unified-collection-overlay .sp-guide-details-content::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.2);
+  border-radius: 2px;
+}
+
+#sp-unified-collection-overlay .sp-guide-details-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.35);
+}
+
+/* summary 标题行不被压缩 */
+#sp-unified-collection-overlay .sp-guide-summary {
+  flex-shrink: 0;
+  min-height: 38px;
+}
+
+/* 图鉴网格 */
+.sp-unified-coll-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.sp-unified-coll-item {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  border: 2px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.15s;
+}
+
+.sp-unified-coll-item:hover {
+  border-color: rgba(100,180,255,0.4);
+  background: rgba(100,180,255,0.08);
+}
+
+.sp-unified-coll-name {
+  font-size: 8px;
+  color: var(--sp-text-muted);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 90%;
+  line-height: 1.2;
+}
+
+.sp-unified-coll-link {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  font-size: 8px;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.sp-unified-coll-upload {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  font-size: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 2;
+}
+
+.sp-unified-coll-upload:hover {
+  background: rgba(100,180,255,0.8);
+}
+
+@media (max-width: 768px) {
+  .sp-unified-coll-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 5px;
+  }
+
+  .sp-unified-coll-item {
+    border-radius: 6px;
+  }
+
+  .sp-unified-coll-name {
+    font-size: 7px;
+  }
+
+  #sp-unified-collection-overlay .sp-guide-details-content {
+    max-height: 45vh;
+  }
+}
+
+@media (max-width: 480px) {
+  .sp-unified-coll-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+  }
+
+  #sp-unified-collection-overlay .sp-guide-details-content {
+    max-height: 40vh;
+  }
 }
