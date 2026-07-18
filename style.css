@@ -3487,7 +3487,7 @@
 }
 #sp-match3-panel.sp-match3-minimized #sp-match3-notice,
 #sp-match3-panel.sp-match3-minimized #sp-match3-body {
-  display: none;
+  display: none !important;
 }
 #sp-match3-panel.sp-match3-minimized #sp-match3-header {
   border-bottom: none;
@@ -3495,7 +3495,7 @@
 }
 
 #sp-match3-panel.sp-match3-minimized > div:nth-child(3) {
-  display: none;
+  display: none !important;
 }
 
 /* ===== 消消看背包样式 ===== */
@@ -4467,14 +4467,14 @@
 }
 #sp-link-panel.sp-link-minimized #sp-link-notice,
 #sp-link-panel.sp-link-minimized #sp-link-body {
-  display: none;
+  display: none !important;
 }
 #sp-link-panel.sp-link-minimized #sp-link-header {
   border-bottom: none;
   border-radius: 16px;
 }
 #sp-link-panel.sp-link-minimized > div:nth-child(3) {
-  display: none;
+  display: none !important;
 }
 
 /* 连连看移动端适配 */
@@ -5338,14 +5338,14 @@
 }
 #sp-fridge-panel.sp-fridge-minimized #sp-fridge-notice,
 #sp-fridge-panel.sp-fridge-minimized #sp-fridge-body {
-  display: none;
+  display: none !important;
 }
 #sp-fridge-panel.sp-fridge-minimized #sp-fridge-header {
   border-bottom: none;
   border-radius: 16px;
 }
 #sp-fridge-panel.sp-fridge-minimized > div:nth-child(3) {
-  display: none;
+  display: none !important;
 }
 
 /* 移动端适配 */
@@ -5562,8 +5562,8 @@
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  border: 2px dashed rgba(255,255,255,0.1);
-  background: rgba(255,255,255,0.02);
+  border: 2px dashed rgba(128,128,128,0.5);
+  background: rgba(128,128,128,0.05);
 }
 
 /* 竹签底座 */
@@ -5592,15 +5592,16 @@
   resize: none;
 }
 #sp-tanghulu-panel.sp-tanghulu-minimized #sp-tanghulu-notice,
-#sp-tanghulu-panel.sp-tanghulu-minimized #sp-tanghulu-body {
-  display: none;
+#sp-tanghulu-panel.sp-tanghulu-minimized #sp-tanghulu-body,
+#sp-tanghulu-panel.sp-tanghulu-minimized #sp-tanghulu-tabs {
+  display: none !important;
 }
 #sp-tanghulu-panel.sp-tanghulu-minimized #sp-tanghulu-header {
   border-bottom: none;
   border-radius: 16px;
 }
 #sp-tanghulu-panel.sp-tanghulu-minimized > div:nth-child(3) {
-  display: none;
+  display: none !important;
 }
 
 /* 移动端适配 */

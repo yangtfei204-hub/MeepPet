@@ -17992,7 +17992,7 @@ window.addEventListener('beforeunload', () => {
         </div>
       </div>
       <div id="sp-tanghulu-notice"></div>
-      <div style="display:flex;gap:4px;padding:6px 10px;background:rgba(255,255,255,0.03);border-bottom:1px solid var(--sp-border-light);align-items:center;">
+      <div id="sp-tanghulu-tabs" style="display:flex;gap:4px;padding:6px 10px;background:rgba(255,255,255,0.03);border-bottom:1px solid var(--sp-border-light);align-items:center;">
         <button class="sp-game-tab active" data-thtab="play" id="sp-tanghulu-tab-play">🎮 游戏</button>
         <button class="sp-game-tab" data-thtab="bag" id="sp-tanghulu-tab-bag">🎒 背包</button>
         <button class="sp-game-tab" data-thtab="shop" id="sp-tanghulu-tab-shop">🛒 商城</button>
