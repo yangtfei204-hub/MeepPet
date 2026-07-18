@@ -162,6 +162,72 @@
         bubbleBorder: 'rgba(144,238,144,0.4)',
       }
     },
+
+    lightBlue: {
+      name: '🩵 淡蓝',
+      colors: {
+        primary: 'rgba(147,197,253,0.35)',
+        primaryHover: 'rgba(147,197,253,0.55)',
+        primaryBorder: 'rgba(147,197,253,0.45)',
+        bgMain: 'rgba(240,247,255,0.92)',
+        bgSecondary: 'rgba(224,239,255,0.95)',
+        bgLight: 'rgba(186,220,255,0.18)',
+        border: 'rgba(147,197,253,0.35)',
+        borderLight: 'rgba(147,197,253,0.20)',
+        textPrimary: '#2c4a6e',
+        textSecondary: '#4a6a8e',
+        textMuted: '#7a9abe',
+        statusHunger: '#f6a355',
+        statusClean: '#7ec8e3',
+        statusEnergy: '#86c99a',
+        bubbleBg: 'rgba(224,239,255,0.95)',
+        bubbleBorder: 'rgba(147,197,253,0.40)',
+      }
+    },
+    lightPurple: {
+      name: '🪻 淡紫',
+      colors: {
+        primary: 'rgba(196,167,231,0.35)',
+        primaryHover: 'rgba(196,167,231,0.55)',
+        primaryBorder: 'rgba(196,167,231,0.45)',
+        bgMain: 'rgba(248,244,255,0.92)',
+        bgSecondary: 'rgba(238,232,255,0.95)',
+        bgLight: 'rgba(210,190,255,0.18)',
+        border: 'rgba(196,167,231,0.35)',
+        borderLight: 'rgba(196,167,231,0.20)',
+        textPrimary: '#3d2a5e',
+        textSecondary: '#5e4a7e',
+        textMuted: '#8e7aae',
+        statusHunger: '#f6a355',
+        statusClean: '#c4a7e7',
+        statusEnergy: '#a3c4a8',
+        bubbleBg: 'rgba(238,232,255,0.95)',
+        bubbleBorder: 'rgba(196,167,231,0.40)',
+      }
+    },
+
+    lightYellow: {
+      name: '🌼 淡黄',
+      colors: {
+        primary: 'rgba(234,210,120,0.35)',
+        primaryHover: 'rgba(234,210,120,0.55)',
+        primaryBorder: 'rgba(234,210,120,0.45)',
+        bgMain: 'rgba(255,252,235,0.92)',
+        bgSecondary: 'rgba(255,248,215,0.95)',
+        bgLight: 'rgba(255,235,150,0.18)',
+        border: 'rgba(234,210,120,0.35)',
+        borderLight: 'rgba(234,210,120,0.20)',
+        textPrimary: '#5a4410',
+        textSecondary: '#7a621e',
+        textMuted: '#a8903a',
+        statusHunger: '#e8834a',
+        statusClean: '#8ecad8',
+        statusEnergy: '#8ec48a',
+        bubbleBg: 'rgba(255,248,215,0.95)',
+        bubbleBorder: 'rgba(234,210,120,0.40)',
+      }
+    },
+
   };
 
   
