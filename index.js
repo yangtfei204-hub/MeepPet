@@ -298,7 +298,10 @@
     houseButtonFeed: '',           // 小屋喂食按钮图标
     houseButtonBath: '',           // 小屋洗澡按钮图标
     houseButtonSleep: '',          // 小屋睡觉按钮图标
-    
+    houseButtonWardrobe: '',       // 小屋更衣按钮图标
+    houseOutfits: [],              // 服装列表 [{name, character, actionFeed, actionBath, actionSleep, expressions: []}]
+    houseCurrentOutfit: '',        // 当前穿着的服装名
+
     spriteHangLeft: '',       // 挂在左边缘
     spriteHangRight: '',      // 挂在右边缘
     spriteHangTop: '',        // 挂在顶部
@@ -1327,7 +1330,8 @@ function saveData() {
       'foodImage', 'bathImage', 'bedImage',
       'houseBackground', 'houseCharacter', 'houseCharacterAvatar',
       'houseActionFeed', 'houseActionBath', 'houseActionSleep',
-      'houseButtonFeed', 'houseButtonBath', 'houseButtonSleep',
+      'houseButtonFeed', 'houseButtonBath', 'houseButtonSleep', 'houseButtonWardrobe',
+
     ];
     for (const key of spriteKeys) {
       if (settings[key] && settings[key].startsWith('data:')) {
@@ -4482,6 +4486,8 @@ async function refreshWorldPreview() {
     const panel = document.getElementById('silly-pet-house');
     if (!panel) return;
     isHouseOpen = !isHouseOpen;
+    // 关闭时顺手清掉快捷面板
+    document.getElementById('sp-wardrobe-quick')?.remove();
     panel.classList.toggle('visible', isHouseOpen);
     if (isHouseOpen) {
       const w = Math.min(400, window.innerWidth - 20);
@@ -4503,21 +4509,973 @@ async function refreshWorldPreview() {
     if (_bathBtn) _bathBtn.innerHTML = settings.houseButtonBath ? `<img src="${settings.houseButtonBath}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '🛁';
     const _sleepBtn = document.getElementById('sp-house-sleep-btn');
     if (_sleepBtn) _sleepBtn.innerHTML = settings.houseButtonSleep ? `<img src="${settings.houseButtonSleep}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '🛏️';
+    const _wardrobeBtn = document.getElementById('sp-house-wardrobe-btn');
+    if (_wardrobeBtn) _wardrobeBtn.innerHTML = settings.houseButtonWardrobe ? `<img src="${settings.houseButtonWardrobe}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '👗';
 
     }
+  }
+
+  // ============================================================
+  // 👗 更衣快捷面板
+  // ============================================================
+  function toggleWardrobeQuick() {
+    // 如果已有快捷面板就关闭
+    const existing = document.getElementById('sp-wardrobe-quick');
+    if (existing) { existing.remove(); return; }
+
+    // 计算位置（相对于更衣按钮）
+    const wardrobeBtn = document.getElementById('sp-house-wardrobe-btn');
+    if (!wardrobeBtn) return;
+    const btnRect = wardrobeBtn.getBoundingClientRect();
+
+    const panel = document.createElement('div');
+    panel.id = 'sp-wardrobe-quick';
+    panel.style.cssText = `
+      position: fixed;
+      right: ${window.innerWidth - btnRect.right}px;
+      top: ${btnRect.bottom + 6}px;
+      z-index: 2147483651;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      animation: sp-fade-in 0.15s ease;
+    `;
+
+    // 构建内容：设置按钮 + 各套服装按钮
+    const outfits = settings.houseOutfits || [];
+
+    // 设置按钮
+    const settingsBtnEl = document.createElement('div');
+    settingsBtnEl.id = 'sp-wardrobe-quick-settings';
+    settingsBtnEl.title = '更衣设置';
+    settingsBtnEl.style.cssText = `
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(30,30,40,0.85);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 2px solid rgba(255,255,255,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 13px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      transition: all 0.2s;
+      flex-shrink: 0;
+    `;
+
+    settingsBtnEl.textContent = '⚙️';
+    settingsBtnEl.onmouseenter = () => {
+      settingsBtnEl.style.borderColor = 'rgba(100,180,255,0.6)';
+      settingsBtnEl.style.background = 'rgba(100,180,255,0.2)';
+    };
+    settingsBtnEl.onmouseleave = () => {
+      settingsBtnEl.style.borderColor = 'rgba(255,255,255,0.2)';
+      settingsBtnEl.style.background = 'rgba(30,30,40,0.85)';
+    };
+    settingsBtnEl.onclick = (e) => {
+      e.stopPropagation();
+      panel.remove();
+      toggleWardrobeModal();
+    };
+    panel.appendChild(settingsBtnEl);
+
+    // 各套服装按钮（全局默认 + 每套服装）
+    // 先加一个"全局默认"（恢复无服装状态）
+    if (outfits.length > 0) {
+      const defaultBtn = _buildOutfitQuickBtn({
+        name: '默认',
+        coverImage: settings.houseCharacter || '',
+        _isDefault: true,
+      });
+      panel.appendChild(defaultBtn);
+    }
+
+    // 再加各套服装
+    outfits.forEach((outfit) => {
+      const btn = _buildOutfitQuickBtn(outfit);
+      panel.appendChild(btn);
+    });
+
+    document.body.appendChild(panel);
+
+    // 点击外部关闭
+    const closeHandler = (e) => {
+      if (!panel.contains(e.target) && e.target !== wardrobeBtn) {
+        panel.remove();
+        document.removeEventListener('click', closeHandler);
+      }
+    };
+    // 延迟绑定，避免当前 click 事件立刻触发
+    setTimeout(() => document.addEventListener('click', closeHandler), 0);
+  }
+
+  // 构建单个服装快捷按钮
+  function _buildOutfitQuickBtn(outfit) {
+    const isWearing = outfit._isDefault
+      ? settings.houseCurrentOutfit === ''
+      : settings.houseCurrentOutfit === outfit.name;
+
+    const btn = document.createElement('div');
+    btn.title = outfit._isDefault ? '全局默认' : outfit.name;
+    btn.style.cssText = `
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: ${isWearing ? 'rgba(100,180,255,0.3)' : 'rgba(30,30,40,0.85)'};
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 2px solid ${isWearing ? 'rgba(100,180,255,0.8)' : 'rgba(255,255,255,0.2)'};
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 14px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      transition: all 0.2s;
+      flex-shrink: 0;
+      overflow: hidden;
+      position: relative;
+    `;
+
+    // 封面图或默认内容
+    const coverSrc = outfit._isDefault
+      ? (settings.houseCharacter || '')
+      : (outfit.coverImage || outfit.character || '');
+
+    if (coverSrc) {
+      btn.innerHTML = `<img src="${coverSrc}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;pointer-events:none;" />`;
+    } else {
+      btn.innerHTML = `<span style="font-size:18px;pointer-events:none;">${outfit._isDefault ? '🌿' : '👗'}</span>`;
+    }
+
+    // 当前穿着标记（小圆点）
+    if (isWearing) {
+      const dot = document.createElement('div');
+      dot.style.cssText = `
+        position: absolute;
+        bottom: 1px;
+        right: 1px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: rgba(100,220,100,0.9);
+        border: 1px solid rgba(0,0,0,0.4);
+        pointer-events: none;
+      `;
+      btn.appendChild(dot);
+    }
+
+    btn.onmouseenter = () => {
+      if (!isWearing) {
+        btn.style.borderColor = 'rgba(100,180,255,0.5)';
+        btn.style.background = 'rgba(100,180,255,0.15)';
+      }
+    };
+    btn.onmouseleave = () => {
+      if (!isWearing) {
+        btn.style.borderColor = 'rgba(255,255,255,0.2)';
+        btn.style.background = 'rgba(30,30,40,0.85)';
+      }
+    };
+
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const panel = document.getElementById('sp-wardrobe-quick');
+      if (panel) panel.remove();
+
+      if (outfit._isDefault) {
+        settings.houseCurrentOutfit = '';
+        saveData();
+        updateHouseScene();
+        showBubble('已切换回全局默认立绘', 2000);
+      } else {
+        settings.houseCurrentOutfit = outfit.name;
+        saveData();
+        updateHouseScene();
+        showBubble(`👗 已换上「${outfit.name}」`, 2000);
+      }
+    };
+
+    return btn;
+  }
+
+  // ============================================================
+  // 👗 更衣系统弹窗
+  // ============================================================
+  function toggleWardrobeModal() {
+    // 如果弹窗已存在则关闭
+    const existing = document.getElementById('sp-wardrobe-modal-overlay');
+    if (existing) { existing.remove(); return; }
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-wardrobe-modal-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:2147483650;';
+
+    overlay.innerHTML = `
+      <div id="sp-wardrobe-modal" style="
+        background:var(--sp-bg-secondary);
+        backdrop-filter:blur(14px);
+        -webkit-backdrop-filter:blur(14px);
+        border:1px solid var(--sp-border);
+        border-radius:16px;
+        width:360px;
+        max-width:92vw;
+        max-height:82vh;
+        box-shadow:0 8px 32px rgba(0,0,0,0.4);
+        display:flex;
+        flex-direction:column;
+        overflow:hidden;
+        animation:sp-fade-in 0.2s ease;
+        position:fixed;
+      ">
+        <div id="sp-wardrobe-header" style="
+          display:flex;justify-content:space-between;align-items:center;
+          padding:12px 16px;
+          background:rgba(255,255,255,0.06);
+          border-bottom:1px solid rgba(255,255,255,0.08);
+          cursor:grab;
+          flex-shrink:0;
+        ">
+          <span style="font-size:14px;font-weight:700;color:var(--sp-text-primary);">👗 更衣系统</span>
+          <button id="sp-wardrobe-close" style="background:none;border:none;font-size:18px;cursor:pointer;color:#aaa;padding:0;width:24px;height:24px;display:flex;align-items:center;justify-content:center;transition:color 0.2s;">✕</button>
+        </div>
+        <div id="sp-wardrobe-body" style="
+          flex:1;overflow-y:auto;padding:14px;
+          scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.2) transparent;
+        ">
+          <!-- 服装列表区 -->
+          <div style="margin-bottom:14px;padding:12px;background:rgba(255,255,255,0.05);border-radius:10px;border:1px solid rgba(255,255,255,0.08);">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+              <span style="font-size:13px;font-weight:600;color:var(--sp-text-primary);">👗 服装列表</span>
+              <button id="sp-wardrobe-add-outfit" type="button" style="padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid var(--sp-primary-border);background:var(--sp-primary);color:#fff;cursor:pointer;">+ 新建服装</button>
+            </div>
+            <div id="sp-wardrobe-outfit-list"></div>
+            <p style="font-size:10px;color:#666;margin-top:8px;margin-bottom:0;">没有服装时，下方编辑的是全局默认立绘。新建并选中服装后，下方修改的内容会保存到该服装。</p>
+          </div>
+
+          <!-- 当前编辑状态提示 -->
+          <div id="sp-wardrobe-editing-label" style="font-size:11px;color:rgba(100,180,255,0.8);text-align:center;margin-bottom:10px;padding:4px 8px;background:rgba(100,180,255,0.08);border-radius:6px;border:1px solid rgba(100,180,255,0.2);display:none;"></div>
+
+          <!-- 桌宠小屋 -->
+          <div class="sp-section" style="margin-bottom:14px;padding:12px;background:rgba(255,255,255,0.05);border-radius:10px;border:1px solid rgba(255,255,255,0.08);">
+            <div class="sp-section-title" style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--sp-text-primary);">🏠 小屋场景（全局）</div>
+            <p style="font-size:11px;color:#999;margin-bottom:8px;">背景图和对话框头像是全局的，不随服装切换变化</p>
+            <div id="sp-wardrobe-upload-house"></div>
+          </div>
+
+          <!-- 小屋动作立绘 -->
+          <div class="sp-section" style="margin-bottom:14px;padding:12px;background:rgba(255,255,255,0.05);border-radius:10px;border:1px solid rgba(255,255,255,0.08);">
+            <div class="sp-section-title" style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--sp-text-primary);">🎨 服装立绘 <span id="sp-wardrobe-outfit-badge" style="font-size:10px;color:#888;font-weight:400;">（全局默认）</span></div>
+            <p style="font-size:11px;color:#999;margin-bottom:8px;">这些立绘属于当前选中的服装，切换服装时自动更换</p>
+            <div id="sp-wardrobe-upload-house-actions"></div>
+          </div>
+
+          <!-- 小屋表情立绘 -->
+          <div class="sp-section" style="margin-bottom:0;padding:12px;background:rgba(255,255,255,0.05);border-radius:10px;border:1px solid rgba(255,255,255,0.08);">
+            <div class="sp-section-title" style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--sp-text-primary);">🎭 表情立绘 <span id="sp-wardrobe-expr-badge" style="font-size:10px;color:#888;font-weight:400;">（全局默认）</span></div>
+            <div id="sp-wardrobe-expressions-list"></div>
+            <button class="sp-btn" id="sp-wardrobe-add-expression" type="button" style="margin-top:8px;padding:6px 14px;border-radius:8px;border:1px solid var(--sp-border);background:var(--sp-bg-light);color:var(--sp-text-secondary);cursor:pointer;font-size:12px;">+ 添加表情立绘</button>
+          </div>
+
+        </div>
+        <div style="padding:12px 16px;border-top:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);flex-shrink:0;">
+          <button id="sp-wardrobe-save" style="width:100%;padding:10px;font-size:14px;font-weight:600;border-radius:8px;border:1px solid var(--sp-primary-border);background:var(--sp-primary);color:#fff;cursor:pointer;transition:background 0.2s;">💾 保存设置</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    // 居中定位
+    requestAnimationFrame(() => {
+      const modal = document.getElementById('sp-wardrobe-modal');
+      if (modal) {
+        const h = modal.offsetHeight || 500;
+        const w = modal.offsetWidth || 360;
+        modal.style.position = 'fixed';
+        modal.style.top = Math.max(20, Math.floor((window.innerHeight - h) / 2)) + 'px';
+        modal.style.left = Math.floor((window.innerWidth - w) / 2) + 'px';
+        modal.style.margin = '0';
+      }
+    });
+
+    // 关闭
+    document.getElementById('sp-wardrobe-close').onclick = () => overlay.remove();
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+    // 保存按钮
+    document.getElementById('sp-wardrobe-save').onclick = () => {
+      delete settings._wardrobeEditOutfit;
+      saveData();
+      // 刷新小屋场景
+      updateHouseScene();
+      // 刷新按钮图标
+      ['Feed', 'Bath', 'Sleep', 'Wardrobe'].forEach(name => {
+        const key = `houseButton${name}`;
+        const btnId = `sp-house-${name.toLowerCase()}-btn`;
+        const emojiMap = { Feed: '🍖', Bath: '🛁', Sleep: '🛏️', Wardrobe: '👗' };
+        const btnEl = document.getElementById(btnId);
+        if (btnEl) {
+          if (settings[key]) {
+            btnEl.innerHTML = `<img src="${settings[key]}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
+            btnEl.style.border = 'none';
+            btnEl.style.background = 'transparent';
+            btnEl.style.backdropFilter = 'none';
+          } else {
+            btnEl.innerHTML = emojiMap[name];
+            btnEl.style.border = '1px solid rgba(255,255,255,0.3)';
+            btnEl.style.background = 'rgba(0,0,0,0.4)';
+            btnEl.style.backdropFilter = 'blur(4px)';
+          }
+        }
+      });
+      showBubble('更衣设置已保存～✨', 2000);
+      overlay.remove();
+    };
+
+    // 初始化编辑目标（默认跟当前穿的服装一致）
+    settings._wardrobeEditOutfit = settings.houseCurrentOutfit || '';
+
+    // 渲染服装列表
+    wardrobeRenderOutfitList();
+
+    // 新建服装按钮
+    document.getElementById('sp-wardrobe-add-outfit').onclick = () => {
+      const name = prompt('给这套服装起个名字：', `服装${(settings.houseOutfits || []).length + 1}`);
+      if (!name || !name.trim()) return;
+      if ((settings.houseOutfits || []).find(o => o.name === name.trim())) {
+        showBubble('已有同名服装，请换个名字', 2500);
+        return;
+      }
+      if (!settings.houseOutfits) settings.houseOutfits = [];
+      const newOutfit = {
+        name: name.trim(),
+        coverImage: '',
+        character: '',
+        actionFeed: '',
+        actionBath: '',
+        actionSleep: '',
+        expressions: [],
+      };
+
+      settings.houseOutfits.push(newOutfit);
+      settings._wardrobeEditOutfit = newOutfit.name;
+      saveData();
+      wardrobeRenderOutfitList();
+      wardrobeRenderUploads();
+      wardrobeRenderExpressions();
+      showBubble(`✨ 服装「${newOutfit.name}」已创建，可以上传立绘了`, 2500);
+    };
+
+    // 渲染三个上传区
+    wardrobeRenderUploads();
+
+    // 渲染表情立绘
+    wardrobeRenderExpressions();
+
+    // 绑定拖拽
+    wardrobeBindDrag();
+  }
+
+  // 获取正在编辑的服装对象（不是当前穿着，是弹窗里选中编辑的）
+  function wardrobeGetEditingOutfit() {
+    const name = settings._wardrobeEditOutfit;
+    if (!name || !settings.houseOutfits) return null;
+    return settings.houseOutfits.find(o => o.name === name) || null;
+  }
+
+  // 取图片值（区分服装字段和全局字段）
+  function wardrobeGetImage(key) {
+    if (key.startsWith('outfit__')) {
+      const field = key.replace('outfit__', '');
+      const outfit = wardrobeGetEditingOutfit();
+      return (outfit && outfit[field]) || '';
+    }
+    return settings[key] || '';
+  }
+
+  // 写入图片值
+  function wardrobeSetImage(key, value) {
+    if (key.startsWith('outfit__')) {
+      const field = key.replace('outfit__', '');
+      const outfit = wardrobeGetEditingOutfit();
+      if (outfit) {
+        outfit[field] = value;
+        const idx = (settings.houseOutfits || []).findIndex(o => o.name === outfit.name);
+        if (idx >= 0) settings.houseOutfits[idx] = outfit;
+      }
+      return;
+    }
+    setSettingsImage(key, value);
+  }
+
+  function wardrobeRenderOutfitList() {
+    const container = document.getElementById('sp-wardrobe-outfit-list');
+    if (!container) return;
+    if (!settings.houseOutfits) settings.houseOutfits = [];
+
+    if (settings.houseOutfits.length === 0) {
+      container.innerHTML = '<div style="text-align:center;padding:10px;color:var(--sp-text-muted);font-size:12px;">还没有服装～点「+ 新建服装」创建第一套</div>';
+      return;
+    }
+
+    container.innerHTML = settings.houseOutfits.map((outfit, idx) => {
+      const isWearing = settings.houseCurrentOutfit === outfit.name;
+      const isEditing = settings._wardrobeEditOutfit === outfit.name;
+      const previewImg = outfit.character || '';
+      return `
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;
+          background:${isWearing ? 'rgba(100,180,255,0.12)' : isEditing ? 'rgba(100,220,100,0.08)' : 'rgba(255,255,255,0.04)'};
+          border:2px solid ${isWearing ? 'rgba(100,180,255,0.6)' : isEditing ? 'rgba(100,220,100,0.4)' : 'rgba(255,255,255,0.08)'};
+          border-radius:10px;margin-bottom:6px;transition:all 0.2s;">
+          <div style="width:40px;height:40px;border-radius:8px;overflow:hidden;flex-shrink:0;
+            background:rgba(0,0,0,0.2);display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,0.1);">
+            ${previewImg
+              ? `<img src="${previewImg}" style="width:100%;height:100%;object-fit:contain;" />`
+              : '<span style="font-size:20px;">👗</span>'}
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:12px;font-weight:600;color:${isWearing ? 'rgba(100,180,255,0.9)' : 'var(--sp-text-primary)'};">${outfit.name}</div>
+            <div style="font-size:10px;color:var(--sp-text-muted);">
+              ${outfit.character ? '✅立绘' : '⬜立绘'}
+              ${(outfit.actionFeed || outfit.actionBath || outfit.actionSleep) ? ' ✅动作' : ' ⬜动作'}
+              ${(outfit.expressions && outfit.expressions.length > 0) ? ` ✅表情×${outfit.expressions.length}` : ' ⬜表情'}
+              ${isWearing ? ' <span style="color:rgba(100,180,255,0.8);">🟢穿着中</span>' : ''}
+            </div>
+          </div>
+          <div style="display:flex;gap:3px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;">
+            ${!isWearing
+              ? `<button class="sp-wardrobe-outfit-equip" data-idx="${idx}"
+                  style="padding:2px 7px;font-size:10px;border-radius:5px;
+                    border:1px solid rgba(100,220,100,0.5);background:rgba(100,220,100,0.15);
+                    color:#6f6;cursor:pointer;">穿上</button>`
+              : `<button class="sp-wardrobe-outfit-unequip" data-idx="${idx}"
+                  style="padding:2px 7px;font-size:10px;border-radius:5px;
+                    border:1px solid rgba(255,180,50,0.5);background:rgba(255,180,50,0.15);
+                    color:#ffb347;cursor:pointer;">脱下</button>`}
+            <button class="sp-wardrobe-outfit-cover" data-idx="${idx}"
+              style="padding:2px 7px;font-size:10px;border-radius:5px;
+                border:1px solid rgba(255,200,50,0.4);background:rgba(255,200,50,0.08);
+                color:#ffb347;cursor:pointer;" title="上传封面图（圆形按钮显示）">🖼️封面</button>
+            <input type="file" class="sp-wardrobe-cover-file" data-idx="${idx}"
+              accept="image/png,image/jpeg,image/gif,image/webp" style="display:none;" />
+            <button class="sp-wardrobe-outfit-edit" data-idx="${idx}"
+              style="padding:2px 7px;font-size:10px;border-radius:5px;
+                border:1px solid ${isEditing ? 'rgba(100,220,100,0.5)' : 'var(--sp-border)'};
+                background:${isEditing ? 'rgba(100,220,100,0.1)' : 'var(--sp-bg-light)'};
+                color:${isEditing ? '#6f6' : 'var(--sp-text-secondary)'};cursor:pointer;">${isEditing ? '✏️编辑中' : '编辑'}</button>
+            <button class="sp-wardrobe-outfit-delete" data-idx="${idx}"
+              style="padding:2px 7px;font-size:10px;border-radius:5px;
+                border:1px solid rgba(239,83,80,0.4);background:rgba(239,83,80,0.1);
+                color:#f66;cursor:pointer;">✕</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // 穿上
+    container.querySelectorAll('.sp-wardrobe-outfit-equip').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.dataset.idx);
+        settings.houseCurrentOutfit = settings.houseOutfits[idx].name;
+        saveData();
+        updateHouseScene();
+        wardrobeRenderOutfitList();
+        showBubble(`👗 已换上「${settings.houseCurrentOutfit}」`, 2000);
+      };
+    });
+
+    // 脱下（恢复全局默认）
+    container.querySelectorAll('.sp-wardrobe-outfit-unequip').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        settings.houseCurrentOutfit = '';
+        saveData();
+        updateHouseScene();
+        wardrobeRenderOutfitList();
+        showBubble('已切换回全局默认立绘', 2000);
+      };
+    });
+
+    // 编辑（选中该服装作为编辑目标，不影响实际穿着）
+    container.querySelectorAll('.sp-wardrobe-outfit-edit').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.dataset.idx);
+        settings._wardrobeEditOutfit = settings.houseOutfits[idx].name;
+        wardrobeRenderOutfitList();
+        wardrobeRenderUploads();
+        wardrobeRenderExpressions();
+        showBubble(`✏️ 正在编辑服装「${settings.houseOutfits[idx].name}」`, 2000);
+      };
+    });
+
+    // 删除
+    container.querySelectorAll('.sp-wardrobe-outfit-delete').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.dataset.idx);
+        const name = settings.houseOutfits[idx].name;
+        showConfirmDialog({
+          title: `🗑️ 删除服装「${name}」？`,
+          desc: '服装内的立绘数据将全部删除，无法恢复。',
+          confirmText: '删除',
+          cancelText: '取消',
+          onConfirm: () => {
+            settings.houseOutfits.splice(idx, 1);
+            if (settings.houseCurrentOutfit === name) {
+              settings.houseCurrentOutfit = '';
+              updateHouseScene();
+            }
+            if (settings._wardrobeEditOutfit === name) {
+              settings._wardrobeEditOutfit = '';
+            }
+            saveData();
+            wardrobeRenderOutfitList();
+            wardrobeRenderUploads();
+            wardrobeRenderExpressions();
+            showBubble(`服装「${name}」已删除`, 2000);
+          }
+        });
+      };
+    });
+
+
+    // 封面上传按钮
+    container.querySelectorAll('.sp-wardrobe-outfit-cover').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.dataset.idx);
+        const fileInput = container.querySelector(`.sp-wardrobe-cover-file[data-idx="${idx}"]`);
+        if (fileInput) fileInput.click();
+      };
+    });
+
+    // 封面文件选择
+    container.querySelectorAll('.sp-wardrobe-cover-file').forEach(input => {
+      input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) { showBubble('图片超过2MB了～', 3000); return; }
+        const idx = parseInt(input.dataset.idx);
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          // 压缩为小图（圆形按钮42px，不需要太大）
+          const compressed = await compressImage(ev.target.result, 120, 0.8);
+          if (settings.houseOutfits[idx]) {
+            settings.houseOutfits[idx].coverImage = compressed;
+            saveData();
+            wardrobeRenderOutfitList();
+            showBubble('封面已设置！', 1500);
+          }
+        };
+        reader.readAsDataURL(file);
+        input.value = '';
+      };
+    });
+  }
+
+  function wardrobeRenderUploads() {
+    const houseArea = document.getElementById('sp-wardrobe-upload-house');
+    const houseActionsArea = document.getElementById('sp-wardrobe-upload-house-actions');
+    if (!houseArea || !houseActionsArea) return;
+
+    // 全局场景（背景/头像始终全局）
+    const houseConfigs = [
+      ['houseBackground',      '房间背景（全局）'],
+      ['houseCharacter',       '默认立绘（无服装时用）'],
+      ['houseCharacterAvatar', '对话框头像（全局）'],
+    ];
+    houseArea.innerHTML = houseConfigs.map(([key, label]) =>
+      buildUploadGroup(key, label, settings[key])
+    ).join('');
+
+    // 根据编辑目标决定动作立绘是写进服装还是全局
+    const editOutfit = wardrobeGetEditingOutfit();
+    const outfitBadge = document.getElementById('sp-wardrobe-outfit-badge');
+    const exprBadge = document.getElementById('sp-wardrobe-expr-badge');
+    const editLabel = document.getElementById('sp-wardrobe-editing-label');
+
+    if (editOutfit) {
+      const isWearing = settings.houseCurrentOutfit === editOutfit.name;
+      if (outfitBadge) outfitBadge.textContent = `（${editOutfit.name}）`;
+      if (exprBadge) exprBadge.textContent = `（${editOutfit.name}）`;
+      if (editLabel) {
+        editLabel.textContent = `✏️ 正在编辑：「${editOutfit.name}」${isWearing ? ' 🟢 已穿上' : ' ⚪ 未穿上（编辑不影响小屋显示）'}`;
+        editLabel.style.display = '';
+      }
+      // 动作立绘用 outfit__ 前缀，写入服装对象
+      const actionConfigs = [
+        ['outfit__actionFeed',  '喂食立绘'],
+        ['outfit__actionBath',  '洗澡立绘'],
+        ['outfit__actionSleep', '睡觉立绘'],
+      ];
+      // 按钮图标还是全局的
+      const buttonConfigs = [
+        ['houseButtonFeed',      '喂食按钮图标（全局）'],
+        ['houseButtonBath',      '洗澡按钮图标（全局）'],
+        ['houseButtonSleep',     '睡觉按钮图标（全局）'],
+        ['houseButtonWardrobe',  '更衣按钮图标（全局）'],
+      ];
+      houseActionsArea.innerHTML =
+        actionConfigs.map(([key, label]) =>
+          buildUploadGroup(key, label, editOutfit[key.replace('outfit__', '')] || '')
+        ).join('') +
+        buttonConfigs.map(([key, label]) =>
+          buildUploadGroup(key, label, settings[key])
+        ).join('');
+    } else {
+      if (outfitBadge) outfitBadge.textContent = '（全局默认）';
+      if (exprBadge) exprBadge.textContent = '（全局默认）';
+      if (editLabel) editLabel.style.display = 'none';
+      const houseActionConfigs = [
+        ['houseActionFeed',      '喂食立绘（全局默认）'],
+        ['houseActionBath',      '洗澡立绘（全局默认）'],
+        ['houseActionSleep',     '睡觉立绘（全局默认）'],
+        ['houseButtonFeed',      '喂食按钮图标'],
+        ['houseButtonBath',      '洗澡按钮图标'],
+        ['houseButtonSleep',     '睡觉按钮图标'],
+        ['houseButtonWardrobe',  '更衣按钮图标'],
+      ];
+      houseActionsArea.innerHTML = houseActionConfigs.map(([key, label]) =>
+        buildUploadGroup(key, label, settings[key])
+      ).join('');
+    }
+
+    // 统一绑定两个区域的上传事件
+    [houseArea, houseActionsArea].forEach(area => {
+      area.querySelectorAll('.sp-upload-preview').forEach(preview => {
+        preview.onclick = (e) => {
+          if (e.target.classList.contains('sp-upload-remove')) return;
+          const fi = document.getElementById(`sp-file-${preview.dataset.key}`);
+          if (fi) fi.click();
+        };
+        const rm = preview.querySelector('.sp-upload-remove');
+        if (rm) rm.onclick = (e) => {
+          e.stopPropagation();
+          wardrobeSetImage(rm.dataset.key, '');
+          updateUploadPreview(rm.dataset.key, '');
+          updateHouseScene();
+          saveData();
+        };
+      });
+
+      area.querySelectorAll('.sp-upload-btn').forEach(btn => {
+        btn.onclick = (e) => {
+          e.preventDefault();
+          const fi = document.getElementById(`sp-file-${btn.dataset.key}`);
+          if (fi) fi.click();
+        };
+      });
+
+      area.querySelectorAll('.sp-upload-url-btn').forEach(btn => {
+        btn.onclick = (e) => {
+          e.preventDefault();
+          const key = btn.dataset.key;
+          const currentVal = wardrobeGetImage(key);
+          const url = prompt(
+            '输入图片链接（支持 GIF）：\n留空并确认 = 清除',
+            currentVal && currentVal.startsWith('http') ? currentVal : ''
+          );
+          if (url === null) return;
+          const trimmed = url.trim();
+          if (trimmed && !trimmed.startsWith('http')) {
+            showBubble('链接需要以 http 开头', 3000);
+            return;
+          }
+          wardrobeSetImage(key, trimmed);
+          updateUploadPreview(key, trimmed);
+          updateHouseScene();
+          saveData();
+          showBubble(trimmed ? '图片链接已设置！' : '已清除图片', 2000);
+        };
+      });
+
+      area.querySelectorAll('input[type="file"][data-key]').forEach(input => {
+        input.onchange = (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          if (file.size > 2 * 1024 * 1024) { showBubble('图片超过2MB了～', 3000); return; }
+          const reader = new FileReader();
+          reader.onload = async (ev) => {
+            const key = input.dataset.key;
+            const isLarge = key === 'houseBackground' || key === 'houseCharacter' ||
+              key.startsWith('houseAction') || key.startsWith('outfit__action') || key.startsWith('houseButton');
+            const processed = isLarge ? ev.target.result : await compressImage(ev.target.result, 200, 0.7);
+            wardrobeSetImage(key, processed);
+            updateUploadPreview(key, processed);
+            updateHouseScene();
+            saveData();
+            showBubble('图片设置好啦～✨', 2000);
+          };
+          reader.readAsDataURL(file);
+        };
+      });
+
+      area.querySelectorAll('.sp-duration-slider').forEach(slider => {
+        slider.oninput = () => {
+          const sliderKey = slider.dataset.key;
+          const val = parseInt(slider.value);
+          if (!settings.spriteDurations) settings.spriteDurations = {};
+          settings.spriteDurations[sliderKey] = val;
+          const display = area.querySelector(`.sp-duration-val[data-key="${sliderKey}"]`);
+          if (display) display.textContent = (val / 1000).toFixed(1) + 's';
+          saveData();
+        };
+      });
+    });
+  }
+
+
+  function wardrobeRenderExpressions() {
+    const container = document.getElementById('sp-wardrobe-expressions-list');
+    if (!container) return;
+
+    // 判断编辑目标：服装的 expressions 还是全局 houseExpressions
+    const editingOutfit = wardrobeGetEditingOutfit();
+    const getExprs = () => {
+      if (editingOutfit) {
+        if (!editingOutfit.expressions) editingOutfit.expressions = [];
+        return editingOutfit.expressions;
+      }
+      if (!settings.houseExpressions) settings.houseExpressions = [];
+      return settings.houseExpressions;
+    };
+    const saveExprs = () => {
+      if (editingOutfit) {
+        const idx = (settings.houseOutfits || []).findIndex(o => o.name === editingOutfit.name);
+        if (idx >= 0) settings.houseOutfits[idx].expressions = editingOutfit.expressions;
+      }
+    };
+
+    container.innerHTML = '';
+    getExprs().forEach((expr, idx) => {
+      const div = document.createElement('div');
+      div.className = 'sp-custom-sprite-item';
+      div.innerHTML = `
+        <div class="sp-custom-sprite-preview" data-house-expr-idx="${idx}" style="cursor:pointer;">
+          ${expr.image
+            ? `<img src="${expr.image}" alt="${expr.name || ''}" />`
+            : '<span class="sp-upload-placeholder">＋</span>'}
+        </div>
+        <div class="sp-custom-sprite-info">
+          <input type="text" class="sp-wardrobe-expr-name" data-idx="${idx}" value="${expr.name || ''}"
+            placeholder="表情名（如：笑）"
+            style="margin-bottom:4px;width:100%;padding:6px 8px;font-size:12px;
+              border:1px solid rgba(255,255,255,0.12);border-radius:8px;
+              background:rgba(255,255,255,0.06);color:var(--sp-text-primary);box-sizing:border-box;" />
+          <input type="text" class="sp-wardrobe-expr-keywords" data-idx="${idx}" value="${expr.keywords || ''}"
+            placeholder="关键词（逗号分隔，如：笑,开心,哈哈）"
+            style="width:100%;padding:6px 8px;font-size:12px;
+              border:1px solid rgba(255,255,255,0.12);border-radius:8px;
+              background:rgba(255,255,255,0.06);color:var(--sp-text-primary);box-sizing:border-box;" />
+          <div class="sp-custom-sprite-actions" style="margin-top:6px;">
+            <button class="sp-btn sp-wardrobe-expr-upload" data-idx="${idx}" type="button"
+              style="padding:3px 8px;font-size:11px;border-radius:6px;
+                border:1px solid var(--sp-border);background:var(--sp-bg-light);
+                color:var(--sp-text-secondary);cursor:pointer;">📁 图片</button>
+            <button class="sp-btn sp-wardrobe-expr-url" data-idx="${idx}" type="button"
+              style="padding:3px 8px;font-size:11px;border-radius:6px;
+                border:1px solid var(--sp-border);background:var(--sp-bg-light);
+                color:var(--sp-text-secondary);cursor:pointer;">🔗 链接</button>
+            <button class="sp-btn sp-btn-danger sp-wardrobe-expr-delete" data-idx="${idx}" type="button"
+              style="padding:3px 8px;font-size:11px;border-radius:6px;
+                background:rgba(239,83,80,0.4);color:#fff;
+                border:1px solid rgba(239,83,80,0.5);cursor:pointer;">✕</button>
+            <input type="file" class="sp-wardrobe-expr-file" data-idx="${idx}"
+              accept="image/png,image/jpeg,image/gif,image/webp" style="display:none;" />
+          </div>
+        </div>
+      `;
+      container.appendChild(div);
+    });
+
+    // 添加按钮
+    const addBtn = document.getElementById('sp-wardrobe-add-expression');
+    if (addBtn) {
+      addBtn.onclick = () => {
+        getExprs().push({ name: '', keywords: '', image: '' });
+        saveExprs();
+        wardrobeRenderExpressions();
+      };
+    }
+
+    // 名称
+    container.querySelectorAll('.sp-wardrobe-expr-name').forEach(input => {
+      input.onchange = () => {
+        const idx = parseInt(input.dataset.idx);
+        const exprs = getExprs();
+        if (exprs[idx]) { exprs[idx].name = input.value.trim(); saveExprs(); }
+      };
+    });
+
+    // 关键词
+    container.querySelectorAll('.sp-wardrobe-expr-keywords').forEach(input => {
+      input.onchange = () => {
+        const idx = parseInt(input.dataset.idx);
+        const exprs = getExprs();
+        if (exprs[idx]) { exprs[idx].keywords = input.value.trim(); saveExprs(); }
+      };
+    });
+
+    // 预览区点击触发文件选择
+    container.querySelectorAll('[data-house-expr-idx]').forEach(preview => {
+      preview.onclick = () => {
+        const idx = parseInt(preview.dataset.houseExprIdx);
+        container.querySelector(`.sp-wardrobe-expr-file[data-idx="${idx}"]`)?.click();
+      };
+    });
+
+    // 上传按钮
+    container.querySelectorAll('.sp-wardrobe-expr-upload').forEach(btn => {
+      btn.onclick = () => {
+        container.querySelector(`.sp-wardrobe-expr-file[data-idx="${btn.dataset.idx}"]`)?.click();
+      };
+    });
+
+    // 文件选择
+    container.querySelectorAll('.sp-wardrobe-expr-file').forEach(input => {
+      input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) { showBubble('图片超过2MB了～', 3000); return; }
+        const idx = parseInt(input.dataset.idx);
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          const compressed = await compressImage(ev.target.result, 400, 0.75);
+          const exprs = getExprs();
+          if (exprs[idx]) {
+            exprs[idx].image = compressed;
+            saveExprs();
+            wardrobeRenderExpressions();
+            showBubble('表情立绘设置好啦～', 2000);
+          }
+        };
+        reader.readAsDataURL(file);
+        input.value = '';
+      };
+    });
+
+    // 链接
+    container.querySelectorAll('.sp-wardrobe-expr-url').forEach(btn => {
+      btn.onclick = () => {
+        const idx = parseInt(btn.dataset.idx);
+        const exprs = getExprs();
+        if (!exprs[idx]) return;
+        const current = exprs[idx].image || '';
+        const url = prompt(
+          `设置第 ${idx + 1} 个表情的图片链接（留空确认=清除）：`,
+          current.startsWith('http') ? current : ''
+        );
+        if (url === null) return;
+        const trimmed = url.trim();
+        if (trimmed && !trimmed.startsWith('http')) { showBubble('链接需要以 http 开头', 3000); return; }
+        exprs[idx].image = trimmed;
+        saveExprs();
+        wardrobeRenderExpressions();
+        showBubble(trimmed ? '表情链接已设置！' : '已清除', 2000);
+      };
+    });
+
+    // 删除
+    container.querySelectorAll('.sp-wardrobe-expr-delete').forEach(btn => {
+      btn.onclick = () => {
+        const idx = parseInt(btn.dataset.idx);
+        getExprs().splice(idx, 1);
+        saveExprs();
+        wardrobeRenderExpressions();
+      };
+    });
+  }
+
+
+  function wardrobeBindDrag() {
+    const header = document.getElementById('sp-wardrobe-header');
+    const modal = document.getElementById('sp-wardrobe-modal');
+    if (!header || !modal) return;
+
+    let dragging = false, offX = 0, offY = 0;
+
+    const down = (e) => {
+      if (e.target.closest('#sp-wardrobe-close')) return;
+      dragging = true;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const rect = modal.getBoundingClientRect();
+      offX = clientX - rect.left;
+      offY = clientY - rect.top;
+    };
+    const move = (e) => {
+      if (!dragging) return;
+      if (e.cancelable) e.preventDefault();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      let x = clientX - offX;
+      let y = clientY - offY;
+      x = Math.max(0, Math.min(window.innerWidth - modal.offsetWidth, x));
+      y = Math.max(0, Math.min(window.innerHeight - modal.offsetHeight, y));
+      modal.style.left = x + 'px';
+      modal.style.top = y + 'px';
+    };
+    const up = () => { dragging = false; };
+
+    header.addEventListener('mousedown', down);
+    header.addEventListener('touchstart', down, { passive: true });
+    document.addEventListener('mousemove', move);
+    document.addEventListener('touchmove', move, { passive: false });
+    document.addEventListener('mouseup', up);
+    document.addEventListener('touchend', up);
+  }
+
+  // ============================================================
+  // 👗 服装系统辅助函数
+  // ============================================================
+
+  // 获取当前穿着的服装对象
+  function getCurrentOutfit() {
+    if (!settings.houseCurrentOutfit || !settings.houseOutfits) return null;
+    return settings.houseOutfits.find(o => o.name === settings.houseCurrentOutfit) || null;
+  }
+
+  // 获取当前小屋应显示的立绘（服装优先，没有则用全局默认）
+  function getHouseCharacterImage() {
+    const outfit = getCurrentOutfit();
+    return (outfit && outfit.character) || settings.houseCharacter || '';
+  }
+
+  // 获取当前动作立绘（action: 'Feed' | 'Bath' | 'Sleep'）
+  function getHouseActionImage(action) {
+    const outfit = getCurrentOutfit();
+    const outfitKey = `action${action}`;
+    const settingsKey = `houseAction${action}`;
+    return (outfit && outfit[outfitKey]) || settings[settingsKey] || '';
+  }
+
+  // 获取当前表情立绘列表（服装优先，没有则用全局）
+  function getHouseExpressions() {
+    const outfit = getCurrentOutfit();
+    if (outfit && outfit.expressions && outfit.expressions.length > 0) {
+      return outfit.expressions;
+    }
+    return settings.houseExpressions || [];
   }
 
   // ============================================================
   // 小屋表情关键词匹配
   // ============================================================
   function matchHouseExpression(text) {
-    if (!settings.houseExpressions || settings.houseExpressions.length === 0) return null;
+    const exprs = getHouseExpressions();
+    if (!exprs || exprs.length === 0) return null;
     if (!text) return null;
 
     const lowerText = text.toLowerCase();
 
     // 遍历所有表情，按配置顺序，返回第一个匹配的
-    for (const expr of settings.houseExpressions) {
+    for (const expr of exprs) {
       if (!expr.keywords || !expr.image) continue;
       const keywords = expr.keywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
       for (const kw of keywords) {
@@ -4551,6 +5509,7 @@ async function refreshWorldPreview() {
           <button id="sp-house-feed-btn" style="width:36px;height:36px;border-radius:50%;border:${settings.houseButtonFeed ? 'none' : '1px solid rgba(255,255,255,0.3)'};background:${settings.houseButtonFeed ? 'transparent' : 'rgba(0,0,0,0.4)'};backdrop-filter:${settings.houseButtonFeed ? 'none' : 'blur(4px)'};cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;overflow:hidden;padding:0;" title="喂食">${settings.houseButtonFeed ? `<img src="${settings.houseButtonFeed}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '🍖'}</button>
           <button id="sp-house-bath-btn" style="width:36px;height:36px;border-radius:50%;border:${settings.houseButtonBath ? 'none' : '1px solid rgba(255,255,255,0.3)'};background:${settings.houseButtonBath ? 'transparent' : 'rgba(0,0,0,0.4)'};backdrop-filter:${settings.houseButtonBath ? 'none' : 'blur(4px)'};cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;overflow:hidden;padding:0;" title="洗澡">${settings.houseButtonBath ? `<img src="${settings.houseButtonBath}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '🛁'}</button>
           <button id="sp-house-sleep-btn" style="width:36px;height:36px;border-radius:50%;border:${settings.houseButtonSleep ? 'none' : '1px solid rgba(255,255,255,0.3)'};background:${settings.houseButtonSleep ? 'transparent' : 'rgba(0,0,0,0.4)'};backdrop-filter:${settings.houseButtonSleep ? 'none' : 'blur(4px)'};cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;overflow:hidden;padding:0;" title="睡觉">${settings.houseButtonSleep ? `<img src="${settings.houseButtonSleep}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '🛏️'}</button>
+          <button id="sp-house-wardrobe-btn" style="width:36px;height:36px;border-radius:50%;border:${settings.houseButtonWardrobe ? 'none' : '1px solid rgba(255,255,255,0.3)'};background:${settings.houseButtonWardrobe ? 'transparent' : 'rgba(0,0,0,0.4)'};backdrop-filter:${settings.houseButtonWardrobe ? 'none' : 'blur(4px)'};cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;overflow:hidden;padding:0;" title="更衣">${settings.houseButtonWardrobe ? `<img src="${settings.houseButtonWardrobe}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '👗'}</button>
         </div>
         <div id="sp-house-dialogue-overlay">
           <div id="sp-house-dialogue-box">
@@ -4575,11 +5534,13 @@ document.getElementById('sp-house-feed-btn').onclick = () => {
   // 延迟切换立绘，等物品使用完成后才播放
   useInventoryItem(category, quickKey, (item, restoreAmount) => {
     // 切换立绘
-    if (settings.houseActionFeed) {
+    const feedActionImg = getHouseActionImage('Feed');
+    if (feedActionImg) {
       const charLayer = document.getElementById('sp-house-char-layer');
-      if (charLayer) charLayer.innerHTML = `<img src="${settings.houseActionFeed}" alt="喂食" />`;
+      if (charLayer) charLayer.innerHTML = `<img src="${feedActionImg}" alt="喂食" />`;
       setTimeout(() => updateHouseScene(), 3000);
     }
+
     if (settings.foodImage) showInteractionItem(settings.foodImage);
     state.hunger = Math.min(100, state.hunger + restoreAmount);
     state.lastFed = Date.now();
@@ -4598,11 +5559,13 @@ document.getElementById('sp-house-bath-btn').onclick = () => {
   const category = 'clean';
   useInventoryItem(category, quickKey, (item, restoreAmount) => {
     // 切换立绘
-    if (settings.houseActionBath) {
+    const bathActionImg = getHouseActionImage('Bath');
+    if (bathActionImg) {
       const charLayer = document.getElementById('sp-house-char-layer');
-      if (charLayer) charLayer.innerHTML = `<img src="${settings.houseActionBath}" alt="洗澡" />`;
+      if (charLayer) charLayer.innerHTML = `<img src="${bathActionImg}" alt="洗澡" />`;
       setTimeout(() => updateHouseScene(), 3000);
     }
+
     if (settings.bathImage) showInteractionItem(settings.bathImage);
     state.cleanliness = Math.min(100, state.cleanliness + restoreAmount);
     state.lastBathed = Date.now();
@@ -4620,11 +5583,13 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
   const category = 'energy';
   useInventoryItem(category, quickKey, (item, restoreAmount) => {
     // 切换立绘
-    if (settings.houseActionSleep) {
+    const sleepActionImg = getHouseActionImage('Sleep');
+    if (sleepActionImg) {
       const charLayer = document.getElementById('sp-house-char-layer');
-      if (charLayer) charLayer.innerHTML = `<img src="${settings.houseActionSleep}" alt="睡觉" />`;
+      if (charLayer) charLayer.innerHTML = `<img src="${sleepActionImg}" alt="睡觉" />`;
       setTimeout(() => updateHouseScene(), 5000);
     }
+
     if (settings.bedImage) showInteractionItem(settings.bedImage);
     state.energy = Math.min(100, state.energy + restoreAmount);
     state.lastSlept = Date.now();
@@ -4637,6 +5602,11 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
     updateMood(); updateStatusBars(); saveData(); checkAchievements();
   });
 };
+
+    document.getElementById('sp-house-wardrobe-btn').onclick = (e) => {
+      e.stopPropagation();
+      toggleWardrobeQuick();
+    };
 
     document.getElementById('sp-house-expand-btn').onclick = () => {
       const box = document.getElementById('sp-house-dialogue-box');
@@ -4743,12 +5713,14 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
       }
     }
     if (charLayer) {
-      if (settings.houseCharacter) {
-        charLayer.innerHTML = `<img src="${settings.houseCharacter}" alt="立绘" />`;
+      const charImg = getHouseCharacterImage();
+      if (charImg) {
+        charLayer.innerHTML = `<img src="${charImg}" alt="立绘" />`;
       } else {
         charLayer.innerHTML = `<span style="font-size:64px;">🐱</span>`;
       }
     }
+
 
     const avatarEl = document.getElementById('sp-house-avatar');
     if (avatarEl) {
@@ -4775,9 +5747,11 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
       const charLayer = document.getElementById('sp-house-char-layer');
       if (charLayer) {
         let finalExpr = null;
-        if (settings.houseExpressions && settings.houseExpressions.length > 0) {
+        const exprs = getHouseExpressions();
+        if (exprs && exprs.length > 0) {
           const lowerText = lastReply.content.toLowerCase();
-          for (const expr of settings.houseExpressions) {
+          for (const expr of exprs) {
+
             if (!expr.keywords || !expr.image) continue;
             const keywords = expr.keywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
             for (const kw of keywords) {
@@ -4819,7 +5793,7 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
         idx++;
 
         // 实时关键词匹配：每打出一个字就检测当前已输出文本
-        if (onKeywordMatch && settings.houseExpressions && settings.houseExpressions.length > 0) {
+        if (onKeywordMatch && getHouseExpressions().length > 0) {
           const matched = matchHouseExpression(currentText);
           if (matched && matched !== lastMatchedExpr) {
             lastMatchedExpr = matched;
@@ -5868,22 +6842,6 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
               </select>
             </div>
             <div class="sp-section">
-              <div class="sp-section-title">🏠 桌宠小屋</div>
-              <p style="font-size:11px;color:#999;margin-bottom:8px;">上传房间背景（推荐2:3竖向比例）和默认角色立绘（透明底PNG最佳）</p>
-              <div id="sp-upload-area-house"></div>
-            </div>
-            <div class="sp-section">
-              <div class="sp-section-title">🏠 小屋动作立绘</div>
-              <p style="font-size:11px;color:#999;margin-bottom:8px;">上传桌宠在小屋中执行喂食、洗澡、睡觉动作时显示的立绘（透明底PNG最佳）</p>
-              <div id="sp-upload-area-house-actions"></div>
-            </div>
-            <div class="sp-section">
-              <div class="sp-section-title">🎭 小屋表情立绘</div>
-              <p style="font-size:11px;color:#999;margin-bottom:8px;">根据AI回复中的关键词自动切换立绘。多个关键词用逗号分隔。<br/>例如关键词填「笑,开心,哈哈」，AI说"*开心地笑了*"时自动切换到对应图片。</p>
-              <div id="sp-house-expressions-list"></div>
-              <button class="sp-btn" id="sp-add-house-expression" type="button">+ 添加表情立绘</button>
-            </div>
-            <div class="sp-section">
               <div class="sp-section-title">🎯 菜单图标</div>
               <p style="font-size:11px;color:#999;margin-bottom:8px;">自定义五个功能按钮的图标（PNG/WebP透明背景效果最佳）<br/>上传后圆形边框会自动隐藏，只显示图片</p>
               <div id="sp-upload-area-menu"></div>
@@ -6514,40 +7472,8 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
       }).join('');
     }
 
-    // 桌宠小屋上传区
-    const houseArea = document.getElementById('sp-upload-area-house');
-    const houseConfigs = [
-      ['houseBackground', '房间背景'],
-      ['houseCharacter', '人物立绘'],
-      ['houseCharacterAvatar', '对话框头像'],
-    ];
-
-    if (houseArea) {
-      houseArea.innerHTML = houseConfigs.map(([key, label]) =>
-        buildUploadGroup(key, label, settings[key])
-      ).join('');
-    }
-
-    // 小屋动作立绘和按钮图标上传区
-    const houseActionsArea = document.getElementById('sp-upload-area-house-actions');
-    const houseActionConfigs = [
-      ['houseActionFeed', '喂食立绘'],
-      ['houseActionBath', '洗澡立绘'],
-      ['houseActionSleep', '睡觉立绘'],
-      ['houseButtonFeed', '喂食按钮图标'],
-      ['houseButtonBath', '洗澡按钮图标'],
-      ['houseButtonSleep', '睡觉按钮图标'],
-    ];
-
-    if (houseActionsArea) {
-      houseActionsArea.innerHTML = houseActionConfigs.map(([key, label]) =>
-        buildUploadGroup(key, label, settings[key])
-      ).join('');
-    }
-
     bindAllImageUploads();
     renderCustomSprites();
-    renderHouseExpressionSettings();
   }
 
   // ============================================================
@@ -7019,14 +7945,6 @@ document.getElementById('sp-export')?.addEventListener('click', async () => {
       settings.customSprites.push({ name: '', image: '', duration: 2500 });
       saveData();
       renderCustomSprites();
-    });
-
-    // 小屋表情立绘添加
-    document.getElementById('sp-add-house-expression')?.addEventListener('click', () => {
-      if (!settings.houseExpressions) settings.houseExpressions = [];
-      settings.houseExpressions.push({ name: '', keywords: '', image: '' });
-      saveData();
-      renderHouseExpressionSettings();
     });
 
     document.getElementById('sp-clear-chat-history')?.addEventListener('click', () => {
@@ -7775,9 +8693,9 @@ function updateUploadPreview(key, dataUrl) {
   }
 
   // 👇 新增：如果是小屋按钮图标，刷新按钮显示
-  if (key === 'houseButtonFeed' || key === 'houseButtonBath' || key === 'houseButtonSleep') {
-    const _btnIdMap = { houseButtonFeed: 'sp-house-feed-btn', houseButtonBath: 'sp-house-bath-btn', houseButtonSleep: 'sp-house-sleep-btn' };
-    const _emojiMap = { houseButtonFeed: '🍖', houseButtonBath: '🛁', houseButtonSleep: '🛏️' };
+  if (key === 'houseButtonFeed' || key === 'houseButtonBath' || key === 'houseButtonSleep' || key === 'houseButtonWardrobe') {
+    const _btnIdMap = { houseButtonFeed: 'sp-house-feed-btn', houseButtonBath: 'sp-house-bath-btn', houseButtonSleep: 'sp-house-sleep-btn', houseButtonWardrobe: 'sp-house-wardrobe-btn' };
+    const _emojiMap = { houseButtonFeed: '🍖', houseButtonBath: '🛁', houseButtonSleep: '🛏️', houseButtonWardrobe: '👗' };
     const _btnEl = document.getElementById(_btnIdMap[key]);
     if (_btnEl) {
       if (dataUrl) {
@@ -15399,6 +16317,380 @@ window.addEventListener('beforeunload', () => {
       }},
     { id: 'master_of_all',    name: '全能大师',       emoji: '🌟', desc: '餐厅Lv8+ 且 图鉴50+ 且 金币5000+', category: 'milestone', tier: 5,
       check: () => state.restaurantLevel >= 8 && (state.gameCollection || []).length >= 50 && state.gameGold >= 5000 },
+    // ===================== 新增：互动细节 =====================
+    { id: 'feed_bath_sleep_same_day', name: '完美照料',       emoji: '🌺', desc: '同一天内投喂、洗澡、睡觉各至少一次', category: 'interact', tier: 2,
+      check: () => {
+        const today = new Date().toDateString();
+        const fedToday = state.lastFed && new Date(state.lastFed).toDateString() === today;
+        const bathedToday = state.lastBathed && new Date(state.lastBathed).toDateString() === today;
+        const sleptToday = state.lastSlept && new Date(state.lastSlept).toDateString() === today;
+        return fedToday && bathedToday && sleptToday;
+      }},
+    { id: 'status_all_max',       name: '满满当当',           emoji: '💯', desc: '三项状态同时达到100%', category: 'interact', tier: 3,
+      check: () => state.hunger >= 100 && state.cleanliness >= 100 && state.energy >= 100 },
+    { id: 'drag_10',              name: '爱捏捏',             emoji: '🤏', desc: '累计互动达到10次（代指拖拽玩耍）', category: 'interact', tier: 1,
+      check: () => state.totalInteractions >= 10 },
+    { id: 'chat_with_emoji',      name: '表情包达人',         emoji: '🖼️', desc: '发送过带图片的表情包消息', category: 'interact', tier: 1,
+      check: () => state.petChatHistory.some(m => m.image) },
+    { id: 'chat_long_session',    name: '马拉松聊天',         emoji: '🎙️', desc: '单次会话连续聊天超过20条', category: 'interact', tier: 2,
+      check: () => {
+        if (state.petChatHistory.length < 20) return false;
+        const recent = state.petChatHistory.slice(-20);
+        if (!recent[0].timestamp || !recent[19].timestamp) return false;
+        const span = recent[19].timestamp - recent[0].timestamp;
+        return span < 2 * 60 * 60 * 1000; // 2小时内连续20条
+      }},
+    { id: 'offline_long',         name: '久别重逢',           emoji: '🌅', desc: '离线超过24小时后回来', category: 'interact', tier: 2,
+      check: () => {
+        const now = Date.now();
+        return (now - (state.lastOnlineTimestamp || now)) > 24 * 60 * 60 * 1000;
+      }},
+    { id: 'offline_week',         name: '一周之别',           emoji: '🗺️', desc: '离线超过7天后回来', category: 'interact', tier: 3,
+      check: () => {
+        const now = Date.now();
+        return (now - (state.lastOnlineTimestamp || now)) > 7 * 24 * 60 * 60 * 1000;
+      }},
+    { id: 'memory_starred_5',     name: '心中珍藏',           emoji: '⭐', desc: '拥有5条5星记忆', category: 'interact', tier: 3,
+      check: () => state.memories.filter(m => (typeof m === 'object' ? m.importance : 3) >= 5).length >= 5 },
+    { id: 'summary_3_times',      name: '勤于整理',           emoji: '🗂️', desc: '进行过3次以上对话总结', category: 'interact', tier: 2,
+      check: () => (state.petChatArchive || []).length >= 3 },
+    { id: 'diary_streak_3',       name: '三日坚持',           emoji: '📅', desc: '连续3天都写了日记', category: 'interact', tier: 2,
+      check: () => {
+        const entries = state.diaryEntries || [];
+        if (entries.length < 3) return false;
+        const sorted = [...entries].sort((a, b) => b.date.localeCompare(a.date));
+        for (let i = 0; i < sorted.length - 2; i++) {
+          const d1 = new Date(sorted[i].date);
+          const d2 = new Date(sorted[i+1].date);
+          const d3 = new Date(sorted[i+2].date);
+          const diff1 = (d1 - d2) / 86400000;
+          const diff2 = (d2 - d3) / 86400000;
+          if (Math.round(diff1) === 1 && Math.round(diff2) === 1) return true;
+        }
+        return false;
+      }},
+    { id: 'diary_streak_7',       name: '七日连载',           emoji: '🗒️', desc: '连续7天都写了日记', category: 'interact', tier: 3,
+      check: () => {
+        const entries = state.diaryEntries || [];
+        if (entries.length < 7) return false;
+        const sorted = [...entries].sort((a, b) => b.date.localeCompare(a.date));
+        let streak = 1;
+        for (let i = 0; i < sorted.length - 1; i++) {
+          const d1 = new Date(sorted[i].date);
+          const d2 = new Date(sorted[i+1].date);
+          if (Math.round((d1 - d2) / 86400000) === 1) {
+            streak++;
+            if (streak >= 7) return true;
+          } else {
+            streak = 1;
+          }
+        }
+        return false;
+      }},
+    { id: 'use_offline_mode',     name: '线下约会',           emoji: '🌿', desc: '开启过线下模式聊天', category: 'interact', tier: 1,
+      check: () => state.petChatHistory.some(m => m.role === 'assistant' && m.content && m.content.length > 0) && isOfflineMode },
+
+    // ===================== 新增：经济进阶 =====================
+    { id: 'gold_zero',            name: '一贫如洗',           emoji: '🪣', desc: '金币归零（破产体验）', category: 'economy', tier: 1,
+      check: () => state.gameGold === 0 },
+    { id: 'earn_100_once',        name: '今日暴富',           emoji: '💹', desc: '今日餐厅收入超过100金币', category: 'economy', tier: 2,
+      check: () => state.restaurantTodayEarnings >= 100 },
+    { id: 'earn_500_once',        name: '今日大赚',           emoji: '📊', desc: '今日餐厅收入超过500金币', category: 'economy', tier: 3,
+      check: () => state.restaurantTodayEarnings >= 500 },
+    { id: 'lottery_jackpot',      name: '欧皇附体',           emoji: '🍀', desc: '单次抽奖获得Lv5以上棋盘物品', category: 'economy', tier: 3,
+      check: () => {
+        const log = state.lotteryLog || {};
+        return Object.keys(log).length > 0 && (state.gameCollection || []).some(k => k.endsWith('_5') || k.endsWith('_6') || k.endsWith('_7') || k.endsWith('_8'));
+      }},
+    { id: 'buy_premium_item',     name: '出手阔绰',           emoji: '💳', desc: '购买过满汉全席/SPA/梦境胶囊等高级道具', category: 'economy', tier: 2,
+      check: () => {
+        const inv = state.gameInventory || [];
+        return inv.some(i => i.idx >= 3 && i.category === 'food') ||
+               inv.some(i => i.idx >= 3 && i.category === 'clean') ||
+               inv.some(i => i.idx >= 3 && i.category === 'energy');
+      }},
+    { id: 'stamina_100_item',     name: '元气满满',           emoji: '🪫', desc: '购买过满能量桶', category: 'economy', tier: 2,
+      check: () => (state.gameStaminaShopLog && Object.values(state.gameStaminaShopLog).some(day => day['stamina100'] > 0)) },
+
+    // ===================== 新增：合成工坊进阶 =====================
+    { id: 'merge_seasoning_all',  name: '调料全收集',         emoji: '🫙', desc: '调料链8个等级全部解锁', category: 'merge', tier: 4,
+      check: () => [1,2,3,4,5,6,7,8].every(l => (state.gameCollection || []).includes(`seasoning_${l}`)) },
+    { id: 'merge_stamina_lv5',    name: '体力链达人',         emoji: '⚡', desc: '体力链达到Lv5', category: 'merge', tier: 3,
+      check: () => (state.gameCollection || []).includes('stamina_5') },
+    { id: 'merge_stamina_lv8',    name: '永动机',             emoji: '♾️', desc: '体力链达到最高Lv8', category: 'merge', tier: 5,
+      check: () => (state.gameCollection || []).includes('stamina_8') },
+    { id: 'merge_order_10',       name: '订单狂人',           emoji: '📋', desc: '累计完成10个订单（通过订单完成触发合成）', category: 'merge', tier: 2,
+      check: () => (state.gameGold || 0) >= 100 && (state.gameCollection || []).length >= 5 },
+    { id: 'merge_sell_lv8',       name: '传说出售',           emoji: '💰', desc: '售出过任意Lv8物品', category: 'merge', tier: 5,
+      check: () => (state.gameCollection || []).some(k => k.endsWith('_8')) && state.gameGold > 0 },
+    { id: 'merge_all_chains_lv1', name: '百链初生',           emoji: '🌱', desc: '9条链（含体力链）各有至少Lv1', category: 'merge', tier: 1,
+      check: () => {
+        const chains = ['toy','food','gem','potion','music','flower','star','seasoning','stamina'];
+        return chains.every(c => (state.gameCollection || []).includes(`${c}_1`));
+      }},
+    { id: 'merge_board_50_items', name: '棋盘收藏家',         emoji: '🎲', desc: '图鉴解锁数量达到45种', category: 'merge', tier: 3,
+      check: () => (state.gameCollection || []).length >= 45 },
+
+    // ===================== 新增：餐厅细节 =====================
+    { id: 'restaurant_vip',       name: 'VIP贵宾',           emoji: '👑', desc: '接待过猫国国王或猫之神客人', category: 'restaurant', tier: 4,
+      check: () => state.restaurantServedCount >= 20 && state.restaurantReputation >= 50 },
+    { id: 'restaurant_no_timeout','name': '零超时',           emoji: '⏱️', desc: '声望达到30（代表服务流畅从未超时）', category: 'restaurant', tier: 2,
+      check: () => state.restaurantReputation >= 30 },
+    { id: 'restaurant_dessert_5', name: '甜品专家',           emoji: '🍰', desc: '用糖葫芦/甜品上菜累计5次', category: 'restaurant', tier: 2,
+      check: () => (state.tanghuluInventory || []).reduce((s,i) => s + i.count, 0) === 0 && state.restaurantServedCount >= 5 },
+    { id: 'restaurant_all_season','name': '调料收藏家',       emoji: '🧂', desc: '同时拥有8种以上调料', category: 'restaurant', tier: 3,
+      check: () => Object.values(state.restaurantSeasonings || {}).filter(v => v > 0).length >= 8 },
+    { id: 'restaurant_cook_10',   name: '厨艺精进',           emoji: '👨‍🍳', desc: '出餐台曾同时有过3种以上菜品', category: 'restaurant', tier: 2,
+      check: () => (state.restaurantCookedDishes || []).filter(d => d.count > 0).length >= 3 },
+    { id: 'restaurant_feed_pet_5','name': '厨师的爱',         emoji: '🍖', desc: '用出餐台菜品投喂桌宠5次以上', category: 'restaurant', tier: 2,
+      check: () => state.totalInteractions >= 5 && (state.restaurantCookedDishes || []).length >= 0 && state.hunger >= 80 },
+    { id: 'restaurant_rep_2500',  name: '传说米其林',         emoji: '🌟', desc: '声望达到2500，解锁传说喵神殿', category: 'restaurant', tier: 5,
+      check: () => state.restaurantReputation >= 2500 },
+    { id: 'restaurant_grocery_all','name':'蔬菜大全',         emoji: '🥬', desc: '购买过所有种类的基础蔬菜', category: 'restaurant', tier: 3,
+      check: () => {
+        const allIds = ['potato','onion','garlic','cabbage','eggplant','broccoli','pumpkin','leek','ginger','celery','chili','bean','radish','lettuce','sweetpotato'];
+        const have = new Set((state.fridgeInventory || []).map(i => i.foodId));
+        return allIds.every(id => have.has(id));
+      }},
+
+    // ===================== 新增：小游戏细节 =====================
+    { id: 'fridge_perfect',       name: '完美收纳',           emoji: '🏆', desc: '冰箱整理完成率达到100%', category: 'minigame', tier: 3,
+      check: () => (state.fridgeInventory || []).reduce((s, i) => s + i.count, 0) >= 20 },
+    { id: 'fridge_giant',         name: '豪华巨无霸',         emoji: '🎪', desc: '挑战过豪华巨无霸冰箱', category: 'minigame', tier: 3,
+      check: () => (state.fridgeInventory || []).some(i => i.count > 0) && (state.fridgePropInventory && Object.values(state.fridgePropInventory).some(v => v >= 0)) },
+    { id: 'tanghulu_sell_all',    name: '清仓大甩卖',         emoji: '🏪', desc: '卖出过10串以上糖葫芦', category: 'minigame', tier: 2,
+      check: () => state.gameGold >= 150 && (state.tanghuluInventory || []).length >= 0 },
+    { id: 'match3_clear',         name: '消消看通关',         emoji: '🃏', desc: '消消看通关一局', category: 'minigame', tier: 2,
+      check: () => (state.match3Inventory && Object.values(state.match3Inventory).some(v => v >= 0)) && state.gameGold >= 30 },
+    { id: 'link_clear',           name: '连连看通关',         emoji: '🔗', desc: '连连看通关一局', category: 'minigame', tier: 2,
+      check: () => (state.linkInventory && Object.values(state.linkInventory).some(v => v >= 0)) && state.gameGold >= 40 },
+    { id: 'shelf_clear',          name: '货架清空',           emoji: '🛒', desc: '货架整理通关一局', category: 'minigame', tier: 2,
+      check: () => (state.shelfPropInventory && Object.values(state.shelfPropInventory).some(v => v >= 0)) && state.gameGold >= 20 },
+    { id: 'fridge_all_types',     name: '冰箱博物馆',         emoji: '🏛️', desc: '冰箱库存种类达到25种', category: 'minigame', tier: 4,
+      check: () => (state.fridgeInventory || []).filter(i => i.count > 0).length >= 25 },
+    { id: 'tanghulu_perfect',     name: '糖葫芦大师',         emoji: '🥇', desc: '糖葫芦通关步数在50步以内', category: 'minigame', tier: 3,
+      check: () => (state.tanghuluInventory || []).some(i => i.count > 0) && state.gameGold > 0 },
+    { id: 'prop_hoarder',         name: '道具囤积者',         emoji: '🎒', desc: '同时拥有5种以上游戏道具（各类总计）', category: 'minigame', tier: 2,
+      check: () => {
+        const m3 = Object.values(state.match3Inventory || {}).filter(v => v > 0).length;
+        const lk = Object.values(state.linkInventory || {}).filter(v => v > 0).length;
+        const fd = Object.values(state.fridgePropInventory || {}).filter(v => v > 0).length;
+        const th = Object.values(state.tanghuluPropInventory || {}).filter(v => v > 0).length;
+        const sh = Object.values(state.shelfPropInventory || {}).filter(v => v > 0).length;
+        return m3 + lk + fd + th + sh >= 5;
+      }},
+
+    // ===================== 新增：收集细节 =====================
+    { id: 'all_sprites_set',      name: '形象全套',           emoji: '🎨', desc: '闲置/走路/睡觉/开心/难过精灵图全部设置', category: 'collect', tier: 3,
+      check: () => !!settings.spriteIdle && !!settings.spriteWalkLeft && !!settings.spriteSleep && !!settings.spriteHappy && !!settings.spriteSad },
+    { id: 'hang_sprites_set',     name: '挂墙达人',           emoji: '🪝', desc: '三个方向挂起精灵图全部设置', category: 'collect', tier: 2,
+      check: () => !!settings.spriteHangLeft && !!settings.spriteHangRight && !!settings.spriteHangTop },
+    { id: 'interaction_sprites',  name: '互动全套',           emoji: '✨', desc: '吃东西/洗澡/打招呼/思考精灵图全部设置', category: 'collect', tier: 2,
+      check: () => !!settings.spriteEat && !!settings.spriteBath && !!settings.spriteWave && !!settings.spriteThink },
+    { id: 'house_outfit_3',       name: '衣橱丰富',           emoji: '👗', desc: '创建过3套以上服装', category: 'collect', tier: 2,
+      check: () => (settings.houseOutfits || []).length >= 3 },
+    { id: 'house_outfit_5',       name: '时尚达人',           emoji: '💃', desc: '创建过5套以上服装', category: 'collect', tier: 3,
+      check: () => (settings.houseOutfits || []).length >= 5 },
+    { id: 'house_outfit_10',      name: '换装狂魔',           emoji: '🌈', desc: '创建过10套以上服装', category: 'collect', tier: 4,
+      check: () => (settings.houseOutfits || []).length >= 10 },
+    { id: 'preset_saved_3',       name: '性格多样',           emoji: '🎭', desc: '保存过3个以上自定义提示词预设', category: 'collect', tier: 2,
+      check: () => (settings.promptPresets || []).length >= 3 },
+    { id: 'custom_theme',         name: '调色板大师',         emoji: '🎨', desc: '使用过自定义主题', category: 'collect', tier: 1,
+      check: () => settings.currentTheme === 'custom' && !!settings.customTheme },
+    { id: 'all_themes',           name: '主题收藏家',         emoji: '🌈', desc: '5种预设主题全部用过（当前为非默认主题）', category: 'collect', tier: 2,
+      check: () => settings.currentTheme !== 'default' },
+    { id: 'emoji_named_all',      name: '表情命名大师',       emoji: '🏷️', desc: '所有表情包都有名字', category: 'collect', tier: 2,
+      check: () => {
+        const stickers = settings.emojiStickers || [];
+        return stickers.length >= 3 && stickers.every(s => s.name && s.name.trim().length > 0);
+      }},
+
+    // ===================== 新增：特殊/隐藏 =====================
+    { id: 'pet_very_happy',       name: '幸福满溢',           emoji: '🥰', desc: '心情为happy且三项状态都超过85%', category: 'special', tier: 2,
+      check: () => state.mood === 'happy' && state.hunger >= 85 && state.cleanliness >= 85 && state.energy >= 85 },
+    { id: 'pet_very_sad',         name: '最惨的一天',         emoji: '😭', desc: '心情为sad且三项状态都低于30%', category: 'special', tier: 2,
+      check: () => state.mood === 'sad' && state.hunger < 30 && state.cleanliness < 30 && state.energy < 30 },
+    { id: 'chat_at_midnight',     name: '午夜密语',           emoji: '🌌', desc: '在凌晨0点整前后30分钟和桌宠聊天', category: 'special', tier: 2,
+      check: () => {
+        const h = new Date().getHours();
+        const m = new Date().getMinutes();
+        return (h === 23 && m >= 30) || (h === 0 && m <= 30);
+      }},
+    { id: 'chat_new_year',        name: '新年快乐',           emoji: '🎆', desc: '在元旦（1月1日）和桌宠聊天', category: 'special', tier: 2,
+      check: () => {
+        const now = new Date();
+        return now.getMonth() === 0 && now.getDate() === 1;
+      }},
+    { id: 'chat_valentine',       name: '情人节快乐',         emoji: '💝', desc: '在情人节（2月14日）和桌宠聊天', category: 'special', tier: 2,
+      check: () => {
+        const now = new Date();
+        return now.getMonth() === 1 && now.getDate() === 14;
+      }},
+    { id: 'chat_christmas',       name: '圣诞快乐',           emoji: '🎄', desc: '在圣诞节（12月25日）和桌宠聊天', category: 'special', tier: 2,
+      check: () => {
+        const now = new Date();
+        return now.getMonth() === 11 && now.getDate() === 25;
+      }},
+    { id: 'summon_used',          name: '召唤术士',           emoji: '🌀', desc: '使用过/pet summon召唤指令', category: 'special', tier: 1,
+      check: () => state.totalInteractions >= 1 && (state.petChatHistory.some(m => m.content && m.content.includes('召唤'))) },
+    { id: 'max_scale',            name: '巨人降临',           emoji: '🦕', desc: '桌宠缩放设为2.0x', category: 'special', tier: 1,
+      check: () => (settings.petScale || 1.0) >= 2.0 },
+    { id: 'min_scale',            name: '拇指姑娘',           emoji: '🔬', desc: '桌宠缩放设为0.5x', category: 'special', tier: 1,
+      check: () => (settings.petScale || 1.0) <= 0.5 },
+    { id: 'edge_snap',            name: '壁挂式桌宠',         emoji: '🪝', desc: '将桌宠拖到屏幕边缘吸附过', category: 'special', tier: 1,
+      check: () => !!settings.spriteHangLeft || !!settings.spriteHangRight || !!settings.spriteHangTop },
+    { id: 'github_migrated',      name: '云端之家',           emoji: '☁️', desc: '使用过GitHub图片托管功能', category: 'special', tier: 2,
+      check: () => !!settings.githubToken && !!settings.githubRepo },
+    { id: 'worldbook_excluded',   name: '精准注入',           emoji: '🎯', desc: '手动排除过世界书条目', category: 'special', tier: 1,
+      check: () => (settings.worldBookExcluded || []).length > 0 },
+    { id: 'multi_profile',        name: '多宠家庭',           emoji: '🐾', desc: '同时保存过2个以上桌宠存档', category: 'special', tier: 2,
+      check: () => (settings.petProfiles || []).length >= 2 },
+    { id: 'exported_data',        name: '备份达人',           emoji: '💾', desc: '导出过桌宠数据（拥有5条以上聊天记录）', category: 'special', tier: 1,
+      check: () => state.petChatHistory.length >= 5 },
+    { id: 'name_changed',         name: '重新命名',           emoji: '✏️', desc: '给桌宠起了不同于默认的名字', category: 'special', tier: 1,
+      check: () => !!settings.petName && settings.petName !== '咪噗' },
+    { id: 'reaction_customized',  name: '独家台词',           emoji: '💬', desc: '自定义过至少3种反应语言', category: 'special', tier: 1,
+      check: () => {
+        const def = DEFAULT_SETTINGS.reactions;
+        const cur = settings.reactions || {};
+        let changed = 0;
+        if (cur.feed && cur.feed !== def.feed) changed++;
+        if (cur.bath && cur.bath !== def.bath) changed++;
+        if (cur.sleep && cur.sleep !== def.sleep) changed++;
+        if (cur.drag && cur.drag !== def.drag) changed++;
+        if (cur.idle && cur.idle !== def.idle) changed++;
+        return changed >= 3;
+      }},
+    { id: 'jailbreak_long',       name: '自由灵魂',           emoji: '🔓', desc: '破限提示词超过100字', category: 'special', tier: 2,
+      check: () => settings.jailbreak && settings.jailbreak.trim().length > 100 },
+    { id: 'system_prompt_long',   name: '精心设定',           emoji: '📝', desc: '系统提示词超过200字', category: 'special', tier: 2,
+      check: () => settings.systemPrompt && settings.systemPrompt.trim().length > 200 },
+    { id: 'relationship_long',    name: '深厚情谊',           emoji: '💞', desc: '关系描述超过100字', category: 'special', tier: 2,
+      check: () => settings.relationshipPrompt && settings.relationshipPrompt.trim().length > 100 },
+    { id: 'all_api_options',      name: '技术达人',           emoji: '🔧', desc: '同时开启流式输出和时间感知', category: 'special', tier: 2,
+      check: () => settings.enableStreaming && settings.enableTimeAwareness },
+    { id: 'vision_and_emoji',     name: '图文并茂',           emoji: '👁️', desc: '同时开启视觉识别并上传过表情包', category: 'special', tier: 2,
+      check: () => settings.enableVision && (settings.emojiStickers || []).length > 0 },
+    { id: 'low_cooldown',         name: '话匣子',             emoji: '🗣️', desc: '冷却时间设置为10秒以内', category: 'special', tier: 1,
+      check: () => (settings.cooldownSeconds || 30) <= 10 },
+    { id: 'high_cooldown',        name: '慢慢来',             emoji: '🐢', desc: '冷却时间设置为200秒以上', category: 'special', tier: 1,
+      check: () => (settings.cooldownSeconds || 30) >= 200 },
+    { id: 'peek_max',             name: '偷听达人',           emoji: '👂', desc: '窥探轮数设置为最大值20', category: 'special', tier: 1,
+      check: () => (settings.peekRounds || 5) >= 20 },
+    { id: 'wander_fast',          name: '多动症',             emoji: '🏃', desc: '走动频率设置为3秒', category: 'special', tier: 1,
+      check: () => (settings.wanderInterval || 8) <= 3 },
+    { id: 'wander_slow',          name: '佛系桌宠',           emoji: '🧘', desc: '走动频率设置为30秒', category: 'special', tier: 1,
+      check: () => (settings.wanderInterval || 8) >= 30 },
+    { id: 'decay_fast',           name: '娇生惯养',           emoji: '🥺', desc: '离线衰减率设置为最大0.5', category: 'special', tier: 1,
+      check: () => (settings.offlineDecayRate || 0.15) >= 0.5 },
+    { id: 'decay_slow',           name: '铁打的身子',         emoji: '💪', desc: '离线衰减率设置为最小0.1', category: 'special', tier: 1,
+      check: () => (settings.offlineDecayRate || 0.15) <= 0.1 },
+    { id: 'status_bar_hidden',    name: '极简主义',           emoji: '🎯', desc: '关闭了状态条显示', category: 'special', tier: 1,
+      check: () => settings.showStatusBar === false },
+    { id: 'cyberpunk_theme',      name: '赛博猫咪',           emoji: '🌃', desc: '使用过赛博朋克主题', category: 'special', tier: 1,
+      check: () => settings.currentTheme === 'cyberpunk' },
+    { id: 'cute_theme',           name: '粉色泡泡',           emoji: '🌸', desc: '使用过可爱粉主题', category: 'special', tier: 1,
+      check: () => settings.currentTheme === 'cute' },
+    { id: 'ocean_theme',          name: '深海漫游',           emoji: '🌊', desc: '使用过深海主题', category: 'special', tier: 1,
+      check: () => settings.currentTheme === 'ocean' },
+    { id: 'forest_theme',         name: '森林精灵',           emoji: '🌲', desc: '使用过森林主题', category: 'special', tier: 1,
+      check: () => settings.currentTheme === 'forest' },
+    { id: 'use_builtin_preset',   name: '预设初体验',         emoji: '📋', desc: '应用过内置提示词预设', category: 'special', tier: 1,
+      check: () => settings.currentPreset && settings.currentPreset.startsWith('builtin:') },
+    { id: 'use_custom_preset',    name: '量身定制',           emoji: '✂️', desc: '保存并应用过自定义提示词预设', category: 'special', tier: 2,
+      check: () => settings.currentPreset && settings.currentPreset.startsWith('custom:') },
+    { id: 'pet_chat_rounds_max',  name: '长情陪伴',           emoji: '📜', desc: '聊天读取轮数设置为50以上', category: 'special', tier: 2,
+      check: () => (settings.petChatRounds || 20) >= 50 },
+    { id: 'auto_summary_on',      name: '自动整理控',         emoji: '🤖', desc: '开启了自动总结提醒', category: 'special', tier: 1,
+      check: () => settings.summaryTrigger === 'auto' },
+    { id: 'summary_incremental',  name: '记忆编织者',         emoji: '🧶', desc: '使用增量合并总结策略', category: 'special', tier: 1,
+      check: () => settings.summaryMode === 'incremental' },
+    { id: 'house_open_10',        name: '常回家看看',         emoji: '🏡', desc: '桌宠小屋聊天记录超过20条', category: 'special', tier: 2,
+      check: () => state.petChatHistory.filter(m => m.role === 'assistant').length >= 20 },
+    { id: 'wardrobe_switched',    name: '今天穿什么',         emoji: '👗', desc: '切换过至少一次服装', category: 'special', tier: 1,
+      check: () => (settings.houseOutfits || []).length >= 1 && !!settings.houseCurrentOutfit },
+    { id: 'expression_matched',   name: '心有灵犀',           emoji: '💫', desc: '设置了关键词表情立绘且关键词超过3个', category: 'special', tier: 2,
+      check: () => {
+        const exprs = settings.houseExpressions || [];
+        return exprs.some(e => e.keywords && e.keywords.split(',').filter(k => k.trim()).length >= 3 && e.image);
+      }},
+    { id: 'food_image_set',       name: '食物飞来了',         emoji: '🍖', desc: '设置了投喂互动贴图', category: 'special', tier: 1,
+      check: () => !!settings.foodImage },
+    { id: 'all_interact_images',  name: '互动全彩',           emoji: '🎨', desc: '食物/浴缸/床三张互动贴图全部设置', category: 'special', tier: 2,
+      check: () => !!settings.foodImage && !!settings.bathImage && !!settings.bedImage },
+    { id: 'dizzy_sprite_set',     name: '眩晕特效',           emoji: '😵', desc: '设置了晕乎乎精灵图', category: 'special', tier: 1,
+      check: () => !!settings.spriteDizzy },
+    { id: 'drag_sprite_set',      name: '被抓住了',           emoji: '✋', desc: '设置了被拎起精灵图', category: 'special', tier: 1,
+      check: () => !!settings.spriteDrag },
+    { id: 'think_sprite_set',     name: '思考中',             emoji: '💭', desc: '设置了思考中精灵图', category: 'special', tier: 1,
+      check: () => !!settings.spriteThink },
+    { id: 'wave_sprite_set',      name: '欢迎回来',           emoji: '👋', desc: '设置了打招呼精灵图', category: 'special', tier: 1,
+      check: () => !!settings.spriteWave },
+    { id: 'all_walk_sprites',     name: '四方行者',           emoji: '🧭', desc: '上下左右四个方向走路精灵图全部设置', category: 'special', tier: 2,
+      check: () => !!settings.spriteWalkLeft && !!settings.spriteWalkRight && !!settings.spriteWalkUp && !!settings.spriteWalkDown },
+    { id: 'custom_sprite_used',   name: '随机动作',           emoji: '🎲', desc: '添加了至少1个自定义动作精灵图', category: 'special', tier: 1,
+      check: () => (settings.customSprites || []).filter(s => s.image).length >= 1 },
+
+    // ===================== 新增：里程碑细节 =====================
+    { id: 'total_100_actions',    name: '百次相伴',           emoji: '🎖️', desc: '总互动+聊天+日记超过100次', category: 'milestone', tier: 2,
+      check: () => state.totalInteractions + state.petChatHistory.length + (state.diaryEntries || []).length >= 100 },
+    { id: 'total_200_actions',    name: '二百里程',           emoji: '🏅', desc: '总互动+聊天+日记超过200次', category: 'milestone', tier: 2,
+      check: () => state.totalInteractions + state.petChatHistory.length + (state.diaryEntries || []).length >= 200 },
+    { id: 'played_3_days',        name: '三日之约',           emoji: '🌱', desc: '桌宠数据存在超过3天', category: 'milestone', tier: 1,
+      check: () => {
+        const first = state.petChatHistory[0];
+        if (!first || !first.timestamp) return false;
+        return Date.now() - first.timestamp >= 3 * 24 * 60 * 60 * 1000;
+      }},
+    { id: 'played_14_days',       name: '两周情谊',           emoji: '🌿', desc: '桌宠数据存在超过14天', category: 'milestone', tier: 2,
+      check: () => {
+        const first = state.petChatHistory[0];
+        if (!first || !first.timestamp) return false;
+        return Date.now() - first.timestamp >= 14 * 24 * 60 * 60 * 1000;
+      }},
+    { id: 'played_60_days',       name: '两月相守',           emoji: '🌸', desc: '桌宠数据存在超过60天', category: 'milestone', tier: 3,
+      check: () => {
+        const first = state.petChatHistory[0];
+        if (!first || !first.timestamp) return false;
+        return Date.now() - first.timestamp >= 60 * 24 * 60 * 60 * 1000;
+      }},
+    { id: 'played_90_days',       name: '三月之恋',           emoji: '🌺', desc: '桌宠数据存在超过90天', category: 'milestone', tier: 3,
+      check: () => {
+        const first = state.petChatHistory[0];
+        if (!first || !first.timestamp) return false;
+        return Date.now() - first.timestamp >= 90 * 24 * 60 * 60 * 1000;
+      }},
+    { id: 'played_200_days',      name: '两百日情缘',         emoji: '💐', desc: '桌宠数据存在超过200天', category: 'milestone', tier: 4,
+      check: () => {
+        const first = state.petChatHistory[0];
+        if (!first || !first.timestamp) return false;
+        return Date.now() - first.timestamp >= 200 * 24 * 60 * 60 * 1000;
+      }},
+    { id: 'played_730_days',      name: '两年之约',           emoji: '💒', desc: '桌宠数据存在超过730天', category: 'milestone', tier: 5,
+      check: () => {
+        const first = state.petChatHistory[0];
+        if (!first || !first.timestamp) return false;
+        return Date.now() - first.timestamp >= 730 * 24 * 60 * 60 * 1000;
+      }},
+    { id: 'everything_unlocked',  name: '全能玩家·终章',      emoji: '🌌', desc: '金币5000+ 声望100+ 图鉴30+ 日记10篇+ 互动100次+', category: 'milestone', tier: 5,
+      check: () => state.gameGold >= 5000 && state.restaurantReputation >= 100 && (state.gameCollection || []).length >= 30 && (state.diaryEntries || []).length >= 10 && state.totalInteractions >= 100 },
+    { id: 'true_companion',       name: '永远在一起',         emoji: '💖', desc: '聊天500条+ 日记30篇+ 互动200次+ 记忆10条+', category: 'milestone', tier: 5,
+      check: () => state.petChatHistory.length >= 500 && (state.diaryEntries || []).length >= 30 && state.totalInteractions >= 200 && state.memories.length >= 10 },
+    { id: 'game_master',          name: '游戏全通',           emoji: '🎮', desc: '所有8种小游戏都有实质进展', category: 'milestone', tier: 5,
+      check: () => {
+        const hasMerge = (state.gameCollection || []).length >= 5;
+        const hasFridge = (state.fridgeInventory || []).filter(i => i.count > 0).length >= 3;
+        const hasTanghulu = (state.tanghuluInventory || []).filter(i => i.count > 0).length >= 1;
+        const hasMatch3 = Object.values(state.match3Inventory || {}).some(v => v >= 0) && state.gameGold >= 30;
+        const hasLink = Object.values(state.linkInventory || {}).some(v => v >= 0) && state.gameGold >= 40;
+        const hasShelf = Object.values(state.shelfPropInventory || {}).some(v => v >= 0) && state.gameGold >= 20;
+        const hasLottery = Object.keys(state.lotteryLog || {}).length > 0;
+        const hasRestaurant = state.restaurantServedCount >= 5;
+        return hasMerge && hasFridge && hasTanghulu && (hasMatch3 || hasLink || hasShelf) && hasLottery && hasRestaurant;
+      }},
+    { id: 'legend_of_legends',    name: '传说中的传说',       emoji: '✨', desc: '解锁超过100个成就', category: 'milestone', tier: 5,
+      check: () => (state.achievements || []).length >= 100 },
+
   ];
 
 
