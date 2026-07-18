@@ -16690,6 +16690,68 @@ window.addEventListener('beforeunload', () => {
       }},
     { id: 'legend_of_legends',    name: '传说中的传说',       emoji: '✨', desc: '解锁超过100个成就', category: 'milestone', tier: 5,
       check: () => (state.achievements || []).length >= 100 },
+    // ===================== 补足300个 =====================
+    { id: 'chat_morning',         name: '早安问候',           emoji: '🌤️', desc: '在早晨7-9点和桌宠聊天', category: 'special', tier: 1,
+      check: () => { const h = new Date().getHours(); return h >= 7 && h < 9 && state.petChatHistory.length > 0; }},
+    { id: 'chat_noon',            name: '午间小憩',           emoji: '☀️', desc: '在中午12-14点和桌宠聊天', category: 'special', tier: 1,
+      check: () => { const h = new Date().getHours(); return h >= 12 && h < 14 && state.petChatHistory.length > 0; }},
+    { id: 'chat_evening',         name: '晚安道别',           emoji: '🌙', desc: '在晚上22-24点和桌宠聊天', category: 'special', tier: 1,
+      check: () => { const h = new Date().getHours(); return h >= 22 && state.petChatHistory.length > 0; }},
+    { id: 'memory_tag_used',      name: '标签整理控',         emoji: '🏷️', desc: '拥有至少3条带标签的记忆', category: 'interact', tier: 1,
+      check: () => state.memories.filter(m => typeof m === 'object' && m.tag && m.tag.trim().length > 0).length >= 3 },
+    { id: 'fridge_prop_all',      name: '冰箱工具箱',         emoji: '🧰', desc: '同时拥有冰箱三种道具各至少1个', category: 'minigame', tier: 3,
+      check: () => {
+        const inv = state.fridgePropInventory || {};
+        return (inv.compress || 0) >= 1 && (inv.backpack || 0) >= 1 && (inv.organize || 0) >= 1;
+      }},
+    { id: 'tanghulu_prop_all',    name: '糖葫芦工具箱',       emoji: '🥢', desc: '同时拥有糖葫芦三种道具各至少1个', category: 'minigame', tier: 3,
+      check: () => {
+        const inv = state.tanghuluPropInventory || {};
+        return (inv.extraStick || 0) >= 1 && (inv.undo || 0) >= 1 && (inv.lubricant || 0) >= 1;
+      }},
+    { id: 'link_prop_all',        name: '连连看工具箱',       emoji: '🔗', desc: '同时拥有连连看四种道具各至少1个', category: 'minigame', tier: 3,
+      check: () => {
+        const inv = state.linkInventory || {};
+        return (inv.hint || 0) >= 1 && (inv.shuffle || 0) >= 1 && (inv.bomb || 0) >= 1 && (inv.compass || 0) >= 1;
+      }},
+    { id: 'match3_prop_all',      name: '消消看工具箱',       emoji: '🃏', desc: '同时拥有消消看三种道具各至少1个', category: 'minigame', tier: 3,
+      check: () => {
+        const inv = state.match3Inventory || {};
+        return (inv.expand || 0) >= 1 && (inv.sweep || 0) >= 1 && (inv.shuffle || 0) >= 1;
+      }},
+    { id: 'all_toolboxes',        name: '全能道具师',         emoji: '🎒', desc: '同时拥有四个游戏的全套道具', category: 'milestone', tier: 4,
+      check: () => {
+        const m3 = state.match3Inventory || {};
+        const lk = state.linkInventory || {};
+        const fd = state.fridgePropInventory || {};
+        const th = state.tanghuluPropInventory || {};
+        return (m3.expand||0)>=1 && (m3.sweep||0)>=1 && (m3.shuffle||0)>=1
+          && (lk.hint||0)>=1 && (lk.shuffle||0)>=1 && (lk.bomb||0)>=1 && (lk.compass||0)>=1
+          && (fd.compress||0)>=1 && (fd.backpack||0)>=1 && (fd.organize||0)>=1
+          && (th.extraStick||0)>=1 && (th.undo||0)>=1 && (th.lubricant||0)>=1;
+      }},
+    { id: 'chat_100_pet_reply',   name: '百句应答',           emoji: '🐾', desc: '桌宠回复累计达到100条', category: 'interact', tier: 3,
+      check: () => state.petChatHistory.filter(m => m.role === 'assistant').length >= 100 },
+    { id: 'diary_export',         name: '记录成册',           emoji: '📚', desc: '日记达到20篇以上（可以导出了）', category: 'interact', tier: 3,
+      check: () => (state.diaryEntries || []).length >= 20 },
+    { id: 'gold_spend_big',       name: '豪爽一掷',           emoji: '🎰', desc: '单日抽奖花费超过100金币', category: 'economy', tier: 2,
+      check: () => {
+        const today = new Date().toISOString().slice(0, 10);
+        const log = (state.lotteryLog || {})[today] || {};
+        const spent = (log.small || 0) * 10 + (log.medium || 0) * 30 + (log.large || 0) * 50;
+        return spent >= 100;
+      }},
+    { id: 'restaurant_serve_vip', name: '迎接贵宾',           emoji: '🎩', desc: '服务过声望要求50以上的高级客人', category: 'restaurant', tier: 3,
+      check: () => state.restaurantReputation >= 50 && state.restaurantServedCount >= 15 },
+    { id: 'shelf_prop_all',       name: '货架工具箱',         emoji: '🛒', desc: '同时拥有货架整理三种道具各至少1个', category: 'minigame', tier: 3,
+      check: () => {
+        const inv = state.shelfPropInventory || {};
+        return (inv.basket || 0) >= 1 && (inv.autoMatch || 0) >= 1 && (inv.shuffle || 0) >= 1;
+      }},
+    { id: 'pet_name_long',        name: '名字好长啊',         emoji: '📛', desc: '桌宠名字超过6个字', category: 'special', tier: 1,
+      check: () => settings.petName && settings.petName.trim().length > 6 },
+    { id: 'total_3000_actions',   name: '三千之缘',           emoji: '🌠', desc: '总互动+聊天+日记超过3000次', category: 'milestone', tier: 5,
+      check: () => state.totalInteractions + state.petChatHistory.length + (state.diaryEntries || []).length >= 3000 },
 
   ];
 
