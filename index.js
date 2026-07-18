@@ -517,6 +517,7 @@
   let isDragging = false;
   let dragOffset = { x: 0, y: 0 };
   let isMenuOpen = false;
+  let menuOpenTime = 0;
   let isHouseOpen = false;
   let isChatOpen = false;
   let petUnsummarizedCount = 0;
@@ -2668,7 +2669,14 @@ function showInventoryPopup(category, quickKey, onUse) {
     if (!menu) return;
     isMenuOpen = !isMenuOpen;
     if (isMenuOpen) {
+      menuOpenTime = Date.now();
       updateMenuPositions();
+    } else {
+      // 收起时重置所有按钮坐标到原点，避免残留位置挡住其他点击
+      menu.querySelectorAll('.sp-menu-btn').forEach(btn => {
+        btn.style.left = '0px';
+        btn.style.top = '0px';
+      });
     }
     menu.classList.toggle('visible', isMenuOpen);
 
@@ -7794,8 +7802,8 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 
     // 菜单按钮（同时支持 click 和 touchend）
     document.querySelectorAll('.sp-menu-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => { e.stopPropagation(); if (!isMenuOpen) return; handleMenuAction(btn.dataset.action); });
-      btn.addEventListener('touchend', (e) => { e.stopPropagation(); e.preventDefault(); if (!isMenuOpen) return; handleMenuAction(btn.dataset.action); });
+      btn.addEventListener('click', (e) => { e.stopPropagation(); if (!isMenuOpen) return; if (Date.now() - menuOpenTime < 300) return; handleMenuAction(btn.dataset.action); });
+      btn.addEventListener('touchend', (e) => { e.stopPropagation(); e.preventDefault(); if (!isMenuOpen) return; if (Date.now() - menuOpenTime < 300) return; handleMenuAction(btn.dataset.action); });
     });
 
     // 聊天（初始化绑定，toggleChat 内会重新绑定最新逻辑）
