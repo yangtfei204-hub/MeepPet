@@ -365,6 +365,9 @@
     houseButtonBath: '',           // 小屋洗澡按钮图标
     houseButtonSleep: '',          // 小屋睡觉按钮图标
     houseButtonWardrobe: '',       // 小屋更衣按钮图标
+    houseButtonRegen: '',          // 小屋重新生成按钮图标
+    houseButtonSend: '',           // 小屋发送按钮图标
+    houseButtonWardrobeSettings: '', // 更衣系统设置入口按钮图标
     houseOutfits: [],              // 服装列表 [{name, character, actionFeed, actionBath, actionSleep, expressions: []}]
     houseCurrentOutfit: '',        // 当前穿着的服装名
 
@@ -1397,6 +1400,9 @@ function saveData() {
       'houseBackground', 'houseCharacter', 'houseCharacterAvatar',
       'houseActionFeed', 'houseActionBath', 'houseActionSleep',
       'houseButtonFeed', 'houseButtonBath', 'houseButtonSleep', 'houseButtonWardrobe',
+      'houseButtonRegen',
+      'houseButtonSend',
+      'houseButtonWardrobeSettings',
 
     ];
     for (const key of spriteKeys) {
@@ -4577,6 +4583,20 @@ async function refreshWorldPreview() {
     if (_sleepBtn) _sleepBtn.innerHTML = settings.houseButtonSleep ? `<img src="${settings.houseButtonSleep}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '🛏️';
     const _wardrobeBtn = document.getElementById('sp-house-wardrobe-btn');
     if (_wardrobeBtn) _wardrobeBtn.innerHTML = settings.houseButtonWardrobe ? `<img src="${settings.houseButtonWardrobe}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '👗';
+    const _regenBtn = document.getElementById('sp-house-regen-btn');
+    if (_regenBtn) {
+      _regenBtn.innerHTML = settings.houseButtonRegen ? `<img src="${settings.houseButtonRegen}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '🔄';
+      _regenBtn.style.background = settings.houseButtonRegen ? 'transparent' : '';
+      _regenBtn.style.border = settings.houseButtonRegen ? 'none' : '';
+      _regenBtn.style.backdropFilter = settings.houseButtonRegen ? 'none' : '';
+    }
+    const _sendBtn = document.getElementById('sp-house-send-btn');
+    if (_sendBtn) {
+      _sendBtn.innerHTML = settings.houseButtonSend ? `<img src="${settings.houseButtonSend}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '➤';
+      _sendBtn.style.background = settings.houseButtonSend ? 'transparent' : '';
+      _sendBtn.style.border = settings.houseButtonSend ? 'none' : '';
+      _sendBtn.style.backdropFilter = settings.houseButtonSend ? 'none' : '';
+    }
 
     }
   }
@@ -4632,7 +4652,15 @@ async function refreshWorldPreview() {
       flex-shrink: 0;
     `;
 
-    settingsBtnEl.textContent = '⚙️';
+    if (settings.houseButtonWardrobeSettings) {
+      settingsBtnEl.innerHTML = `<img src="${settings.houseButtonWardrobeSettings}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
+      settingsBtnEl.style.background = 'transparent';
+      settingsBtnEl.style.border = 'none';
+      settingsBtnEl.style.backdropFilter = 'none';
+    } else {
+      settingsBtnEl.textContent = '⚙️';
+    }
+
     settingsBtnEl.onmouseenter = () => {
       settingsBtnEl.style.borderColor = 'rgba(100,180,255,0.6)';
       settingsBtnEl.style.background = 'rgba(100,180,255,0.2)';
@@ -5206,6 +5234,9 @@ async function refreshWorldPreview() {
         ['houseButtonBath',      '洗澡按钮图标'],
         ['houseButtonSleep',     '睡觉按钮图标'],
         ['houseButtonWardrobe',  '更衣按钮图标'],
+        ['houseButtonRegen',           '重新生成按钮图标'],
+        ['houseButtonSend',            '发送按钮图标'],
+        ['houseButtonWardrobeSettings','更衣设置入口图标'],
       ];
       houseActionsArea.innerHTML = houseActionConfigs.map(([key, label]) =>
         buildUploadGroup(key, label, settings[key])
@@ -5583,9 +5614,9 @@ async function refreshWorldPreview() {
             <div id="sp-house-dialogue-text"></div>
           </div>
         <div id="sp-house-input-area">
-          <button id="sp-house-regen-btn" title="重新生成上一条回复">🔄</button>
+          <button id="sp-house-regen-btn" title="重新生成上一条回复" style="overflow:hidden;padding:0;${settings.houseButtonRegen ? 'background:transparent;border:none;backdrop-filter:none;' : ''}">${settings.houseButtonRegen ? `<img src="${settings.houseButtonRegen}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '🔄'}</button>
           <input type="text" id="sp-house-input-field" placeholder="请输入你想对${settings.petName || '他'}说的话..." />
-          <button id="sp-house-send-btn" title="发送">➤</button>
+          <button id="sp-house-send-btn" title="发送" style="overflow:hidden;padding:0;${settings.houseButtonSend ? 'background:transparent;border:none;backdrop-filter:none;' : ''}">${settings.houseButtonSend ? `<img src="${settings.houseButtonSend}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '➤'}</button>
         </div>
         </div>
       </div>
