@@ -545,29 +545,48 @@
       ? settings.customTheme 
       : PRESET_THEMES[themeName] || PRESET_THEMES.default;
     
-    const root = document.documentElement;
     const c = theme.colors;
     
-    root.style.setProperty('--sp-primary', c.primary);
-    root.style.setProperty('--sp-primary-hover', c.primaryHover);
-    root.style.setProperty('--sp-primary-border', c.primaryBorder);
-    root.style.setProperty('--sp-bg-main', c.bgMain);
-    root.style.setProperty('--sp-bg-secondary', c.bgSecondary);
-    root.style.setProperty('--sp-bg-light', c.bgLight);
-    root.style.setProperty('--sp-border', c.border);
-    root.style.setProperty('--sp-border-light', c.borderLight);
-    root.style.setProperty('--sp-text-primary', c.textPrimary);
-    root.style.setProperty('--sp-text-secondary', c.textSecondary);
-    root.style.setProperty('--sp-text-muted', c.textMuted);
-    root.style.setProperty('--sp-status-hunger', c.statusHunger);
-    root.style.setProperty('--sp-status-clean', c.statusClean);
-    root.style.setProperty('--sp-status-energy', c.statusEnergy);
-    root.style.setProperty('--sp-bubble-bg', c.bubbleBg);
-    root.style.setProperty('--sp-bubble-border', c.bubbleBorder);
+    // 用 <style> 标签注入变量，而非 inline style
+    // 这样用户自定义 CSS（在它之后加载）可以正常覆盖
+    let styleEl = document.getElementById('sp-theme-vars');
+    if (!styleEl) {
+      styleEl = document.createElement('style');
+      styleEl.id = 'sp-theme-vars';
+      document.head.appendChild(styleEl);
+    }
+    
+    styleEl.textContent = `
+      :root {
+        --sp-primary: ${c.primary};
+        --sp-primary-hover: ${c.primaryHover};
+        --sp-primary-border: ${c.primaryBorder};
+        --sp-bg-main: ${c.bgMain};
+        --sp-bg-secondary: ${c.bgSecondary};
+        --sp-bg-light: ${c.bgLight};
+        --sp-border: ${c.border};
+        --sp-border-light: ${c.borderLight};
+        --sp-text-primary: ${c.textPrimary};
+        --sp-text-secondary: ${c.textSecondary};
+        --sp-text-muted: ${c.textMuted};
+        --sp-status-hunger: ${c.statusHunger};
+        --sp-status-clean: ${c.statusClean};
+        --sp-status-energy: ${c.statusEnergy};
+        --sp-bubble-bg: ${c.bubbleBg};
+        --sp-bubble-border: ${c.bubbleBorder};
+      }
+    `;
+    
+    // 确保用户自定义 CSS 在主题之后（重新追加到末尾）
+    const customCssEl = document.getElementById('sp-custom-user-css');
+    if (customCssEl) {
+      document.head.appendChild(customCssEl);
+    }
     
     settings.currentTheme = themeName;
     saveData();
   }
+
 
   function rgbaToHex(rgba) {
     if (!rgba || !rgba.includes('rgb')) return '#64b4ff';
@@ -19178,17 +19197,17 @@ window.addEventListener('beforeunload', () => {
       const elapsed = Date.now() - restaurantRuntime.cooking.startTime;
       const remaining = Math.max(0, Math.ceil((restaurantRuntime.cooking.duration - elapsed) / 1000));
       cookingHtml = `
-        <div style="text-align:center;padding:12px;background:rgba(255,180,50,0.08);border:1px solid rgba(255,180,50,0.3);border-radius:8px;">
+        <div class="sp-r-cooking-active">
           <div style="font-size:18px;margin-bottom:4px;">🔥</div>
-          <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);">正在烹饪：${recipe?.name || '?'} ${recipe?.emoji || ''}</div>
-          <div style="font-size:11px;color:#ffb347;margin-top:4px;">剩余 ${remaining} 秒…</div>
+          <div class="sp-r-cooking-name">正在烹饪：${recipe?.name || '?'} ${recipe?.emoji || ''}</div>
+          <div class="sp-r-cooking-timer">剩余 ${remaining} 秒…</div>
         </div>
       `;
     } else {
       cookingHtml = `
-        <div style="padding:8px;background:rgba(255,255,255,0.04);border:1px solid var(--sp-border-light);border-radius:8px;">
-          <div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin-bottom:6px;">🍳 烹饪台</div>
-          <button id="sp-restaurant-cook-btn" style="width:100%;padding:9px;font-size:12px;font-weight:600;border-radius:6px;border:1px solid var(--sp-primary-border);background:var(--sp-primary);color:#fff;cursor:pointer;">📋 选择食谱并烹饪</button>
+        <div class="sp-r-cooking-idle">
+          <div class="sp-r-kitchen-title">🍳 烹饪台</div>
+          <button id="sp-restaurant-cook-btn" class="sp-r-cook-btn">📋 选择食谱并烹饪</button>
         </div>
       `;
     }
@@ -19203,11 +19222,11 @@ window.addEventListener('beforeunload', () => {
         const recipe = RESTAURANT_RECIPES.find(r => r.id === d.recipeId);
         if (!recipe) return '';
         return `
-          <div style="display:inline-flex;align-items:center;gap:3px;padding:3px 8px;background:rgba(255,255,255,0.06);border:1px solid var(--sp-border-light);border-radius:6px;font-size:11px;">
+          <div class="sp-r-dish-tag">
             <span>${recipe.emoji}</span>
-            <span style="color:var(--sp-text-primary);">${recipe.name}</span>
-            <span style="color:var(--sp-text-muted);">×${d.count}</span>
-            <button class="sp-restaurant-feed-btn" data-recipe="${d.recipeId}" style="padding:1px 5px;font-size:9px;border-radius:3px;border:1px solid rgba(255,180,50,0.4);background:rgba(255,180,50,0.1);color:#ffb347;cursor:pointer;margin-left:2px;">🍖</button>
+            <span class="sp-r-dish-name">${recipe.name}</span>
+            <span class="sp-r-dish-count">×${d.count}</span>
+            <button class="sp-restaurant-feed-btn" data-recipe="${d.recipeId}">🍖</button>
           </div>
         `;
       }).join(' ');
@@ -19222,17 +19241,17 @@ window.addEventListener('beforeunload', () => {
       : '<span style="font-size:10px;color:rgba(239,83,80,0.7);margin-left:4px;">🔴 已关店</span>';
 
     container.innerHTML = `
-      <div style="margin-bottom:8px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-          <div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);">🪑 餐桌区 (${customers.length}/${maxTables}位客人)${shopStatusText}</div>
-          <button id="sp-restaurant-shop-toggle" style="padding:4px 12px;font-size:11px;font-weight:600;border-radius:6px;${shopOpenBtnStyle}cursor:pointer;transition:all 0.2s;flex-shrink:0;">${shopOpenBtnText}</button>
+      <div class="sp-r-kitchen-section">
+        <div class="sp-r-kitchen-header">
+          <div class="sp-r-kitchen-title">🪑 餐桌区 (${customers.length}/${maxTables}位客人)${shopStatusText}</div>
+          <button id="sp-restaurant-shop-toggle" class="sp-r-shop-toggle" style="${shopOpenBtnStyle}">${shopOpenBtnText}</button>
         </div>
         <div class="sp-restaurant-tables">${tablesHtml}</div>
       </div>
       ${cookingHtml}
-      <div style="margin-top:8px;">
-        <div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin-bottom:4px;">🍽️ 出餐台</div>
-        <div style="display:flex;flex-wrap:wrap;gap:4px;">${dishesHtml}</div>
+      <div class="sp-r-kitchen-section">
+        <div class="sp-r-kitchen-title">🍽️ 出餐台</div>
+        <div class="sp-r-dishes-row">${dishesHtml}</div>
       </div>
     `;
 
@@ -19328,8 +19347,8 @@ window.addEventListener('beforeunload', () => {
       else groupLabel = `🔓 声望 ${repReq} 解锁`;
 
       html += `
-        <details ${unlocked ? 'open' : ''} style="margin-bottom:10px;border:1px solid ${unlocked ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.04)'};border-radius:8px;overflow:hidden;">
-          <summary style="padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;background:rgba(255,255,255,0.04);color:${unlocked ? 'var(--sp-text-primary)' : 'var(--sp-text-muted)'};list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none;">
+        <details ${unlocked ? 'open' : ''} class="sp-r-menu-group ${unlocked ? 'sp-r-menu-unlocked' : 'sp-r-menu-locked'}">
+          <summary class="sp-r-menu-group-summary ${unlocked ? '' : 'sp-r-menu-locked-text'}">
             <span>${groupLabel}</span>
             <span style="font-size:10px;color:${unlocked ? 'rgba(100,220,100,0.8)' : '#f66'};">${unlocked ? '✅ 已解锁' : '🔒 未解锁'}</span>
           </summary>
@@ -19350,19 +19369,19 @@ window.addEventListener('beforeunload', () => {
               }).join(' ');
               const canMake = unlocked && restaurantCheckIngredients(r);
               return `
-                <div style="display:flex;align-items:center;gap:6px;padding:5px 6px;background:${canMake ? 'rgba(100,220,100,0.05)' : 'rgba(255,255,255,0.03)'};border-radius:6px;margin-bottom:2px;">
-                  <span style="font-size:15px;flex-shrink:0;">${r.emoji}</span>
-                  <div style="flex:1;min-width:0;">
-                    <div style="font-size:11px;font-weight:600;color:${unlocked ? 'var(--sp-text-primary)' : 'var(--sp-text-muted)'};">${r.name}</div>
-                    <div style="font-size:9px;display:flex;flex-wrap:wrap;gap:3px;align-items:center;margin-top:1px;">
+                <div class="sp-r-menu-recipe ${canMake ? 'sp-r-menu-canmake' : ''}">
+                  <span class="sp-r-menu-recipe-emoji">${r.emoji}</span>
+                  <div class="sp-r-menu-recipe-info">
+                    <div class="sp-r-menu-recipe-name ${unlocked ? '' : 'sp-r-menu-locked-text'}">${r.name}</div>
+                    <div class="sp-r-menu-recipe-materials">
                       ${ingText}
                       ${r.seasonings.length > 0 ? `<span style="color:var(--sp-text-muted);">🧂</span>${seaText}` : ''}
                       <span style="color:var(--sp-text-muted);">⏱️${r.cookTime}s</span>
                     </div>
                   </div>
-                  <div style="text-align:right;flex-shrink:0;">
-                    <div style="font-size:11px;color:#ffb347;font-weight:600;">🪙${r.sellPrice}</div>
-                    <div style="font-size:9px;color:var(--sp-status-hunger);">+${r.feedAmount}饱</div>
+                  <div class="sp-r-menu-recipe-price-area">
+                    <div class="sp-r-menu-recipe-price">🪙${r.sellPrice}</div>
+                    <div class="sp-r-menu-recipe-feed">+${r.feedAmount}饱</div>
                   </div>
                 </div>
               `;
@@ -19374,8 +19393,8 @@ window.addEventListener('beforeunload', () => {
 
     // 甜品说明
     html += `
-      <details style="margin-bottom:10px;border:1px solid rgba(255,150,200,0.2);border-radius:8px;overflow:hidden;">
-        <summary style="padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;background:rgba(255,150,200,0.05);color:var(--sp-text-primary);list-style:none;user-select:none;">
+      <details class="sp-r-menu-group sp-r-menu-dessert-group">
+        <summary class="sp-r-menu-group-summary sp-r-menu-dessert-summary">
           🍰 甜品/点心（来自库存，直接上架）
         </summary>
         <div style="padding:8px 12px;font-size:10px;color:var(--sp-text-muted);line-height:1.8;">
@@ -19396,7 +19415,7 @@ window.addEventListener('beforeunload', () => {
     if (!container) return;
 
     let html = `
-      <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">🧂 调料商店</div>
+      <div class="sp-r-supply-title">🧂 调料商店</div>
     `;
 
     RESTAURANT_SEASONINGS.forEach(s => {
@@ -19405,14 +19424,14 @@ window.addEventListener('beforeunload', () => {
       const cantAfford3 = state.gameGold < s.price * 3;
       const cantAfford5 = state.gameGold < s.price * 5;
       html += `
-        <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:${unlocked ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.1)'};border:1px solid var(--sp-border-light);border-radius:8px;margin-bottom:5px;opacity:${unlocked ? '1' : '0.45'};">
-          <span style="font-size:18px;flex-shrink:0;">${s.emoji}</span>
-          <div style="flex:1;">
-            <div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);">
+        <div class="sp-r-supply-row ${unlocked ? '' : 'sp-r-supply-locked'}">
+          <span class="sp-r-supply-emoji">${s.emoji}</span>
+          <div class="sp-r-supply-info">
+            <div class="sp-r-supply-name">
               ${s.name}
               ${!unlocked ? `<span style="font-size:9px;color:#f66;margin-left:4px;">🔒声望${s.reputationRequired}</span>` : ''}
             </div>
-            <div style="font-size:10px;color:var(--sp-text-muted);">库存: ${have} | 单价: ${s.price}🪙</div>
+            <div class="sp-r-supply-detail">库存: ${have} | 单价: ${s.price}🪙</div>
           </div>
           ${unlocked ? `
             <button class="sp-restaurant-buy-sea-btn" data-id="${s.id}" data-amount="3" style="padding:3px 7px;font-size:10px;border-radius:5px;border:1px solid rgba(255,180,50,0.4);background:rgba(255,180,50,0.15);color:#ffb347;cursor:pointer;${cantAfford3 ? 'opacity:0.4;pointer-events:none;' : ''}">买3 (${s.price * 3}🪙)</button>
@@ -19426,7 +19445,7 @@ window.addEventListener('beforeunload', () => {
     const bottleInv = (state.fridgeInventory || []).find(i => i.foodId === 'bottle');
     const bottleCount = bottleInv ? bottleInv.count : 0;
     html += `
-      <div style="margin-top:10px;padding:8px 10px;background:rgba(100,180,255,0.05);border:1px solid rgba(100,180,255,0.2);border-radius:8px;font-size:10px;color:var(--sp-text-muted);line-height:1.7;">
+      <div class="sp-r-convert-area">
         💡 冰箱整理中的「酱油瓶🫙」可在此转换为酱油调料（1瓶=3份）<br/>
         当前酱油瓶库存：${bottleCount} 瓶
         ${bottleCount > 0 ? `<br/><button id="sp-restaurant-convert-soy" style="margin-top:4px;padding:3px 8px;font-size:10px;border-radius:4px;border:1px solid rgba(100,180,255,0.4);background:rgba(100,180,255,0.15);color:#64b4ff;cursor:pointer;">🫙 全部转换为酱油 (+${bottleCount * 3}份)</button>` : ''}
@@ -19435,8 +19454,8 @@ window.addEventListener('beforeunload', () => {
 
     // 基础蔬菜进货区
     html += `
-      <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin:16px 0 8px;">🥬 基础蔬菜进货</div>
-      <div style="font-size:10px;color:var(--sp-text-muted);margin-bottom:8px;">花金币直接购买，不需要玩其他小游戏获得</div>
+      <div class="sp-r-supply-title" style="margin-top:16px;">🥬 基础蔬菜进货</div>
+      <div class="sp-r-supply-hint">花金币直接购买，不需要玩其他小游戏获得</div>
     `;
 
     RESTAURANT_GROCERIES.forEach(g => {
@@ -19446,14 +19465,14 @@ window.addEventListener('beforeunload', () => {
       const cantAfford3 = state.gameGold < g.price * 3;
       const cantAfford5 = state.gameGold < g.price * 5;
       html += `
-        <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:${unlocked ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.1)'};border:1px solid var(--sp-border-light);border-radius:8px;margin-bottom:5px;opacity:${unlocked ? '1' : '0.45'};">
-          <span style="font-size:18px;flex-shrink:0;">${g.emoji}</span>
-          <div style="flex:1;">
-            <div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);">
+        <div class="sp-r-supply-row ${unlocked ? '' : 'sp-r-supply-locked'}">
+          <span class="sp-r-supply-emoji">${g.emoji}</span>
+          <div class="sp-r-supply-info">
+            <div class="sp-r-supply-name">
               ${g.name}
               ${!unlocked ? `<span style="font-size:9px;color:#f66;margin-left:4px;">🔒声望${g.reputationRequired}</span>` : ''}
             </div>
-            <div style="font-size:10px;color:var(--sp-text-muted);">库存: ${haveCount} | 单价: ${g.price}🪙</div>
+            <div class="sp-r-supply-detail">库存: ${haveCount} | 单价: ${g.price}🪙</div>
           </div>
           ${unlocked ? `
             <button class="sp-restaurant-buy-grocery-btn" data-id="${g.id}" data-amount="3" style="padding:3px 7px;font-size:10px;border-radius:5px;border:1px solid rgba(100,220,100,0.4);background:rgba(100,220,100,0.15);color:#6f6;cursor:pointer;${cantAfford3 ? 'opacity:0.4;pointer-events:none;' : ''}">买3 (${g.price * 3}🪙)</button>
@@ -19506,16 +19525,18 @@ window.addEventListener('beforeunload', () => {
     const fridgeInv = (state.fridgeInventory || []).filter(i => i.count > 0);
     let ingredientsHtml = '';
     if (fridgeInv.length === 0) {
-      ingredientsHtml = '<div style="color:var(--sp-text-muted);font-size:11px;text-align:center;padding:8px;">暂无食材，去玩冰箱整理吧！</div>';
+      //🔄 原:<div style="color:var(--sp-text-muted);font-size:11px;text-align:center;padding:8px;">
+      ingredientsHtml = '<div class="sp-r-stock-empty">暂无食材，去玩冰箱整理吧！</div>';
     } else {
       ingredientsHtml = fridgeInv.map(inv => {
         const data = FRIDGE_FOODS.find(f => f.id === inv.foodId);
         if (!data) return '';
+        // 🔄 原: 每个 div/span 都有内联 style
         return `
-          <div style="display:flex;align-items:center;gap:6px;padding:3px 6px;">
-            <span style="font-size:14px;">${data.emoji}</span>
-            <span style="font-size:11px;color:var(--sp-text-primary);flex:1;">${data.name}</span>
-            <span style="font-size:11px;font-weight:600;color:var(--sp-text-primary);">×${inv.count}</span>
+          <div class="sp-r-stock-item">
+            <span class="sp-r-stock-item-emoji">${data.emoji}</span>
+            <span class="sp-r-stock-item-name">${data.name}</span>
+            <span class="sp-r-stock-item-count">×${inv.count}</span>
           </div>
         `;
       }).join('');
@@ -19525,16 +19546,18 @@ window.addEventListener('beforeunload', () => {
     const seaEntries = Object.entries(state.restaurantSeasonings || {}).filter(([, v]) => v > 0);
     let seasoningHtml = '';
     if (seaEntries.length === 0) {
-      seasoningHtml = '<div style="color:var(--sp-text-muted);font-size:11px;text-align:center;padding:8px;">调料空空，去补货吧！</div>';
+      // 🔄 原: <div style="color:var(--sp-text-muted);font-size:11px;text-align:center;padding:8px;">
+      seasoningHtml = '<div class="sp-r-stock-empty">调料空空，去补货吧！</div>';
     } else {
       seasoningHtml = seaEntries.map(([id, count]) => {
         const data = RESTAURANT_SEASONINGS.find(s => s.id === id);
         if (!data) return '';
+        // 🔄 原: 每个 div/span 都有内联 style
         return `
-          <div style="display:flex;align-items:center;gap:6px;padding:3px 6px;">
-            <span style="font-size:14px;">${data.emoji}</span>
-            <span style="font-size:11px;color:var(--sp-text-primary);flex:1;">${data.name}</span>
-            <span style="font-size:11px;font-weight:600;color:var(--sp-text-primary);">×${count}</span>
+          <div class="sp-r-stock-item">
+            <span class="sp-r-stock-item-emoji">${data.emoji}</span>
+            <span class="sp-r-stock-item-name">${data.name}</span>
+            <span class="sp-r-stock-item-count">×${count}</span>
           </div>
         `;
       }).join('');
@@ -19548,37 +19571,41 @@ window.addEventListener('beforeunload', () => {
     const crystalCount = state.tanghuluSugarCrystal || 0;
     let dessertHtml = '';
     if (tangInv.length === 0 && fridgeDesserts.length === 0 && crystalCount === 0) {
-      dessertHtml = '<div style="color:var(--sp-text-muted);font-size:11px;text-align:center;padding:8px;">暂无甜品/点心库存</div>';
+      // 🔄 原: <div style="color:var(--sp-text-muted);font-size:11px;text-align:center;padding:8px;">
+      dessertHtml = '<div class="sp-r-stock-empty">暂无甜品/点心库存</div>';
     } else {
       dessertHtml = '';
+      // 🔄 糖葫芦条目
       tangInv.forEach(inv => {
         const data = TANGHULU_FRUITS.find(f => f.key === inv.fruitKey);
         if (!data) return;
         dessertHtml += `
-          <div style="display:flex;align-items:center;gap:6px;padding:3px 6px;">
-            <span style="font-size:14px;">${data.emoji}</span>
-            <span style="font-size:11px;color:var(--sp-text-primary);flex:1;">🍢${data.name}糖葫芦</span>
-            <span style="font-size:11px;font-weight:600;color:var(--sp-text-primary);">×${inv.count}</span>
+          <div class="sp-r-stock-item">
+            <span class="sp-r-stock-item-emoji">${data.emoji}</span>
+            <span class="sp-r-stock-item-name">🍢${data.name}糖葫芦</span>
+            <span class="sp-r-stock-item-count">×${inv.count}</span>
           </div>
         `;
       });
+      // 🔄 冰箱甜品条目
       fridgeDesserts.forEach(inv => {
         const data = FRIDGE_FOODS.find(f => f.id === inv.foodId);
         if (!data) return;
         dessertHtml += `
-          <div style="display:flex;align-items:center;gap:6px;padding:3px 6px;">
-            <span style="font-size:14px;">${data.emoji}</span>
-            <span style="font-size:11px;color:var(--sp-text-primary);flex:1;">${data.name}</span>
-            <span style="font-size:11px;font-weight:600;color:var(--sp-text-primary);">×${inv.count}</span>
+          <div class="sp-r-stock-item">
+            <span class="sp-r-stock-item-emoji">${data.emoji}</span>
+            <span class="sp-r-stock-item-name">${data.name}</span>
+            <span class="sp-r-stock-item-count">×${inv.count}</span>
           </div>
         `;
       });
+      // 🔄 完美糖砂条目
       if (crystalCount > 0) {
         dessertHtml += `
-          <div style="display:flex;align-items:center;gap:6px;padding:3px 6px;">
-            <span style="font-size:14px;">✨</span>
-            <span style="font-size:11px;color:var(--sp-text-primary);flex:1;">完美的亮晶晶糖砂</span>
-            <span style="font-size:11px;font-weight:600;color:#ffb347;">×${crystalCount}</span>
+          <div class="sp-r-stock-item">
+            <span class="sp-r-stock-item-emoji">✨</span>
+            <span class="sp-r-stock-item-name">完美的亮晶晶糖砂</span>
+            <span class="sp-r-stock-item-count sp-r-stock-item-highlight">×${crystalCount}</span>
           </div>
         `;
       }
@@ -19591,29 +19618,31 @@ window.addEventListener('beforeunload', () => {
       state.restaurantLastOpenDate = today;
     }
 
+    // 🔄 整个 container.innerHTML 全部改用 class
     container.innerHTML = `
-      <div style="margin-bottom:10px;padding:8px 10px;background:rgba(255,180,50,0.06);border:1px solid rgba(255,180,50,0.2);border-radius:8px;">
-        <div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin-bottom:4px;">📊 营业数据</div>
-        <div style="font-size:11px;color:var(--sp-text-secondary);line-height:1.8;">
-          今日收入: <span style="color:#ffb347;font-weight:600;">🪙${state.restaurantTodayEarnings}</span><br/>
-          历史总收入: <span style="color:#ffb347;">🪙${state.restaurantTotalEarnings}</span><br/>
-          服务客人: <span style="color:var(--sp-text-primary);">${state.restaurantServedCount} 位</span>
+      <div class="sp-r-stock-card sp-r-stock-card-earnings">
+        <div class="sp-r-stock-card-title">📊 营业数据</div>
+        <div class="sp-r-stock-card-body">
+          今日收入: <span class="sp-r-stock-gold">🪙${state.restaurantTodayEarnings}</span><br/>
+          历史总收入: <span class="sp-r-stock-gold">🪙${state.restaurantTotalEarnings}</span><br/>
+          服务客人: <span class="sp-r-stock-count-text">${state.restaurantServedCount} 位</span>
         </div>
       </div>
-      <div style="margin-bottom:10px;background:rgba(255,255,255,0.03);border:1px solid var(--sp-border-light);border-radius:8px;overflow:hidden;">
-        <div style="padding:6px 10px;background:rgba(255,255,255,0.04);font-size:11px;font-weight:600;color:var(--sp-text-primary);">🥬 食材库存（来自冰箱整理）</div>
-        <div style="padding:4px 4px;">${ingredientsHtml}</div>
+      <div class="sp-r-stock-section">
+        <div class="sp-r-stock-section-header">🥬 食材库存（来自冰箱整理）</div>
+        <div class="sp-r-stock-section-body">${ingredientsHtml}</div>
       </div>
-      <div style="margin-bottom:10px;background:rgba(255,255,255,0.03);border:1px solid var(--sp-border-light);border-radius:8px;overflow:hidden;">
-        <div style="padding:6px 10px;background:rgba(255,255,255,0.04);font-size:11px;font-weight:600;color:var(--sp-text-primary);">🧂 调料库存</div>
-        <div style="padding:4px 4px;">${seasoningHtml}</div>
+      <div class="sp-r-stock-section">
+        <div class="sp-r-stock-section-header">🧂 调料库存</div>
+        <div class="sp-r-stock-section-body">${seasoningHtml}</div>
       </div>
-      <div style="background:rgba(255,255,255,0.03);border:1px solid var(--sp-border-light);border-radius:8px;overflow:hidden;">
-        <div style="padding:6px 10px;background:rgba(255,255,255,0.04);font-size:11px;font-weight:600;color:var(--sp-text-primary);">🍰 甜品/点心库存</div>
-        <div style="padding:4px 4px;">${dessertHtml}</div>
+      <div class="sp-r-stock-section">
+        <div class="sp-r-stock-section-header">🍰 甜品/点心库存</div>
+        <div class="sp-r-stock-section-body">${dessertHtml}</div>
       </div>
     `;
   }
+
 
   // ===== 渲染图鉴标签页 =====
   function restaurantRenderAtlas() {

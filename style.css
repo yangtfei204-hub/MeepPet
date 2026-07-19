@@ -7212,6 +7212,8 @@
   transform: scale(0.95);
 }
 
+
+
 /* ===== 可读性修复：确保关键文字在所有主题下可见 ===== */
 
 /* 状态条文字 */
@@ -7535,4 +7537,389 @@
 [data-panel="customcss"] pre::-webkit-scrollbar-thumb {
   background: rgba(255,255,255,0.2);
   border-radius: 2px;
+}
+
+/* ============================================================ */
+/* 🐱 小猫餐厅组件化样式（从内联迁出）                           */
+/* ============================================================ */
+
+/* ===== 厨房标签 ===== */
+.sp-r-kitchen-section {
+  margin-bottom: 8px;
+}
+
+.sp-r-kitchen-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.sp-r-kitchen-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sp-text-primary);
+  margin-bottom: 4px;
+}
+
+.sp-r-shop-toggle {
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.sp-r-cooking-active {
+  text-align: center;
+  padding: 12px;
+  background: rgba(255, 180, 50, 0.08);
+  border: 1px solid rgba(255, 180, 50, 0.3);
+  border-radius: 8px;
+}
+
+.sp-r-cooking-idle {
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--sp-border-light);
+  border-radius: 8px;
+}
+
+.sp-r-cook-btn {
+  width: 100%;
+  padding: 9px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--sp-primary-border);
+  background: var(--sp-primary);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.sp-r-cook-btn:hover {
+  background: var(--sp-primary-hover);
+}
+
+.sp-r-dishes-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.sp-r-dish-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--sp-border-light);
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--sp-text-primary);
+}
+
+.sp-restaurant-feed-btn {
+  padding: 1px 5px;
+  font-size: 9px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 180, 50, 0.4);
+  background: rgba(255, 180, 50, 0.1);
+  color: #ffb347;
+  cursor: pointer;
+  margin-left: 2px;
+  transition: background 0.15s;
+}
+
+.sp-restaurant-feed-btn:hover {
+  background: rgba(255, 180, 50, 0.25);
+}
+
+/* ===== 补货标签 ===== */
+.sp-r-supply-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sp-text-primary);
+  margin-bottom: 8px;
+}
+
+.sp-r-supply-hint {
+  font-size: 10px;
+  color: var(--sp-text-muted);
+  margin-bottom: 8px;
+}
+
+.sp-r-supply-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--sp-border-light);
+  border-radius: 8px;
+  margin-bottom: 5px;
+  transition: background 0.15s;
+}
+
+.sp-r-supply-row:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sp-r-supply-locked {
+  background: rgba(0, 0, 0, 0.1);
+  opacity: 0.45;
+}
+
+.sp-r-supply-emoji {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.sp-r-supply-info {
+  flex: 1;
+}
+
+.sp-r-supply-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sp-text-primary);
+}
+
+.sp-r-supply-detail {
+  font-size: 10px;
+  color: var(--sp-text-muted);
+}
+
+.sp-r-convert-area {
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: rgba(100, 180, 255, 0.05);
+  border: 1px solid rgba(100, 180, 255, 0.2);
+  border-radius: 8px;
+  font-size: 10px;
+  color: var(--sp-text-muted);
+  line-height: 1.7;
+}
+
+/* ===== 库存标签 ===== */
+.sp-r-stock-card {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+
+.sp-r-stock-card-earnings {
+  background: rgba(255, 180, 50, 0.06);
+  border: 1px solid rgba(255, 180, 50, 0.2);
+}
+
+.sp-r-stock-card-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sp-text-primary);
+  margin-bottom: 4px;
+}
+
+.sp-r-stock-card-body {
+  font-size: 11px;
+  color: var(--sp-text-secondary);
+  line-height: 1.8;
+}
+
+.sp-r-stock-section {
+  margin-bottom: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--sp-border-light);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.sp-r-stock-section-header {
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sp-text-primary);
+}
+
+.sp-r-stock-section-body {
+  padding: 4px 4px;
+}
+
+.sp-r-stock-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+}
+
+.sp-r-stock-item-emoji {
+  font-size: 14px;
+}
+
+.sp-r-stock-item-name {
+  font-size: 11px;
+  color: var(--sp-text-primary);
+  flex: 1;
+}
+
+.sp-r-stock-item-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sp-text-primary);
+}
+
+/* ===== 菜单标签 ===== */
+.sp-r-menu-group {
+  margin-bottom: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.sp-r-menu-locked {
+  border-color: rgba(255, 255, 255, 0.04);
+}
+
+.sp-r-menu-group-summary {
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--sp-text-primary);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+}
+
+.sp-r-menu-group-summary::-webkit-details-marker {
+  display: none;
+}
+
+.sp-r-menu-locked-text {
+  color: var(--sp-text-muted);
+}
+
+.sp-r-menu-dessert-group {
+  border-color: rgba(255, 150, 200, 0.2);
+}
+
+.sp-r-menu-dessert-summary {
+  background: rgba(255, 150, 200, 0.05);
+}
+
+.sp-r-menu-recipe {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  margin-bottom: 2px;
+  transition: background 0.15s;
+}
+
+.sp-r-menu-recipe:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sp-r-menu-canmake {
+  background: rgba(100, 220, 100, 0.05);
+}
+
+.sp-r-menu-canmake:hover {
+  background: rgba(100, 220, 100, 0.1);
+}
+
+.sp-r-menu-recipe-emoji {
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.sp-r-menu-recipe-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.sp-r-menu-recipe-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sp-text-primary);
+}
+
+.sp-r-menu-recipe-materials {
+  font-size: 9px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  align-items: center;
+  margin-top: 1px;
+}
+
+.sp-r-menu-recipe-price-area {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.sp-r-menu-recipe-price {
+  font-size: 11px;
+  color: #ffb347;
+  font-weight: 600;
+}
+
+.sp-r-menu-recipe-feed {
+  font-size: 9px;
+  color: var(--sp-status-hunger);
+}
+
+/* ===== 库存标签 — 补充遗漏的 class ===== */
+
+/* 空状态提示 */
+.sp-r-stock-empty {
+  color: var(--sp-text-muted);
+  font-size: 11px;
+  text-align: center;
+  padding: 8px;
+}
+
+/* 金币高亮文字 */
+.sp-r-stock-gold {
+  color: #ffb347;
+  font-weight: 600;
+}
+
+/* 服务客人数文字 */
+.sp-r-stock-count-text {
+  color: var(--sp-text-primary);
+}
+
+/* 完美糖砂的特殊高亮计数 */
+.sp-r-stock-item-highlight {
+  color: #ffb347;
+}
+
+.sp-r-cooking-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sp-text-primary);
+}
+
+.sp-r-cooking-timer {
+  font-size: 11px;
+  color: #ffb347;
+  margin-top: 4px;
+}
+
+.sp-r-dish-name {
+  color: var(--sp-text-primary);
+}
+
+.sp-r-dish-count {
+  color: var(--sp-text-muted);
 }
