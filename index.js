@@ -286,6 +286,8 @@
     // 主题系统
     currentTheme: 'default',
     customTheme: null,
+    customCSS: '',            // 用户自定义CSS美化代码
+
 
     // API 来源
     apiSource: 'custom',      // 'tavern' | 'custom'
@@ -582,6 +584,19 @@
     return `rgba(${r},${g},${b},${alpha})`;
   }
 
+  // ============================================================
+  // 用户自定义 CSS 注入
+  // ============================================================
+  function applyCustomCSS() {
+    let styleEl = document.getElementById('sp-custom-user-css');
+    if (!styleEl) {
+      styleEl = document.createElement('style');
+      styleEl.id = 'sp-custom-user-css';
+      document.head.appendChild(styleEl);
+    }
+    styleEl.textContent = settings.customCSS || '';
+  }
+
   function renderCustomThemeInputs() {
     const container = document.getElementById('sp-theme-color-inputs');
     if (!container) return;
@@ -632,6 +647,7 @@
     loadData();
     await loadDataAsync();
     applyTheme(settings.currentTheme || 'default'); 
+    applyCustomCSS();
     applyOfflineDecay();
     renderPetUI();
     renderSettingsUI();
@@ -846,6 +862,7 @@ function saveData() {
   function applyLoadedProfileUI() {
     // 1. 应用新存档的主题配色
     applyTheme(settings.currentTheme || 'default');
+    applyCustomCSS();
 
     // 2. 准备重新渲染设置面板并保留当前 active 标签页、位置和显示状态
     const settingsPanel = document.getElementById('silly-pet-settings');
@@ -6954,6 +6971,7 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
           <div class="sp-tab" data-tab="memory">🧠 记忆</div>
           <div class="sp-tab" data-tab="data">💾 数据</div>
           <div class="sp-tab" data-tab="guide">📖 使用说明</div>
+          <div class="sp-tab" data-tab="customcss">✏️ 自定义CSS</div>
         </div>
         <div class="sp-tab-panels">
 
@@ -7453,6 +7471,133 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
                     抽奖 → 各类道具和物品<br/>
                     金币 → 商店买道具 → 投喂/洗澡/睡觉消耗
                   </p>
+                </div>
+              </details>
+            </div>
+          </div>
+          <!-- 自定义CSS -->
+          <div class="sp-tab-panel" data-panel="customcss">
+            <div class="sp-section">
+              <div class="sp-section-title">✏️ 自定义 CSS 美化</div>
+              <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;margin-bottom:12px;">
+                在下方编辑框中编写自定义 CSS 代码，可以美化桌宠插件的各种界面元素。<br/>
+                修改后点击「▶ 实时预览」立即查看效果，满意后点底部「💾 保存所有设置」永久生效。
+              </p>
+              <textarea id="sp-custom-css-editor" style="width:100%;min-height:200px;max-height:400px;font-family:'Consolas','Monaco','Courier New',monospace;font-size:12px;line-height:1.5;tab-size:2;white-space:pre;overflow:auto;resize:vertical;padding:12px;border-radius:8px;border:1px solid var(--sp-border);background:rgba(0,0,0,0.3);color:#a9dc76;box-sizing:border-box;">${(settings.customCSS || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+              <div class="sp-row" style="margin-top:10px;flex-wrap:wrap;">
+                <button class="sp-btn sp-btn-primary" id="sp-custom-css-apply" type="button">▶ 实时预览</button>
+                <button class="sp-btn" id="sp-custom-css-clear" type="button">🗑️ 清空</button>
+                <button class="sp-btn" id="sp-custom-css-export" type="button">📤 导出</button>
+                <button class="sp-btn" id="sp-custom-css-import-btn" type="button">📥 导入</button>
+                <input type="file" id="sp-custom-css-import-file" accept=".css,.txt" style="display:none;" />
+              </div>
+            </div>
+            <div class="sp-section">
+              <div class="sp-section-title">💡 常用选择器参考</div>
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">桌宠主体</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* 桌宠容器 */
+#silly-pet-container { }
+
+/* 精灵图 */
+#silly-pet-sprite { }
+
+/* 气泡 */
+#silly-pet-bubble { }
+
+/* 心情图标 */
+#silly-pet-mood { }
+
+/* 状态条 */
+#silly-pet-status-bar { }
+
+/* 菜单按钮 */
+.sp-menu-btn { }</pre>
+                </div>
+              </details><details class="sp-guide-details">
+                <summary class="sp-guide-summary">聊天框</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* 聊天框容器 */
+#silly-pet-chat { }
+
+/* 聊天消息 -桌宠 */
+.sp-chat-msg.pet { }
+
+/* 聊天消息 - 用户 */
+.sp-chat-msg.user { }
+
+/* 输入框 */
+#sp-chat-input-field { }</pre>
+                </div>
+              </details>
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">设置面板 & 小屋</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* 设置面板 */
+#silly-pet-settings { }
+
+/* 标签按钮 */
+.sp-tab { }
+.sp-tab.active { }
+
+/* 小屋面板 */
+#silly-pet-house { }
+
+/* 小屋场景 */
+#sp-house-scene { }
+
+/* 小屋对话文字 */
+#sp-house-dialogue-text { }
+
+/* 日记面板 */
+#silly-pet-diary { }</pre>
+                </div>
+              </details>
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">CSS 变量（主题色）</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* 可以覆盖这些变量来改变整体颜色 */
+:root {
+  --sp-primary: rgba(100,180,255,0.4);
+  --sp-bg-main: rgba(20,20,30,0.85);
+  --sp-bg-secondary: rgba(30,30,40,0.9);
+  --sp-text-primary: #eee;
+  --sp-text-secondary: #bbb;
+  --sp-text-muted: #888;
+  --sp-border: rgba(255,255,255,0.12);
+  --sp-status-hunger: #ffb347;
+  --sp-status-clean: #87ceeb;
+  --sp-status-energy: #90ee90;
+  --sp-bubble-bg: rgba(20,20,30,0.85);
+}</pre>
+                </div>
+              </details>
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">示例：圆角加大+ 气泡渐变</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* 所有面板圆角加大 */
+#silly-pet-chat,
+#silly-pet-settings,
+#silly-pet-house,
+#silly-pet-diary {
+  border-radius: 24px;
+}
+
+/* 气泡渐变背景 */
+#silly-pet-bubble {
+  background: linear-gradient(
+    135deg,
+    rgba(100,180,255,0.3),
+    rgba(200,100,255,0.3)
+  );
+  border: 1px solid rgba(200,100,255,0.4);
+}
+
+/* 聊天消息圆润 */
+.sp-chat-msg {
+  border-radius: 18px;
+}</pre>
                 </div>
               </details>
             </div>
@@ -8171,6 +8316,56 @@ document.getElementById('sp-export')?.addEventListener('click', async () => {
       alert('数据已重置！点确定后页面将刷新。');
       window.location.reload(true);
     });
+    // 自定义CSS相关按钮
+    document.getElementById('sp-custom-css-apply')?.addEventListener('click', () => {
+      const editor = document.getElementById('sp-custom-css-editor');
+      if (editor) {
+        settings.customCSS = editor.value;
+        applyCustomCSS();
+        showBubble('✨ CSS 已应用预览！点底部「💾 保存」永久生效', 3000);
+      }
+    });
+
+    document.getElementById('sp-custom-css-clear')?.addEventListener('click', () => {
+      const editor = document.getElementById('sp-custom-css-editor');
+      if (editor) editor.value = '';
+      settings.customCSS = '';
+      applyCustomCSS();
+      showBubble('🗑️ 自定义 CSS 已清空', 2000);
+    });
+
+    document.getElementById('sp-custom-css-export')?.addEventListener('click', () => {
+      const css = document.getElementById('sp-custom-css-editor')?.value || '';
+      if (!css.trim()) { showBubble('没有 CSS 代码可导出', 2000); return; }
+      const blob = new Blob([css], { type: 'text/css' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `meep-pet-custom-${Date.now()}.css`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showBubble('📤 CSS 已导出', 2000);
+    });
+
+    document.getElementById('sp-custom-css-import-btn')?.addEventListener('click', () => {
+      document.getElementById('sp-custom-css-import-file')?.click();
+    });
+
+    document.getElementById('sp-custom-css-import-file')?.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const css = ev.target.result;
+        const editor = document.getElementById('sp-custom-css-editor');
+        if (editor) editor.value = css;
+        settings.customCSS = css;
+        applyCustomCSS();
+        showBubble('📥 CSS 已导入并预览！点底部「💾 保存」永久生效', 3000);
+      };
+      reader.readAsText(file);e.target.value = '';
+    });
+
         document.querySelectorAll('.sp-theme-card').forEach(card => {
       card.addEventListener('click', () => {
         const theme = card.dataset.theme;
@@ -8479,6 +8674,7 @@ document.getElementById('sp-export')?.addEventListener('click', async () => {
     settings.githubPath = v('sp-github-path') || 'meep-images';
 
     settings.showStatusBar = c('sp-show-status-bar');
+    settings.customCSS = document.getElementById('sp-custom-css-editor')?.value || '';
 
     settings.reactions = {
       feed: v('sp-react-feed') || DEFAULT_SETTINGS.reactions.feed,
@@ -8506,6 +8702,8 @@ document.getElementById('sp-export')?.addEventListener('click', async () => {
 
     startWandering();
     saveData();
+    applyCustomCSS();
+
     renderStatusOverview();
     const statusBar = document.getElementById('silly-pet-status-bar');
     if (statusBar) statusBar.style.display = settings.showStatusBar ? '' : 'none';

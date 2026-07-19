@@ -7485,3 +7485,54 @@
     max-height: 40vh;
   }
 }
+
+/* ============================================================ */
+/* ✏️ 自定义 CSS 编辑器样式                                      */
+/* ============================================================ */
+
+#sp-custom-css-editor {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+  tab-size: 2 !important;
+  white-space: pre !important;
+  color: #a9dc76 !important;
+  background: rgba(0,0,0,0.35) !important;
+  border: 1px solid var(--sp-border) !important;
+  border-radius: 8px !important;
+  padding: 12px !important;
+  resize: vertical !important;
+  overflow: auto !important;
+  box-sizing: border-box !important;transition: border-color 0.2s;
+}
+
+#sp-custom-css-editor:focus {
+  border-color: rgba(100,180,255,0.5) !important;
+  outline: none !important;
+  box-shadow: 0 0 12px rgba(100,180,255,0.15);
+}
+
+#sp-custom-css-editor::placeholder {
+  color: rgba(255,255,255,0.25);
+}
+
+/* 选择器参考区代码块 */
+[data-panel="customcss"] pre {
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.2) transparent;
+}
+
+[data-panel="customcss"] pre::-webkit-scrollbar {
+  height: 4px;
+}
+
+[data-panel="customcss"] pre::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.2);
+  border-radius: 2px;
+}
