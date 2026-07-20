@@ -2703,7 +2703,7 @@ function showInventoryPopup(category, quickKey, onUse) {
       const isQuick = state[quickKey] && state[quickKey].category === inv.category && state[quickKey].idx === inv.idx;
       return `
         <div class="sp-inv-item" data-cat="${inv.category}" data-idx="${inv.idx}">
-          <span class="sp-inv-item-emoji">${itemData.emoji}</span>
+          <span class="sp-inv-item-emoji">${getItemDisplayHtml(inv.category + '_shopitem_' + inv.idx, itemData.emoji, 22)}</span>
           <div class="sp-inv-item-info">
             <span class="sp-inv-item-name">${itemData.name}</span>
             <span class="sp-inv-item-detail">+${itemData.restore} | 库存: ${inv.count}</span>
@@ -2724,7 +2724,7 @@ function showInventoryPopup(category, quickKey, onUse) {
         if (!data) return;
         itemsHtml += `
           <div class="sp-inv-item" data-fridge-food="${inv.foodId}">
-            <span class="sp-inv-item-emoji">${data.emoji}</span>
+            <span class="sp-inv-item-emoji">${getItemDisplayHtml('fridge_food_' + inv.foodId, data.emoji, 22)}</span>
             <div class="sp-inv-item-info">
               <span class="sp-inv-item-name">🧊 ${data.name}</span>
               <span class="sp-inv-item-detail">+${data.feed} | 冰箱库存: ${inv.count}</span>
@@ -2745,7 +2745,7 @@ function showInventoryPopup(category, quickKey, onUse) {
         if (!data) return;
         itemsHtml += `
           <div class="sp-inv-item" data-tanghulu-fruit="${inv.fruitKey}">
-            <span class="sp-inv-item-emoji">${data.emoji}</span>
+            <span class="sp-inv-item-emoji">${getItemDisplayHtml('tanghulu_fruit_' + inv.fruitKey, data.emoji, 22)}</span>
             <div class="sp-inv-item-info">
               <span class="sp-inv-item-name">🍢 ${data.name}糖葫芦</span>
               <span class="sp-inv-item-detail">+${data.feedAmount} | 库存: ${inv.count}</span>
@@ -2779,7 +2779,7 @@ function showInventoryPopup(category, quickKey, onUse) {
         if (!recipe) return;
         itemsHtml += `
           <div class="sp-inv-item" data-cooked-recipe="${d.recipeId}">
-            <span class="sp-inv-item-emoji">${recipe.emoji}</span>
+            <span class="sp-inv-item-emoji">${getItemDisplayHtml('restaurant_recipe_' + d.recipeId, recipe.emoji, 22)}</span>
             <div class="sp-inv-item-info">
               <span class="sp-inv-item-name">🐱 ${recipe.name}</span>
               <span class="sp-inv-item-detail">+${recipe.feedAmount}饱食${recipe.energyAmount > 0 ? ' +' + recipe.energyAmount + '精力' : ''} | 出餐台: ${d.count}</span>
@@ -3427,7 +3427,7 @@ function showInventoryPopup(category, quickKey, onUse) {
       return items.map(inv => {
         const data = GAME_SHOP_ITEMS[category][inv.idx];
         if (!data) return '';
-        return `<div class="sp-total-inv-row"><span class="sp-total-inv-emoji">${data.emoji}</span><span class="sp-total-inv-name">${data.name}</span><span class="sp-total-inv-detail">+${data.restore}</span><span class="sp-total-inv-count">×${inv.count}</span></div>`;
+        return `<div class="sp-total-inv-row"><span class="sp-total-inv-emoji">${getItemDisplayHtml(category + '_shopitem_' + inv.idx, data.emoji, 16)}</span><span class="sp-total-inv-name">${data.name}</span><span class="sp-total-inv-detail">+${data.restore}</span><span class="sp-total-inv-count">×${inv.count}</span></div>`;
       }).join('');
     }
 
@@ -3436,7 +3436,7 @@ function showInventoryPopup(category, quickKey, onUse) {
       const hasAny = GAME_STAMINA_ITEMS.some(item => (staminaInv[item.key] || 0) > 0);
       if (!hasAny) return '<div class="sp-total-inv-empty">暂无</div>';
       return GAME_STAMINA_ITEMS.filter(item => (staminaInv[item.key] || 0) > 0).map(item => {
-        return `<div class="sp-total-inv-row"><span class="sp-total-inv-emoji">${item.emoji}</span><span class="sp-total-inv-name">${item.name}</span><span class="sp-total-inv-detail">+${item.restore}⚡</span><span class="sp-total-inv-count">×${staminaInv[item.key]}</span></div>`;
+        return `<div class="sp-total-inv-row"><span class="sp-total-inv-emoji">${getItemDisplayHtml('stamina_item_' + item.key, item.emoji, 16)}</span><span class="sp-total-inv-name">${item.name}</span><span class="sp-total-inv-detail">+${item.restore}⚡</span><span class="sp-total-inv-count">×${staminaInv[item.key]}</span></div>`;
       }).join('');
     }
 
@@ -3450,7 +3450,7 @@ function showInventoryPopup(category, quickKey, onUse) {
       const hasAny = items.some(i => i.count > 0);
       if (!hasAny) return '<div class="sp-total-inv-empty">暂无</div>';
       return items.filter(i => i.count > 0).map(i => {
-        return `<div class="sp-total-inv-row"><span class="sp-total-inv-emoji">${i.emoji}</span><span class="sp-total-inv-name">${i.name}</span><span class="sp-total-inv-detail"></span><span class="sp-total-inv-count">×${i.count}</span></div>`;
+        return `<div class="sp-total-inv-row"><span class="sp-total-inv-emoji">${getItemDisplayHtml('match3_prop_' + i.key, i.emoji, 16)}</span><span class="sp-total-inv-name">${i.name}</span><span class="sp-total-inv-detail"></span><span class="sp-total-inv-count">×${i.count}</span></div>`;
       }).join('');
     }
 
@@ -3465,7 +3465,7 @@ function showInventoryPopup(category, quickKey, onUse) {
       const hasAny = items.some(i => i.count > 0);
       if (!hasAny) return '<div class="sp-total-inv-empty">暂无</div>';
       return items.filter(i => i.count > 0).map(i => {
-        return `<div class="sp-total-inv-row"><span class="sp-total-inv-emoji">${i.emoji}</span><span class="sp-total-inv-name">${i.name}</span><span class="sp-total-inv-detail"></span><span class="sp-total-inv-count">×${i.count}</span></div>`;
+        return `<div class="sp-total-inv-row"><span class="sp-total-inv-emoji">${getItemDisplayHtml('link_prop_' + i.key, i.emoji, 16)}</span><span class="sp-total-inv-name">${i.name}</span><span class="sp-total-inv-detail"></span><span class="sp-total-inv-count">×${i.count}</span></div>`;
       }).join('');
     }
 
@@ -3480,7 +3480,7 @@ function showInventoryPopup(category, quickKey, onUse) {
       const hasAny = items.some(i => i.count > 0);
       if (!hasAny) return '<div class="sp-total-inv-empty">暂无</div>';
       return items.filter(i => i.count > 0).map(i => {
-        return `<div class="sp-total-inv-row"><span class="sp-total-inv-emoji">${i.emoji}</span><span class="sp-total-inv-name">${i.name}</span><span class="sp-total-inv-detail"></span><span class="sp-total-inv-count">×${i.count}</span></div>`;
+        return `<div class="sp-total-inv-row"><span class="sp-total-inv-emoji">${getItemDisplayHtml('shelf_prop_' + i.key, i.emoji, 16)}</span><span class="sp-total-inv-name">${i.name}</span><span class="sp-total-inv-detail"></span><span class="sp-total-inv-count">×${i.count}</span></div>`;
       }).join('');
     }
 
@@ -3491,7 +3491,7 @@ function showInventoryPopup(category, quickKey, onUse) {
       return fridgeInv.filter(i => i.count > 0).map(inv => {
         const data = FRIDGE_FOODS.find(f => f.id === inv.foodId);
         if (!data) return '';
-        return `<div class="sp-total-inv-row"><span class="sp-total-inv-emoji">${data.emoji}</span><span class="sp-total-inv-name">${data.name}</span><span class="sp-total-inv-detail">+${data.feed}饱食</span><span class="sp-total-inv-count">×${inv.count}</span></div>`;
+        return `<div class="sp-total-inv-row"><span class="sp-total-inv-emoji">${getItemDisplayHtml('fridge_food_' + inv.foodId, data.emoji, 16)}</span><span class="sp-total-inv-name">${data.name}</span><span class="sp-total-inv-detail">+${data.feed}饱食</span><span class="sp-total-inv-count">×${inv.count}</span></div>`;
       }).join('');
     }
 
@@ -3501,7 +3501,7 @@ function showInventoryPopup(category, quickKey, onUse) {
       const hasAny = Object.values(fridgePropInv).some(v => v > 0);
       if (!hasAny) return '<div class="sp-total-inv-empty">暂无</div>';
       return Object.entries(FRIDGE_PROP_ITEMS).filter(([key]) => (fridgePropInv[key] || 0) > 0).map(([key, prop]) => {
-        return `<div class="sp-total-inv-row"><span class="sp-total-inv-emoji">${prop.name.split(' ')[0]}</span><span class="sp-total-inv-name">${prop.name.split(' ').slice(1).join(' ')}</span><span class="sp-total-inv-detail">${prop.desc}</span><span class="sp-total-inv-count">×${fridgePropInv[key]}</span></div>`;
+        return `<div class="sp-total-inv-row"><span class="sp-total-inv-emoji">${getItemDisplayHtml('fridge_prop_' + key, prop.name.split(' ')[0], 16)}</span><span class="sp-total-inv-name">${prop.name.split(' ').slice(1).join(' ')}</span><span class="sp-total-inv-detail">${prop.desc}</span><span class="sp-total-inv-count">×${fridgePropInv[key]}</span></div>`;
       }).join('');
     }
 
@@ -3512,7 +3512,7 @@ function showInventoryPopup(category, quickKey, onUse) {
       return tangInv.filter(i => i.count > 0).map(inv => {
         const data = TANGHULU_FRUITS.find(f => f.key === inv.fruitKey);
         if (!data) return '';
-        return `<div class="sp-total-inv-row"><span class="sp-total-inv-emoji">${data.emoji}</span><span class="sp-total-inv-name">${data.name}糖葫芦</span><span class="sp-total-inv-detail">售${data.sellPrice}🪙</span><span class="sp-total-inv-count">×${inv.count}</span></div>`;
+        return `<div class="sp-total-inv-row"><span class="sp-total-inv-emoji">${getItemDisplayHtml('tanghulu_fruit_' + inv.fruitKey, data.emoji, 16)}</span><span class="sp-total-inv-name">${data.name}糖葫芦</span><span class="sp-total-inv-detail">售${data.sellPrice}🪙</span><span class="sp-total-inv-count">×${inv.count}</span></div>`;
       }).join('');
     }
 
@@ -3527,7 +3527,7 @@ function showInventoryPopup(category, quickKey, onUse) {
         { key: 'lubricant', emoji: '🌀', name: '顺滑剂' },
       ];
       return propDefs.filter(p => (tangPropInv[p.key] || 0) > 0).map(p => {
-        return `<div class="sp-total-inv-row"><span class="sp-total-inv-emoji">${p.emoji}</span><span class="sp-total-inv-name">${p.name}</span><span class="sp-total-inv-detail"></span><span class="sp-total-inv-count">×${tangPropInv[p.key]}</span></div>`;
+        return `<div class="sp-total-inv-row"><span class="sp-total-inv-emoji">${getItemDisplayHtml('tanghulu_prop_' + p.key, p.emoji, 16)}</span><span class="sp-total-inv-name">${p.name}</span><span class="sp-total-inv-detail"></span><span class="sp-total-inv-count">×${tangPropInv[p.key]}</span></div>`;
       }).join('');
     }
 
@@ -11838,7 +11838,7 @@ window.addEventListener('beforeunload', () => {
             const limitText = `<span class="sp-game-shop-limit ${soldOut ? 'sold-out' : ''}">${soldOut ? '已售罄' : `剩${item.dailyLimit - bought}次`}</span>`;
             return `
               <div class="sp-game-shop-item ${disabled ? 'sp-game-shop-disabled' : ''}">
-                <span class="sp-game-shop-item-emoji">${item.emoji}</span>
+                <span class="sp-game-shop-item-emoji">${getItemDisplayHtml('stamina_item_' + item.key, item.emoji, 18)}</span>
                 <span class="sp-game-shop-item-name">${item.name}</span>
                 <span class="sp-game-shop-item-info">+${item.restore}⚡</span>
                 ${limitText}
@@ -11866,7 +11866,7 @@ window.addEventListener('beforeunload', () => {
               : '<span class="sp-game-shop-limit">不限量</span>';
             return `
               <div class="sp-game-shop-item ${disabled ? 'sp-game-shop-disabled' : ''}">
-                <span class="sp-game-shop-item-emoji">${item.emoji}</span>
+                <span class="sp-game-shop-item-emoji">${getItemDisplayHtml(cat.key + '_shopitem_' + idx, item.emoji, 18)}</span>
                 <span class="sp-game-shop-item-name">${item.name}</span>
                 <span class="sp-game-shop-item-info">+${item.restore}</span>
                 ${limitText}
@@ -13078,17 +13078,17 @@ window.addEventListener('beforeunload', () => {
           </div>
           <div id="sp-match3-props">
             <button class="sp-match3-prop-btn" id="sp-match3-prop-expand" title="${MATCH3_PROPS.expand.desc}">
-              <span class="sp-match3-prop-icon">🪜</span>
+            <span class="sp-match3-prop-icon">${getItemDisplayHtml('match3_prop_expand', '🪜', 20)}</span>
               <span class="sp-match3-prop-price">背包使用</span>
               <span class="sp-match3-prop-count">0/${MATCH3_PROPS.expand.perGameLimit}</span>
             </button>
             <button class="sp-match3-prop-btn" id="sp-match3-prop-sweep" title="${MATCH3_PROPS.sweep.desc}">
-              <span class="sp-match3-prop-icon">🧹</span>
+            <span class="sp-match3-prop-icon">${getItemDisplayHtml('match3_prop_sweep', '🧹', 20)}</span>
               <span class="sp-match3-prop-price">背包使用</span>
               <span class="sp-match3-prop-count">0/${MATCH3_PROPS.sweep.perGameLimit}</span>
             </button>
             <button class="sp-match3-prop-btn" id="sp-match3-prop-shuffle" title="${MATCH3_PROPS.shuffle.desc}">
-              <span class="sp-match3-prop-icon">🌀</span>
+            <span class="sp-match3-prop-icon">${getItemDisplayHtml('match3_prop_shuffle', '🌀', 20)}</span>
               <span class="sp-match3-prop-price">背包使用</span>
               <span class="sp-match3-prop-count">0/${MATCH3_PROPS.shuffle.perGameLimit}</span>
             </button>
@@ -13242,6 +13242,26 @@ window.addEventListener('beforeunload', () => {
       `;
     }).join('');
 
+    // 追加道具图鉴
+    let propsHtml = '<div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin:14px 0 6px;">🧰 道具图鉴</div>';
+    propsHtml += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">';
+    Object.entries(MATCH3_PROPS).forEach(([key, prop]) => {
+      const imgKey = `match3_prop_${key}`;
+      const custom = state.gameCustomImages?.[imgKey];
+      const propEmoji = prop.name.split(' ')[0];
+      const display = custom
+        ? `<img src="${custom}" style="width:28px;height:28px;object-fit:contain;border-radius:4px;" />`
+        : `<span style="font-size:22px;">${propEmoji}</span>`;
+      propsHtml += `
+        <div style="aspect-ratio:1;border-radius:8px;border:2px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;position:relative;cursor:pointer;overflow:hidden;transition:all 0.15s;" data-match3-prop-key="${key}">
+          ${display}
+          <span style="font-size:8px;color:var(--sp-text-muted);text-align:center;">${prop.name.split(' ').slice(1).join(' ')}</span><div class="sp-match3-prop-upload" data-prop-key="${key}" style="position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;font-size:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity 0.2s;">📷</div>
+        </div>
+      `;
+    });
+    propsHtml += '</div>';
+    grid.insertAdjacentHTML('afterend', propsHtml);
+
     // hover 显示上传按钮
     grid.querySelectorAll('[data-match3-icon-idx]').forEach(item => {
       item.addEventListener('mouseenter', () => {
@@ -13262,6 +13282,30 @@ window.addEventListener('beforeunload', () => {
         match3PromptIconUpload(idx);
       });
     });
+
+    // 道具图鉴 hover + 上传
+    grid.parentElement.querySelectorAll('[data-match3-prop-key]').forEach(item => {
+      item.addEventListener('mouseenter', () => {
+        const btn = item.querySelector('.sp-match3-prop-upload');
+        if (btn) btn.style.opacity = '1';
+      });
+      item.addEventListener('mouseleave', () => {
+        const btn = item.querySelector('.sp-match3-prop-upload');
+        if (btn) btn.style.opacity = '0';
+      });
+    });
+
+    grid.parentElement.querySelectorAll('.sp-match3-prop-upload').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const propKey = btn.dataset.propKey;
+        const imgKey = `match3_prop_${propKey}`;
+        const prop = MATCH3_PROPS[propKey];
+        const name = prop ? prop.name.split(' ').slice(1).join(' ') : propKey;
+        gamePromptImageUpload(imgKey);
+      });
+    });
+
   }
 
   // ===== 消消看图案上传 =====
@@ -15164,6 +15208,48 @@ window.addEventListener('beforeunload', () => {
       });
     });
 
+    // 追加道具图鉴
+    let linkPropsHtml = '<div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin:14px 0 6px;">🧰 道具图鉴</div>';
+    linkPropsHtml += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">';
+    Object.entries(LINK_PROPS).forEach(([key, prop]) => {
+      const imgKey = `link_prop_${key}`;
+      const custom = state.gameCustomImages?.[imgKey];
+      const propEmoji = prop.name.split(' ')[0];
+      const display = custom
+        ? `<img src="${custom}" style="width:28px;height:28px;object-fit:contain;border-radius:4px;" />`
+        : `<span style="font-size:22px;">${propEmoji}</span>`;
+      linkPropsHtml += `
+        <div style="aspect-ratio:1;border-radius:8px;border:2px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;position:relative;cursor:pointer;overflow:hidden;transition:all 0.15s;" data-link-prop-key="${key}">
+          ${display}
+          <span style="font-size:8px;color:var(--sp-text-muted);text-align:center;">${prop.name.split(' ').slice(1).join(' ')}</span>
+          <div class="sp-link-prop-upload" data-prop-key="${key}" style="position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;font-size:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity 0.2s;">📷</div>
+        </div>
+      `;
+    });
+    linkPropsHtml += '</div>';
+    grid.insertAdjacentHTML('afterend', linkPropsHtml);
+
+    // 道具图鉴 hover + 上传
+    grid.parentElement.querySelectorAll('[data-link-prop-key]').forEach(item => {
+      item.addEventListener('mouseenter', () => {
+        const btn = item.querySelector('.sp-link-prop-upload');
+        if (btn) btn.style.opacity = '1';
+      });
+      item.addEventListener('mouseleave', () => {
+        const btn = item.querySelector('.sp-link-prop-upload');
+        if (btn) btn.style.opacity = '0';
+      });
+    });
+
+    grid.parentElement.querySelectorAll('.sp-link-prop-upload').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const propKey = btn.dataset.propKey;
+        const imgKey = `link_prop_${propKey}`;
+        gamePromptImageUpload(imgKey);
+      });
+    });
+
     // 上传按钮
     grid.querySelectorAll('.sp-link-icon-upload').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -15292,22 +15378,22 @@ window.addEventListener('beforeunload', () => {
           <div id="sp-link-board"></div>
           <div id="sp-link-props">
             <button class="sp-link-prop-btn" id="sp-link-prop-hint" title="${LINK_PROPS.hint.desc}">
-              <span class="sp-link-prop-icon">🔍</span>
+              <span class="sp-link-prop-icon">${getItemDisplayHtml('link_prop_hint', '🔍', 18)}</span>
               <span class="sp-link-prop-name">放大镜</span>
               <span class="sp-link-prop-count" id="sp-link-prop-hint-count">×0</span>
             </button>
             <button class="sp-link-prop-btn" id="sp-link-prop-shuffle" title="${LINK_PROPS.shuffle.desc}">
-              <span class="sp-link-prop-icon">🌀</span>
+              <span class="sp-link-prop-icon">${getItemDisplayHtml('link_prop_shuffle', '🌀', 18)}</span>
               <span class="sp-link-prop-name">重组旋风</span>
               <span class="sp-link-prop-count" id="sp-link-prop-shuffle-count">×0</span>
             </button>
             <button class="sp-link-prop-btn" id="sp-link-prop-bomb" title="${LINK_PROPS.bomb.desc}">
-              <span class="sp-link-prop-icon">💣</span>
+              <span class="sp-link-prop-icon">${getItemDisplayHtml('link_prop_bomb', '💣', 18)}</span>
               <span class="sp-link-prop-name">友情炸弹</span>
               <span class="sp-link-prop-count" id="sp-link-prop-bomb-count">×0</span>
             </button>
             <button class="sp-link-prop-btn" id="sp-link-prop-compass" title="${LINK_PROPS.compass.desc}">
-              <span class="sp-link-prop-icon">🧭</span>
+              <span class="sp-link-prop-icon">${getItemDisplayHtml('link_prop_compass', '🧭', 18)}</span>
               <span class="sp-link-prop-name">罗盘透视</span>
               <span class="sp-link-prop-count" id="sp-link-prop-compass-count">×0</span>
             </button>
@@ -16234,7 +16320,7 @@ window.addEventListener('beforeunload', () => {
     // 已放置的物品（覆盖在格子上面）
     placed.forEach(item => {
       const data = FRIDGE_FOODS.find(f => f.id === item.foodId);
-      const emoji = data ? data.emoji : '?';
+      const emojiDisplay = data ? getItemDisplayHtml('fridge_food_' + item.foodId, data.emoji, 18) : '?';
       const name = data ? data.name : '?';
 
       if (item.shape) {
@@ -16251,11 +16337,11 @@ window.addEventListener('beforeunload', () => {
           }
         }
         // emoji 用绝对定位浮在中心，不影响点击穿透
-        html += `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:18px;line-height:1;">${emoji}</div>`;
+        html += `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:18px;line-height:1;">${emojiDisplay}</div>`;
         html += `</div>`;
       } else {
         // 普通矩形物品：保持原来的渲染方式
-        html += `<div class="sp-fridge-placed-item" data-placed-instance="${item.instanceId}" style="grid-column:${item.col + 1}/span ${item.w};grid-row:${item.row + 1}/span ${item.h};" title="${name} (${item.w}×${item.h}) - 点击取出"><span class="sp-fridge-placed-emoji">${emoji}</span><span class="sp-fridge-placed-name">${name}</span></div>`;
+        html += `<div class="sp-fridge-placed-item" data-placed-instance="${item.instanceId}" style="grid-column:${item.col + 1}/span ${item.w};grid-row:${item.row + 1}/span ${item.h};" title="${name} (${item.w}×${item.h}) - 点击取出"><span class="sp-fridge-placed-emoji">${emojiDisplay}</span><span class="sp-fridge-placed-name">${name}</span></div>`;
       }
     });
 
@@ -16386,7 +16472,7 @@ window.addEventListener('beforeunload', () => {
           const isSelected = item.instanceId === selectedItem;
           const noRotateTag = (data && data.noRotate) ? '<span style="font-size:8px;color:#f66;margin-left:2px;">🔒</span>' : '';
           const shapeTag = item.shape ? '<span style="font-size:8px;color:#c87fff;margin-left:2px;">◆异形</span>' : '';
-          return `<div class="sp-fridge-basket-item ${isSelected ? 'sp-fridge-basket-selected' : ''}" data-instance="${item.instanceId}"><span class="sp-fridge-basket-emoji">${data?.emoji || '?'}</span><span class="sp-fridge-basket-info"><span class="sp-fridge-basket-name">${data?.name || '?'}${noRotateTag}${shapeTag}</span><span class="sp-fridge-basket-size">${item.w}×${item.h}${item.shape ? '(异形)' : ''}</span></span></div>`;
+          return `<div class="sp-fridge-basket-item ${isSelected ? 'sp-fridge-basket-selected' : ''}" data-instance="${item.instanceId}"><span class="sp-fridge-basket-emoji">${getItemDisplayHtml('fridge_food_' + item.foodId, data?.emoji || '?', 18)}</span><span class="sp-fridge-basket-info"><span class="sp-fridge-basket-name">${data?.name || '?'}${noRotateTag}${shapeTag}</span><span class="sp-fridge-basket-size">${item.w}×${item.h}${item.shape ? '(异形)' : ''}</span></span></div>`;
         }).join('');
 
         basketEl.querySelectorAll('.sp-fridge-basket-item').forEach(el => {
@@ -16522,6 +16608,48 @@ window.addEventListener('beforeunload', () => {
         fridgePromptFoodUpload(btn.dataset.foodId);
       });
     });
+
+    // 追加道具图鉴
+    let fridgePropsHtml = '<div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin:14px 0 6px;">🧰 道具图鉴</div>';
+    fridgePropsHtml += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">';
+    Object.entries(FRIDGE_PROP_ITEMS).forEach(([key, prop]) => {
+      const imgKey = `fridge_prop_${key}`;
+      const custom = state.gameCustomImages?.[imgKey];
+      const propEmoji = prop.name.split(' ')[0];
+      const display = custom
+        ? `<img src="${custom}" style="width:28px;height:28px;object-fit:contain;border-radius:4px;" />`
+        : `<span style="font-size:22px;">${propEmoji}</span>`;
+      fridgePropsHtml += `
+        <div style="aspect-ratio:1;border-radius:8px;border:2px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;position:relative;cursor:pointer;overflow:hidden;transition:all 0.15s;" data-fridge-prop-key="${key}">
+          ${display}
+          <span style="font-size:8px;color:var(--sp-text-muted);text-align:center;">${prop.name.split(' ').slice(1).join(' ')}</span>
+          <div class="sp-fridge-prop-upload" data-prop-key="${key}" style="position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;font-size:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity 0.2s;">📷</div>
+        </div>
+      `;
+    });
+    fridgePropsHtml += '</div>';
+    container.insertAdjacentHTML('beforeend', fridgePropsHtml);
+
+    container.querySelectorAll('[data-fridge-prop-key]').forEach(item => {
+      item.addEventListener('mouseenter', () => {
+        const btn = item.querySelector('.sp-fridge-prop-upload');
+        if (btn) btn.style.opacity = '1';
+      });
+      item.addEventListener('mouseleave', () => {
+        const btn = item.querySelector('.sp-fridge-prop-upload');
+        if (btn) btn.style.opacity = '0';
+      });
+    });
+
+    container.querySelectorAll('.sp-fridge-prop-upload').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const propKey = btn.dataset.propKey;
+        const imgKey = `fridge_prop_${propKey}`;
+        gamePromptImageUpload(imgKey);
+      });
+    });
+
   }
 
   // ===== 冰箱食材图片上传 =====
@@ -16772,13 +16900,13 @@ window.addEventListener('beforeunload', () => {
               <span>🔄</span><span>旋转</span>
             </button>
             <button class="sp-fridge-prop-btn" id="sp-fridge-btn-compress" title="缩小选中食材尺寸">
-              <span>🧃</span><span>压缩 <span id="sp-fridge-compress-count">0</span></span>
+              <span>${getItemDisplayHtml('fridge_prop_compress', '🧃', 16)}</span><span>压缩 <span id="sp-fridge-compress-count">0</span></span>
             </button>
             <button class="sp-fridge-prop-btn" id="sp-fridge-btn-organize" title="自动整理冰箱">
-              <span>🧹</span><span>整理 <span id="sp-fridge-organize-count">0</span></span>
+              <span>${getItemDisplayHtml('fridge_prop_organize', '🧹', 16)}</span><span>整理 <span id="sp-fridge-organize-count">0</span></span>
             </button>
             <button class="sp-fridge-prop-btn" id="sp-fridge-btn-backpack" title="跳过一个食材">
-              <span>🎒</span><span>跳过 <span id="sp-fridge-backpack-count">0</span></span>
+              <span>${getItemDisplayHtml('fridge_prop_backpack', '🎒', 16)}</span><span>跳过 <span id="sp-fridge-backpack-count">0</span></span>
             </button>
           </div>
           <div id="sp-fridge-props-used" style="text-align:center;font-size:10px;color:var(--sp-text-muted);margin-top:4px;"></div>
@@ -19367,6 +19495,48 @@ window.addEventListener('beforeunload', () => {
         tanghuluPromptFruitUpload(btn.dataset.key);
       });
     });
+
+    // 追加道具图鉴
+    let thPropsHtml = '<div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin:14px 0 6px;">🧰 道具图鉴</div>';
+    thPropsHtml += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">';
+    Object.entries(TANGHULU_PROPS).forEach(([key, prop]) => {
+      const imgKey = `tanghulu_prop_${key}`;
+      const custom = state.gameCustomImages?.[imgKey];
+      const propEmoji = prop.name.split(' ')[0];
+      const display = custom
+        ? `<img src="${custom}" style="width:28px;height:28px;object-fit:contain;border-radius:4px;" />`
+        : `<span style="font-size:22px;">${propEmoji}</span>`;
+      thPropsHtml += `
+        <div style="aspect-ratio:1;border-radius:8px;border:2px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;position:relative;cursor:pointer;overflow:hidden;transition:all 0.15s;" data-tanghulu-prop-key="${key}">
+          ${display}
+          <span style="font-size:8px;color:var(--sp-text-muted);text-align:center;">${prop.name.split(' ').slice(1).join(' ')}</span>
+          <div class="sp-tanghulu-prop-upload" data-prop-key="${key}" style="position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;font-size:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity 0.2s;">📷</div>
+        </div>
+      `;
+    });
+    thPropsHtml += '</div>';
+    grid.insertAdjacentHTML('afterend', thPropsHtml);
+
+    grid.parentElement.querySelectorAll('[data-tanghulu-prop-key]').forEach(item => {
+      item.addEventListener('mouseenter', () => {
+        const btn = item.querySelector('.sp-tanghulu-prop-upload');
+        if (btn) btn.style.opacity = '1';
+      });
+      item.addEventListener('mouseleave', () => {
+        const btn = item.querySelector('.sp-tanghulu-prop-upload');
+        if (btn) btn.style.opacity = '0';
+      });
+    });
+
+    grid.parentElement.querySelectorAll('.sp-tanghulu-prop-upload').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const propKey = btn.dataset.propKey;
+        const imgKey = `tanghulu_prop_${propKey}`;
+        gamePromptImageUpload(imgKey);
+      });
+    });
+
   }
 
   // ===== 糖葫芦水果图片上传 =====
@@ -19519,7 +19689,8 @@ window.addEventListener('beforeunload', () => {
       const fruitsHtml = stick.fruits.map((fruitKey, fi) => {
         const data = TANGHULU_FRUITS.find(f => f.key === fruitKey);
         const isTop = fi === 0;
-        return `<div class="sp-tanghulu-fruit ${isTop && isSelected ? 'sp-tanghulu-fruit-top' : ''}" style="background:${data ? data.color : '#888'};" title="${data ? data.name : '?'}">${data ? data.emoji : '?'}</div>`;
+        const fruitDisplay = data ? getItemDisplayHtml('tanghulu_fruit_' + fruitKey, data.emoji, 16) : '?';
+        return `<div class="sp-tanghulu-fruit ${isTop && isSelected ? 'sp-tanghulu-fruit-top' : ''}" style="background:${data ? data.color : '#888'};" title="${data ? data.name : '?'}">${fruitDisplay}</div>`;
       }).join('');
 
       // 空位占位
@@ -19721,17 +19892,17 @@ window.addEventListener('beforeunload', () => {
           <div id="sp-tanghulu-board" class="sp-tanghulu-board"></div>
           <div id="sp-tanghulu-props" style="display:flex;gap:6px;justify-content:center;margin-top:8px;flex-wrap:wrap;">
             <button class="sp-link-prop-btn" id="sp-tanghulu-prop-es" title="${TANGHULU_PROPS.extraStick.desc}">
-              <span class="sp-link-prop-icon">🥢</span>
+              <span class="sp-link-prop-icon">${getItemDisplayHtml('tanghulu_prop_extraStick', '🥢', 18)}</span>
               <span class="sp-link-prop-name">赠送竹签</span>
               <span class="sp-link-prop-count" id="sp-tanghulu-prop-es-count">×0</span>
             </button>
             <button class="sp-link-prop-btn" id="sp-tanghulu-prop-undo" title="${TANGHULU_PROPS.undo.desc}">
-              <span class="sp-link-prop-icon">↩️</span>
+              <span class="sp-link-prop-icon">${getItemDisplayHtml('tanghulu_prop_undo', '↩️', 18)}</span>
               <span class="sp-link-prop-name">悔步撤销</span>
               <span class="sp-link-prop-count" id="sp-tanghulu-prop-undo-count">×0</span>
             </button>
             <button class="sp-link-prop-btn" id="sp-tanghulu-prop-lub" title="${TANGHULU_PROPS.lubricant.desc}">
-              <span class="sp-link-prop-icon">🌀</span>
+              <span class="sp-link-prop-icon">${getItemDisplayHtml('tanghulu_prop_lubricant', '🌀', 18)}</span>
               <span class="sp-link-prop-name">顺滑剂</span>
               <span class="sp-link-prop-count" id="sp-tanghulu-prop-lub-count">×0</span>
             </button>
@@ -19999,6 +20170,26 @@ window.addEventListener('beforeunload', () => {
       }
     }
     return result;
+  }
+
+  // ===== 餐厅自定义图片显示辅助 =====
+  function restaurantGetItemDisplay(imageKey, defaultEmoji, size) {
+    const sz = size || 18;
+    const custom = getLinkedImage(imageKey);
+    if (custom) {
+      return `<img src="${custom}" style="width:${sz}px;height:${sz}px;object-fit:contain;border-radius:3px;vertical-align:middle;" />`;
+    }
+    return defaultEmoji;
+  }
+
+  // ===== 通用物品图片显示（所有游戏通用）=====
+  function getItemDisplayHtml(imageKey, defaultEmoji, size) {
+    const sz = size || 18;
+    const custom = getLinkedImage(imageKey);
+    if (custom) {
+      return `<img src="${custom}" style="width:${sz}px;height:${sz}px;object-fit:contain;border-radius:3px;vertical-align:middle;" />`;
+    }
+    return defaultEmoji;
   }
 
   // ===== 获取已解锁食谱 =====
@@ -20485,7 +20676,7 @@ window.addEventListener('beforeunload', () => {
           const recipe = RESTAURANT_RECIPES.find(r => r.id === d.recipeId);
           if (!recipe || d.count <= 0) return;
           if (!restaurantCustomerAccepts(customer, recipe)) return;
-          serveButtonsHtml += `<button class="sp-restaurant-table-serve-btn" data-customer="${i}" data-recipe="${d.recipeId}" title="${recipe.name}">${recipe.emoji}</button>`;
+          serveButtonsHtml += `<button class="sp-restaurant-table-serve-btn" data-customer="${i}" data-recipe="${d.recipeId}" title="${recipe.name}">${getItemDisplayHtml('restaurant_recipe_' + d.recipeId, recipe.emoji, 14)}</button>`;
         });
 
         // 甜品按钮（如果客人要甜品或 any）
@@ -20495,7 +20686,7 @@ window.addEventListener('beforeunload', () => {
           tangInv.slice(0, 2).forEach(inv => {
             const data = TANGHULU_FRUITS.find(f => f.key === inv.fruitKey);
             if (!data) return;
-            dessertButtonsHtml += `<button class="sp-restaurant-table-dessert-btn" data-customer="${i}" data-type="tanghulu" data-key="${inv.fruitKey}" title="${data.name}糖葫芦">${data.emoji}</button>`;
+            dessertButtonsHtml += `<button class="sp-restaurant-table-dessert-btn" data-customer="${i}" data-type="tanghulu" data-key="${inv.fruitKey}" title="${data.name}糖葫芦">${getItemDisplayHtml('tanghulu_fruit_' + inv.fruitKey, data.emoji, 14)}</button>`;
           });
           if ((state.tanghuluSugarCrystal || 0) > 0) {
             dessertButtonsHtml += `<button class="sp-restaurant-table-dessert-btn" data-customer="${i}" data-type="crystal" data-key="crystal" title="糖砂甜品">✨</button>`;
@@ -20504,7 +20695,7 @@ window.addEventListener('beforeunload', () => {
           fridgeDesserts.forEach(inv => {
             const data = FRIDGE_FOODS.find(f => f.id === inv.foodId);
             if (!data) return;
-            dessertButtonsHtml += `<button class="sp-restaurant-table-dessert-btn" data-customer="${i}" data-type="fridge" data-key="${inv.foodId}" title="${data.name}">${data.emoji}</button>`;
+            dessertButtonsHtml += `<button class="sp-restaurant-table-dessert-btn" data-customer="${i}" data-type="fridge" data-key="${inv.foodId}" title="${data.name}">${getItemDisplayHtml('fridge_food_' + inv.foodId, data.emoji, 14)}</button>`;
           });
         }
 
@@ -20514,7 +20705,7 @@ window.addEventListener('beforeunload', () => {
           <div class="sp-restaurant-table sp-restaurant-table-occupied${urgentClass}" data-table-idx="${i}">
             <span class="sp-restaurant-table-number">#${i + 1}</span>
             <span class="sp-restaurant-table-timer${timerClass}">⏱️${remaining}s</span>
-            <span class="sp-restaurant-table-emoji">${customer.emoji}</span>
+            <span class="sp-restaurant-table-emoji">${restaurantGetItemDisplay('restaurant_customer_' + customer.id, customer.emoji, 22)}</span>
             <span class="sp-restaurant-table-name">${customer.name}</span>
             <span class="sp-restaurant-table-wants">${wantText}</span>
             <span class="sp-restaurant-table-dialogue">${customer.dialogue}</span>
@@ -20533,7 +20724,7 @@ window.addEventListener('beforeunload', () => {
       cookingHtml = `
         <div class="sp-r-cooking-active">
           <div style="font-size:18px;margin-bottom:4px;">🔥</div>
-          <div class="sp-r-cooking-name">正在烹饪：${recipe?.name || '?'} ${recipe?.emoji || ''}</div>
+          <div class="sp-r-cooking-name">正在烹饪：${getItemDisplayHtml('restaurant_recipe_' + restaurantRuntime.cooking.recipeId, recipe?.emoji || '', 16)} ${recipe?.name || '?'}</div>
           <div class="sp-r-cooking-timer">剩余 ${remaining} 秒…</div>
         </div>
       `;
@@ -20557,7 +20748,7 @@ window.addEventListener('beforeunload', () => {
         if (!recipe) return '';
         return `
           <div class="sp-r-dish-tag">
-            <span>${recipe.emoji}</span>
+            <span>${restaurantGetItemDisplay('restaurant_recipe_' + recipe.id, recipe.emoji, 16)}</span>
             <span class="sp-r-dish-name">${recipe.name}</span>
             <span class="sp-r-dish-count">×${d.count}</span>
             <button class="sp-restaurant-feed-btn" data-recipe="${d.recipeId}">🍖</button>
@@ -20693,18 +20884,20 @@ window.addEventListener('beforeunload', () => {
                 const have = (state.fridgeInventory || []).find(i => i.foodId === ing.foodId);
                 const haveCount = have ? have.count : 0;
                 const ok = unlocked && haveCount >= ing.count;
-                return `<span style="color:${unlocked ? (ok ? 'rgba(100,220,100,0.8)' : '#f66') : 'var(--sp-text-muted)'};">${fd?.emoji || '?'}×${ing.count}</span>`;
+                const ingIcon = getItemDisplayHtml('fridge_food_' + ing.foodId, fd?.emoji || '?', 12);
+                return `<span style="color:${unlocked ? (ok ? 'rgba(100,220,100,0.8)' : '#f66') : 'var(--sp-text-muted)'};">${ingIcon}×${ing.count}</span>`;
               }).join(' ');
               const seaText = r.seasonings.map(s => {
                 const sd = RESTAURANT_SEASONINGS.find(x => x.id === s.id);
                 const have = (state.restaurantSeasonings && state.restaurantSeasonings[s.id]) || 0;
                 const ok = unlocked && have >= s.count;
-                return `<span style="color:${unlocked ? (ok ? 'rgba(100,220,100,0.8)' : '#f66') : 'var(--sp-text-muted)'};">${sd?.emoji || '?'}×${s.count}</span>`;
+                const seaIcon = getItemDisplayHtml('restaurant_sea_' + s.id, sd?.emoji || '?', 12);
+                return `<span style="color:${unlocked ? (ok ? 'rgba(100,220,100,0.8)' : '#f66') : 'var(--sp-text-muted)'};">${seaIcon}×${s.count}</span>`;
               }).join(' ');
               const canMake = unlocked && restaurantCheckIngredients(r);
               return `
                 <div class="sp-r-menu-recipe ${canMake ? 'sp-r-menu-canmake' : ''}">
-                  <span class="sp-r-menu-recipe-emoji">${r.emoji}</span>
+                  <span class="sp-r-menu-recipe-emoji">${getItemDisplayHtml('restaurant_recipe_' + r.id, r.emoji, 15)}</span>
                   <div class="sp-r-menu-recipe-info">
                     <div class="sp-r-menu-recipe-name ${unlocked ? '' : 'sp-r-menu-locked-text'}">${r.name}</div>
                     <div class="sp-r-menu-recipe-materials">
@@ -20759,7 +20952,7 @@ window.addEventListener('beforeunload', () => {
       const cantAfford5 = state.gameGold < s.price * 5;
       html += `
         <div class="sp-r-supply-row ${unlocked ? '' : 'sp-r-supply-locked'}">
-          <span class="sp-r-supply-emoji">${s.emoji}</span>
+          <span class="sp-r-supply-emoji">${restaurantGetItemDisplay('restaurant_sea_' + s.id, s.emoji, 18)}</span>
           <div class="sp-r-supply-info">
             <div class="sp-r-supply-name">
               ${s.name}
@@ -20800,7 +20993,7 @@ window.addEventListener('beforeunload', () => {
       const cantAfford5 = state.gameGold < g.price * 5;
       html += `
         <div class="sp-r-supply-row ${unlocked ? '' : 'sp-r-supply-locked'}">
-          <span class="sp-r-supply-emoji">${g.emoji}</span>
+          <span class="sp-r-supply-emoji">${restaurantGetItemDisplay('fridge_food_' + g.id, g.emoji, 18)}</span>
           <div class="sp-r-supply-info">
             <div class="sp-r-supply-name">
               ${g.name}
@@ -20868,7 +21061,7 @@ window.addEventListener('beforeunload', () => {
         // 🔄 原: 每个 div/span 都有内联 style
         return `
           <div class="sp-r-stock-item">
-            <span class="sp-r-stock-item-emoji">${data.emoji}</span>
+            <span class="sp-r-stock-item-emoji">${restaurantGetItemDisplay('fridge_food_' + data.id, data.emoji, 14)}</span>
             <span class="sp-r-stock-item-name">${data.name}</span>
             <span class="sp-r-stock-item-count">×${inv.count}</span>
           </div>
@@ -20889,7 +21082,7 @@ window.addEventListener('beforeunload', () => {
         // 🔄 原: 每个 div/span 都有内联 style
         return `
           <div class="sp-r-stock-item">
-            <span class="sp-r-stock-item-emoji">${data.emoji}</span>
+            <span class="sp-r-stock-item-emoji">${restaurantGetItemDisplay('restaurant_sea_' + id, data.emoji, 14)}</span>
             <span class="sp-r-stock-item-name">${data.name}</span>
             <span class="sp-r-stock-item-count">×${count}</span>
           </div>
@@ -20915,7 +21108,7 @@ window.addEventListener('beforeunload', () => {
         if (!data) return;
         dessertHtml += `
           <div class="sp-r-stock-item">
-            <span class="sp-r-stock-item-emoji">${data.emoji}</span>
+            <span class="sp-r-stock-item-emoji">${getItemDisplayHtml('tanghulu_fruit_' + inv.fruitKey, data.emoji, 14)}</span>
             <span class="sp-r-stock-item-name">🍢${data.name}糖葫芦</span>
             <span class="sp-r-stock-item-count">×${inv.count}</span>
           </div>
@@ -20927,7 +21120,7 @@ window.addEventListener('beforeunload', () => {
         if (!data) return;
         dessertHtml += `
           <div class="sp-r-stock-item">
-            <span class="sp-r-stock-item-emoji">${data.emoji}</span>
+            <span class="sp-r-stock-item-emoji">${getItemDisplayHtml('fridge_food_' + inv.foodId, data.emoji, 14)}</span>
             <span class="sp-r-stock-item-name">${data.name}</span>
             <span class="sp-r-stock-item-count">×${inv.count}</span>
           </div>
@@ -21473,18 +21666,20 @@ window.addEventListener('beforeunload', () => {
         const have = (state.fridgeInventory || []).find(i => i.foodId === ing.foodId);
         const haveCount = have ? have.count : 0;
         const ok = haveCount >= ing.count;
-        return `${fd?.emoji || '?'}×${ing.count}${ok ? '✅' : '❌'}`;
+        const ingDisplay = getItemDisplayHtml('fridge_food_' + ing.foodId, fd?.emoji || '?', 14);
+        return `${ingDisplay}×${ing.count}${ok ? '✅' : '❌'}`;
       }).join(' ');
       const seaText = r.seasonings.map(s => {
         const sd = RESTAURANT_SEASONINGS.find(x => x.id === s.id);
         const have = (state.restaurantSeasonings && state.restaurantSeasonings[s.id]) || 0;
         const ok = have >= s.count;
-        return `${sd?.emoji || '?'}×${s.count}${ok ? '✅' : '❌'}`;
+        const seaDisplay = getItemDisplayHtml('restaurant_sea_' + s.id, sd?.emoji || '?', 14);
+        return `${seaDisplay}×${s.count}${ok ? '✅' : '❌'}`;
       }).join(' ');
       const materials = [ingText, seaText].filter(Boolean).join(' 🧂 ');
       return `
         <div class="sp-restaurant-recipe-item ${canMake ? '' : 'sp-restaurant-recipe-disabled'}" data-recipe-id="${r.id}">
-          <span class="sp-restaurant-recipe-emoji">${r.emoji}</span>
+          <span class="sp-restaurant-recipe-emoji">${restaurantGetItemDisplay('restaurant_recipe_' + r.id, r.emoji, 22)}</span>
           <div class="sp-restaurant-recipe-info">
             <div class="sp-restaurant-recipe-name">${r.name}</div>
             <div class="sp-restaurant-recipe-detail">${materials} | ⏱️${r.cookTime}s | 🍖+${r.feedAmount}</div>
@@ -22419,6 +22614,48 @@ window.addEventListener('beforeunload', () => {
         shelfPromptItemUpload(parseInt(btn.dataset.itemId));
       });
     });
+
+    // 追加道具图鉴
+    let shelfPropsHtml = '<div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin:14px 0 6px;">🧰 道具图鉴</div>';
+    shelfPropsHtml += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">';
+    Object.entries(SHELF_PROPS).forEach(([key, prop]) => {
+      const imgKey = `shelf_prop_${key}`;
+      const custom = state.gameCustomImages?.[imgKey];
+      const propEmoji = prop.name.split(' ')[0];
+      const display = custom
+        ? `<img src="${custom}" style="width:28px;height:28px;object-fit:contain;border-radius:4px;" />`
+        : `<span style="font-size:22px;">${propEmoji}</span>`;
+      shelfPropsHtml += `
+        <div style="aspect-ratio:1;border-radius:8px;border:2px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;position:relative;cursor:pointer;overflow:hidden;transition:all 0.15s;" data-shelf-prop-key="${key}">
+          ${display}
+          <span style="font-size:8px;color:var(--sp-text-muted);text-align:center;">${prop.name.split(' ').slice(1).join(' ')}</span>
+          <div class="sp-shelf-prop-upload" data-prop-key="${key}" style="position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;font-size:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity 0.2s;">📷</div>
+        </div>
+      `;
+    });
+    shelfPropsHtml += '</div>';
+    grid.insertAdjacentHTML('afterend', shelfPropsHtml);
+
+    grid.parentElement.querySelectorAll('[data-shelf-prop-key]').forEach(item => {
+      item.addEventListener('mouseenter', () => {
+        const btn = item.querySelector('.sp-shelf-prop-upload');
+        if (btn) btn.style.opacity = '1';
+      });
+      item.addEventListener('mouseleave', () => {
+        const btn = item.querySelector('.sp-shelf-prop-upload');
+        if (btn) btn.style.opacity = '0';
+      });
+    });
+
+    grid.parentElement.querySelectorAll('.sp-shelf-prop-upload').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const propKey = btn.dataset.propKey;
+        const imgKey = `shelf_prop_${propKey}`;
+        gamePromptImageUpload(imgKey);
+      });
+    });
+
   }
 
   // ===== 货架商品图片上传 =====
@@ -22556,7 +22793,8 @@ window.addEventListener('beforeunload', () => {
           if (filled) cls += ' sp-shelf-slot-filled';
           if (isSelected) cls += ' sp-shelf-slot-selected';
 
-          return `<div class="${cls}" data-source="bay" data-bay="${bayIdx}" data-slot="${slotIdx}" title="${itemData ? itemData.name : '空格'}">${filled ? itemData.emoji : ''}</div>`;
+          const slotDisplay = filled ? getItemDisplayHtml('shelf_item_' + v, itemData.emoji, 18) : '';
+          return `<div class="${cls}" data-source="bay" data-bay="${bayIdx}" data-slot="${slotIdx}" title="${itemData ? itemData.name : '空格'}">${slotDisplay}</div>`;
         }).join('');
 
         // 后排指示器
@@ -22603,7 +22841,8 @@ window.addEventListener('beforeunload', () => {
         if (filled) cls += ' sp-shelf-bag-filled';
         if (isSelected) cls += ' sp-shelf-slot-selected';
         if (locked) cls += ' sp-shelf-bag-locked';
-        return `<div class="${cls}" data-source="bag" data-slot="${slotIdx}" title="${locked ? '🔒 使用扩展篮道具解锁' : (itemData ? itemData.name : '总背包格')}">${filled ? itemData.emoji : (locked ? '🔒' : '')}</div>`;
+        const bagDisplay = filled ? getItemDisplayHtml('shelf_item_' + v, itemData.emoji, 24) : (locked ? '🔒' : '');
+        return `<div class="${cls}" data-source="bag" data-slot="${slotIdx}" title="${locked ? '🔒 使用扩展篮道具解锁' : (itemData ? itemData.name : '总背包格')}">${bagDisplay}</div>`;
       }).join('');
 
       bagAreaEl.querySelectorAll('.sp-shelf-bag-slot').forEach(el => {
@@ -22844,17 +23083,17 @@ window.addEventListener('beforeunload', () => {
           </div>
           <div id="sp-shelf-props" style="margin-top:8px;">
             <button class="sp-shelf-prop-btn" id="sp-shelf-prop-basket-btn" title="${SHELF_PROPS.basket.desc}">
-              <span class="sp-shelf-prop-icon">🪵</span>
+              <span class="sp-shelf-prop-icon">${getItemDisplayHtml('shelf_prop_basket', '🪵', 18)}</span>
               <span class="sp-shelf-prop-name">扩展篮</span>
               <span class="sp-shelf-prop-count" id="sp-shelf-prop-basket-count">×0</span>
             </button>
             <button class="sp-shelf-prop-btn" id="sp-shelf-prop-automatch-btn" title="${SHELF_PROPS.autoMatch.desc}">
-              <span class="sp-shelf-prop-icon">🧹</span>
+              <span class="sp-shelf-prop-icon">${getItemDisplayHtml('shelf_prop_autoMatch', '🧹', 18)}</span>
               <span class="sp-shelf-prop-name">喵喵爪</span>
               <span class="sp-shelf-prop-count" id="sp-shelf-prop-automatch-count">×0</span>
             </button>
             <button class="sp-shelf-prop-btn" id="sp-shelf-prop-shuffle-btn" title="${SHELF_PROPS.shuffle.desc}">
-              <span class="sp-shelf-prop-icon">🔄</span>
+              <span class="sp-shelf-prop-icon">${getItemDisplayHtml('shelf_prop_shuffle', '🔄', 18)}</span>
               <span class="sp-shelf-prop-name">大洗牌</span>
               <span class="sp-shelf-prop-count" id="sp-shelf-prop-shuffle-count">×0</span>
             </button>
@@ -23481,6 +23720,74 @@ window.addEventListener('beforeunload', () => {
       bodyHtml += renderItem(`restaurant_customer_${c.id}`, c.emoji, c.name, unlocked ? `⭐+${c.reputationGive}` : `需声望${c.reputationRequired}`, !unlocked);
     });
     bodyHtml += '</div></div></details>';
+
+    // ===== 游戏道具图鉴 =====
+    bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">🧰 游戏道具</summary><div class="sp-guide-details-content">';
+
+    // 消消看道具
+    bodyHtml += '<div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin:8px 0 4px;">🃏 消消看道具</div>';
+    bodyHtml += '<div class="sp-unified-coll-grid">';
+    Object.entries(MATCH3_PROPS).forEach(([key, prop]) => {
+      const propEmoji = prop.name.split(' ')[0];
+      bodyHtml += renderItem(`match3_prop_${key}`, propEmoji, prop.name.split(' ').slice(1).join(' '), prop.desc, false);
+    });
+    bodyHtml += '</div>';
+
+    // 连连看道具
+    bodyHtml += '<div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin:8px 0 4px;">🔗 连连看道具</div>';
+    bodyHtml += '<div class="sp-unified-coll-grid">';
+    Object.entries(LINK_PROPS).forEach(([key, prop]) => {
+      const propEmoji = prop.name.split(' ')[0];
+      bodyHtml += renderItem(`link_prop_${key}`, propEmoji, prop.name.split(' ').slice(1).join(' '), prop.desc, false);
+    });
+    bodyHtml += '</div>';
+
+    //冰箱道具
+    bodyHtml += '<div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin:8px 0 4px;">🧊 冰箱道具</div>';
+    bodyHtml += '<div class="sp-unified-coll-grid">';
+    Object.entries(FRIDGE_PROP_ITEMS).forEach(([key, prop]) => {
+      const propEmoji = prop.name.split(' ')[0];
+      bodyHtml += renderItem(`fridge_prop_${key}`, propEmoji, prop.name.split(' ').slice(1).join(' '), prop.desc, false);
+    });
+    bodyHtml += '</div>';
+
+    // 糖葫芦道具
+    bodyHtml += '<div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin:8px 0 4px;">🍢 糖葫芦道具</div>';
+    bodyHtml += '<div class="sp-unified-coll-grid">';
+    Object.entries(TANGHULU_PROPS).forEach(([key, prop]) => {
+      const propEmoji = prop.name.split(' ')[0];
+      bodyHtml += renderItem(`tanghulu_prop_${key}`, propEmoji, prop.name.split(' ').slice(1).join(' '), prop.desc, false);
+    });
+    bodyHtml += '</div>';
+
+    // 货架道具
+    bodyHtml += '<div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin:8px 0 4px;">🛒 货架道具</div>';
+    bodyHtml += '<div class="sp-unified-coll-grid">';
+    Object.entries(SHELF_PROPS).forEach(([key, prop]) => {
+      const propEmoji = prop.name.split(' ')[0];
+      bodyHtml += renderItem(`shelf_prop_${key}`, propEmoji, prop.name.split(' ').slice(1).join(' '), prop.desc, false);
+    });
+    bodyHtml += '</div>';
+
+    // 体力道具
+    bodyHtml += '<div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin:8px 0 4px;">⚡ 体力道具</div>';
+    bodyHtml += '<div class="sp-unified-coll-grid">';GAME_STAMINA_ITEMS.forEach(item => {
+      bodyHtml += renderItem(`stamina_item_${item.key}`, item.emoji, item.name, `+${item.restore}⚡`, false);
+    });
+    bodyHtml += '</div>';
+
+    // 工坊背包道具（食物/清洁/睡眠）
+    bodyHtml += '<div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin:8px 0 4px;">🎒 工坊背包道具</div>';
+    bodyHtml += '<div class="sp-unified-coll-grid">';
+    ['food', 'clean', 'energy'].forEach(cat => {
+      const catEmoji = { food: '🍖', clean: '🧴', energy: '🛏️' };
+      GAME_SHOP_ITEMS[cat].forEach((item, idx) => {
+        bodyHtml += renderItem(`${cat}_shopitem_${idx}`, item.emoji, item.name, `+${item.restore} ${catEmoji[cat]}`, false);
+      });
+    });
+    bodyHtml += '</div>';
+
+    bodyHtml += '</div></details>';
 
     // 统计
     const totalImages = Object.keys(state.gameCustomImages || {}).length;
