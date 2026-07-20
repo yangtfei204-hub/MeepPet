@@ -2745,7 +2745,7 @@ function showInventoryPopup(category, quickKey, onUse) {
         if (!data) return;
         itemsHtml += `
           <div class="sp-inv-item" data-tanghulu-fruit="${inv.fruitKey}">
-            <span class="sp-inv-item-emoji">${getItemDisplayHtml('tanghulu_fruit_' + inv.fruitKey, data.emoji, 22)}</span>
+            <span class="sp-inv-item-emoji">${getItemDisplayHtml('tanghulu_product_' + inv.fruitKey, '🍢' + data.emoji, 22)}</span>
             <div class="sp-inv-item-info">
               <span class="sp-inv-item-name">🍢 ${data.name}糖葫芦</span>
               <span class="sp-inv-item-detail">+${data.feedAmount} | 库存: ${inv.count}</span>
@@ -3512,7 +3512,7 @@ function showInventoryPopup(category, quickKey, onUse) {
       return tangInv.filter(i => i.count > 0).map(inv => {
         const data = TANGHULU_FRUITS.find(f => f.key === inv.fruitKey);
         if (!data) return '';
-        return `<div class="sp-total-inv-row"><span class="sp-total-inv-emoji">${getItemDisplayHtml('tanghulu_fruit_' + inv.fruitKey, data.emoji, 16)}</span><span class="sp-total-inv-name">${data.name}糖葫芦</span><span class="sp-total-inv-detail">售${data.sellPrice}🪙</span><span class="sp-total-inv-count">×${inv.count}</span></div>`;
+        return `<div class="sp-total-inv-row"><span class="sp-total-inv-emoji">${getItemDisplayHtml('tanghulu_product_' + inv.fruitKey, '🍢' + data.emoji, 16)}</span><span class="sp-total-inv-name">${data.name}糖葫芦</span><span class="sp-total-inv-detail">售${data.sellPrice}🪙</span><span class="sp-total-inv-count">×${inv.count}</span></div>`;
       }).join('');
     }
 
@@ -19398,7 +19398,7 @@ window.addEventListener('beforeunload', () => {
         if (!data) return;
         html += `
           <div class="sp-link-bag-item">
-            <span class="sp-link-bag-icon">${data.emoji}</span>
+            <span class="sp-link-bag-icon">${getItemDisplayHtml('tanghulu_product_' + inv.fruitKey, '🍢' + data.emoji, 20)}</span>
             <div class="sp-link-bag-info">
               <span class="sp-link-bag-name">${data.name}糖葫芦</span>
               <span class="sp-link-bag-desc">投喂 +${data.feedAmount} | 售价 ${data.sellPrice}🪙</span>
@@ -19463,21 +19463,51 @@ window.addEventListener('beforeunload', () => {
     if (!grid) return;
     if (!state.gameCustomImages) state.gameCustomImages = {};
 
-    grid.innerHTML = TANGHULU_FRUITS.map((fruit, idx) => {
+    // ===== 水果原料图鉴 =====
+    let html = '';
+    html += '<div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:6px;">🍓 水果原料图鉴</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px;">';
+    TANGHULU_FRUITS.forEach((fruit) => {
       const key = `tanghulu_fruit_${fruit.key}`;
       const custom = state.gameCustomImages[key];
       const display = custom
         ? `<img src="${custom}" style="width:28px;height:28px;object-fit:contain;border-radius:50%;" />`
         : `<span style="font-size:22px;">${fruit.emoji}</span>`;
-      return `
+      html += `
         <div style="aspect-ratio:1;border-radius:8px;border:2px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;position:relative;cursor:pointer;overflow:hidden;transition:all 0.15s;" data-tanghulu-fruit-key="${fruit.key}">
           ${display}
           <span style="font-size:8px;color:var(--sp-text-muted);text-align:center;">${fruit.name}</span>
           <div class="sp-tanghulu-fruit-upload" data-key="${fruit.key}" style="position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;font-size:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity 0.2s;">📷</div>
         </div>
       `;
-    }).join('');
+    });
+    html += '</div>';
 
+    // ===== 成品糖葫芦图鉴 =====
+    html += '<div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:6px;">🍢 成品糖葫芦图鉴 <span style="font-size:10px;color:var(--sp-text-muted);font-weight:400;">（穿好的糖葫芦，联动餐厅/投喂）</span></div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px;">';
+    TANGHULU_FRUITS.forEach((fruit) => {
+      const key = `tanghulu_product_${fruit.key}`;
+      const custom = state.gameCustomImages[key];
+      const inv = (state.tanghuluInventory || []).find(i => i.fruitKey === fruit.key);
+      const count = inv ? inv.count : 0;
+      const display = custom
+        ? `<img src="${custom}" style="width:28px;height:28px;object-fit:contain;border-radius:4px;" />`
+        : `<span style="font-size:18px;">🍢${fruit.emoji}</span>`;
+      html += `
+        <div style="aspect-ratio:1;border-radius:8px;border:2px solid ${count > 0 ? 'rgba(255,180,100,0.3)' : 'rgba(255,255,255,0.1)'};background:${count > 0 ? 'rgba(255,180,100,0.06)' : 'rgba(255,255,255,0.05)'};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;position:relative;cursor:pointer;overflow:hidden;transition:all 0.15s;" data-tanghulu-product-key="${fruit.key}">
+          ${display}
+          <span style="font-size:7px;color:var(--sp-text-muted);text-align:center;">${fruit.name}串</span>
+          ${count > 0 ? `<span style="font-size:8px;color:#ffb347;font-weight:600;">×${count}</span>` : ''}
+          <div class="sp-tanghulu-product-upload" data-key="${fruit.key}" style="position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;font-size:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity 0.2s;">📷</div>
+        </div>
+      `;
+    });
+    html += '</div>';
+
+    grid.innerHTML = html;
+
+    // ===== 水果原料 hover + 上传 =====
     grid.querySelectorAll('[data-tanghulu-fruit-key]').forEach(item => {
       item.addEventListener('mouseenter', () => {
         const btn = item.querySelector('.sp-tanghulu-fruit-upload');
@@ -19496,7 +19526,26 @@ window.addEventListener('beforeunload', () => {
       });
     });
 
-    // 追加道具图鉴
+    // ===== 成品糖葫芦 hover + 上传 =====
+    grid.querySelectorAll('[data-tanghulu-product-key]').forEach(item => {
+      item.addEventListener('mouseenter', () => {
+        const btn = item.querySelector('.sp-tanghulu-product-upload');
+        if (btn) btn.style.opacity = '1';
+      });
+      item.addEventListener('mouseleave', () => {
+        const btn = item.querySelector('.sp-tanghulu-product-upload');
+        if (btn) btn.style.opacity = '0';
+      });
+    });
+
+    grid.querySelectorAll('.sp-tanghulu-product-upload').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        tanghuluPromptProductUpload(btn.dataset.key);
+      });
+    });
+
+    // ===== 道具图鉴（保持不变）=====
     let thPropsHtml = '<div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin:14px 0 6px;">🧰 道具图鉴</div>';
     thPropsHtml += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">';
     Object.entries(TANGHULU_PROPS).forEach(([key, prop]) => {
@@ -19515,9 +19564,10 @@ window.addEventListener('beforeunload', () => {
       `;
     });
     thPropsHtml += '</div>';
-    grid.insertAdjacentHTML('afterend', thPropsHtml);
+    grid.insertAdjacentHTML('beforeend', thPropsHtml);
 
-    grid.parentElement.querySelectorAll('[data-tanghulu-prop-key]').forEach(item => {
+    // 道具图鉴 hover + 上传（保持不变）
+    grid.querySelectorAll('[data-tanghulu-prop-key]').forEach(item => {
       item.addEventListener('mouseenter', () => {
         const btn = item.querySelector('.sp-tanghulu-prop-upload');
         if (btn) btn.style.opacity = '1';
@@ -19528,7 +19578,7 @@ window.addEventListener('beforeunload', () => {
       });
     });
 
-    grid.parentElement.querySelectorAll('.sp-tanghulu-prop-upload').forEach(btn => {
+    grid.querySelectorAll('.sp-tanghulu-prop-upload').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const propKey = btn.dataset.propKey;
@@ -19536,8 +19586,8 @@ window.addEventListener('beforeunload', () => {
         gamePromptImageUpload(imgKey);
       });
     });
-
   }
+
 
   // ===== 糖葫芦水果图片上传 =====
   function tanghuluPromptFruitUpload(fruitKey) {
@@ -19629,6 +19679,95 @@ window.addEventListener('beforeunload', () => {
     });
   }
 
+  // ===== 成品糖葫芦图片上传 =====
+  function tanghuluPromptProductUpload(fruitKey) {
+    const fruit = TANGHULU_FRUITS.find(f => f.key === fruitKey);
+    const key = `tanghulu_product_${fruitKey}`;
+    if (!state.gameCustomImages) state.gameCustomImages = {};
+    const currentImg = state.gameCustomImages[key];
+
+    if (currentImg) {
+      showConfirmDialog({
+        title: '🖼️ 当前已有自定义图片',
+        desc: `「${fruit?.name || fruitKey}糖葫芦成品」已有自定义图片`,
+        confirmText: '移除图片',
+        cancelText: '替换为新图片',
+        onConfirm: () => {
+          delete state.gameCustomImages[key];
+          saveDataImmediate('糖葫芦成品图片移除');
+          tanghuluRenderCollection();
+          tanghuluShowNotice('成品图片已移除，恢复默认显示');
+        },
+        onCancel: () => {
+          _tanghuluPromptProductUploadStep2(fruitKey, fruit, key, currentImg);
+        }
+      });
+      return;
+    }
+
+    _tanghuluPromptProductUploadStep2(fruitKey, fruit, key, '');
+  }
+
+  function _tanghuluPromptProductUploadStep2(fruitKey, fruit, key, currentImg) {
+    showConfirmDialog({
+      title: `🖼️ 设置「${fruit?.name || fruitKey}糖葫芦成品」图片`,
+      desc: '⭐ 推荐使用图片链接（节省内存）<br/>此图片会联动显示在投喂/餐厅/总背包中',
+      confirmText: '📝 输入链接',
+      cancelText: '📁 本地上传',
+      onConfirm: () => {
+        showPromptDialog({
+          title: '🔗 输入图片链接',
+          desc: '留空确认 = 清除',
+          placeholder: 'https://...',
+          defaultValue: currentImg && currentImg.startsWith('http') ? currentImg : '',
+          confirmText: '确认',
+          cancelText: '取消',
+          onConfirm: (url) => {
+            const trimmed = (url || '').trim();
+            if (!trimmed) {
+              delete state.gameCustomImages[key];
+              saveDataImmediate('糖葫芦成品图片清除');
+              tanghuluRenderCollection();
+              tanghuluShowNotice('成品图片已清除');
+              return;
+            }
+            if (!trimmed.startsWith('http')) {
+              tanghuluShowNotice('请输入以 http 开头的链接');
+              return;
+            }
+            state.gameCustomImages[key] = trimmed;
+            saveDataImmediate('糖葫芦成品图片链接');
+            tanghuluRenderCollection();
+            tanghuluShowNotice('成品图片已设置！');
+          }
+        });
+      },
+      onCancel: () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+        input.onchange = async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          if (file.size > 2 * 1024 * 1024) {
+            tanghuluShowNotice('图片不能超过2MB，推荐使用图片链接');
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = async (ev) => {
+            const compressed = await compressImage(ev.target.result, 80, 0.7);
+            if (!state.gameCustomImages) state.gameCustomImages = {};
+            state.gameCustomImages[key] = compressed;
+            saveDataImmediate('糖葫芦成品图片上传');
+            tanghuluRenderCollection();
+            tanghuluShowNotice('成品图片已设置！（提示：使用链接可节省存储空间）');
+          };
+          reader.readAsDataURL(file);
+        };
+        input.click();
+      }
+    });
+  }
 
   // ===== 卖糖葫芦 =====
   function tanghuluSellItem(fruitKey) {
@@ -19816,7 +19955,7 @@ window.addEventListener('beforeunload', () => {
         if (!data) return;
         html += `
           <div class="sp-link-shop-item">
-            <span class="sp-link-shop-icon">${data.emoji}</span>
+            <span class="sp-link-shop-icon">${getItemDisplayHtml('tanghulu_product_' + inv.fruitKey, '🍢' + data.emoji, 20)}</span>
             <div class="sp-link-shop-info">
               <span class="sp-link-shop-name">${data.name}糖葫芦</span>
               <span class="sp-link-shop-desc">库存: ${inv.count}</span>
@@ -19926,8 +20065,8 @@ window.addEventListener('beforeunload', () => {
           <div id="sp-tanghulu-inventory-content"></div>
         </div>
         <div id="sp-tanghulu-tab-content-collection" style="display:none;padding:8px;">
-          <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">📖 水果图鉴 <span style="font-size:10px;color:var(--sp-text-muted);font-weight:400;">（点击 📷 设置图片，优先推荐链接节省内存）</span></div>
-          <div id="sp-tanghulu-collection-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;"></div>
+          <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">📖 图鉴 <span style="font-size:10px;color:var(--sp-text-muted);font-weight:400;">（点击 📷 设置图片，优先推荐链接节省内存）</span></div>
+          <div id="sp-tanghulu-collection-grid"></div>
         </div>
       </div>
     `;
@@ -20686,7 +20825,7 @@ window.addEventListener('beforeunload', () => {
           tangInv.slice(0, 2).forEach(inv => {
             const data = TANGHULU_FRUITS.find(f => f.key === inv.fruitKey);
             if (!data) return;
-            dessertButtonsHtml += `<button class="sp-restaurant-table-dessert-btn" data-customer="${i}" data-type="tanghulu" data-key="${inv.fruitKey}" title="${data.name}糖葫芦">${getItemDisplayHtml('tanghulu_fruit_' + inv.fruitKey, data.emoji, 14)}</button>`;
+            dessertButtonsHtml += `<button class="sp-restaurant-table-dessert-btn" data-customer="${i}" data-type="tanghulu" data-key="${inv.fruitKey}" title="${data.name}糖葫芦">${getItemDisplayHtml('tanghulu_product_' + inv.fruitKey, '🍢' + data.emoji, 14)}</button>`;
           });
           if ((state.tanghuluSugarCrystal || 0) > 0) {
             dessertButtonsHtml += `<button class="sp-restaurant-table-dessert-btn" data-customer="${i}" data-type="crystal" data-key="crystal" title="糖砂甜品">✨</button>`;
@@ -21108,7 +21247,7 @@ window.addEventListener('beforeunload', () => {
         if (!data) return;
         dessertHtml += `
           <div class="sp-r-stock-item">
-            <span class="sp-r-stock-item-emoji">${getItemDisplayHtml('tanghulu_fruit_' + inv.fruitKey, data.emoji, 14)}</span>
+            <span class="sp-r-stock-item-emoji">${getItemDisplayHtml('tanghulu_product_' + inv.fruitKey, '🍢' + data.emoji, 14)}</span>
             <span class="sp-r-stock-item-name">🍢${data.name}糖葫芦</span>
             <span class="sp-r-stock-item-count">×${inv.count}</span>
           </div>
@@ -23684,10 +23823,17 @@ window.addEventListener('beforeunload', () => {
     });
     bodyHtml += '</div></div></details>';
 
-    // ===== 糖葫芦水果 =====
-    bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">🍢 糖葫芦水果</summary><div class="sp-guide-details-content"><div class="sp-unified-coll-grid">';
+    // ===== 糖葫芦水果原料 =====
+    bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">🍓 糖葫芦水果原料</summary><div class="sp-guide-details-content"><div class="sp-unified-coll-grid">';
     TANGHULU_FRUITS.forEach(fruit => {
-      bodyHtml += renderItem(`tanghulu_fruit_${fruit.key}`, fruit.emoji, fruit.name, `售${fruit.sellPrice}🪙 投喂+${fruit.feedAmount}`, false);
+      bodyHtml += renderItem(`tanghulu_fruit_${fruit.key}`, fruit.emoji, fruit.name, `水果原料`, false);
+    });
+    bodyHtml += '</div></div></details>';
+
+    // ===== 成品糖葫芦 =====
+    bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">🍢 成品糖葫芦 <span style="font-size:10px;color:var(--sp-text-muted);">（联动餐厅/投喂/总背包）</span></summary><div class="sp-guide-details-content"><div class="sp-unified-coll-grid">';
+    TANGHULU_FRUITS.forEach(fruit => {
+      bodyHtml += renderItem(`tanghulu_product_${fruit.key}`, '🍢' + fruit.emoji, fruit.name + '串', `售${fruit.sellPrice}🪙 投喂+${fruit.feedAmount}`, false);
     });
     bodyHtml += '</div></div></details>';
 
