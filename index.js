@@ -535,6 +535,7 @@
   let spriteStateLockTimer = null; // 对应的恢复定时器
   let chatMode = 'pet';             // 'pet'(桌宠模式) | 'online'(线上模式) | 'offline'(线下模式)
   let selectedEmoji = null;        // 当前选中的表情包 (base64 或 URL)
+  let showLockedNames = false;     // 是否显示上锁物品的真实名字
   let emojiStickers = [];          // 用户上传的表情包列表
 
   // ============================================================
@@ -987,6 +988,16 @@ function saveData() {
     // 游戏自定义图片（图鉴自定义图）
     if (state.gameCustomImages && Object.keys(state.gameCustomImages).length > 0) {
       imageData.gameCustomImages = state.gameCustomImages;
+    }
+
+    // 游戏图标
+    const gameIconKeys = Object.keys(state.gameCustomImages || {}).filter(k => k.startsWith('game_icon_'));
+    if (gameIconKeys.length > 0) {
+      if (!imageData.gameCustomImages) imageData.gameCustomImages = {};
+      gameIconKeys.forEach(k => {
+        imageData.gameCustomImages[k] = state.gameCustomImages[k];
+      });
+      count += gameIconKeys.length;
     }
 
     // 游戏背景图
@@ -1925,6 +1936,124 @@ function clearSpriteLock() {
       if (e.target === overlay) {
         cleanup();
         if (onCancel) onCancel();
+      }
+    };
+  }
+
+  // ============================================================
+  // 统一输入弹窗工具（替代 prompt）
+  // ============================================================
+  function showPromptDialog({ title, desc, placeholder, defaultValue, confirmText, cancelText, onConfirm, onCancel }) {
+    document.getElementById('sp-prompt-dialog-overlay')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-prompt-dialog-overlay';
+    overlay.className = 'sp-confirm-overlay';
+    overlay.innerHTML = `
+      <div class="sp-confirm-box" id="sp-prompt-dialog-box">
+        <div class="sp-confirm-title">${title || '请输入'}</div>
+        ${desc ? `<div class="sp-confirm-desc">${desc}</div>` : ''}
+        <input type="text" id="sp-prompt-dialog-input" class="sp-prompt-input" placeholder="${placeholder || ''}" value="${defaultValue || ''}" />
+        <div class="sp-confirm-actions">
+          <button class="sp-confirm-btn sp-confirm-btn-cancel" id="sp-prompt-dialog-cancel">${cancelText || '取消'}</button>
+          <button class="sp-confirm-btn sp-confirm-btn-primary" id="sp-prompt-dialog-ok">${confirmText || '确认'}</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    requestAnimationFrame(() => {
+      const box = document.getElementById('sp-prompt-dialog-box');
+      if (box) {
+        const boxH = box.offsetHeight || 200;
+        const boxW = box.offsetWidth || 300;
+        box.style.position = 'fixed';
+        box.style.top = Math.max(20, Math.floor((window.innerHeight - boxH) / 2)) + 'px';
+        box.style.left = Math.floor((window.innerWidth - boxW) / 2) + 'px';
+        box.style.margin = '0';
+      }
+      const inputEl = document.getElementById('sp-prompt-dialog-input');
+      if (inputEl) {
+        inputEl.focus();
+        inputEl.select();
+      }
+    });
+
+    const cleanup = () => { overlay.remove(); };
+
+    const inputEl = document.getElementById('sp-prompt-dialog-input');
+
+    document.getElementById('sp-prompt-dialog-ok').onclick = () => {
+      const val = document.getElementById('sp-prompt-dialog-input')?.value;
+      cleanup();
+      if (onConfirm) onConfirm(val);
+    };
+
+    document.getElementById('sp-prompt-dialog-cancel').onclick = () => {
+      cleanup();
+      if (onCancel) onCancel();
+    };
+
+    if (inputEl) {
+      inputEl.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          document.getElementById('sp-prompt-dialog-ok')?.click();
+        }
+      };
+    }
+
+    overlay.onclick = (e) => {
+      if (e.target === overlay) {
+        cleanup();
+        if (onCancel) onCancel();
+      }
+    };
+  }
+
+  // ============================================================
+  // 统一提示弹窗工具（替代 alert）
+  // ============================================================
+  function showAlertDialog({ title, desc, buttonText, onClose }) {
+    document.getElementById('sp-alert-dialog-overlay')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-alert-dialog-overlay';
+    overlay.className = 'sp-confirm-overlay';
+    overlay.innerHTML = `
+      <div class="sp-confirm-box" id="sp-alert-dialog-box">
+        <div class="sp-confirm-title">${title || '提示'}</div>
+        ${desc ? `<div class="sp-confirm-desc">${desc}</div>` : ''}
+        <div class="sp-confirm-actions" style="justify-content:center;">
+          <button class="sp-confirm-btn sp-confirm-btn-primary" id="sp-alert-dialog-ok">${buttonText || '确定'}</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    requestAnimationFrame(() => {
+      const box = document.getElementById('sp-alert-dialog-box');
+      if (box) {
+        const boxH = box.offsetHeight || 160;
+        const boxW = box.offsetWidth || 280;
+        box.style.position = 'fixed';
+        box.style.top = Math.max(20, Math.floor((window.innerHeight - boxH) / 2)) + 'px';
+        box.style.left = Math.floor((window.innerWidth - boxW) / 2) + 'px';
+        box.style.margin = '0';
+      }
+    });
+
+    const cleanup = () => { overlay.remove(); };
+
+    document.getElementById('sp-alert-dialog-ok').onclick = () => {
+      cleanup();
+      if (onClose) onClose();
+    };
+
+    overlay.onclick = (e) => {
+      if (e.target === overlay) {
+        cleanup();
+        if (onClose) onClose();
       }
     };
   }
@@ -2943,6 +3072,18 @@ function showInventoryPopup(category, quickKey, onUse) {
     toggleMenu();
   }
 
+  //===== 获取游戏自定义图标HTML =====
+  function getGameIconHtml(gameId, defaultEmoji, size) {
+    const imgSize = size || 28;
+    const key = `game_icon_${gameId}`;
+    const custom = (state.gameCustomImages && state.gameCustomImages[key]) || '';
+    if (custom) {
+      return `<img src="${custom}" style="width:${imgSize}px;height:${imgSize}px;object-fit:contain;border-radius:6px;" />`;
+    }
+    return defaultEmoji;
+  }
+
+
   // ============================================================
   // 游戏选择弹窗
   // ============================================================
@@ -2964,77 +3105,77 @@ function showInventoryPopup(category, quickKey, onUse) {
         </div>
         <div class="sp-game-selector-body">
           <div class="sp-game-selector-card" data-game="restaurant">
-            <div class="sp-game-selector-icon">🐱</div>
+            <div class="sp-game-selector-icon">${getGameIconHtml('restaurant', '🐱')}</div>
             <div class="sp-game-selector-info">
               <div class="sp-game-selector-name">小猫餐厅</div>
               <div class="sp-game-selector-desc">用食材烹饪菜品，招待客人赚取金币</div>
             </div>
           </div>
           <div class="sp-game-selector-card" data-game="merge">
-            <div class="sp-game-selector-icon">🧶</div>
+            <div class="sp-game-selector-icon">${getGameIconHtml('merge', '🧶')}</div>
             <div class="sp-game-selector-info">
               <div class="sp-game-selector-name">合成工坊</div>
               <div class="sp-game-selector-desc">合成物品、完成订单、赚取金币</div>
             </div>
           </div>
           <div class="sp-game-selector-card" data-game="match3">
-            <div class="sp-game-selector-icon">🃏</div>
+            <div class="sp-game-selector-icon">${getGameIconHtml('match3', '🃏')}</div>
             <div class="sp-game-selector-info">
               <div class="sp-game-selector-name">消消看</div>
               <div class="sp-game-selector-desc">点击图案收集到暂存栏，三消通关</div>
             </div>
           </div>
           <div class="sp-game-selector-card" data-game="lottery">
-            <div class="sp-game-selector-icon">🎰</div>
+            <div class="sp-game-selector-icon">${getGameIconHtml('lottery', '🎰')}</div>
             <div class="sp-game-selector-info">
               <div class="sp-game-selector-name">幸运抽奖</div>
               <div class="sp-game-selector-desc">消耗金币抽取道具、物品和金币奖励</div>
             </div>
           </div>
           <div class="sp-game-selector-card" data-game="link">
-            <div class="sp-game-selector-icon">🔗</div>
+            <div class="sp-game-selector-icon">${getGameIconHtml('link', '🔗')}</div>
             <div class="sp-game-selector-info">
               <div class="sp-game-selector-name">连连看</div>
               <div class="sp-game-selector-desc">找到相同图案，两折连线消除</div>
             </div>
           </div>
           <div class="sp-game-selector-card" data-game="fridge">
-            <div class="sp-game-selector-icon">🧊</div>
+            <div class="sp-game-selector-icon">${getGameIconHtml('fridge', '🧊')}</div>
             <div class="sp-game-selector-info">
               <div class="sp-game-selector-name">冰箱整理</div>
               <div class="sp-game-selector-desc">把食材塞进冰箱，旋转摆放挑战空间极限</div>
             </div>
           </div>
           <div class="sp-game-selector-card" data-game="tanghulu">
-            <div class="sp-game-selector-icon">🍢</div>
+            <div class="sp-game-selector-icon">${getGameIconHtml('tanghulu', '🍢')}</div>
             <div class="sp-game-selector-info">
               <div class="sp-game-selector-name">糖葫芦工坊</div>
               <div class="sp-game-selector-desc">水果排序归类，做出漂亮糖葫芦</div>
             </div>
           </div>
           <div class="sp-game-selector-card" data-game="shelf">
-            <div class="sp-game-selector-icon">🛒</div>
+            <div class="sp-game-selector-icon">${getGameIconHtml('shelf', '🛒')}</div>
             <div class="sp-game-selector-info">
               <div class="sp-game-selector-name">整理货架</div>
               <div class="sp-game-selector-desc">三消消除，清空货架上所有商品</div>
             </div>
           </div>
           <div class="sp-game-selector-card" data-game="inventory">
-            <div class="sp-game-selector-icon">🎒</div>
+            <div class="sp-game-selector-icon">${getGameIconHtml('inventory', '🎒')}</div>
             <div class="sp-game-selector-info">
               <div class="sp-game-selector-name">总背包</div>
               <div class="sp-game-selector-desc">查看所有道具、体力和物资</div>
             </div>
           </div>
           <div class="sp-game-selector-card" data-game="achievements">
-            <div class="sp-game-selector-icon">🏆</div>
+            <div class="sp-game-selector-icon">${getGameIconHtml('achievements', '🏆')}</div>
             <div class="sp-game-selector-info">
               <div class="sp-game-selector-name">成就</div>
               <div class="sp-game-selector-desc">查看已解锁的成就和进度</div>
             </div>
           </div>
           <div class="sp-game-selector-card" data-game="unifiedCollection" style="grid-column:span 2;">
-            <div class="sp-game-selector-icon">📖</div>
+            <div class="sp-game-selector-icon">${getGameIconHtml('unifiedCollection', '📖')}</div>
             <div class="sp-game-selector-info">
               <div class="sp-game-selector-name">图鉴合集</div>
               <div class="sp-game-selector-desc">所有游戏图鉴汇总，联动物品共享图片</div>
@@ -5219,31 +5360,41 @@ async function refreshWorldPreview() {
 
     // 新建服装按钮
     document.getElementById('sp-wardrobe-add-outfit').onclick = () => {
-      const name = prompt('给这套服装起个名字：', `服装${(settings.houseOutfits || []).length + 1}`);
-      if (!name || !name.trim()) return;
-      if ((settings.houseOutfits || []).find(o => o.name === name.trim())) {
-        showBubble('已有同名服装，请换个名字', 2500);
-        return;
-      }
-      if (!settings.houseOutfits) settings.houseOutfits = [];
-      const newOutfit = {
-        name: name.trim(),
-        coverImage: '',
-        character: '',
-        actionFeed: '',
-        actionBath: '',
-        actionSleep: '',
-        expressions: [],
-      };
+      showPromptDialog({
+        title: '👗 新建服装',
+        desc: '给这套服装起个名字吧',
+        placeholder: '服装名称',
+        defaultValue: `服装${(settings.houseOutfits || []).length + 1}`,
+        confirmText: '创建',
+        cancelText: '取消',
+        onConfirm: (name) => {
+          if (!name || !name.trim()) return;
+          if ((settings.houseOutfits || []).find(o => o.name === name.trim())) {
+            showBubble('已有同名服装，请换个名字',2500);
+            return;
+          }
+          if (!settings.houseOutfits) settings.houseOutfits = [];
+          const newOutfit = {
+            name: name.trim(),
+            coverImage: '',
+            character: '',
+            actionFeed: '',
+            actionBath: '',
+            actionSleep: '',
+            expressions: [],
+          };
 
-      settings.houseOutfits.push(newOutfit);
-      settings._wardrobeEditOutfit = newOutfit.name;
-      saveData();
-      wardrobeRenderOutfitList();
-      wardrobeRenderUploads();
-      wardrobeRenderExpressions();
-      showBubble(`✨ 服装「${newOutfit.name}」已创建，可以上传立绘了`, 2500);
+          settings.houseOutfits.push(newOutfit);
+          settings._wardrobeEditOutfit = newOutfit.name;
+          saveData();
+          wardrobeRenderOutfitList();
+          wardrobeRenderUploads();
+          wardrobeRenderExpressions();
+          showBubble(`✨ 服装「${newOutfit.name}」已创建，可以上传立绘了`, 2500);
+        }
+      });
     };
+
 
     // 渲染三个上传区
     wardrobeRenderUploads();
@@ -5555,23 +5706,29 @@ async function refreshWorldPreview() {
           e.preventDefault();
           const key = btn.dataset.key;
           const currentVal = wardrobeGetImage(key);
-          const url = prompt(
-            '输入图片链接（支持 GIF）：\n留空并确认 = 清除',
-            currentVal && currentVal.startsWith('http') ? currentVal : ''
-          );
-          if (url === null) return;
-          const trimmed = url.trim();
-          if (trimmed && !trimmed.startsWith('http')) {
-            showBubble('链接需要以 http 开头', 3000);
-            return;
-          }
-          wardrobeSetImage(key, trimmed);
-          updateUploadPreview(key, trimmed);
-          updateHouseScene();
-          saveData();
-          showBubble(trimmed ? '图片链接已设置！' : '已清除图片', 2000);
+          showPromptDialog({
+            title: '🔗 输入图片链接',
+            desc: '支持 GIF 动图。留空并确认 = 清除当前图片',
+            placeholder:'https://...',
+            defaultValue: currentVal && currentVal.startsWith('http') ? currentVal : '',
+            confirmText: '确认',
+            cancelText: '取消',
+            onConfirm: (url) => {
+              const trimmed = (url || '').trim();
+              if (trimmed && !trimmed.startsWith('http')) {
+                showBubble('链接需要以 http 开头', 3000);
+                return;
+              }
+              wardrobeSetImage(key, trimmed);
+              updateUploadPreview(key, trimmed);
+              updateHouseScene();
+              saveData();
+              showBubble(trimmed ? '图片链接已设置！' : '已清除图片', 2000);
+            }
+          });
         };
       });
+
 
       area.querySelectorAll('input[type="file"][data-key]').forEach(input => {
         input.onchange = (e) => {
@@ -5745,19 +5902,25 @@ async function refreshWorldPreview() {
         const exprs = getExprs();
         if (!exprs[idx]) return;
         const current = exprs[idx].image || '';
-        const url = prompt(
-          `设置第 ${idx + 1} 个表情的图片链接（留空确认=清除）：`,
-          current.startsWith('http') ? current : ''
-        );
-        if (url === null) return;
-        const trimmed = url.trim();
-        if (trimmed && !trimmed.startsWith('http')) { showBubble('链接需要以 http 开头', 3000); return; }
-        exprs[idx].image = trimmed;
-        saveExprs();
-        wardrobeRenderExpressions();
-        showBubble(trimmed ? '表情链接已设置！' : '已清除', 2000);
+        showPromptDialog({
+          title: `🔗 设置第 ${idx + 1} 个表情图片链接`,
+          desc: '留空确认 = 清除当前图片',
+          placeholder: 'https://...',
+          defaultValue: current.startsWith('http') ? current : '',
+          confirmText: '确认',
+          cancelText: '取消',
+          onConfirm: (url) => {
+            const trimmed = (url || '').trim();
+            if (trimmed && !trimmed.startsWith('http')) { showBubble('链接需要以 http 开头', 3000); return; }
+            exprs[idx].image = trimmed;
+            saveExprs();
+            wardrobeRenderExpressions();
+            showBubble(trimmed ? '表情链接已设置！' : '已清除', 2000);
+          }
+        });
       };
     });
+
 
     // 删除
     container.querySelectorAll('.sp-wardrobe-expr-delete').forEach(btn => {
@@ -6469,14 +6632,22 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
           document.getElementById('sp-diary-cancel-edit')?.addEventListener('click', () => { renderDiaryContent(); });
         });
         container.querySelector('.sp-diary-delete-btn')?.addEventListener('click', () => {
-          if (!confirm(`确定删除 ${entry.date} 的日记吗？`)) return;
-          state.diaryEntries = entries.filter(e => e.date !== diarySelectedDate);
-          saveData();
-          diarySelectedDate = '';
-          renderDiaryCalendar();
-          renderDiaryContent();
-          showBubble('日记已删除', 2000);
+          showConfirmDialog({
+            title: '🗑️ 删除日记',
+            desc: `确定删除 ${entry.date} 的日记吗？<br/>此操作不可撤销`,
+            confirmText: '删除',
+            cancelText: '取消',
+            onConfirm: () => {
+              state.diaryEntries = entries.filter(e => e.date !== diarySelectedDate);
+              saveData();
+              diarySelectedDate = '';
+              renderDiaryCalendar();
+              renderDiaryContent();
+              showBubble('日记已删除', 2000);
+            }
+          });
         });
+
       } else {
         container.innerHTML = `<div class="sp-diary-empty">📭 ${diarySelectedDate} 没有日记<br/><span style="font-size:11px;">点下方「✨ 生成今日日记」来写一篇吧</span></div>`;
       }
@@ -6683,25 +6854,45 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
       // 如果今天已有日记，追加或覆盖
       const existIdx = state.diaryEntries.findIndex(e => e.date === dateStr);
       if (existIdx >= 0) {
-        if (confirm('今天已有日记，要覆盖吗？\n取消则追加到后面。')) {
-          state.diaryEntries[existIdx].content = result;
-          state.diaryEntries[existIdx].timestamp = Date.now();
-        } else {
-          state.diaryEntries[existIdx].content += '\n\n---\n\n' + result;
-          state.diaryEntries[existIdx].timestamp = Date.now();
-        }
+        const _diaryResult = result;
+        const _diaryExistIdx = existIdx;
+        const _diaryDateStr = dateStr;
+        if (btn) { btn.textContent = '✨ 生成今日日记'; btn.disabled = false; }
+        showConfirmDialog({
+          title: '📔 今天已有日记',
+          desc: '要覆盖原有日记，还是追加到后面？',
+          confirmText: '覆盖',
+          cancelText: '追加到后面',
+          onConfirm: () => {
+            state.diaryEntries[_diaryExistIdx].content = _diaryResult;
+            state.diaryEntries[_diaryExistIdx].timestamp = Date.now();
+            saveData();
+            checkAchievements();
+            diarySelectedDate = _diaryDateStr;
+            renderDiaryCalendar();
+            renderDiaryContent();
+            showBubble('📔 今日日记已覆盖！', 3000);
+          },
+          onCancel: () => {
+            state.diaryEntries[_diaryExistIdx].content += '\n\n---\n\n' + _diaryResult;
+            state.diaryEntries[_diaryExistIdx].timestamp = Date.now();
+            saveData();
+            checkAchievements();
+            diarySelectedDate = _diaryDateStr;
+            renderDiaryCalendar();
+            renderDiaryContent();
+            showBubble('📔 日记已追加！', 3000);
+          }
+        });
       } else {
         state.diaryEntries.push({ date: dateStr, content: result, timestamp: Date.now() });
+        saveData();
+        checkAchievements();
+        diarySelectedDate = dateStr;
+        renderDiaryCalendar();
+        renderDiaryContent();
+        showBubble('📔 今日日记写好啦！', 3000);
       }
-
-      saveData();
-      checkAchievements();
-      diarySelectedDate = dateStr;
-      renderDiaryCalendar();
-      renderDiaryContent();
-      showBubble('📔 今日日记写好啦！', 3000);
-    } else {
-      showBubble('日记生成失败了…检查API', 3000);
     }
   }
 
@@ -7514,86 +7705,1010 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
             <div class="sp-section">
               <div class="sp-section-title">💡 常用选择器参考</div>
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">桌宠主体</summary>
+                <summary class="sp-guide-summary">🐾 桌宠主体</summary>
                 <div class="sp-guide-details-content">
-                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* 桌宠容器 */
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 桌宠容器（整个桌宠的外层盒子）===== */
 #silly-pet-container { }
 
-/* 精灵图 */
+/* ===== 精灵图（桌宠本体图片）===== */
 #silly-pet-sprite { }
 
-/* 气泡 */
+/* ===== 气泡（桌宠说话的对话气泡）===== */
 #silly-pet-bubble { }
+/* 气泡显示时*/
+#silly-pet-bubble.visible { }
+/* 气泡底部三角箭头 */
+#silly-pet-bubble::after { }
 
-/* 心情图标 */
+/* ===== 心情图标（右上角emoji）===== */
 #silly-pet-mood { }
 
-/* 状态条 */
+/* ===== 状态条（底部饱食/清洁/精力三条）===== */
 #silly-pet-status-bar { }
+/* 状态条显示时 */
+#silly-pet-status-bar.visible { }
+/* 单条状态行 */
+.sp-stat { }
+/* 状态图标（🍖💧⚡） */
+.sp-stat-icon { }
+/* 状态进度条容器 */
+.sp-stat-bar { }
+/* 状态进度条填充（通过 width 控制百分比）*/
+.sp-stat-fill { }
+.sp-stat-fill.hunger { }  /* 饱食 */
+.sp-stat-fill.clean { }   /* 清洁 */
+.sp-stat-fill.energy { }  /* 精力 */
+/* 状态百分比文字 */
+.sp-stat-pct { }
 
-/* 菜单按钮 */
-.sp-menu-btn { }</pre>
-                </div>
-              </details><details class="sp-guide-details">
-                <summary class="sp-guide-summary">聊天框</summary>
-                <div class="sp-guide-details-content">
-                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* 聊天框容器 */
-#silly-pet-chat { }
+/* ===== 菜单按钮（圆形发散的8个按钮）===== */
+#silly-pet-menu { }
+/* 菜单展开时 */
+#silly-pet-menu.visible { }
+/* 单个菜单按钮 */
+.sp-menu-btn { }
+/* 有自定义图标的菜单按钮 */
+.sp-menu-btn.has-custom-icon { }
+/* 按功能区分*/
+.sp-menu-btn[data-action="feed"] { }     /* 投喂 */
+.sp-menu-btn[data-action="bath"] { }     /* 洗澡 */
+.sp-menu-btn[data-action="sleep"] { }    /* 睡觉 */
+.sp-menu-btn[data-action="chat"] { }     /* 聊天 */
+.sp-menu-btn[data-action="diary"] { }    /* 日记 */
+.sp-menu-btn[data-action="game"] { }     /* 游戏 */
+.sp-menu-btn[data-action="house"] { }    /* 小屋 */
+.sp-menu-btn[data-action="settings"] { } /* 设置 */
 
-/* 聊天消息 -桌宠 */
-.sp-chat-msg.pet { }
-
-/* 聊天消息 - 用户 */
-.sp-chat-msg.user { }
-
-/* 输入框 */
-#sp-chat-input-field { }</pre>
+/* ===== 互动贴图（投喂/洗澡/睡觉时飘出的物品）===== */
+#silly-pet-interaction-item { }
+#silly-pet-interaction-item.active { }
+#silly-pet-interaction-item img { }</pre>
                 </div>
               </details>
-              <details class="sp-guide-details">
-                <summary class="sp-guide-summary">设置面板 & 小屋</summary>
-                <div class="sp-guide-details-content">
-                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* 设置面板 */
-#silly-pet-settings { }
 
-/* 标签按钮 */
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">💬聊天框</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 聊天面板容器 ===== */
+#silly-pet-chat { }
+/* 聊天面板显示时 */
+#silly-pet-chat.visible { }
+/* 聊天面板最小化时 */
+#silly-pet-chat.sp-chat-minimized { }
+
+/* ===== 聊天头部（可拖拽的标题栏）===== */
+#silly-pet-chat-header { }
+
+/* ===== 聊天消息区 ===== */
+#silly-pet-chat-messages { }
+/* 聊天消息滚动条 */
+#silly-pet-chat-messages::-webkit-scrollbar { }
+#silly-pet-chat-messages::-webkit-scrollbar-thumb { }
+
+/* ===== 聊天消息气泡 ===== */
+.sp-chat-msg { }           /* 所有消息 */
+.sp-chat-msg.pet { }       /* 桌宠的回复 */
+.sp-chat-msg.user { }      /* 用户的消息 */
+/* 消息内的Markdown 元素 */
+.sp-chat-msg em { }        /* 斜体 */
+.sp-chat-msg strong { }    /* 加粗 */
+.sp-chat-msg code { }      /* 代码 */
+/* 思考中动画（桌宠正在生成回复）*/
+.sp-chat-msg.sp-thinking { }
+.sp-thinking-dots { }
+
+/* ===== Token 显示栏 ===== */
+#sp-chat-token-bar { }
+#sp-token-display { }
+
+/* ===== 聊天输入区 ===== */
+#silly-pet-chat-input { }
+/* 输入行容器 */
+#silly-pet-chat-input-row { }
+/* 输入框 */
+#sp-chat-input-field { }
+/* 表情包按钮 */
+#sp-chat-emoji-toggle { }
+/* 发送消息按钮（不生成回复）*/
+#sp-chat-send-msg-btn { }
+/* 生成回复按钮 */
+#sp-chat-generate-btn { }
+
+/* ===== 表情包面板 ===== */
+#sp-emoji-panel { }
+#sp-emoji-panel.visible { }
+/* 单个表情格子 */
+.sp-emoji-item { }
+.sp-emoji-item.selected { }
+.sp-emoji-item img { }
+/* 添加表情按钮 */
+.sp-emoji-add-btn { }
+
+/* ===== 已选表情预览条 ===== */
+#sp-emoji-preview-bar { }
+#sp-emoji-preview-bar.visible { }
+#sp-emoji-preview-bar img { }
+#sp-emoji-preview-bar .sp-emoji-preview-remove { }</pre>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">⚙️ 设置面板</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 设置面板容器 ===== */
+#silly-pet-settings { }
+#silly-pet-settings.visible { }
+
+/* ===== 设置头部 ===== */
+.sp-settings-header { }
+.sp-settings-header-icon { }   /* 🐾 图标 */
+.sp-settings-header-title { }  /* 标题文字 */
+.sp-settings-header-ver { }    /* 版本号标签 */
+.sp-settings-close { }         /* 关闭按钮✕ */
+
+/* ===== 标签栏 ===== */
+.sp-tabs { }
+/* 单个标签 */
 .sp-tab { }
+.sp-tab:hover { }
 .sp-tab.active { }
 
-/* 小屋面板 */
-#silly-pet-house { }
+/* ===== 标签页面板容器 ===== */
+.sp-tab-panels { }
+/* 单个面板 */
+.sp-tab-panel { }
+.sp-tab-panel.active { }
+/* 按面板名区分 */
+.sp-tab-panel[data-panel="api"] { }
+.sp-tab-panel[data-panel="persona"] { }
+.sp-tab-panel[data-panel="prompt"] { }
+.sp-tab-panel[data-panel="behavior"] { }
+.sp-tab-panel[data-panel="display"] { }
+.sp-tab-panel[data-panel="memory"] { }
+.sp-tab-panel[data-panel="data"] { }
+.sp-tab-panel[data-panel="guide"] { }
+.sp-tab-panel[data-panel="customcss"] { }
 
-/* 小屋场景 */
-#sp-house-scene { }
+/* ===== 区块===== */
+#silly-pet-settings .sp-section { }
+#silly-pet-settings .sp-section-title { }
 
-/* 小屋对话文字 */
-#sp-house-dialogue-text { }
+/* ===== 输入控件 ===== */
+#silly-pet-settings input[type="text"] { }
+#silly-pet-settings input[type="number"] { }
+#silly-pet-settings input[type="password"] { }
+#silly-pet-settings textarea { }
+#silly-pet-settings select { }
+#silly-pet-settings label { }
 
-/* 日记面板 */
-#silly-pet-diary { }</pre>
+/* ===== 按钮 ===== */
+#silly-pet-settings .sp-btn { }
+#silly-pet-settings .sp-btn-primary { }
+#silly-pet-settings .sp-btn-danger { }
+
+/* ===== 底部保存栏 ===== */
+.sp-settings-footer { }
+.sp-settings-footer .sp-btn-primary { }
+
+/* ===== 开关 ===== */
+.sp-toggle-switch { }
+.sp-toggle-slider { }
+.sp-toggle-slider::before { }
+.sp-toggle-switch input:checked + .sp-toggle-slider { }
+
+/* ===== 搜索下拉 ===== */
+.sp-search-select { }
+.sp-search-dropdown { }
+.sp-search-dropdown.visible { }
+.sp-search-dropdown-item { }
+
+/* ===== 图片上传 ===== */
+.sp-upload-group { }
+.sp-upload-preview { }
+.sp-upload-preview img { }
+.sp-upload-preview .sp-upload-remove { }
+.sp-upload-btn { }
+.sp-upload-url-btn { }
+.sp-upload-hint { }
+
+/* ===== 记忆条目 ===== */
+.sp-memory-item { }
+.sp-memory-item textarea { }
+.sp-memory-tag { }
+.sp-memory-stars { }
+
+/* ===== 聊天记录条目 ===== */
+.sp-chat-history-item { }
+.sp-chat-history-header { }
+.sp-chat-history-text { }
+
+/* ===== 主题配色卡片 ===== */
+.sp-theme-grid { }
+.sp-theme-card { }
+.sp-theme-card.active { }
+.sp-theme-preview { }
+.sp-theme-dot { }
+.sp-theme-name { }
+/* 自定义主题编辑器 */
+#sp-custom-theme-editor { }
+.sp-theme-color-input { }
+.sp-theme-color-picker { }</pre>
                 </div>
               </details>
+
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">CSS 变量（主题色）</summary>
+                <summary class="sp-guide-summary">🏠 桌宠小屋</summary>
                 <div class="sp-guide-details-content">
-                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* 可以覆盖这些变量来改变整体颜色 */
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 小屋面板 ===== */
+#silly-pet-house { }
+#silly-pet-house.visible { }
+/* 最小化状态 */
+#silly-pet-house.sp-house-minimized { }
+
+/* ===== 小屋头部 ===== */
+#sp-house-header { }
+
+/* ===== 场景区域（2:3竖屏）===== */
+#sp-house-scene { }
+/* 背景层 */
+#sp-house-bg-layer { }
+/* 角色立绘层 */
+#sp-house-char-layer { }
+#sp-house-char-layer img { }
+
+/* ===== 动作按钮（右上角）===== */
+#sp-house-actions { }
+#sp-house-feed-btn { }
+#sp-house-bath-btn { }
+#sp-house-sleep-btn { }
+#sp-house-wardrobe-btn { }
+
+/* ===== 对话覆盖层（底部毛玻璃）===== */
+#sp-house-dialogue-overlay { }
+/* 对话框折叠时 */
+#sp-house-dialogue-overlay.sp-house-dialogue-collapsed { }
+
+/* ===== 对话框 ===== */
+#sp-house-dialogue-box { }
+/* 展开对话框时 */
+#sp-house-dialogue-box.sp-house-dialogue-expanded { }
+
+/*角色名字行 */
+#sp-house-char-name { }
+/* 头像圆形容器 */
+#sp-house-avatar { }
+#sp-house-avatar img { }
+/* 名字文字 */
+#sp-house-name-text { }
+
+/* 对话文字 */
+#sp-house-dialogue-text { }
+/* 打字完成后（隐藏光标）*/
+#sp-house-dialogue-text.sp-house-typing-done { }
+/* 打字光标 */
+#sp-house-dialogue-text::after { }
+/* 对话文字的 Markdown */
+#sp-house-dialogue-text em { }
+#sp-house-dialogue-text strong { }
+#sp-house-dialogue-text code { }
+
+/* ===== 输入区===== */
+#sp-house-input-area { }
+#sp-house-input-field { }
+#sp-house-send-btn { }
+#sp-house-regen-btn { }</pre>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">📔 日记面板</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 日记面板 ===== */
+#silly-pet-diary { }
+#silly-pet-diary.visible { }
+#sp-diary-header { }
+
+/* ===== 日历网格 ===== */
+.sp-diary-calendar { }
+.sp-diary-calendar-header { }
+.sp-diary-calendar-header button { } /* 上/下月箭头 */
+.sp-diary-weekdays { }
+.sp-diary-weekday { }
+/* 日期格子 */
+.sp-diary-day { }
+.sp-diary-day.today { }       /* 今天 */
+.sp-diary-day.has-diary { }   /* 有日记的日期 */
+.sp-diary-day.selected { }    /* 选中的日期 */
+.sp-diary-day.has-diary::after { } /* 日记小圆点 */
+
+/* ===== 日记内容 ===== */
+.sp-diary-entry { }
+.sp-diary-entry-header { }
+.sp-diary-entry-date { }
+.sp-diary-entry-content { }
+.sp-diary-empty { }
+
+/* ===== 生成控制区 ===== */
+#sp-diary-generate-section { }
+.sp-diary-range-row { }
+.sp-diary-range-hint { }
+#sp-diary-generate-btn {}</pre>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">🗨️ 弹窗（确认/输入/提示/总结）</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 确认弹窗 ===== */
+.sp-confirm-overlay { }    /* 遮罩层 */
+.sp-confirm-box { }        /* 弹窗主体 */
+.sp-confirm-title { }      /* 标题 */
+.sp-confirm-desc { }       /* 描述文字 */
+.sp-confirm-actions { }    /* 按钮行 */
+.sp-confirm-btn { }        /* 按钮通用 */
+.sp-confirm-btn-primary { } /* 主按钮 */
+.sp-confirm-btn-cancel { }/* 取消按钮 */
+
+/* ===== 输入弹窗（替代prompt）===== */
+#sp-prompt-dialog-overlay { }
+#sp-prompt-dialog-box { }
+.sp-prompt-input { }        /* 输入框 */
+
+/* ===== 提示弹窗（替代alert）===== */
+#sp-alert-dialog-overlay { }
+#sp-alert-dialog-box { }
+
+/* ===== 总结弹窗 ===== */
+#silly-pet-summary-modal { }
+#silly-pet-summary-modal.visible { }
+#silly-pet-summary-modal .sp-modal-content { }
+#silly-pet-summary-modal h3 { }
+#silly-pet-summary-modal textarea { }
+.sp-modal-actions { }
+
+/* ===== 表情包编辑弹窗 ===== */
+#sp-emoji-modal-overlay { }
+#sp-emoji-modal-overlay.visible { }
+#sp-emoji-modal { }
+#sp-emoji-modal h4 { }
+#sp-emoji-modal input[type="text"] { }
+.sp-emoji-modal-actions { }
+.sp-emoji-modal-confirm { }
+.sp-emoji-modal-delete { }</pre>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">🧶 合成工坊</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 合成工坊面板 ===== */
+#sp-game-panel { }
+#sp-game-panel.visible { }
+/* 最小化 */
+#sp-game-panel.sp-game-minimized { }
+
+/* ===== 头部 / 状态 / 通知===== */
+#sp-game-header { }
+#sp-game-status-bar { }
+.sp-game-stat { }
+#sp-game-notice { }
+#sp-game-notice.visible { }
+
+/* ===== 标签页切换 ===== */
+.sp-game-tab { }
+.sp-game-tab.active { }
+.sp-game-tab-content { }
+.sp-game-tab-content.active { }
+
+/* =====棋盘 ===== */
+#sp-game-board { }
+/* 单个格子 */
+.sp-game-cell { }
+.sp-game-cell.sp-game-has-item { }
+.sp-game-cell.sp-game-selected { }
+.sp-game-cell.sp-game-generator { }  /* 生成器 */
+.sp-game-cell.sp-game-sell { }       /* 售卖区 */
+.sp-game-cell.sp-game-dragging { }   /* 拖拽中 */
+.sp-game-cell.sp-game-dragover { }   /* 拖入悬停 */
+/* 按合成链着色 */
+.sp-game-cell.sp-game-chain-toy { }
+.sp-game-cell.sp-game-chain-food { }
+.sp-game-cell.sp-game-chain-gem { }
+.sp-game-cell.sp-game-chain-potion { }
+.sp-game-cell.sp-game-chain-music { }
+.sp-game-cell.sp-game-chain-flower { }
+.sp-game-cell.sp-game-chain-star { }
+.sp-game-cell.sp-game-chain-seasoning { }
+.sp-game-cell.sp-game-chain-stamina { }
+/* 格子内图标 */
+.sp-game-cell-emoji { }
+.sp-game-cell-img { }
+/* 等级标签 */
+.sp-game-level-badge { }
+
+/* ===== 订单 ===== */
+#sp-game-orders { }
+.sp-game-order-card { }
+.sp-game-order-card.sp-game-order-matched { }
+.sp-game-order-emoji { }
+.sp-game-order-name { }
+.sp-game-order-reward { }
+.sp-game-order-btn { }
+/* 刷新按钮 */
+.sp-game-order-refresh-btn { }
+
+/* ===== 商店 ===== */
+#sp-game-shop-content { }
+.sp-game-shop-category { }
+.sp-game-shop-cat-title { }
+.sp-game-shop-item { }
+.sp-game-shop-item.sp-game-shop-disabled { }
+.sp-game-shop-item-emoji { }
+.sp-game-shop-item-name { }
+.sp-game-shop-buy { }
+.sp-game-shop-limit { }
+.sp-game-shop-limit.sold-out { }
+
+/* ===== 图鉴 ===== */
+#sp-game-collection-content { }
+.sp-game-collection-chain { }
+.sp-game-collection-chain-title { }
+.sp-game-coll-item { }
+.sp-game-coll-item.unlocked { }
+.sp-game-coll-item.locked { }
+.sp-game-coll-item-name { }
+.sp-game-coll-upload-overlay { }
+
+/* ===== 游戏设置 ===== */
+.sp-game-settings-section { }
+.sp-game-settings-title { }
+.sp-game-settings-btn { }
+.sp-game-btn-danger { }</pre>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">🃏 消消看</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 面板 ===== */
+#sp-match3-panel { }
+#sp-match3-panel.visible { }
+#sp-match3-panel.sp-match3-minimized { }
+#sp-match3-header { }
+#sp-match3-notice { }
+
+/* ===== 棋盘 ===== */
+#sp-match3-board { }
+/* 牌 */
+.sp-match3-card { }
+.sp-match3-clickable { }
+.sp-match3-clickable:hover { }
+.sp-match3-blocked { }
+
+/* ===== 暂存栏 ===== */
+#sp-match3-slots-wrapper { }
+#sp-match3-slots { }
+.sp-match3-slot { }
+.sp-match3-slot-empty { }
+.sp-match3-slot-filled { }
+
+/* ===== 道具 ===== */
+#sp-match3-props { }
+.sp-match3-prop-btn { }
+.sp-match3-prop-icon { }
+.sp-match3-prop-count { }
+
+/* ===== 控制按钮 ===== */
+#sp-match3-controls { }
+.sp-match3-ctrl-btn { }
+.sp-match3-ctrl-quit { }
+
+/* ===== 结算 ===== */
+.sp-match3-result-box { }
+.sp-match3-result-title { }
+.sp-match3-result-info { }
+.sp-match3-result-btn { }
+
+/* ===== 背包/商店 ===== */
+.sp-match3-bag-item { }
+.sp-match3-shop-item { }
+.sp-match3-shop-buy { }</pre>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">🔗 连连看</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 面板 ===== */
+#sp-link-panel { }
+#sp-link-panel.visible { }
+#sp-link-panel.sp-link-minimized { }
+#sp-link-header { }
+#sp-link-notice { }
+
+/* =====棋盘 ===== */
+#sp-link-board { }
+.sp-link-cell { }
+.sp-link-cell-empty { }
+.sp-link-cell-tile { }
+.sp-link-cell-tile:hover { }
+.sp-link-cell-tile.sp-link-selected { }
+.sp-link-cell-tile.sp-link-hint { }
+.sp-link-cell-tile.sp-link-compass-highlight { }
+.sp-link-cell-img { }
+
+/* 连线 SVG */
+#sp-link-path-svg { }
+#sp-link-path-svg line { }
+
+/* ===== 道具/控制/结算 ===== */
+.sp-link-prop-btn { }
+.sp-link-prop-icon { }
+.sp-link-prop-count { }
+.sp-link-ctrl-btn { }
+.sp-link-ctrl-quit { }
+.sp-link-result-box { }
+.sp-link-result-title { }
+.sp-link-result-btn { }
+
+/* ===== 背包/商店 ===== */
+.sp-link-bag-item { }
+.sp-link-shop-item { }
+.sp-link-shop-buy { }
+
+/* ===== 大棋盘字号适配 ===== */
+#sp-link-board[style*="repeat(12"] .sp-link-cell { }
+#sp-link-board[style*="repeat(14"] .sp-link-cell { }
+#sp-link-board[style*="repeat(16"] .sp-link-cell { }
+#sp-link-board[style*="repeat(18"] .sp-link-cell { }</pre>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">🧊 冰箱整理</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 面板 ===== */
+#sp-fridge-panel { }
+#sp-fridge-panel.visible { }
+#sp-fridge-panel.sp-fridge-minimized { }
+#sp-fridge-header { }
+#sp-fridge-notice { }
+
+/* =====冰箱网格 ===== */
+.sp-fridge-grid { }
+/* 空格子 */
+.sp-fridge-cell { }
+.sp-fridge-cell-occupied { }
+/* 放置预览高亮 */
+.sp-fridge-cell.sp-fridge-preview-ok { }
+.sp-fridge-cell.sp-fridge-preview-bad { }
+
+/* ===== 已放置物品 ===== */
+.sp-fridge-placed-item { }
+.sp-fridge-placed-item:hover { }
+.sp-fridge-placed-emoji { }
+.sp-fridge-placed-name { }
+/* 异形物品的单格 */
+.sp-fridge-placed-cell { }
+
+/* ===== 购物筐 ===== */
+.sp-fridge-basket { }
+.sp-fridge-basket-item { }
+.sp-fridge-basket-item.sp-fridge-basket-selected { }
+.sp-fridge-basket-emoji { }
+.sp-fridge-basket-name { }
+.sp-fridge-basket-size { }
+.sp-fridge-basket-empty { }
+
+/* ===== 道具/控制/结算 ===== */
+.sp-fridge-prop-btn { }
+.sp-fridge-ctrl-btn { }
+.sp-fridge-ctrl-quit { }
+.sp-fridge-result-box { }
+.sp-fridge-result-title { }
+
+/* ===== 背包/商店 ===== */
+.sp-fridge-bag-item { }</pre>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">🍢糖葫芦工坊</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 面板 ===== */
+#sp-tanghulu-panel { }
+#sp-tanghulu-panel.visible { }
+#sp-tanghulu-panel.sp-tanghulu-minimized { }
+#sp-tanghulu-header { }
+#sp-tanghulu-notice { }
+
+/* ===== 竹签棋盘 ===== */
+.sp-tanghulu-board { }
+/* 单根竹签 */
+.sp-tanghulu-stick { }
+.sp-tanghulu-stick:hover { }
+.sp-tanghulu-stick.sp-tanghulu-stick-selected { }
+/* 竹签上的水果容器 */
+.sp-tanghulu-stick-fruits { }
+/* 水果球 */
+.sp-tanghulu-fruit { }
+.sp-tanghulu-fruit-top { }
+/* 空位 */
+.sp-tanghulu-slot-empty { }
+/* 竹签底座 */
+.sp-tanghulu-stick-base { }
+/* 竹签标签 */
+.sp-tanghulu-stick-label { }</pre>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">🛒 货架整理</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 面板 ===== */
+#sp-shelf-panel { }
+#sp-shelf-panel.visible { }
+#sp-shelf-panel.sp-shelf-minimized { }
+#sp-shelf-header { }
+#sp-shelf-notice { }
+
+/* ===== 货架区域 ===== */
+#sp-shelf-area { }
+/* 单个隔间（3格一组）*/
+.sp-shelf-bay { }
+.sp-shelf-bay:hover { }
+/*拖拽落点反馈 */
+.sp-shelf-bay.sp-shelf-bay-drop-ok { }
+.sp-shelf-bay.sp-shelf-bay-drop-bad { }
+
+/* ===== 隔间内格子 ===== */
+.sp-shelf-slot { }
+.sp-shelf-slot:hover { }
+.sp-shelf-slot.sp-shelf-slot-filled { }
+.sp-shelf-slot.sp-shelf-slot-selected { }
+.sp-shelf-slot.sp-shelf-slot-dragging { }
+
+/* ===== 底部背包区===== */
+#sp-shelf-bag-area { }
+.sp-shelf-bag-slot { }
+.sp-shelf-bag-slot.sp-shelf-bag-filled { }
+.sp-shelf-bag-slot.sp-shelf-bag-locked { }
+.sp-shelf-bag-slot.sp-shelf-slot-selected { }
+
+/* ===== 道具/结算 ===== */
+.sp-shelf-prop-btn { }
+.sp-shelf-result-box { }
+.sp-shelf-result-title { }</pre>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">🐱 小猫餐厅</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 面板 ===== */
+#sp-restaurant-panel { }
+#sp-restaurant-header { }
+#sp-restaurant-notice { }
+
+/* =====桌子网格 ===== */
+.sp-restaurant-tables { }
+.sp-restaurant-table { }
+.sp-restaurant-table-empty { }
+.sp-restaurant-table-occupied { }
+.sp-restaurant-table-urgent { }
+.sp-restaurant-table-emoji { }
+.sp-restaurant-table-name { }
+.sp-restaurant-table-dialogue { }
+.sp-restaurant-table-timer { }
+.sp-restaurant-table-timer.urgent { }
+.sp-restaurant-table-wants { }
+.sp-restaurant-table-number { }
+/* 上菜/甜品按钮 */
+.sp-restaurant-table-serve-btn { }
+.sp-restaurant-table-dessert-btn { }
+
+/* ===== 厨房 ===== */
+.sp-r-kitchen-section { }
+.sp-r-kitchen-title { }
+.sp-r-shop-toggle { }         /* 开店/关店按钮 */
+.sp-r-cooking-active { }      /* 烹饪中 */
+.sp-r-cooking-idle { }        /* 空闲 */
+.sp-r-cooking-name { }
+.sp-r-cooking-timer { }
+.sp-r-cook-btn { }            /* 选食谱烹饪按钮 */
+
+/* ===== 出餐台 ===== */
+.sp-r-dishes-row { }
+.sp-r-dish-tag { }
+.sp-r-dish-name { }
+.sp-r-dish-count { }
+.sp-restaurant-feed-btn { }   /* 喂桌宠按钮 */
+
+/* ===== 菜单 ===== */
+.sp-r-menu-group { }
+.sp-r-menu-group-summary { }
+.sp-r-menu-recipe { }
+.sp-r-menu-canmake { }
+.sp-r-menu-recipe-emoji { }
+.sp-r-menu-recipe-name { }
+.sp-r-menu-recipe-price { }
+
+/* ===== 补货 ===== */
+.sp-r-supply-title { }
+.sp-r-supply-row { }
+.sp-r-supply-locked { }
+.sp-r-supply-emoji { }
+.sp-r-supply-name { }
+.sp-r-convert-area { }
+
+/* ===== 库存 ===== */
+.sp-r-stock-card { }
+.sp-r-stock-card-earnings { }
+.sp-r-stock-section { }
+.sp-r-stock-section-header { }
+.sp-r-stock-item { }
+.sp-r-stock-empty { }
+.sp-r-stock-gold { }
+
+/* ===== 食谱选择弹窗 ===== */
+#sp-restaurant-recipe-modal-overlay { }
+#sp-restaurant-recipe-modal { }
+#sp-restaurant-recipe-modal-header { }
+.sp-restaurant-recipe-item { }
+.sp-restaurant-recipe-item.sp-restaurant-recipe-disabled { }
+.sp-restaurant-recipe-emoji { }
+.sp-restaurant-recipe-name { }
+.sp-restaurant-recipe-price { }
+.sp-restaurant-recipe-lock { }</pre>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">🎰 抽奖 /🎮 游戏选择 / 🎒 背包</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 抽奖面板 ===== */
+#sp-lottery-panel { }
+#sp-lottery-panel.visible { }
+#sp-lottery-header { }
+#sp-lottery-notice { }
+#sp-lottery-pools { }
+.sp-lottery-pool-card { }
+.sp-lottery-pool-card.sp-lottery-pool-disabled { }
+.sp-lottery-pool-name { }
+.sp-lottery-pool-cost { }
+.sp-lottery-pool-desc { }
+.sp-lottery-pool-preview { }
+.sp-lottery-preview-tag { }
+.sp-lottery-draw-btn { }
+.sp-lottery-limit-badge { }
+
+/* 抽奖结果弹层 */
+.sp-lottery-result-overlay { }
+.sp-lottery-rarity-common { }
+.sp-lottery-rarity-rare { }
+.sp-lottery-rarity-epic { }
+.sp-lottery-rarity-legendary { }
+.sp-lottery-result-box { }
+.sp-lottery-rarity-badge { }
+.sp-lottery-result-icon { }
+.sp-lottery-result-label { }
+.sp-lottery-result-msg { }
+.sp-lottery-result-gold { }
+.sp-lottery-result-close-btn { }
+
+/* ===== 游戏选择弹窗 ===== */
+.sp-game-selector-box { }
+.sp-game-selector-header { }
+.sp-game-selector-close { }
+.sp-game-selector-body { }
+.sp-game-selector-card { }
+.sp-game-selector-card:hover { }
+.sp-game-selector-icon { }
+.sp-game-selector-name { }
+.sp-game-selector-desc { }
+/*帮助按钮 */
+.sp-game-selector-help { }
+
+/* ===== 游戏帮助弹窗 ===== */
+#sp-game-help-overlay { }
+#sp-game-help-box { }
+#sp-game-help-header { }
+#sp-game-help-body { }
+
+/* ===== 物品背包弹窗 ===== */
+.sp-inv-popup-box { }
+.sp-inv-popup-header { }
+.sp-inv-popup-body { }
+.sp-inv-item { }
+.sp-inv-item-emoji { }
+.sp-inv-item-name { }
+.sp-inv-item-detail { }
+.sp-inv-use-btn { }
+.sp-inv-quick-btn { }
+.sp-inv-quick-btn.active { }
+.sp-inv-empty { }
+.sp-inv-popup-hint { }
+
+/* ===== 总背包弹窗 ===== */
+.sp-total-inv-box { }
+.sp-total-inv-header { }
+.sp-total-inv-body { }
+.sp-total-inv-section { }
+.sp-total-inv-section-title { }
+.sp-total-inv-row { }
+.sp-total-inv-emoji { }
+.sp-total-inv-name { }
+.sp-total-inv-count { }
+.sp-total-inv-empty { }
+
+/* ===== 体力背包弹窗 ===== */
+#sp-stamina-inv-popup .sp-inv-popup-box { }</pre>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">🏆 成就 / 📖 图鉴合集/ 👗 更衣</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 成就弹窗 ===== */
+#sp-achievements-overlay { }
+#sp-achievements-overlay .sp-total-inv-box { }
+#sp-achievements-overlay .sp-total-inv-body { }
+#sp-achievements-overlay details { }
+#sp-achievements-overlay details[open] { }
+#sp-achievements-overlay details summary { }
+/* 领取按钮 */
+.sp-achievement-claim-btn { }
+#sp-achievements-claim-all { }
+
+/* ===== 图鉴合集弹窗 ===== */
+#sp-unified-collection-overlay { }
+#sp-unified-collection-overlay .sp-total-inv-box { }
+#sp-unified-collection-overlay .sp-total-inv-body { }
+/* 折叠栏 */
+#sp-unified-collection-overlay .sp-guide-details { }
+#sp-unified-collection-overlay .sp-guide-details-content { }
+/* 图鉴网格 */
+.sp-unified-coll-grid { }
+.sp-unified-coll-item { }
+.sp-unified-coll-item:hover { }
+.sp-unified-coll-item.sp-unified-locked { }
+.sp-unified-coll-item.sp-unified-has-custom { }
+.sp-unified-coll-name { }
+.sp-unified-coll-link { }    /* 🔗联动标记 */
+.sp-unified-coll-upload { }  /* 📷上传按钮 */
+/* 游戏图标网格 */
+.sp-unified-game-icon-grid { }
+.sp-unified-game-icon-item { }
+.sp-unified-game-icon-preview { }
+.sp-unified-game-icon-name { }
+.sp-unified-game-icon-upload { }
+/* 显示上锁名字按钮 */
+.sp-unified-show-locked-names-btn { }
+.sp-unified-show-locked-names-btn.active { }
+
+/* ===== 更衣系统弹窗 ===== */
+#sp-wardrobe-modal-overlay { }
+#sp-wardrobe-modal { }
+#sp-wardrobe-header { }
+#sp-wardrobe-body { }
+/* 更衣快捷面板（小屋右侧浮出的圆形按钮列）*/
+#sp-wardrobe-quick { }
+#sp-wardrobe-quick-settings { }</pre>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">🎨 CSS 变量（主题色）</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* 覆盖这些变量可以改变整体颜色。在「🎨 外观 → 主题配色」中选预设会自动设置，
+   但你也可以在这里手动覆盖。 */
 :root {
+  /* 主色调（按钮、高亮等）*/
   --sp-primary: rgba(100,180,255,0.4);
-  --sp-bg-main: rgba(20,20,30,0.85);
-  --sp-bg-secondary: rgba(30,30,40,0.9);
-  --sp-text-primary: #eee;
-  --sp-text-secondary: #bbb;
-  --sp-text-muted: #888;
+  --sp-primary-hover: rgba(100,180,255,0.6);
+  --sp-primary-border: rgba(100,180,255,0.5);
+
+  /* 背景色 */
+  --sp-bg-main: rgba(20,20,30,0.85);       /* 面板主背景 */
+  --sp-bg-secondary: rgba(30,30,40,0.9);   /* 弹窗/次级背景 */
+  --sp-bg-light: rgba(255,255,255,0.06);   /* 内嵌区块浅底 */
+
+  /* 边框 */
   --sp-border: rgba(255,255,255,0.12);
-  --sp-status-hunger: #ffb347;
-  --sp-status-clean: #87ceeb;
-  --sp-status-energy: #90ee90;
+  --sp-border-light: rgba(255,255,255,0.08);
+
+  /* 文字 */
+  --sp-text-primary: #eee;    /* 主文字 */
+  --sp-text-secondary: #bbb;  /* 副文字 */
+  --sp-text-muted: #888;      /* 灰色提示文字 */
+
+  /* 状态条颜色 */
+  --sp-status-hunger: #ffb347;  /* 饱食 */
+  --sp-status-clean: #87ceeb;   /* 清洁 */
+  --sp-status-energy: #90ee90;  /* 精力 */
+
+  /* 气泡 */
   --sp-bubble-bg: rgba(20,20,30,0.85);
+  --sp-bubble-border: rgba(255,255,255,0.15);
 }</pre>
                 </div>
               </details>
+
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">示例：圆角加大+ 气泡渐变</summary>
+                <summary class="sp-guide-summary">📐 使用说明折叠栏 / 通知条 / 滚动条 / 杂项</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 使用说明折叠栏 ===== */
+.sp-guide-details { }
+.sp-guide-details[open] { }
+.sp-guide-summary { }
+.sp-guide-summary::before { }   /* ▶ 箭头 */
+.sp-guide-details-content { }
+
+/* ===== 所有游戏的通知条（统一覆盖）===== */
+#sp-game-notice,
+#sp-match3-notice,
+#sp-link-notice,
+#sp-fridge-notice,
+#sp-tanghulu-notice,
+#sp-shelf-notice,
+#sp-lottery-notice,
+#sp-restaurant-notice { }
+
+/* ===== 全局滚动条 ===== */
+*::-webkit-scrollbar { }
+*::-webkit-scrollbar-thumb { }
+*::-webkit-scrollbar-track { }
+
+/* ===== GitHub迁移进度条 ===== */
+#sp-migrate-progress-overlay { }
+#sp-migrate-progress-box { }
+#sp-migrate-bar { }
+
+/* ===== 自定义动作条目 ===== */
+.sp-custom-sprite-item { }
+.sp-custom-sprite-preview { }
+.sp-custom-sprite-info { }
+.sp-custom-sprite-actions { }
+
+/* ===== 时间滑轨 ===== */
+.sp-duration-row { }
+.sp-duration-label { }
+.sp-duration-row input[type="range"] { }
+
+/* ===== 记忆/聊天管理 ===== */
+.sp-memory-item { }
+.sp-chat-history-item { }
+.sp-chat-history-header { }
+
+/* ===== 世界书条目 ===== */
+.sp-wi-entry { }
+.sp-wi-entry.sp-wi-expanded { }
+.sp-wi-entry.sp-wi-excluded { }
+.sp-wi-entry-header { }
+.sp-wi-name { }
+.sp-wi-keys { }
+.sp-wi-entry-body { }
+
+/* ===== 预览区===== */
+.sp-preview-box { }
+.sp-preview-header { }
+.sp-preview-content { }
+.sp-preview-content.expanded { }
+
+/* ===== 动画关键帧（可覆盖）===== */
+/*菜单浮动*/
+@keyframes sp-menu-float { }
+/*闲置摆动 */
+@keyframes sp-idle-bob { }
+/* 心情跳动 */
+@keyframes sp-mood-bounce { }
+/* 渐入*/
+@keyframes sp-fade-in { }</pre>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">✨ 示例：圆角加大 + 气泡渐变</summary>
                 <div class="sp-guide-details-content">
                   <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* 所有面板圆角加大 */
 #silly-pet-chat,
@@ -7613,9 +8728,21 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
   border: 1px solid rgba(200,100,255,0.4);
 }
 
-/* 聊天消息圆润 */
+/* 聊天消息更圆润 */
 .sp-chat-msg {
   border-radius: 18px;
+}
+
+/* 菜单按钮方形化 */
+.sp-menu-btn {
+  border-radius: 8px;
+}
+
+/* 给面板加背景图 */
+#silly-pet-chat {
+  background-image: url("https://example.com/bg.jpg");
+  background-size: cover;
+  background-position: center;
 }</pre>
                 </div>
               </details>
@@ -8304,36 +9431,60 @@ document.getElementById('sp-export')?.addEventListener('click', async () => {
     });
     // 清空所有聊天数据（包括聊天记录+归档+总结）
     document.getElementById('sp-clear-all-chat')?.addEventListener('click', () => {
-      if (!confirm('确定要清空所有聊天数据吗？\n包括：聊天记录、历史归档、对话总结\n此操作不可撤销！')) return;
-      state.petChatHistory = [];
-      state.petChatArchive = [];
-      state.summary = '';
-      petUnsummarizedCount = 0;
-      saveData();
-      renderChatHistoryList();
-      renderChatHistory();
-      renderChatArchive();
-      const summaryTextarea = document.getElementById('sp-current-summary');
-      if (summaryTextarea) summaryTextarea.value = '';
-      showBubble('所有聊天数据已清空', 3000);
+      showConfirmDialog({
+        title: '🗑️ 清空所有聊天数据',
+        desc: '包括：聊天记录、历史归档、对话总结<br/><span style="color:#f66;">此操作不可撤销！</span>',
+        confirmText: '确认清空',
+        cancelText: '取消',
+        onConfirm: () => {
+          state.petChatHistory = [];
+          state.petChatArchive = [];
+          state.summary = '';
+          petUnsummarizedCount = 0;
+          saveData();
+          renderChatHistoryList();
+          renderChatHistory();
+          renderChatArchive();
+          const summaryTextarea = document.getElementById('sp-current-summary');
+          if (summaryTextarea) summaryTextarea.value = '';
+          showBubble('所有聊天数据已清空', 3000);
+        }
+      });
     });
 
     // 重置全部数据（恢复出厂设置）
     document.getElementById('sp-reset-all-data')?.addEventListener('click', () => {
-      if (!confirm('确定要重置全部数据吗？\n包括：所有设置、聊天记录、记忆、图片等\n此操作不可撤销！！！')) return;
-      if (!confirm('真的确定吗？所有数据都会丢失！')) return;
-      // 停掉所有定时器防止重新写入
-      if (wanderInterval) { clearInterval(wanderInterval); wanderInterval = null; }
-      if (decayInterval) { clearInterval(decayInterval); decayInterval = null; }
-      // 清空内存数据
-      settings = { ...DEFAULT_SETTINGS };
-      state = { ...DEFAULT_STATE };
-      // 清除 IndexedDB 存储
-      idbSet(STORAGE_KEY, null).catch(() => {});
-      localStorage.removeItem(STORAGE_KEY); // 顺便清旧的
+      showConfirmDialog({
+        title: '💀 重置全部数据',
+        desc: '包括：所有设置、聊天记录、记忆、图片等<br/><span style="color:#f66;font-weight:700;">此操作不可撤销！！！</span>',
+        confirmText: '我要重置',
+        cancelText: '算了',
+        onConfirm: () => {
+          showConfirmDialog({
+            title: '⚠️ 最后确认',
+            desc: '真的确定吗？<br/>所有数据都会永久丢失！',
+            confirmText: '确认重置',
+            cancelText: '取消',
+            onConfirm: () => {
+              if (wanderInterval) { clearInterval(wanderInterval); wanderInterval = null; }
+              if (decayInterval) { clearInterval(decayInterval); decayInterval = null; }
+              settings = { ...DEFAULT_SETTINGS };
+              state = { ...DEFAULT_STATE };
+              idbSet(STORAGE_KEY, null).catch(() => {});
+              localStorage.removeItem(STORAGE_KEY);
 
-      alert('数据已重置！点确定后页面将刷新。');
-      window.location.reload(true);
+              showAlertDialog({
+                title: '✅ 数据已重置',
+                desc: '点击确定后页面将刷新',
+                buttonText: '确定',
+                onClose: () => {
+                  window.location.reload(true);
+                }
+              });
+            }
+          });
+        }
+      });
     });
     // 自定义CSS相关按钮
     document.getElementById('sp-custom-css-apply')?.addEventListener('click', () => {
@@ -8484,41 +9635,47 @@ document.getElementById('sp-export')?.addEventListener('click', async () => {
     });
 
     document.getElementById('sp-preset-save')?.addEventListener('click', () => {
-      const name = prompt('给这个预设起个名字：');
-      if (!name || !name.trim()) return;
+      showPromptDialog({
+        title: '💾 保存为预设',
+        desc: '给当前提示词配置起个名字',
+        placeholder: '预设名称',
+        defaultValue: '',
+        confirmText: '保存',
+        cancelText: '取消',
+        onConfirm: (name) => {
+          if (!name || !name.trim()) return;
 
-      const newPreset = {
-        name: name.trim(),
-        petName: document.getElementById('sp-pet-name')?.value || '咪噗',
-        systemPrompt: document.getElementById('sp-system-prompt')?.value || '',
-        relationshipPrompt: document.getElementById('sp-relationship-prompt')?.value || '',
-        jailbreak: document.getElementById('sp-jailbreak')?.value || '',
-      };
+          const newPreset = {
+            name: name.trim(),
+            petName: document.getElementById('sp-pet-name')?.value || '咪噗',
+            systemPrompt: document.getElementById('sp-system-prompt')?.value || '',
+            relationshipPrompt: document.getElementById('sp-relationship-prompt')?.value || '',
+            jailbreak: document.getElementById('sp-jailbreak')?.value || '',
+          };
 
-      if (!settings.promptPresets) settings.promptPresets = [];
-      // 覆盖同名
-      const existIdx = settings.promptPresets.findIndex(p => p.name === newPreset.name);
-      if (existIdx >= 0) {
-        settings.promptPresets[existIdx] = newPreset;
-      } else {
-        settings.promptPresets.push(newPreset);
-      }
+          if (!settings.promptPresets) settings.promptPresets = [];
+          const existIdx = settings.promptPresets.findIndex(p => p.name === newPreset.name);
+          if (existIdx >= 0) {
+            settings.promptPresets[existIdx] = newPreset;
+          } else {
+            settings.promptPresets.push(newPreset);
+          }
 
-      settings.currentPreset = 'custom:' + newPreset.name;
-      saveData();
+          settings.currentPreset = 'custom:' + newPreset.name;
+          saveData();
 
-      // 刷新下拉列表
-      const select = document.getElementById('sp-prompt-preset-select');
-      if (select) {
-        // 重新构建 options
-        let opts = '<option value="">— 不使用预设 —</option>';
-        opts += PROMPT_PRESETS_BUILTIN.map(p => `<option value="builtin:${p.name}">${p.name}</option>`).join('');
-        opts += (settings.promptPresets || []).map(p => `<option value="custom:${p.name}" ${settings.currentPreset === 'custom:' + p.name ? 'selected' : ''}>⭐ ${p.name}</option>`).join('');
-        select.innerHTML = opts;
-        select.value = settings.currentPreset;
-      }
+          const select = document.getElementById('sp-prompt-preset-select');
+          if (select) {
+            let opts = '<option value="">— 不使用预设 —</option>';
+            opts += PROMPT_PRESETS_BUILTIN.map(p => `<option value="builtin:${p.name}">${p.name}</option>`).join('');
+            opts += (settings.promptPresets || []).map(p => `<option value="custom:${p.name}" ${settings.currentPreset === 'custom:' + p.name ? 'selected' : ''}>⭐ ${p.name}</option>`).join('');
+            select.innerHTML = opts;
+            select.value = settings.currentPreset;
+          }
 
-      showBubble(`预设「${newPreset.name}」已保存 ⭐`, 2000);
+          showBubble(`预设「${newPreset.name}」已保存 ⭐`, 2000);
+        }
+      });
     });
 
     document.getElementById('sp-preset-delete')?.addEventListener('click', () => {
@@ -8531,63 +9688,89 @@ document.getElementById('sp-export')?.addEventListener('click', async () => {
       }
 
       const name = select.value.replace('custom:', '');
-      if (!confirm(`确定删除预设「${name}」吗？`)) return;
+      showConfirmDialog({
+        title: '🗑️ 删除预设',
+        desc: `确定删除预设「${name}」吗？`,
+        confirmText: '删除',
+        cancelText: '取消',
+        onConfirm: () => {
+          settings.promptPresets = (settings.promptPresets || []).filter(p => p.name !== name);
+          if (settings.currentPreset === select.value) settings.currentPreset = '';
+          saveData();
 
-      settings.promptPresets = (settings.promptPresets || []).filter(p => p.name !== name);
-      if (settings.currentPreset === select.value) settings.currentPreset = '';
-      saveData();
+          let opts = '<option value="">— 不使用预设 —</option>';
+          opts += PROMPT_PRESETS_BUILTIN.map(p => `<option value="builtin:${p.name}">${p.name}</option>`).join('');
+          opts += (settings.promptPresets || []).map(p => `<option value="custom:${p.name}">⭐ ${p.name}</option>`).join('');
+          select.innerHTML = opts;
+          select.value = '';
 
-      // 刷新下拉
-      let opts = '<option value="">— 不使用预设 —</option>';
-      opts += PROMPT_PRESETS_BUILTIN.map(p => `<option value="builtin:${p.name}">${p.name}</option>`).join('');
-      opts += (settings.promptPresets || []).map(p => `<option value="custom:${p.name}">⭐ ${p.name}</option>`).join('');
-      select.innerHTML = opts;
-      select.value = '';
-
-      showBubble(`预设已删除`, 2000);
+          showBubble(`预设已删除`, 2000);
+        }
+      });
     });
     // 多桌宠存档
     document.getElementById('sp-profile-save')?.addEventListener('click', () => {
-      const name = prompt('给这个桌宠存档起个名字：', settings.petName || '咪噗');
-      if (!name || !name.trim()) return;
+      showPromptDialog({
+        title: '💾 保存桌宠存档',
+        desc: '给当前桌宠配置起个名字',
+        placeholder: '存档名称',
+        defaultValue: settings.petName || '咪噗',
+        confirmText: '保存',
+        cancelText: '取消',
+        onConfirm: (name) => {
+          if (!name || !name.trim()) return;
 
-      // ★ 保存存档前，先把 DOM 中所有最新设置写入 settings
-      syncSettingsFromDOM();
+          syncSettingsFromDOM();
 
-      if (!settings.petProfiles) settings.petProfiles = [];
+          if (!settings.petProfiles) settings.petProfiles = [];
 
-      // 保存当前完整配置（排除 petProfiles 本身避免嵌套）
-      const profileSettings = { ...settings };
-      delete profileSettings.petProfiles;
-      delete profileSettings.currentProfile;
+          const profileSettings = { ...settings };
+          delete profileSettings.petProfiles;
+          delete profileSettings.currentProfile;
 
-      const profile = {
-        name: name.trim(),
-        settings: JSON.parse(JSON.stringify(profileSettings)),
-        state: JSON.parse(JSON.stringify(state)),
-        timestamp: Date.now()
-      };
+          const profile = {
+            name: name.trim(),
+            settings: JSON.parse(JSON.stringify(profileSettings)),
+            state: JSON.parse(JSON.stringify(state)),
+            timestamp: Date.now()
+          };
 
-      const existIdx = settings.petProfiles.findIndex(p => p.name === profile.name);
-      if (existIdx >= 0) {
-        if (!confirm(`存档「${profile.name}」已存在，覆盖吗？`)) return;
-        settings.petProfiles[existIdx] = profile;
-      } else {
-        settings.petProfiles.push(profile);
-      }
-
-      settings.currentProfile = profile.name;
-      saveData();
-
-      // 刷新下拉
-      const select = document.getElementById('sp-profile-select');
-      if (select) {
-        let opts = '<option value="">— 当前配置 —</option>';
-        opts += settings.petProfiles.map(p => `<option value="${p.name}" ${settings.currentProfile === p.name ? 'selected' : ''}>${p.name}</option>`).join('');
-        select.innerHTML = opts;
-        select.value = settings.currentProfile;
-      }
-      showBubble(`存档「${profile.name}」已保存 🐾`, 2000);
+          const existIdx = settings.petProfiles.findIndex(p => p.name === profile.name);
+          if (existIdx >= 0) {
+            showConfirmDialog({
+              title: '📂 存档已存在',
+              desc: `存档「${profile.name}」已存在，要覆盖吗？`,
+              confirmText: '覆盖',
+              cancelText: '取消',
+              onConfirm: () => {
+                settings.petProfiles[existIdx] = profile;
+                settings.currentProfile = profile.name;
+                saveData();
+                const select = document.getElementById('sp-profile-select');
+                if (select) {
+                  let opts = '<option value="">— 当前配置 —</option>';
+                  opts += settings.petProfiles.map(p => `<option value="${p.name}" ${settings.currentProfile === p.name ? 'selected' : ''}>${p.name}</option>`).join('');
+                  select.innerHTML = opts;
+                  select.value = settings.currentProfile;
+                }
+                showBubble(`存档「${profile.name}」已覆盖保存 🐾`, 2000);
+              }
+            });
+          } else {
+            settings.petProfiles.push(profile);
+            settings.currentProfile = profile.name;
+            saveData();
+            const select = document.getElementById('sp-profile-select');
+            if (select) {
+              let opts = '<option value="">— 当前配置 —</option>';
+              opts += settings.petProfiles.map(p => `<option value="${p.name}" ${settings.currentProfile === p.name ? 'selected' : ''}>${p.name}</option>`).join('');
+              select.innerHTML = opts;
+              select.value = settings.currentProfile;
+            }
+            showBubble(`存档「${profile.name}」已保存 🐾`, 2000);
+          }
+        }
+      });
     });
 
     document.getElementById('sp-profile-load')?.addEventListener('click', () => {
@@ -8597,39 +9780,49 @@ document.getElementById('sp-export')?.addEventListener('click', async () => {
       const profile = (settings.petProfiles || []).find(p => p.name === select.value);
       if (!profile) { showBubble('存档未找到', 2000); return; }
 
-      if (!confirm(`确定加载存档「${profile.name}」吗？\n当前未保存的配置会丢失。`)) return;
+      showConfirmDialog({
+        title: '📂 加载存档',
+        desc: `确定加载存档「${profile.name}」吗？<br/>当前未保存的配置会丢失。`,
+        confirmText: '加载',
+        cancelText: '取消',
+        onConfirm: () => {
+          const savedProfiles = settings.petProfiles;
+          settings = { ...DEFAULT_SETTINGS, ...profile.settings };
+          settings.petProfiles = savedProfiles;
+          settings.currentProfile = profile.name;
+          state = { ...DEFAULT_STATE, ...profile.state };
 
-      // 保留 petProfiles 和 currentProfile 列表本身
-      const savedProfiles = settings.petProfiles;
-      settings = { ...DEFAULT_SETTINGS, ...profile.settings };
-      settings.petProfiles = savedProfiles;
-      settings.currentProfile = profile.name;
-      state = { ...DEFAULT_STATE, ...profile.state };
-
-      saveData();
-      showBubble(`已切换到「${profile.name}」🐾`, 2000);
-
-      // 👈 这里是改动的关键：调用热更新，替换原来的 window.location.reload()
-      applyLoadedProfileUI();
+          saveData();
+          showBubble(`已切换到「${profile.name}」🐾`, 2000);applyLoadedProfileUI();
+        }
+      });
     });
+
 
     document.getElementById('sp-profile-delete')?.addEventListener('click', () => {
       const select = document.getElementById('sp-profile-select');
       if (!select || !select.value) { showBubble('请先选择要删除的存档', 2000); return; }
 
       const name = select.value;
-      if (!confirm(`确定删除存档「${name}」吗？`)) return;
+      showConfirmDialog({
+        title: '🗑️ 删除存档',
+        desc: `确定删除存档「${name}」吗？<br/>此操作不可撤销`,
+        confirmText: '删除',
+        cancelText: '取消',
+        onConfirm: () => {
+          settings.petProfiles = (settings.petProfiles || []).filter(p => p.name !== name);
+          if (settings.currentProfile === name) settings.currentProfile = '';
+          saveData();
 
-      settings.petProfiles = (settings.petProfiles || []).filter(p => p.name !== name);
-      if (settings.currentProfile === name) settings.currentProfile = '';
-      saveData();
-
-      let opts = '<option value="">— 当前配置 —</option>';
-      opts += (settings.petProfiles || []).map(p => `<option value="${p.name}">${p.name}</option>`).join('');
-      select.innerHTML = opts;
-      select.value = '';
-      showBubble('存档已删除', 2000);
+          let opts = '<option value="">— 当前配置 —</option>';
+          opts += (settings.petProfiles || []).map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+          select.innerHTML = opts;
+          select.value = '';
+          showBubble('存档已删除', 2000);
+        }
+      });
     });
+
   }
 
   // ============================================================
@@ -9004,7 +10197,6 @@ function bindAllImageUploads() {
     btn.onclick = (e) => {
       e.preventDefault();
       const key = btn.dataset.key;
-      //读取当前值（区分 mood/menuIcon 等特殊 key）
       let currentVal = '';
       if (key.startsWith('mood')) {
         const moodKey = key.replace('mood', '').toLowerCase();
@@ -9015,22 +10207,27 @@ function bindAllImageUploads() {
       } else {
         currentVal = settings[key] || '';
       }
-      const url = prompt(
-        '输入图片链接（支持 GIF 动图）：\n留空并确认 = 清除当前图片',
-        currentVal.startsWith('http') ? currentVal : ''
-      );
-      if (url === null) return; // 点了取消
-      const trimmed = url.trim();
-      if (trimmed && !trimmed.startsWith('http')) {
-        showBubble('链接需要以 http 开头', 3000);
-        return;
-      }
-      setSettingsImage(key, trimmed);
-      updateUploadPreview(key, trimmed);
-      updateSpriteImage();
-      updateMoodDisplay();
-      saveData();
-      showBubble(trimmed ? '图片链接已设置！' : '已清除图片', 2000);
+      showPromptDialog({
+        title: '🔗 输入图片链接',
+        desc: '支持 GIF 动图。留空并确认 = 清除当前图片',
+        placeholder: 'https://...',
+        defaultValue: currentVal.startsWith('http') ? currentVal : '',
+        confirmText: '确认',
+        cancelText: '取消',
+        onConfirm: (url) => {
+          const trimmed = (url || '').trim();
+          if (trimmed && !trimmed.startsWith('http')) {
+            showBubble('链接需要以 http 开头', 3000);
+            return;
+          }
+          setSettingsImage(key, trimmed);
+          updateUploadPreview(key, trimmed);
+          updateSpriteImage();
+          updateMoodDisplay();
+          saveData();
+          showBubble(trimmed ? '图片链接已设置！' : '已清除图片', 2000);
+        }
+      });
     };
   });
 
@@ -10715,13 +11912,21 @@ window.addEventListener('beforeunload', () => {
               const itemKey = `${chainKey}_${idx + 1}`;
               const unlocked = state.gameCollection.includes(itemKey);
               const customImg = state.gameCustomImages?.[itemKey];
-              const display = unlocked
-                ? (customImg ? `<img src="${customImg}" class="sp-game-coll-img" />` : `<span>${item.emoji}</span>`)
-                : '<span class="sp-game-locked">?</span>';
+              const hasCustom = !!customImg;
+              let display;
+              if (customImg) {
+                display = `<img src="${customImg}" class="sp-game-coll-img" />`;
+              } else if (unlocked) {
+                display = `<span>${item.emoji}</span>`;
+              } else {
+                display = '<span class="sp-game-locked">?</span>';
+              }
+              const lockedClass = unlocked ? 'unlocked' : 'locked';
+              const customClass = (!unlocked && hasCustom) ? ' sp-coll-has-custom' : '';
               return `
-                <div class="sp-game-coll-item ${unlocked ? 'unlocked' : 'locked'}" data-item-key="${itemKey}" title="${unlocked ? item.name + ' (Lv' + (idx+1) + ')' : '未解锁'}">
+                <div class="sp-game-coll-item ${lockedClass}${customClass}" data-item-key="${itemKey}" title="${unlocked ? item.name + ' (Lv' + (idx+1) + ')' : (hasCustom ? item.name + ' (未解锁)' : '未解锁')}">
                   ${display}
-                  <div class="sp-game-coll-item-name">${unlocked ? item.name : '???'}</div>
+                  <div class="sp-game-coll-item-name">${unlocked ? item.name : (hasCustom ? item.name : '???')}</div>
                   <div class="sp-game-coll-upload-overlay" data-item-key="${itemKey}">📷</div>
                 </div>
               `;
@@ -10731,7 +11936,7 @@ window.addEventListener('beforeunload', () => {
       `;
     }).join('');
 
-    // 点击图鉴项上传图片
+    // 点击图鉴项上传图片（解锁和未解锁都可以）
     container.querySelectorAll('.sp-game-coll-upload-overlay').forEach(overlay => {
       overlay.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -10741,114 +11946,147 @@ window.addEventListener('beforeunload', () => {
     });
   }
 
+
   // ===== 图片上传弹窗 =====
   function gamePromptImageUpload(itemKey) {
     if (!state.gameCustomImages) state.gameCustomImages = {};
     const currentImg = state.gameCustomImages[itemKey];
 
-    // 如果已有图片，先问是否要移除
     if (currentImg) {
-      const action = confirm('当前已有自定义图片\n\n点「确定」→ 移除图片（恢复默认emoji）\n点「取消」→ 替换为新图片');
-      if (action) {
-        delete state.gameCustomImages[itemKey];
-        saveDataImmediate('游戏图片移除');
-        gameRenderCollection();
-        gameRenderBoard();
-        gameShowNotice('图片已移除，恢复默认显示');
-        return;
-      }
-    }
-
-    // 设置新图片
-    const choice = confirm('设置物品图片\n\n点「确定」→ 输入图片链接\n点「取消」→ 选择本地文件上传');
-
-    if (choice) {
-      // 链接模式
-      const url = prompt('输入图片链接（留空确认=清除图片）：', currentImg && currentImg.startsWith('http') ? currentImg : '');
-      if (url === null) return; // 点了取消
-      const trimmed = url.trim();
-      if (!trimmed) {
-        // 留空=清除
-        delete state.gameCustomImages[itemKey];
-        saveDataImmediate('游戏图片清除');
-        gameRenderCollection();
-        gameRenderBoard();
-        gameShowNotice('图片已清除');
-        return;
-      }
-      if (!trimmed.startsWith('http')) {
-        gameShowNotice('链接需要以 http 开头');
-        return;
-      }
-      state.gameCustomImages[itemKey] = trimmed;
-      saveDataImmediate('游戏图片链接');
-      gameRenderCollection();
-      gameRenderBoard();
-      gameShowNotice('图片链接已设置！');
-    } else {
-      // 文件模式
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/png,image/jpeg,image/gif,image/webp';
-      input.onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        if (file.size > 2 * 1024 * 1024) {
-          gameShowNotice('图片不能超过2MB');
-          return;
+      showConfirmDialog({
+        title: '🖼️ 当前已有自定义图片',
+        desc: '选择一个操作：',
+        confirmText: '移除图片',
+        cancelText: '替换为新图片',
+        onConfirm: () => {
+          delete state.gameCustomImages[itemKey];
+          saveDataImmediate('游戏图片移除');
+          gameRenderCollection();gameRenderBoard();
+          gameShowNotice('图片已移除，恢复默认显示');
+        },
+        onCancel: () => {
+          _gamePromptImageUploadStep2(itemKey, currentImg);
         }
-        const reader = new FileReader();
-        reader.onload = async (ev) => {
-          const compressed = await compressImage(ev.target.result, 80, 0.7);
-          if (!state.gameCustomImages) state.gameCustomImages = {};
-          state.gameCustomImages[itemKey] = compressed;
-          saveDataImmediate('游戏图片上传');
-          gameRenderCollection();
-          gameRenderBoard();
-          gameShowNotice('图片已设置！');
-        };
-        reader.readAsDataURL(file);
-      };
-      input.click();
+      });return;
     }
+
+    _gamePromptImageUploadStep2(itemKey, '');
+  }
+
+  function _gamePromptImageUploadStep2(itemKey, currentImg) {
+    showConfirmDialog({
+      title: '🖼️ 设置物品图片',
+      desc: '选择图片来源：',
+      confirmText: '📝 输入链接',
+      cancelText: '📁 本地上传',
+      onConfirm: () => {
+        showPromptDialog({
+          title: '🔗 输入图片链接',
+          desc: '留空并确认 = 清除图片',
+          placeholder: 'https://...',
+          defaultValue: currentImg && currentImg.startsWith('http') ? currentImg : '',
+          confirmText: '确认',
+          cancelText: '取消',
+          onConfirm: (url) => {
+            const trimmed = (url || '').trim();
+            if (!trimmed) {
+              delete state.gameCustomImages[itemKey];
+              saveDataImmediate('游戏图片清除');
+              gameRenderCollection();
+              gameRenderBoard();
+              gameShowNotice('图片已清除');return;
+            }
+            if (!trimmed.startsWith('http')) {
+              gameShowNotice('链接需要以 http 开头');
+              return;
+            }
+            state.gameCustomImages[itemKey] = trimmed;
+            saveDataImmediate('游戏图片链接');
+            gameRenderCollection();
+            gameRenderBoard();
+            gameShowNotice('图片链接已设置！');
+          }
+        });
+      },
+      onCancel: () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+        input.onchange = async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          if (file.size > 2 * 1024 * 1024) {
+            gameShowNotice('图片不能超过2MB');
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = async (ev) => {
+            const compressed = await compressImage(ev.target.result, 80, 0.7);
+            if (!state.gameCustomImages) state.gameCustomImages = {};
+            state.gameCustomImages[itemKey] = compressed;
+            saveDataImmediate('游戏图片上传');
+            gameRenderCollection();
+            gameRenderBoard();
+            gameShowNotice('图片已设置！');
+          };
+          reader.readAsDataURL(file);
+        };
+        input.click();
+      }
+    });
   }
 
 
   // ===== 背景图上传 =====
   function gameUploadBackground() {
-    const choice = confirm('设置游戏背景\n\n点「确定」→ 输入图片链接\n点「取消」→ 选择本地文件上传');
-
-    if (choice) {
-      const url = prompt('输入背景图片链接：');
-      if (url && url.trim().startsWith('http')) {
-        state.gameBgImage = url.trim();
-        saveDataImmediate('游戏背景图');
-        gameApplyBackground();
-        gameShowNotice('背景已更新！');
-      }
-    } else {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/png,image/jpeg,image/gif,image/webp';
-      input.onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        if (file.size > 3 * 1024 * 1024) {
-          gameShowNotice('背景图不能超过3MB');
-          return;
-        }
-        const reader = new FileReader();
-        reader.onload = async (ev) => {
-          const compressed = await compressImage(ev.target.result, 600, 0.6);
-          state.gameBgImage = compressed;
-          saveDataImmediate('游戏背景图');
-          gameApplyBackground();
-          gameShowNotice('背景已设置！');
+    showConfirmDialog({
+      title: '🖼️ 设置游戏背景',
+      desc: '选择背景图来源：',
+      confirmText: '📝 输入链接',
+      cancelText: '📁 本地上传',
+      onConfirm: () => {
+        showPromptDialog({
+          title: '🔗 输入背景图片链接',
+          placeholder: 'https://...',
+          defaultValue: '',
+          confirmText: '确认',
+          cancelText: '取消',
+          onConfirm: (url) => {
+            if (url && url.trim().startsWith('http')) {
+              state.gameBgImage = url.trim();
+              saveDataImmediate('游戏背景图');
+              gameApplyBackground();
+              gameShowNotice('背景已更新！');
+            } else if (url && url.trim()) {
+              gameShowNotice('链接需要以 http 开头');
+            }
+          }
+        });
+      },
+      onCancel: () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+        input.onchange = async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          if (file.size > 3 * 1024 * 1024) {
+            gameShowNotice('背景图不能超过3MB');
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = async (ev) => {
+            const compressed = await compressImage(ev.target.result, 600, 0.6);
+            state.gameBgImage = compressed;
+            saveDataImmediate('游戏背景图');
+            gameApplyBackground();
+            gameShowNotice('背景已设置！');
+          };
+          reader.readAsDataURL(file);
         };
-        reader.readAsDataURL(file);
-      };
-      input.click();
-    }
+        input.click();
+      }
+    });
   }
 
   function gameApplyBackground() {
@@ -10879,7 +12117,7 @@ window.addEventListener('beforeunload', () => {
     panel.id = 'sp-game-panel';
     panel.innerHTML = `
       <div id="sp-game-header">
-        <span>🎮 喵咪合成工坊</span>
+        <span>${getGameIconHtml('merge', '🎮', 18)} 喵咪合成工坊</span>
         <div class="sp-game-header-btns">
           <button id="sp-game-tab-board" class="sp-game-tab active" data-tab="board">棋盘</button>
           <button id="sp-game-tab-shop" class="sp-game-tab" data-tab="shop">商店</button>
@@ -11817,7 +13055,7 @@ window.addEventListener('beforeunload', () => {
     panel.id = 'sp-match3-panel';
     panel.innerHTML = `
       <div id="sp-match3-header">
-        <span>🃏 消消看</span>
+        <span>${getGameIconHtml('match3', '🃏', 18)} 消消看</span>
         <div class="sp-match3-header-right">
           <button id="sp-match3-minimize" title="缩小悬挂" style="background:none;border:none;font-size:14px;cursor:pointer;color:var(--sp-text-muted);padding:2px 6px;">─</button>
           <button id="sp-match3-close" title="关闭">✕</button>
@@ -12032,63 +13270,87 @@ window.addEventListener('beforeunload', () => {
     if (!state.gameCustomImages) state.gameCustomImages = {};
     const currentImg = state.gameCustomImages[key];
 
-    // 如果已有图片，先问是否要移除
     if (currentImg) {
-      const action = confirm(`图案 ${MATCH3_DEFAULT_ICONS[idx]} 已有自定义图片\n\n点「确定」→ 移除图片（恢复默认emoji）\n点「取消」→ 替换为新图片`);
-      if (action) {
-        delete state.gameCustomImages[key];
-        saveDataImmediate('消消看图案移除');
-        match3RenderCollection();
-        match3ShowNotice('图片已移除，恢复默认显示');
-        return;
-      }
-    }
-
-    const choice = confirm(`设置图案 ${MATCH3_DEFAULT_ICONS[idx]} 的自定义图片\n\n点「确定」→ 输入图片链接\n点「取消」→ 选择本地文件上传`);
-
-    if (choice) {
-      const url = prompt('输入图片链接（留空确认=清除）：', currentImg && currentImg.startsWith('http') ? currentImg : '');
-      if (url === null) return;
-      const trimmed = url.trim();
-      if (!trimmed) {
-        delete state.gameCustomImages[key];
-        saveDataImmediate('消消看图案清除');
-        match3RenderCollection();
-        match3ShowNotice('图片已清除');
-        return;
-      }
-      if (!trimmed.startsWith('http')) {
-        match3ShowNotice('链接需要以 http 开头');
-        return;
-      }
-      state.gameCustomImages[key] = trimmed;
-      saveDataImmediate('消消看图案链接');
-      match3RenderCollection();
-      match3ShowNotice('图案图片已设置！');
-    } else {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/png,image/jpeg,image/gif,image/webp';
-      input.onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        if (file.size > 2 * 1024 * 1024) {
-          match3ShowNotice('图片不能超过2MB');
-          return;
-        }
-        const reader = new FileReader();
-        reader.onload = async (ev) => {
-          const compressed = await compressImage(ev.target.result, 80, 0.7);
-          if (!state.gameCustomImages) state.gameCustomImages = {};
-          state.gameCustomImages[key] = compressed;
-          saveDataImmediate('消消看图案上传');
+      showConfirmDialog({
+        title: '🖼️ 当前已有自定义图片',
+        desc: `图案 ${MATCH3_DEFAULT_ICONS[idx]} 已有自定义图片`,
+        confirmText: '移除图片',
+        cancelText: '替换为新图片',
+        onConfirm: () => {
+          delete state.gameCustomImages[key];
+          saveDataImmediate('消消看图案移除');
           match3RenderCollection();
-          match3ShowNotice('图案图片已设置！');
-        };
-        reader.readAsDataURL(file);
-      };
-      input.click();
+          match3ShowNotice('图片已移除，恢复默认显示');
+        },
+        onCancel: () => {
+          _match3PromptIconUploadStep2(idx, key, currentImg);
+        }
+      });
+      return;
     }
+
+    _match3PromptIconUploadStep2(idx, key, '');
+  }
+
+  function _match3PromptIconUploadStep2(idx, key, currentImg) {
+    showConfirmDialog({
+      title: `🖼️ 设置图案 ${MATCH3_DEFAULT_ICONS[idx]} 图片`,
+      desc: '选择图片来源：',
+      confirmText: '📝 输入链接',
+      cancelText: '📁 本地上传',
+      onConfirm: () => {
+        showPromptDialog({
+          title: '🔗 输入图片链接',
+          desc: '留空确认 = 清除',
+          placeholder: 'https://...',
+          defaultValue: currentImg && currentImg.startsWith('http') ? currentImg : '',
+          confirmText: '确认',
+          cancelText: '取消',
+          onConfirm: (url) => {
+            const trimmed = (url || '').trim();
+            if (!trimmed) {
+              delete state.gameCustomImages[key];
+              saveDataImmediate('消消看图案清除');
+              match3RenderCollection();
+              match3ShowNotice('图片已清除');
+              return;
+            }
+            if (!trimmed.startsWith('http')) {
+              match3ShowNotice('链接需要以 http 开头');
+              return;
+            }
+            state.gameCustomImages[key] = trimmed;
+            saveDataImmediate('消消看图案链接');
+            match3RenderCollection();
+            match3ShowNotice('图案图片已设置！');
+          }
+        });
+      },
+      onCancel: () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+        input.onchange = async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          if (file.size > 2 * 1024 * 1024) {
+            match3ShowNotice('图片不能超过2MB');
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = async (ev) => {
+            const compressed = await compressImage(ev.target.result, 80, 0.7);
+            if (!state.gameCustomImages) state.gameCustomImages = {};
+            state.gameCustomImages[key] = compressed;
+            saveDataImmediate('消消看图案上传');
+            match3RenderCollection();
+            match3ShowNotice('图案图片已设置！');
+          };
+          reader.readAsDataURL(file);
+        };
+        input.click();
+      }
+    });
   }
 
   // ===== 面板拖拽 =====
@@ -12802,7 +14064,7 @@ window.addEventListener('beforeunload', () => {
     panel.id = 'sp-lottery-panel';
     panel.innerHTML = `
       <div id="sp-lottery-header">
-        <span>🎰 幸运抽奖</span>
+        <span>${getGameIconHtml('lottery', '🎰', 18)} 幸运抽奖</span>
         <div style="display:flex;align-items:center;gap:8px;">
           <span class="sp-lottery-gold-display">🪙 <span id="sp-lottery-gold">${state.gameGold}</span></span>
           <button id="sp-lottery-close" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--sp-text-muted);padding:2px 6px;">✕</button>
@@ -13918,63 +15180,87 @@ window.addEventListener('beforeunload', () => {
     if (!state.gameCustomImages) state.gameCustomImages = {};
     const currentImg = state.gameCustomImages[key];
 
-    // 如果已有图片，先问是否要移除
     if (currentImg) {
-      const action = confirm(`图案 ${LINK_DEFAULT_ICONS[idx]} 已有自定义图片\n\n点「确定」→ 移除图片（恢复默认emoji）\n点「取消」→ 替换为新图片`);
-      if (action) {
-        delete state.gameCustomImages[key];
-        saveDataImmediate('连连看图案移除');
-        linkRenderCollection();
-        linkShowNotice('图片已移除，恢复默认显示');
-        return;
-      }
-    }
-
-    const choice = confirm(`设置图案 ${LINK_DEFAULT_ICONS[idx]} 的自定义图片\n\n点「确定」→ 输入图片链接\n点「取消」→ 选择本地文件上传`);
-
-    if (choice) {
-      const url = prompt('输入图片链接（留空确认=清除）：', currentImg && currentImg.startsWith('http') ? currentImg : '');
-      if (url === null) return;
-      const trimmed = url.trim();
-      if (!trimmed) {
-        delete state.gameCustomImages[key];
-        saveDataImmediate('连连看图案清除');
-        linkRenderCollection();
-        linkShowNotice('图片已清除');
-        return;
-      }
-      if (!trimmed.startsWith('http')) {
-        linkShowNotice('链接需要以 http 开头');
-        return;
-      }
-      state.gameCustomImages[key] = trimmed;
-      saveDataImmediate('连连看图案链接');
-      linkRenderCollection();
-      linkShowNotice('图案图片已设置！');
-    } else {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/png,image/jpeg,image/gif,image/webp';
-      input.onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        if (file.size > 2 * 1024 * 1024) {
-          linkShowNotice('图片不能超过2MB');
-          return;
-        }
-        const reader = new FileReader();
-        reader.onload = async (ev) => {
-          const compressed = await compressImage(ev.target.result, 80, 0.7);
-          if (!state.gameCustomImages) state.gameCustomImages = {};
-          state.gameCustomImages[key] = compressed;
-          saveDataImmediate('连连看图案上传');
+      showConfirmDialog({
+        title: '🖼️ 当前已有自定义图片',
+        desc: `图案 ${LINK_DEFAULT_ICONS[idx]} 已有自定义图片`,
+        confirmText: '移除图片',
+        cancelText: '替换为新图片',
+        onConfirm: () => {
+          delete state.gameCustomImages[key];
+          saveDataImmediate('连连看图案移除');
           linkRenderCollection();
-          linkShowNotice('图案图片已设置！');
-        };
-        reader.readAsDataURL(file);
-      };
-      input.click();
+          linkShowNotice('图片已移除，恢复默认显示');
+        },
+        onCancel: () => {
+          _linkPromptIconUploadStep2(idx, key, currentImg);
+        }
+      });
+      return;
     }
+
+    _linkPromptIconUploadStep2(idx, key, '');
+  }
+
+  function _linkPromptIconUploadStep2(idx, key, currentImg) {
+    showConfirmDialog({
+      title: `🖼️ 设置图案 ${LINK_DEFAULT_ICONS[idx]} 图片`,
+      desc: '选择图片来源：',
+      confirmText: '📝 输入链接',
+      cancelText: '📁 本地上传',
+      onConfirm: () => {
+        showPromptDialog({
+          title: '🔗 输入图片链接',
+          desc: '留空确认 = 清除',
+          placeholder: 'https://...',
+          defaultValue: currentImg && currentImg.startsWith('http') ? currentImg : '',
+          confirmText: '确认',
+          cancelText: '取消',
+          onConfirm: (url) => {
+            const trimmed = (url || '').trim();
+            if (!trimmed) {
+              delete state.gameCustomImages[key];
+              saveDataImmediate('连连看图案清除');
+              linkRenderCollection();
+              linkShowNotice('图片已清除');
+              return;
+            }
+            if (!trimmed.startsWith('http')) {
+              linkShowNotice('链接需要以 http 开头');
+              return;
+            }
+            state.gameCustomImages[key] = trimmed;
+            saveDataImmediate('连连看图案链接');
+            linkRenderCollection();
+            linkShowNotice('图案图片已设置！');
+          }
+        });
+      },
+      onCancel: () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+        input.onchange = async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          if (file.size > 2 * 1024 * 1024) {
+            linkShowNotice('图片不能超过2MB');
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = async (ev) => {
+            const compressed = await compressImage(ev.target.result, 80, 0.7);
+            if (!state.gameCustomImages) state.gameCustomImages = {};
+            state.gameCustomImages[key] = compressed;
+            saveDataImmediate('连连看图案上传');
+            linkRenderCollection();
+            linkShowNotice('图案图片已设置！');
+          };
+          reader.readAsDataURL(file);
+        };
+        input.click();
+      }
+    });
   }
 
   // ===== 渲染主面板 =====
@@ -13986,7 +15272,7 @@ window.addEventListener('beforeunload', () => {
     panel.id = 'sp-link-panel';
     panel.innerHTML = `
       <div id="sp-link-header">
-        <span>🔗 连连看</span>
+        <span>${getGameIconHtml('link', '🔗', 18)} 连连看</span>
         <div class="sp-link-header-right">
           <button id="sp-link-minimize" title="缩小悬挂" style="background:none;border:none;font-size:14px;cursor:pointer;color:var(--sp-text-muted);padding:2px 6px;">─</button>
           <button id="sp-link-close" title="关闭">✕</button>
@@ -15245,65 +16531,88 @@ window.addEventListener('beforeunload', () => {
     if (!state.gameCustomImages) state.gameCustomImages = {};
     const currentImg = state.gameCustomImages[key];
 
-    // 如果已有图片，先问是否要移除
     if (currentImg) {
-      const action = confirm(`「${food?.name || foodId}」已有自定义图片\n\n点「确定」→ 移除图片（恢复默认emoji）\n点「取消」→ 替换为新图片`);
-      if (action) {
-        delete state.gameCustomImages[key];
-        saveDataImmediate('冰箱食材图片移除');
-        fridgeRenderCollection();
-        fridgeShowNotice('图片已移除，恢复默认显示');
-        return;
-      }
-    }
-
-    const choice = confirm(`设置食材「${food?.name || foodId}」的自定义图片\n\n⭐ 推荐：点「确定」→ 输入图片链接（节省内存）\n点「取消」→ 选择本地文件上传`);
-
-    if (choice) {
-      const url = prompt('输入图片链接（留空确认=清除）：', currentImg && currentImg.startsWith('http') ? currentImg : '');
-      if (url === null) return;
-      const trimmed = url.trim();
-      if (!trimmed) {
-        delete state.gameCustomImages[key];
-        saveDataImmediate('冰箱食材图片清除');
-        fridgeRenderCollection();
-        fridgeShowNotice('图片已清除');
-        return;
-      }
-      if (!trimmed.startsWith('http')) {
-        fridgeShowNotice('请输入以 http 开头的链接');
-        return;
-      }
-      state.gameCustomImages[key] = trimmed;
-      saveDataImmediate('冰箱食材图片链接');
-      fridgeRenderCollection();
-      fridgeShowNotice('图片链接已设置！');
-    } else {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/png,image/jpeg,image/gif,image/webp';
-      input.onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        if (file.size > 2 * 1024 * 1024) {
-          fridgeShowNotice('图片不能超过2MB，推荐使用图片链接');
-          return;
-        }
-        const reader = new FileReader();
-        reader.onload = async (ev) => {
-          const compressed = await compressImage(ev.target.result, 80, 0.7);
-          if (!state.gameCustomImages) state.gameCustomImages = {};
-          state.gameCustomImages[key] = compressed;
-          saveDataImmediate('冰箱食材图片上传');
+      showConfirmDialog({
+        title: '🖼️ 当前已有自定义图片',
+        desc: `「${food?.name || foodId}」已有自定义图片`,
+        confirmText: '移除图片',
+        cancelText: '替换为新图片',
+        onConfirm: () => {
+          delete state.gameCustomImages[key];
+          saveDataImmediate('冰箱食材图片移除');
           fridgeRenderCollection();
-          fridgeShowNotice('图片已设置！（提示：使用链接可节省存储空间）');
-        };
-        reader.readAsDataURL(file);
-      };
-      input.click();
+          fridgeShowNotice('图片已移除，恢复默认显示');
+        },
+        onCancel: () => {
+          _fridgePromptFoodUploadStep2(foodId, food, key, currentImg);
+        }
+      });
+      return;
     }
+
+    _fridgePromptFoodUploadStep2(foodId, food, key, '');
   }
 
+  function _fridgePromptFoodUploadStep2(foodId, food, key, currentImg) {
+    showConfirmDialog({
+      title: `🖼️ 设置「${food?.name || foodId}」图片`,
+      desc: '⭐ 推荐使用图片链接（节省内存）',
+      confirmText: '📝 输入链接',
+      cancelText: '📁 本地上传',
+      onConfirm: () => {
+        showPromptDialog({
+          title: '🔗 输入图片链接',
+          desc: '留空确认 = 清除',
+          placeholder: 'https://...',
+          defaultValue: currentImg && currentImg.startsWith('http') ? currentImg : '',
+          confirmText: '确认',
+          cancelText: '取消',
+          onConfirm: (url) => {
+            const trimmed = (url || '').trim();
+            if (!trimmed) {
+              delete state.gameCustomImages[key];
+              saveDataImmediate('冰箱食材图片清除');
+              fridgeRenderCollection();
+              fridgeShowNotice('图片已清除');
+              return;
+            }
+            if (!trimmed.startsWith('http')) {
+              fridgeShowNotice('请输入以 http 开头的链接');
+              return;
+            }
+            state.gameCustomImages[key] = trimmed;
+            saveDataImmediate('冰箱食材图片链接');
+            fridgeRenderCollection();
+            fridgeShowNotice('图片链接已设置！');
+          }
+        });
+      },
+      onCancel: () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+        input.onchange = async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          if (file.size > 2 * 1024 * 1024) {
+            fridgeShowNotice('图片不能超过2MB，推荐使用图片链接');
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = async (ev) => {
+            const compressed = await compressImage(ev.target.result, 80, 0.7);
+            if (!state.gameCustomImages) state.gameCustomImages = {};
+            state.gameCustomImages[key] = compressed;
+            saveDataImmediate('冰箱食材图片上传');
+            fridgeRenderCollection();
+            fridgeShowNotice('图片已设置！（提示：使用链接可节省存储空间）');
+          };
+          reader.readAsDataURL(file);
+        };
+        input.click();
+      }
+    });
+  }
 
   // ===== 冰箱库存背包 =====
   function fridgeRenderBag() {
@@ -15435,7 +16744,7 @@ window.addEventListener('beforeunload', () => {
     panel.id = 'sp-fridge-panel';
     panel.innerHTML = `
       <div id="sp-fridge-header">
-        <span>🧊 冰箱整理</span>
+        <span>${getGameIconHtml('fridge', '🧊', 18)} 冰箱整理</span>
         <div class="sp-fridge-header-right">
           <button id="sp-fridge-minimize" title="缩小悬挂" style="background:none;border:none;font-size:14px;cursor:pointer;color:var(--sp-text-muted);padding:2px 6px;">─</button>
           <button id="sp-fridge-close" title="关闭">✕</button>
@@ -18066,63 +19375,87 @@ window.addEventListener('beforeunload', () => {
     if (!state.gameCustomImages) state.gameCustomImages = {};
     const currentImg = state.gameCustomImages[key];
 
-    // 如果已有图片，先问是否要移除
     if (currentImg) {
-      const action = confirm(`「${fruit?.name || fruitKey}」已有自定义图片\n\n点「确定」→ 移除图片（恢复默认emoji）\n点「取消」→ 替换为新图片`);
-      if (action) {
-        delete state.gameCustomImages[key];
-        saveDataImmediate('糖葫芦水果图片移除');
-        tanghuluRenderCollection();
-        tanghuluShowNotice('图片已移除，恢复默认显示');
-        return;
-      }
-    }
-
-    const choice = confirm(`设置水果「${fruit?.name || fruitKey}」的自定义图片\n\n⭐ 推荐：点「确定」→ 输入图片链接（节省内存）\n点「取消」→ 选择本地文件上传`);
-
-    if (choice) {
-      const url = prompt('输入图片链接（留空确认=清除）：', currentImg && currentImg.startsWith('http') ? currentImg : '');
-      if (url === null) return;
-      const trimmed = url.trim();
-      if (!trimmed) {
-        delete state.gameCustomImages[key];
-        saveDataImmediate('糖葫芦水果图片清除');
-        tanghuluRenderCollection();
-        tanghuluShowNotice('图片已清除');
-        return;
-      }
-      if (!trimmed.startsWith('http')) {
-        tanghuluShowNotice('请输入以 http 开头的链接');
-        return;
-      }
-      state.gameCustomImages[key] = trimmed;
-      saveDataImmediate('糖葫芦水果图片链接');
-      tanghuluRenderCollection();
-      tanghuluShowNotice('图片链接已设置！');
-    } else {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/png,image/jpeg,image/gif,image/webp';
-      input.onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        if (file.size > 2 * 1024 * 1024) {
-          tanghuluShowNotice('图片不能超过2MB，推荐使用图片链接');
-          return;
-        }
-        const reader = new FileReader();
-        reader.onload = async (ev) => {
-          const compressed = await compressImage(ev.target.result, 80, 0.7);
-          if (!state.gameCustomImages) state.gameCustomImages = {};
-          state.gameCustomImages[key] = compressed;
-          saveDataImmediate('糖葫芦水果图片上传');
+      showConfirmDialog({
+        title: '🖼️ 当前已有自定义图片',
+        desc: `「${fruit?.name || fruitKey}」已有自定义图片`,
+        confirmText: '移除图片',
+        cancelText: '替换为新图片',
+        onConfirm: () => {
+          delete state.gameCustomImages[key];
+          saveDataImmediate('糖葫芦水果图片移除');
           tanghuluRenderCollection();
-          tanghuluShowNotice('图片已设置！（提示：使用链接可节省存储空间）');
-        };
-        reader.readAsDataURL(file);
-      };
-      input.click();
+          tanghuluShowNotice('图片已移除，恢复默认显示');
+        },
+        onCancel: () => {
+          _tanghuluPromptFruitUploadStep2(fruitKey, fruit, key, currentImg);
+        }
+      });
+      return;
     }
+
+    _tanghuluPromptFruitUploadStep2(fruitKey, fruit, key, '');
+  }
+
+  function _tanghuluPromptFruitUploadStep2(fruitKey, fruit, key, currentImg) {
+    showConfirmDialog({
+      title: `🖼️ 设置「${fruit?.name || fruitKey}」图片`,
+      desc: '⭐ 推荐使用图片链接（节省内存）',
+      confirmText: '📝 输入链接',
+      cancelText: '📁 本地上传',
+      onConfirm: () => {
+        showPromptDialog({
+          title: '🔗 输入图片链接',
+          desc: '留空确认 = 清除',
+          placeholder: 'https://...',
+          defaultValue: currentImg && currentImg.startsWith('http') ? currentImg : '',
+          confirmText: '确认',
+          cancelText: '取消',
+          onConfirm: (url) => {
+            const trimmed = (url || '').trim();
+            if (!trimmed) {
+              delete state.gameCustomImages[key];
+              saveDataImmediate('糖葫芦水果图片清除');
+              tanghuluRenderCollection();
+              tanghuluShowNotice('图片已清除');
+              return;
+            }
+            if (!trimmed.startsWith('http')) {
+              tanghuluShowNotice('请输入以 http 开头的链接');
+              return;
+            }
+            state.gameCustomImages[key] = trimmed;
+            saveDataImmediate('糖葫芦水果图片链接');
+            tanghuluRenderCollection();
+            tanghuluShowNotice('图片链接已设置！');
+          }
+        });
+      },
+      onCancel: () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+        input.onchange = async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          if (file.size > 2 * 1024 * 1024) {
+            tanghuluShowNotice('图片不能超过2MB，推荐使用图片链接');
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = async (ev) => {
+            const compressed = await compressImage(ev.target.result, 80, 0.7);
+            if (!state.gameCustomImages) state.gameCustomImages = {};
+            state.gameCustomImages[key] = compressed;
+            saveDataImmediate('糖葫芦水果图片上传');
+            tanghuluRenderCollection();
+            tanghuluShowNotice('图片已设置！（提示：使用链接可节省存储空间）');
+          };
+          reader.readAsDataURL(file);
+        };
+        input.click();
+      }
+    });
   }
 
 
@@ -18366,7 +19699,7 @@ window.addEventListener('beforeunload', () => {
     panel.id = 'sp-tanghulu-panel';
     panel.innerHTML = `
       <div id="sp-tanghulu-header">
-        <span>🍢 糖葫芦工坊</span>
+        <span>${getGameIconHtml('tanghulu', '🍢', 18)} 糖葫芦工坊</span>
         <div class="sp-link-header-right">
           <button id="sp-tanghulu-minimize" title="缩小悬挂" style="background:none;border:none;font-size:14px;cursor:pointer;color:var(--sp-text-muted);padding:2px 6px;">─</button>
           <button id="sp-tanghulu-close" title="关闭" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--sp-text-muted);padding:2px 6px;border-radius:4px;transition:color 0.2s;">✕</button>
@@ -19764,63 +21097,87 @@ window.addEventListener('beforeunload', () => {
     if (!state.gameCustomImages) state.gameCustomImages = {};
     const currentImg = state.gameCustomImages[key];
 
-    // 如果已有图片，先问是否要移除
     if (currentImg) {
-      const action = confirm(`「${name}」已有自定义图片\n\n点「确定」→ 移除图片（恢复默认emoji）\n点「取消」→ 替换为新图片`);
-      if (action) {
-        delete state.gameCustomImages[key];
-        saveDataImmediate('餐厅图鉴图片移除');
-        restaurantRenderAtlas();
-        restaurantShowNotice(`${name} 图片已移除`);
-        return;
-      }
-    }
-
-    const choice = confirm(`设置「${name}」的自定义图片\n\n⭐ 推荐：点「确定」→ 输入图片链接（节省内存）\n点「取消」→ 选择本地文件上传`);
-
-    if (choice) {
-      const url = prompt('输入图片链接（留空确认=清除）：', currentImg && currentImg.startsWith('http') ? currentImg : '');
-      if (url === null) return;
-      const trimmed = url.trim();
-      if (!trimmed) {
-        delete state.gameCustomImages[key];
-        saveDataImmediate('餐厅图鉴图片清除');
-        restaurantRenderAtlas();
-        restaurantShowNotice(`${name} 图片已清除`);
-        return;
-      }
-      if (!trimmed.startsWith('http')) {
-        restaurantShowNotice('请输入以 http 开头的链接');
-        return;
-      }
-      state.gameCustomImages[key] = trimmed;
-      saveDataImmediate('餐厅图鉴图片链接');
-      restaurantRenderAtlas();
-      restaurantShowNotice(`${name} 图片已设置！`);
-    } else {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/png,image/jpeg,image/gif,image/webp';
-      input.onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        if (file.size > 2 * 1024 * 1024) {
-          restaurantShowNotice('图片不能超过2MB，推荐使用图片链接');
-          return;
-        }
-        const reader = new FileReader();
-        reader.onload = async (ev) => {
-          const compressed = await compressImage(ev.target.result, 80, 0.7);
-          if (!state.gameCustomImages) state.gameCustomImages = {};
-          state.gameCustomImages[key] = compressed;
-          saveDataImmediate('餐厅图鉴图片上传');
+      showConfirmDialog({
+        title: '🖼️ 当前已有自定义图片',
+        desc: `「${name}」已有自定义图片`,
+        confirmText: '移除图片',
+        cancelText: '替换为新图片',
+        onConfirm: () => {
+          delete state.gameCustomImages[key];
+          saveDataImmediate('餐厅图鉴图片移除');
           restaurantRenderAtlas();
-          restaurantShowNotice(`${name} 图片已设置！（提示：使用链接可节省存储空间）`);
-        };
-        reader.readAsDataURL(file);
-      };
-      input.click();
+          restaurantShowNotice(`${name} 图片已移除`);
+        },
+        onCancel: () => {
+          _restaurantPromptAtlasUploadStep2(key, name, currentImg);
+        }
+      });
+      return;
     }
+
+    _restaurantPromptAtlasUploadStep2(key, name, '');
+  }
+
+  function _restaurantPromptAtlasUploadStep2(key, name, currentImg) {
+    showConfirmDialog({
+      title: `🖼️ 设置「${name}」图片`,
+      desc: '⭐ 推荐使用图片链接（节省内存）',
+      confirmText: '📝 输入链接',
+      cancelText: '📁 本地上传',
+      onConfirm: () => {
+        showPromptDialog({
+          title: '🔗 输入图片链接',
+          desc: '留空确认 = 清除',
+          placeholder: 'https://...',
+          defaultValue: currentImg && currentImg.startsWith('http') ? currentImg : '',
+          confirmText: '确认',
+          cancelText: '取消',
+          onConfirm: (url) => {
+            const trimmed = (url || '').trim();
+            if (!trimmed) {
+              delete state.gameCustomImages[key];
+              saveDataImmediate('餐厅图鉴图片清除');
+              restaurantRenderAtlas();
+              restaurantShowNotice(`${name} 图片已清除`);
+              return;
+            }
+            if (!trimmed.startsWith('http')) {
+              restaurantShowNotice('请输入以 http 开头的链接');
+              return;
+            }
+            state.gameCustomImages[key] = trimmed;
+            saveDataImmediate('餐厅图鉴图片链接');
+            restaurantRenderAtlas();
+            restaurantShowNotice(`${name} 图片已设置！`);
+          }
+        });
+      },
+      onCancel: () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+        input.onchange = async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          if (file.size > 2 * 1024 * 1024) {
+            restaurantShowNotice('图片不能超过2MB，推荐使用图片链接');
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = async (ev) => {
+            const compressed = await compressImage(ev.target.result, 80, 0.7);
+            if (!state.gameCustomImages) state.gameCustomImages = {};
+            state.gameCustomImages[key] = compressed;
+            saveDataImmediate('餐厅图鉴图片上传');
+            restaurantRenderAtlas();
+            restaurantShowNotice(`${name} 图片已设置！（提示：使用链接可节省存储空间）`);
+          };
+          reader.readAsDataURL(file);
+        };
+        input.click();
+      }
+    });
   }
 
   // ===== 渲染面板框架 =====
@@ -19851,7 +21208,7 @@ window.addEventListener('beforeunload', () => {
       <div id="sp-restaurant-header" style="display:flex;align-items:center;padding:10px 12px;background:var(--sp-bg-light);border-bottom:1px solid var(--sp-border-light);cursor:grab;user-select:none;gap:8px;">
         <button id="sp-restaurant-minimize" style="background:none;border:none;font-size:14px;cursor:pointer;color:var(--sp-text-muted);padding:2px 4px;flex-shrink:0;" title="缩小">─</button>
         <button id="sp-restaurant-close" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--sp-text-muted);padding:2px 4px;flex-shrink:0;" title="关闭">✕</button>
-        <span style="font-size:14px;font-weight:700;color:var(--sp-text-primary);flex:1;text-align:center;">🐱 小猫餐厅</span>
+        <span style="font-size:14px;font-weight:700;color:var(--sp-text-primary);flex:1;text-align:center;">${getGameIconHtml('restaurant', '🐱', 18)} 小猫餐厅</span>
         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
           <span style="font-size:11px;color:#a0d4ff;" id="sp-restaurant-lvl">🏕️Lv.1</span>
           <span style="font-size:11px;color:#ffdd80;font-weight:600;">⭐<span id="sp-restaurant-rep">0</span></span>
@@ -21070,63 +22427,87 @@ window.addEventListener('beforeunload', () => {
     if (!state.gameCustomImages) state.gameCustomImages = {};
     const currentImg = state.gameCustomImages[key];
 
-    // 如果已有图片，先问是否要移除
     if (currentImg) {
-      const action = confirm(`「${item?.name || itemId}」已有自定义图片\n\n点「确定」→ 移除图片（恢复默认emoji）\n点「取消」→ 替换为新图片`);
-      if (action) {
-        delete state.gameCustomImages[key];
-        saveDataImmediate('货架商品图片移除');
-        shelfRenderCollection();
-        shelfShowNotice('图片已移除，恢复默认显示');
-        return;
-      }
-    }
-
-    const choice = confirm(`设置商品「${item?.name || itemId}」的自定义图片\n\n⭐ 推荐：点「确定」→ 输入图片链接（节省内存）\n点「取消」→ 选择本地文件上传`);
-
-    if (choice) {
-      const url = prompt('输入图片链接（留空确认=清除）：', currentImg && currentImg.startsWith('http') ? currentImg : '');
-      if (url === null) return;
-      const trimmed = url.trim();
-      if (!trimmed) {
-        delete state.gameCustomImages[key];
-        saveDataImmediate('货架商品图片清除');
-        shelfRenderCollection();
-        shelfShowNotice('图片已清除');
-        return;
-      }
-      if (!trimmed.startsWith('http')) {
-        shelfShowNotice('请输入以 http 开头的链接');
-        return;
-      }
-      state.gameCustomImages[key] = trimmed;
-      saveDataImmediate('货架商品图片链接');
-      shelfRenderCollection();
-      shelfShowNotice('图片链接已设置！');
-    } else {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/png,image/jpeg,image/gif,image/webp';
-      input.onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        if (file.size > 2 * 1024 * 1024) {
-          shelfShowNotice('图片不能超过2MB，推荐使用图片链接');
-          return;
-        }
-        const reader = new FileReader();
-        reader.onload = async (ev) => {
-          const compressed = await compressImage(ev.target.result, 80, 0.7);
-          if (!state.gameCustomImages) state.gameCustomImages = {};
-          state.gameCustomImages[key] = compressed;
-          saveDataImmediate('货架商品图片上传');
+      showConfirmDialog({
+        title: '🖼️ 当前已有自定义图片',
+        desc: `「${item?.name || itemId}」已有自定义图片`,
+        confirmText: '移除图片',
+        cancelText: '替换为新图片',
+        onConfirm: () => {
+          delete state.gameCustomImages[key];
+          saveDataImmediate('货架商品图片移除');
           shelfRenderCollection();
-          shelfShowNotice('图片已设置！（提示：使用链接可节省存储空间）');
-        };
-        reader.readAsDataURL(file);
-      };
-      input.click();
+          shelfShowNotice('图片已移除，恢复默认显示');
+        },
+        onCancel: () => {
+          _shelfPromptItemUploadStep2(itemId, item, key, currentImg);
+        }
+      });
+      return;
     }
+
+    _shelfPromptItemUploadStep2(itemId, item, key, '');
+  }
+
+  function _shelfPromptItemUploadStep2(itemId, item, key, currentImg) {
+    showConfirmDialog({
+      title: `🖼️ 设置「${item?.name || itemId}」图片`,
+      desc: '⭐ 推荐使用图片链接（节省内存）',
+      confirmText: '📝 输入链接',
+      cancelText: '📁 本地上传',
+      onConfirm: () => {
+        showPromptDialog({
+          title: '🔗 输入图片链接',
+          desc: '留空确认 = 清除',
+          placeholder: 'https://...',
+          defaultValue: currentImg && currentImg.startsWith('http') ? currentImg : '',
+          confirmText: '确认',
+          cancelText: '取消',
+          onConfirm: (url) => {
+            const trimmed = (url || '').trim();
+            if (!trimmed) {
+              delete state.gameCustomImages[key];
+              saveDataImmediate('货架商品图片清除');
+              shelfRenderCollection();
+              shelfShowNotice('图片已清除');
+              return;
+            }
+            if (!trimmed.startsWith('http')) {
+              shelfShowNotice('请输入以 http 开头的链接');
+              return;
+            }
+            state.gameCustomImages[key] = trimmed;
+            saveDataImmediate('货架商品图片链接');
+            shelfRenderCollection();
+            shelfShowNotice('图片链接已设置！');
+          }
+        });
+      },
+      onCancel: () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+        input.onchange = async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          if (file.size > 2 * 1024 * 1024) {
+            shelfShowNotice('图片不能超过2MB，推荐使用图片链接');
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = async (ev) => {
+            const compressed = await compressImage(ev.target.result, 80, 0.7);
+            if (!state.gameCustomImages) state.gameCustomImages = {};
+            state.gameCustomImages[key] = compressed;
+            saveDataImmediate('货架商品图片上传');
+            shelfRenderCollection();
+            shelfShowNotice('图片已设置！（提示：使用链接可节省存储空间）');
+          };
+          reader.readAsDataURL(file);
+        };
+        input.click();
+      }
+    });
   }
 
   // ===== 主渲染函数 =====
@@ -21437,7 +22818,7 @@ window.addEventListener('beforeunload', () => {
     panel.id = 'sp-shelf-panel';
     panel.innerHTML = `
       <div id="sp-shelf-header">
-        <span>🛒 整理货架</span>
+        <span>${getGameIconHtml('shelf', '🛒', 18)} 整理货架</span>
         <div class="sp-shelf-header-right">
           <button id="sp-shelf-minimize" title="缩小悬挂" style="background:none;border:none;font-size:14px;cursor:pointer;color:var(--sp-text-muted);padding:2px 6px;">─</button>
           <button id="sp-shelf-close" title="关闭">✕</button>
@@ -21837,78 +23218,154 @@ window.addEventListener('beforeunload', () => {
     const currentImg = getLinkedImage(key);
     const linkedKeys = getLinkedImageKeys(key);
     const linkedCount = linkedKeys.length;
-    const linkedHint = linkedCount > 1 ? `\n\n💡 此图片将同步到 ${linkedCount} 个关联位置` : '';
+    const linkedHint = linkedCount > 1 ? `<br/><br/>💡 此图片将同步到 ${linkedCount} 个关联位置` : '';
 
     if (currentImg) {
-      const action = confirm(`「${name}」已有自定义图片${linkedHint}\n\n点「确定」→ 移除图片（恢复默认emoji）\n点「取消」→ 替换为新图片`);
-      if (action) {
-        unifiedSetImage(key, '');
-        saveDataImmediate('图鉴合集图片移除');
-        showUnifiedCollection();
-        showBubble(`${name} 图片已移除`, 2000);
-        return;
-      }
-    }
-
-    const choice = confirm(`设置「${name}」的自定义图片${linkedHint}\n\n⭐ 推荐：点「确定」→ 输入图片链接（节省内存）\n点「取消」→ 选择本地文件上传`);
-
-    if (choice) {
-      const url = prompt('输入图片链接（留空确认=清除）：', currentImg && currentImg.startsWith('http') ? currentImg : '');
-      if (url === null) return;
-      const trimmed = url.trim();
-      if (!trimmed) {
-        unifiedSetImage(key, '');
-        saveDataImmediate('图鉴合集图片清除');
-        showUnifiedCollection();
-        showBubble(`${name} 图片已清除`, 2000);
-        return;
-      }
-      if (!trimmed.startsWith('http')) { showBubble('请输入以 http 开头的链接', 3000); return; }
-      unifiedSetImage(key, trimmed);
-      saveDataImmediate('图鉴合集图片设置');
-      showUnifiedCollection();
-      showBubble(`${name} 图片已设置！${linkedCount > 1 ? '（已同步到' + linkedCount + '处）' : ''}`, 2500);
-    } else {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/png,image/jpeg,image/gif,image/webp';
-      input.onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        if (file.size > 2 * 1024 * 1024) { showBubble('图片不能超过2MB', 3000); return; }
-        const reader = new FileReader();
-        reader.onload = async (ev) => {
-          const compressed = await compressImage(ev.target.result, 80, 0.7);
-          unifiedSetImage(key, compressed);
-          saveDataImmediate('图鉴合集图片上传');
+      showConfirmDialog({
+        title: '🖼️ 当前已有自定义图片',
+        desc: `「${name}」已有自定义图片${linkedHint}`,
+        confirmText: '移除图片',
+        cancelText: '替换为新图片',
+        onConfirm: () => {
+          unifiedSetImage(key, '');
+          saveDataImmediate('图鉴合集图片移除');
           showUnifiedCollection();
-          showBubble(`${name} 图片已设置！${linkedCount > 1 ? '（已同步到' + linkedCount + '处）' : ''}`, 2500);
-        };
-        reader.readAsDataURL(file);
-      };
-      input.click();
+          showBubble(`${name} 图片已移除`, 2000);
+        },
+        onCancel: () => {
+          _unifiedPromptImageUploadStep2(key, name, currentImg, linkedCount);
+        }
+      });
+      return;
     }
+
+    _unifiedPromptImageUploadStep2(key, name, '', linkedCount);
+  }
+
+  function _unifiedPromptImageUploadStep2(key, name, currentImg, linkedCount) {
+    const linkedHint = linkedCount > 1 ? `<br/>💡 将同步到 ${linkedCount} 个关联位置` : '';
+    showConfirmDialog({
+      title: `🖼️ 设置「${name}」图片`,
+      desc: `⭐ 推荐使用图片链接（节省内存）${linkedHint}`,
+      confirmText: '📝 输入链接',
+      cancelText: '📁 本地上传',
+      onConfirm: () => {
+        showPromptDialog({
+          title: '🔗 输入图片链接',
+          desc: '留空确认 = 清除',
+          placeholder: 'https://...',
+          defaultValue: currentImg && currentImg.startsWith('http') ? currentImg : '',
+          confirmText: '确认',
+          cancelText: '取消',
+          onConfirm: (url) => {
+            const trimmed = (url || '').trim();
+            if (!trimmed) {
+              unifiedSetImage(key, '');
+              saveDataImmediate('图鉴合集图片清除');
+              showUnifiedCollection();
+              showBubble(`${name} 图片已清除`, 2000);
+              return;
+            }
+            if (!trimmed.startsWith('http')) {
+              showBubble('请输入以 http 开头的链接', 3000);
+              return;
+            }
+            unifiedSetImage(key, trimmed);
+            saveDataImmediate('图鉴合集图片设置');
+            showUnifiedCollection();
+            showBubble(`${name} 图片已设置！${linkedCount > 1 ? '（已同步到' + linkedCount + '处）' : ''}`, 2500);
+          }
+        });
+      },
+      onCancel: () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+        input.onchange = async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          if (file.size > 2 * 1024 * 1024) {
+            showBubble('图片不能超过2MB', 3000);
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = async (ev) => {
+            const compressed = await compressImage(ev.target.result, 80, 0.7);
+            unifiedSetImage(key, compressed);
+            saveDataImmediate('图鉴合集图片上传');
+            showUnifiedCollection();
+            showBubble(`${name} 图片已设置！${linkedCount > 1 ? '（已同步到' + linkedCount + '处）' : ''}`, 2500);
+          };
+          reader.readAsDataURL(file);
+        };
+        input.click();
+      }
+    });
   }
 
   // 渲染统一图鉴面板
   function showUnifiedCollection() {
-    document.getElementById('sp-unified-collection-overlay')?.remove();
+    //===== 保存当前折叠栏和滚动状态 =====
+    let savedState = null;
+    const existingOverlay = document.getElementById('sp-unified-collection-overlay');
+    if (existingOverlay) {
+      const body = existingOverlay.querySelector('.sp-total-inv-body');
+      const scrollTop = body ? body.scrollTop : 0;
+      const openDetails = [];
+      existingOverlay.querySelectorAll('.sp-guide-details').forEach((detail, idx) => {
+        if (detail.open) openDetails.push(idx);
+      });
+      savedState = { scrollTop, openDetails };
+      existingOverlay.remove();
+    }
 
     if (!state.gameCustomImages) state.gameCustomImages = {};
 
-    // 构建图鉴格子
-    function renderItem(key, emoji, name, extraInfo) {
+    // 游戏图标定义
+    const GAME_ICON_DEFS = [
+      { id: 'restaurant',emoji: '🐱', name: '小猫餐厅' },
+      { id: 'merge',            emoji: '🧶', name: '合成工坊' },
+      { id: 'match3',           emoji: '🃏', name: '消消看' },
+      { id: 'lottery',          emoji: '🎰', name: '幸运抽奖' },
+      { id: 'link',             emoji: '🔗', name: '连连看' },
+      { id: 'fridge',           emoji: '🧊', name: '冰箱整理' },
+      { id: 'tanghulu',         emoji: '🍢', name: '糖葫芦工坊' },
+      { id: 'shelf',            emoji: '🛒', name: '整理货架' },
+      { id: 'inventory',        emoji: '🎒', name: '总背包' },
+      { id: 'achievements',     emoji: '🏆', name: '成就' },
+      { id: 'unifiedCollection', emoji: '📖', name: '图鉴合集' },
+    ];
+
+    // 构建图鉴格子（支持上锁物品上传 + 半透明 + 显示名字开关）
+    function renderItem(key, emoji, name, extraInfo, isLocked) {
       const custom = getLinkedImage(key);
       const linkedKeys = getLinkedImageKeys(key);
       const hasLink = linkedKeys.length > 1;
-      const display = custom
-        ? `<img src="${custom}" style="width:28px;height:28px;object-fit:contain;border-radius:4px;" />`
-        : `<span style="font-size:20px;">${emoji}</span>`;
+      const hasCustom = !!custom;
+
+      let display;
+      if (custom) {
+        display = `<img src="${custom}" style="width:28px;height:28px;object-fit:contain;border-radius:4px;" />`;
+      } else if (isLocked) {
+        display = `<span style="font-size:14px;color:var(--sp-text-muted);">🔒</span>`;
+      } else {
+        display = `<span style="font-size:20px;">${emoji}</span>`;
+      }
+
+      // 根据 showLockedNames 决定是否显示上锁物品的真实名字
+      let displayName = name;
+      if (isLocked && !showLockedNames && !hasCustom) {
+        displayName = '???';
+      }
+
+      const lockedClass = isLocked ? ' sp-unified-locked' : '';
+      const customLockedClass = (isLocked && hasCustom) ? ' sp-unified-has-custom' : '';
       const escapedName = name.replace(/"/g, '&quot;');
+
       return `
-        <div class="sp-unified-coll-item" data-ukey="${key}" data-uname="${escapedName}" title="${escapedName}${extraInfo ? ' | ' + extraInfo : ''}${hasLink ? ' | 🔗联动' : ''}">
+        <div class="sp-unified-coll-item${lockedClass}${customLockedClass}" data-ukey="${key}" data-uname="${escapedName}" title="${name}${extraInfo ? ' | ' + extraInfo : ''}${hasLink ? ' | 🔗联动' : ''}${isLocked ? ' | 🔒未解锁' : ''}">
           ${display}
-          <span class="sp-unified-coll-name">${name}</span>
+          <span class="sp-unified-coll-name">${displayName}</span>
           ${hasLink ? '<span class="sp-unified-coll-link">🔗</span>' : ''}
           <div class="sp-unified-coll-upload" data-ukey="${key}" data-uname="${escapedName}">📷</div>
         </div>
@@ -21916,6 +23373,27 @@ window.addEventListener('beforeunload', () => {
     }
 
     let bodyHtml = '';
+
+    // ===== 游戏图标折叠栏（最顶部）=====
+    bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">🎮 游戏图标<span style="font-size:10px;color:var(--sp-text-muted);font-weight:400;">（自定义选择游戏界面的图标）</span></summary><div class="sp-guide-details-content">';
+    bodyHtml += '<div class="sp-unified-game-icon-grid">';
+    GAME_ICON_DEFS.forEach(game => {
+      const key = `game_icon_${game.id}`;
+      const custom = state.gameCustomImages[key];
+      const display = custom
+        ? `<img src="${custom}" />`
+        : `<span>${game.emoji}</span>`;
+      bodyHtml += `
+        <div class="sp-unified-game-icon-item" data-game-icon-id="${game.id}" title="${game.name}">
+          <div class="sp-unified-game-icon-preview">${display}</div>
+          <span class="sp-unified-game-icon-name">${game.name}</span>
+          <div class="sp-unified-game-icon-upload" data-game-icon-id="${game.id}">📷</div>
+        </div>
+      `;
+    });
+    bodyHtml += '</div>';
+    bodyHtml += '<div style="font-size:10px;color:var(--sp-text-muted);margin-top:6px;">💡 上传后会同步显示在「选择游戏」界面和各游戏面板标题中</div>';
+    bodyHtml += '</div></details>';
 
     // ===== 合成工坊 =====
     const mergeChainKeys = ['toy', 'food', 'gem', 'potion', 'music', 'flower', 'star', 'seasoning', 'stamina'];
@@ -21927,7 +23405,7 @@ window.addEventListener('beforeunload', () => {
       chain.items.forEach((item, idx) => {
         const key = `${chainKey}_${idx + 1}`;
         const unlocked = (state.gameCollection || []).includes(key);
-        bodyHtml += renderItem(key, unlocked ? item.emoji : '?', unlocked ? item.name : '???', `Lv${idx + 1} 售${item.sell}🪙`);
+        bodyHtml += renderItem(key, unlocked ? item.emoji : '?', item.name, `Lv${idx + 1} 售${item.sell}🪙`, !unlocked);
       });
       bodyHtml += '</div>';
     });
@@ -21936,58 +23414,58 @@ window.addEventListener('beforeunload', () => {
     // ===== 消消看图案 =====
     bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">🃏 消消看图案</summary><div class="sp-guide-details-content"><div class="sp-unified-coll-grid">';
     MATCH3_DEFAULT_ICONS.forEach((icon, idx) => {
-      bodyHtml += renderItem(`match3_icon_${idx}`, icon, `图案${idx + 1}`, icon);
+      bodyHtml += renderItem(`match3_icon_${idx}`, icon, `图案${idx + 1}`, icon, false);
     });
     bodyHtml += '</div></div></details>';
 
     // ===== 连连看图案 =====
     bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">🔗 连连看图案</summary><div class="sp-guide-details-content"><div class="sp-unified-coll-grid">';
     LINK_DEFAULT_ICONS.forEach((icon, idx) => {
-      bodyHtml += renderItem(`link_icon_${idx}`, icon, `图案${idx + 1}`, icon);
+      bodyHtml += renderItem(`link_icon_${idx}`, icon, `图案${idx + 1}`, icon, false);
     });
     bodyHtml += '</div></div></details>';
 
-    // ===== 冰箱食材（联动餐厅食材）=====
+    // ===== 冰箱食材 =====
     bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">🧊 冰箱食材 <span style="font-size:10px;color:var(--sp-text-muted);">（🔗联动餐厅食材图鉴）</span></summary><div class="sp-guide-details-content"><div class="sp-unified-coll-grid">';
     FRIDGE_FOODS.forEach(food => {
-      bodyHtml += renderItem(`fridge_food_${food.id}`, food.emoji, food.name, `${food.w}×${food.h} 投喂+${food.feed}`);
+      bodyHtml += renderItem(`fridge_food_${food.id}`, food.emoji, food.name, `${food.w}×${food.h} 投喂+${food.feed}`, false);
     });
     bodyHtml += '</div></div></details>';
 
     // ===== 糖葫芦水果 =====
     bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">🍢 糖葫芦水果</summary><div class="sp-guide-details-content"><div class="sp-unified-coll-grid">';
     TANGHULU_FRUITS.forEach(fruit => {
-      bodyHtml += renderItem(`tanghulu_fruit_${fruit.key}`, fruit.emoji, fruit.name, `售${fruit.sellPrice}🪙 投喂+${fruit.feedAmount}`);
+      bodyHtml += renderItem(`tanghulu_fruit_${fruit.key}`, fruit.emoji, fruit.name, `售${fruit.sellPrice}🪙 投喂+${fruit.feedAmount}`, false);
     });
     bodyHtml += '</div></div></details>';
 
     // ===== 货架商品 =====
     bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">🛒 货架商品 <span style="font-size:10px;color:var(--sp-text-muted);">（🔗部分联动冰箱/餐厅/糖葫芦）</span></summary><div class="sp-guide-details-content"><div class="sp-unified-coll-grid">';
     SHELF_ITEMS.forEach(item => {
-      bodyHtml += renderItem(`shelf_item_${item.id}`, item.emoji, item.name, item.category);
+      bodyHtml += renderItem(`shelf_item_${item.id}`, item.emoji, item.name, item.category, false);
     });
     bodyHtml += '</div></div></details>';
 
-    // ===== 餐厅调料（联动合成工坊调料链）=====
-    bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">🧂 餐厅调料 <span style="font-size:10px;color:var(--sp-text-muted);">（🔗联动合成工坊调料链）</span></summary><div class="sp-guide-details-content"><div class="sp-unified-coll-grid">';
+    // ===== 餐厅调料 =====
+    bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">🧂 餐厅调料<span style="font-size:10px;color:var(--sp-text-muted);">（🔗联动合成工坊调料链）</span></summary><div class="sp-guide-details-content"><div class="sp-unified-coll-grid">';
     RESTAURANT_SEASONINGS.forEach(s => {
-      bodyHtml += renderItem(`restaurant_sea_${s.id}`, s.emoji, s.name, `${s.price}🪙`);
+      bodyHtml += renderItem(`restaurant_sea_${s.id}`, s.emoji, s.name, `${s.price}🪙`, false);
     });
     bodyHtml += '</div></div></details>';
 
-    // ===== 餐厅菜品 =====
+    // =====餐厅菜品（有上锁概念）=====
     bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">🍽️ 餐厅菜品</summary><div class="sp-guide-details-content"><div class="sp-unified-coll-grid">';
     RESTAURANT_RECIPES.forEach(r => {
       const unlocked = state.restaurantReputation >= r.reputationRequired;
-      bodyHtml += renderItem(`restaurant_recipe_${r.id}`, unlocked ? r.emoji : '🔒', unlocked ? r.name : '???', unlocked ? `售${r.sellPrice}🪙` : `需声望${r.reputationRequired}`);
+      bodyHtml += renderItem(`restaurant_recipe_${r.id}`, r.emoji, r.name, unlocked ? `售${r.sellPrice}🪙` : `需声望${r.reputationRequired}`, !unlocked);
     });
     bodyHtml += '</div></div></details>';
 
-    // ===== 餐厅客人 =====
+    // ===== 餐厅客人（有上锁概念）=====
     bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">😺 餐厅客人</summary><div class="sp-guide-details-content"><div class="sp-unified-coll-grid">';
     RESTAURANT_CUSTOMERS.forEach(c => {
       const unlocked = state.restaurantReputation >= c.reputationRequired;
-      bodyHtml += renderItem(`restaurant_customer_${c.id}`, unlocked ? c.emoji : '🔒', unlocked ? c.name : '???', unlocked ? `⭐+${c.reputationGive}` : `需声望${c.reputationRequired}`);
+      bodyHtml += renderItem(`restaurant_customer_${c.id}`, c.emoji, c.name, unlocked ? `⭐+${c.reputationGive}` : `需声望${c.reputationRequired}`, !unlocked);
     });
     bodyHtml += '</div></div></details>';
 
@@ -22000,16 +23478,17 @@ window.addEventListener('beforeunload', () => {
     overlay.innerHTML = `
       <div class="sp-total-inv-box" style="height:80vh;max-height:80vh;display:flex;flex-direction:column;">
         <div class="sp-total-inv-header">
-          <span>📖 图鉴合集</span>
+          <span>📖图鉴合集</span>
           <div class="sp-total-inv-header-right">
-            <span style="font-size:10px;color:var(--sp-text-muted);">已上传 ${totalImages} 张图片</span>
+            <button class="sp-unified-show-locked-names-btn ${showLockedNames ? 'active' : ''}" id="sp-unified-toggle-locked-names" title="显示/隐藏上锁物品的真实名字">🔒 ${showLockedNames ? '隐藏名字' : '显示名字'}</button>
+            <span style="font-size:10px;color:var(--sp-text-muted);">已上传 ${totalImages} 张</span>
             <button class="sp-total-inv-close" id="sp-unified-coll-close" title="关闭">✕</button>
           </div>
         </div>
         <div class="sp-total-inv-body" style="padding:12px;">
           <div style="text-align:center;font-size:11px;color:var(--sp-text-muted);margin-bottom:10px;line-height:1.6;">
-            汇总所有游戏图鉴，点击 📷 上传图片<br/>
-            🔗 标记表示该物品与其他游戏联动，上传后自动同步
+            汇总所有游戏图鉴，点击 📷 上传图片<br/>🔗 标记表示该物品与其他游戏联动，上传后自动同步<br/>
+            🔒 上锁物品也可以上传图片（会显示为半透明）
           </div>
           ${bodyHtml}
         </div>
@@ -22021,7 +23500,7 @@ window.addEventListener('beforeunload', () => {
     requestAnimationFrame(() => {
       const box = overlay.querySelector('.sp-total-inv-box');
       if (box) {
-        const boxH = box.offsetHeight || 500;
+        const boxH = box.offsetHeight ||500;
         const boxW = box.offsetWidth || 360;
         box.style.position = 'fixed';
         box.style.top = Math.max(20, Math.floor((window.innerHeight - boxH) / 2)) + 'px';
@@ -22035,7 +23514,15 @@ window.addEventListener('beforeunload', () => {
     overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
     overlay.querySelector('.sp-total-inv-box').onclick = (e) => { e.stopPropagation(); };
 
-    // hover 显示上传按钮
+    // 显示/隐藏上锁物品名字按钮
+    document.getElementById('sp-unified-toggle-locked-names').onclick = (e) => {
+      e.stopPropagation();
+      showLockedNames = !showLockedNames;
+      // 重新渲染整个图鉴合集
+      showUnifiedCollection();
+    };
+
+    // hover 显示上传按钮（图鉴物品）
     overlay.querySelectorAll('.sp-unified-coll-item').forEach(item => {
       item.addEventListener('mouseenter', () => {
         const btn = item.querySelector('.sp-unified-coll-upload');
@@ -22047,14 +23534,143 @@ window.addEventListener('beforeunload', () => {
       });
     });
 
-    // 上传按钮点击
+    // 上传按钮点击（图鉴物品）
     overlay.querySelectorAll('.sp-unified-coll-upload').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         unifiedPromptImageUpload(btn.dataset.ukey, btn.dataset.uname);
       });
     });
+
+    // ===== 游戏图标上传按钮事件 =====
+    overlay.querySelectorAll('.sp-unified-game-icon-item').forEach(item => {
+      item.addEventListener('mouseenter', () => {
+        const btn = item.querySelector('.sp-unified-game-icon-upload');
+        if (btn) btn.style.opacity = '1';
+      });
+      item.addEventListener('mouseleave', () => {
+        const btn = item.querySelector('.sp-unified-game-icon-upload');
+        if (btn) btn.style.opacity = '0';
+      });
+    });
+
+    overlay.querySelectorAll('.sp-unified-game-icon-upload').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const gameId = btn.dataset.gameIconId;
+        const gameDef = GAME_ICON_DEFS.find(g => g.id === gameId);
+        const key = `game_icon_${gameId}`;
+        const name = gameDef ? gameDef.name : gameId;
+
+        if (!state.gameCustomImages) state.gameCustomImages = {};
+        const currentImg = state.gameCustomImages[key];
+
+        const doUploadStep2 = () => {
+          showConfirmDialog({
+            title: `🖼️ 设置「${name}」游戏图标`,
+            desc: '⭐ 推荐使用图片链接（节省内存）',
+            confirmText: '📝 输入链接',
+            cancelText: '📁 本地上传',
+            onConfirm: () => {
+              showPromptDialog({
+                title: '🔗 输入图片链接',
+                desc: '留空确认 = 清除',
+                placeholder: 'https://...',
+                defaultValue: currentImg && currentImg.startsWith('http') ? currentImg : '',
+                confirmText: '确认',
+                cancelText: '取消',
+                onConfirm: (url) => {
+                  const trimmed = (url || '').trim();
+                  if (!trimmed) {
+                    delete state.gameCustomImages[key];
+                    saveDataImmediate('游戏图标清除');
+                    showUnifiedCollection();
+                    showBubble(`${name} 图标已清除`, 2000);
+                    return;
+                  }
+                  if (!trimmed.startsWith('http')) { showBubble('请输入以 http 开头的链接', 3000); return; }
+                  state.gameCustomImages[key] = trimmed;
+                  saveDataImmediate('游戏图标设置');
+                  showUnifiedCollection();
+                  showBubble(`${name} 图标已设置！`, 2000);
+                }
+              });
+            },
+            onCancel: () => {
+              const input = document.createElement('input');
+              input.type = 'file';
+              input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+              input.onchange = async (ev) => {
+                const file = ev.target.files[0];
+                if (!file) return;
+                if (file.size > 2 * 1024 * 1024) { showBubble('图片不能超过2MB', 3000); return; }
+                const reader = new FileReader();
+                reader.onload = async (evt) => {
+                  const compressed = await compressImage(evt.target.result, 80, 0.7);
+                  if (!state.gameCustomImages) state.gameCustomImages = {};
+                  state.gameCustomImages[key] = compressed;
+                  saveDataImmediate('游戏图标上传');
+                  showUnifiedCollection();
+                  showBubble(`${name} 图标已设置！`, 2000);
+                };
+                reader.readAsDataURL(file);
+              };
+              input.click();
+            }
+          });
+        };
+
+        if (currentImg) {
+          showConfirmDialog({
+            title: '🖼️ 当前已有自定义图标',
+            desc: `「${name}」游戏图标已有自定义图片`,
+            confirmText: '移除图片',
+            cancelText: '替换为新图片',
+            onConfirm: () => {
+              delete state.gameCustomImages[key];
+              saveDataImmediate('游戏图标移除');
+              showUnifiedCollection();
+              showBubble(`${name} 图标已移除`, 2000);
+            },
+            onCancel: () => {
+              doUploadStep2();
+            }
+          });
+        } else {
+          doUploadStep2();
+        }
+      });
+    });
+
+    // ===== 恢复折叠栏和滚动位置 =====
+    if (savedState) {
+      requestAnimationFrame(() => {
+        const newOverlay = document.getElementById('sp-unified-collection-overlay');
+        if (!newOverlay) return;
+        const allDetails = newOverlay.querySelectorAll('.sp-guide-details');
+        savedState.openDetails.forEach(idx => {
+          if (allDetails[idx]) allDetails[idx].open = true;
+        });
+        const newBody = newOverlay.querySelector('.sp-total-inv-body');
+        if (newBody) {
+          requestAnimationFrame(() => {
+            newBody.scrollTop = savedState.scrollTop;
+          });
+        }
+      });
+    }
+
+
+    // 游戏图标卡片本身点击也触发上传
+    overlay.querySelectorAll('.sp-unified-game-icon-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        if (e.target.closest('.sp-unified-game-icon-upload')) return;
+        const uploadBtn = item.querySelector('.sp-unified-game-icon-upload');
+        if (uploadBtn) uploadBtn.click();
+      });
+    });
   }
+
 
 })();
 
