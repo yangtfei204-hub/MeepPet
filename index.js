@@ -23805,6 +23805,9 @@ window.addEventListener('beforeunload', () => {
             <button class="sp-total-inv-close" id="sp-unified-coll-close" title="关闭">✕</button>
           </div>
         </div>
+        <div style="padding:8px 12px 0;flex-shrink:0;">
+          <input type="text" id="sp-unified-search-input" placeholder="🔍 搜索菜品/物品名称..." style="width:100%;padding:8px 12px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-light);color:var(--sp-text-primary);font-size:12px;outline:none;box-sizing:border-box;transition:border-color 0.2s;" />
+        </div>
         <div class="sp-total-inv-body" style="padding:12px;">
           <div style="text-align:center;font-size:11px;color:var(--sp-text-muted);margin-bottom:10px;line-height:1.6;">
             汇总所有游戏图鉴，点击 📷 上传图片<br/>🔗 标记表示该物品与其他游戏联动，上传后自动同步<br/>
@@ -23986,6 +23989,75 @@ window.addEventListener('beforeunload', () => {
             }
           });
         }
+      });
+    }
+
+    // 搜索功能
+    const searchInput = document.getElementById('sp-unified-search-input');
+    if (searchInput) {
+      searchInput.addEventListener('input', () => {
+        const query = searchInput.value.trim().toLowerCase();
+        const allItems = overlay.querySelectorAll('.sp-unified-coll-item');
+        const allDetails = overlay.querySelectorAll('.sp-guide-details');
+
+        if (!query) {
+          // 搜索框为空，显示所有物品，恢复折叠栏原样
+          allItems.forEach(item => { item.style.display = ''; });
+          return;
+        }
+
+        // 遍历所有图鉴物品，根据搜索词过滤
+        allItems.forEach(item => {
+          const itemName = (item.dataset.uname || '').toLowerCase();
+          const isLocked = item.classList.contains('sp-unified-locked');
+          const hasCustom = item.classList.contains('sp-unified-has-custom');
+
+          let matchable = false;
+
+          if (showLockedNames) {
+            // 显示名字模式：已解锁和未解锁的都可以按真实名字搜索
+            matchable = itemName.includes(query);
+          } else {
+            // 隐藏名字模式：只有已解锁的、或者有自定义图片的未解锁物品才能搜索
+            if (!isLocked) {
+              // 已解锁，可搜索
+              matchable = itemName.includes(query);
+            } else if (hasCustom) {
+              // 未解锁但有自定义图片，可按名字搜索
+              matchable = itemName.includes(query);
+            } else {
+              // 未解锁且无自定义图片，名字显示为???，不可搜索
+              matchable = false;
+            }
+          }
+
+          item.style.display = matchable ? '' : 'none';
+        });
+
+        // 自动展开包含匹配结果的折叠栏，折叠没有匹配结果的
+        allDetails.forEach(detail => {
+          const visibleItems = detail.querySelectorAll('.sp-unified-coll-item[style=""], .sp-unified-coll-item:not([style])');
+          // 排除 display:none 的
+          let hasVisible = false;
+          detail.querySelectorAll('.sp-unified-coll-item').forEach(item => {
+            if (item.style.display !== 'none') hasVisible = true;
+          });
+          if (hasVisible) {
+            detail.open = true;
+          } else {
+            detail.open = false;
+          }
+        });
+      });
+
+      // 搜索框获焦时高亮边框
+      searchInput.addEventListener('focus', () => {
+        searchInput.style.borderColor = 'rgba(100,180,255,0.5)';
+        searchInput.style.boxShadow = '0 0 8px rgba(100,180,255,0.15)';
+      });
+      searchInput.addEventListener('blur', () => {
+        searchInput.style.borderColor = '';
+        searchInput.style.boxShadow = '';
       });
     }
 

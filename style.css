@@ -8130,3 +8130,31 @@
 .sp-prompt-input::placeholder {
   color: var(--sp-text-muted);
 }
+
+/* ===== 图鉴合集搜索框 ===== */
+#sp-unified-search-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--sp-border);
+  border-radius: 8px;
+  background: var(--sp-bg-light);
+  color: var(--sp-text-primary);
+  font-size: 12px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+#sp-unified-search-input:focus {
+  border-color: rgba(100,180,255,0.5);
+  box-shadow: 0 0 8px rgba(100,180,255,0.15);
+}
+
+#sp-unified-search-input::placeholder {
+  color: var(--sp-text-muted);
+}
+
+/* 搜索时隐藏的物品 */
+.sp-unified-coll-item[style*="display: none"] {
+  display: none !important;
+}
