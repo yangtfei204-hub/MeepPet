@@ -23312,10 +23312,17 @@ window.addEventListener('beforeunload', () => {
       const body = existingOverlay.querySelector('.sp-total-inv-body');
       const scrollTop = body ? body.scrollTop : 0;
       const openDetails = [];
+      const detailsScrollTops = {};
       existingOverlay.querySelectorAll('.sp-guide-details').forEach((detail, idx) => {
-        if (detail.open) openDetails.push(idx);
+        if (detail.open) {
+          openDetails.push(idx);
+          const content = detail.querySelector('.sp-guide-details-content');
+          if (content && content.scrollTop > 0) {
+            detailsScrollTops[idx] = content.scrollTop;
+          }
+        }
       });
-      savedState = { scrollTop, openDetails };
+      savedState = { scrollTop, openDetails, detailsScrollTops };
       existingOverlay.remove();
     }
 
@@ -23655,6 +23662,15 @@ window.addEventListener('beforeunload', () => {
         if (newBody) {
           requestAnimationFrame(() => {
             newBody.scrollTop = savedState.scrollTop;
+            if (savedState.detailsScrollTops) {
+              Object.entries(savedState.detailsScrollTops).forEach(([idx, scrollVal]) => {
+                const detail = allDetails[parseInt(idx)];
+                if (detail) {
+                  const content = detail.querySelector('.sp-guide-details-content');
+                  if (content) content.scrollTop = scrollVal;
+                }
+              });
+            }
           });
         }
       });
