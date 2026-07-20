@@ -536,6 +536,7 @@
   let chatMode = 'pet';             // 'pet'(桌宠模式) | 'online'(线上模式) | 'offline'(线下模式)
   let selectedEmoji = null;        // 当前选中的表情包 (base64 或 URL)
   let showLockedNames = false;     // 是否显示上锁物品的真实名字
+  let showMissingOnly = false;     // 是否只显示未上传图片的物品
   let emojiStickers = [];          // 用户上传的表情包列表
 
   // ============================================================
@@ -10864,6 +10865,7 @@ window.addEventListener('beforeunload', () => {
       { name: 'SPA豪华套餐', price: 80, restore: 60, emoji: '🛁', dailyLimit: 1 },
       { name: '薰衣草香氛球', price: 12, restore: 12, emoji: '🪻', dailyLimit: 8 },
       { name: '温泉浴盐罐', price: 55, restore: 45, emoji: '🧪', dailyLimit: 2 },
+      { name: '泡泡浴液',   price: 18, restore: 15, emoji: '🫧', dailyLimit: 5 },
     ],
     energy: [
       { name: '猫薄荷枕', price: 8, restore: 8, emoji: '🌿', dailyLimit: 10 },
@@ -10872,6 +10874,9 @@ window.addEventListener('beforeunload', () => {
       { name: '梦境胶囊', price: 80, restore: 60, emoji: '💊', dailyLimit: 1 },
       { name: '安神小夜灯', price: 12, restore: 12, emoji: '🕯️', dailyLimit: 8 },
       { name: '星空催眠曲盒', price: 55, restore: 45, emoji: '🎶', dailyLimit: 2 },
+      { name: '悠悠球催眠',  price: 10, restore: 10, emoji: '🪀', dailyLimit: 8 },
+      { name: '飞镖减压',    price: 10, restore: 10, emoji: '🎯', dailyLimit: 8 },
+      { name: '香薰蜡烛',    price: 15, restore: 14, emoji: '🕯️', dailyLimit: 6 },
     ]
 
   };
@@ -15718,6 +15723,13 @@ window.addEventListener('beforeunload', () => {
     { id: 'cross_cake',    name: '十字蛋糕',   emoji: '🎂', w: 3, h: 3, value: 14, feed: 14, noRotate: true, shape: [[0,1,0],[1,1,1],[0,1,0]] },
     { id: 'sshape_fish',   name: 'S形鱼排',   emoji: '🐡', w: 2, h: 3, value: 11, feed: 11, shape: [[0,1],[1,1],[1,0]] },
     { id: 'jshape_shrimp', name: 'J形虾排',   emoji: '🦐', w: 2, h: 3, value: 12, feed: 12, shape: [[0,1],[0,1],[1,1]] },
+    // ===== 货架联动专属食材（确保每种货架商品有独立的冰箱联动目标）=====
+    { id: 'beer',        name: '啤酒',       emoji: '🍺', w: 1, h: 2, value: 4,  feed: 4  },
+    { id: 'boxjuice',    name: '盒装果汁',   emoji: '🧃', w: 1, h: 2, value: 4,  feed: 4  },
+    { id: 'cookie',      name: '饼干',       emoji: '🍪', w: 1, h: 1, value: 3,  feed: 3  },
+    { id: 'chocolate',   name: '巧克力',     emoji: '🍫', w: 2, h: 1, value: 4,  feed: 4  },
+    { id: 'candy',       name: '糖果',       emoji: '🍭', w: 1, h: 1, value: 3,  feed: 3  },
+    { id: 'catgrass',    name: '猫草',       emoji: '🌿', w: 1, h: 1, value: 3,  feed: 3  },
 
   ];
 
@@ -21877,19 +21889,23 @@ window.addEventListener('beforeunload', () => {
 
   // ===== 商品定义（每种商品有图标和类型ID）=====
   const SHELF_ITEMS = [
-    // --- 原有联动类 ---
-    { id: 1,  emoji: '🥤', name: '可乐',       category: 'drink'  },
-    { id: 2,  emoji: '🍺', name: '啤酒',       category: 'drink'  },
-    { id: 3,  emoji: '🧃', name: '果汁',       category: 'drink'  },
-    { id: 4,  emoji: '🍪', name: '饼干',       category: 'snack'  },
-    { id: 5,  emoji: '🍫', name: '巧克力',     category: 'snack'  },
-    { id: 6,  emoji: '🍭', name: '糖果',       category: 'snack'  },
-    { id: 7,  emoji: '🧸', name: '毛绒熊',     category: 'toy'    },
-    { id: 8,  emoji: '🪀', name: '悠悠球',     category: 'toy'    },
-    { id: 9,  emoji: '🎯', name: '飞镖',       category: 'toy'    },
-    { id: 10, emoji: '🐟', name: '猫罐头',     category: 'pet'    },
-    { id: 11, emoji: '🌿', name: '猫草',       category: 'pet'    },
-    { id: 12, emoji: '🧴', name: '洗护露',     category: 'clean'  },
+    // --- 饮品类（每种独立映射到不同的冰箱食材）---
+    { id: 1,  emoji: '🥤', name: '可乐',       category: 'shelfFood', linkedFoodId: 'cola'      },
+    { id: 2,  emoji: '🍺', name: '啤酒',       category: 'shelfFood', linkedFoodId: 'beer'      },
+    { id: 3,  emoji: '🧃', name: '果汁',       category: 'shelfFood', linkedFoodId: 'boxjuice'  },
+    // --- 零食类（每种独立映射到不同的冰箱食材）---
+    { id: 4,  emoji: '🍪', name: '饼干',       category: 'shelfFood', linkedFoodId: 'cookie'    },
+    { id: 5,  emoji: '🍫', name: '巧克力',     category: 'shelfFood', linkedFoodId: 'chocolate' },
+    { id: 6,  emoji: '🍭', name: '糖果',       category: 'shelfFood', linkedFoodId: 'candy'     },
+    // --- 玩具类（每种独立映射到不同的工坊睡眠道具）---
+    { id: 7,  emoji: '🧸', name: '毛绒熊',     category: 'shelfSleep', linkedShopCategory: 'energy', linkedShopIdx: 0 },
+    { id: 8,  emoji: '🪀', name: '悠悠球',     category: 'shelfSleep', linkedShopCategory: 'energy', linkedShopIdx: 6 },
+    { id: 9,  emoji: '🎯', name: '飞镖',       category: 'shelfSleep', linkedShopCategory: 'energy', linkedShopIdx: 7 },
+    // --- 宠物用品类（每种独立映射到不同的冰箱食材）---
+    { id: 10, emoji: '🐟', name: '猫罐头',     category: 'shelfFood', linkedFoodId: 'fish'      },
+    { id: 11, emoji: '🌿', name: '猫草',       category: 'shelfFood', linkedFoodId: 'catgrass'  },
+    // --- 清洁类（独立映射到工坊清洁道具）---
+    { id: 12, emoji: '🧴', name: '洗护露',     category: 'shelfBath', linkedShopCategory: 'clean', linkedShopIdx: 1 },
     // --- 货架专属：食物类（消除后进冰箱库存+餐厅食材）---
     { id: 13, emoji: '🍄', name: '香菇包',     category: 'shelfFood',  linkedFoodId: 'mushroom' },
     { id: 14, emoji: '🦐', name: '鲜虾盒',     category: 'shelfFood',  linkedFoodId: 'shrimp'   },
@@ -21907,15 +21923,14 @@ window.addEventListener('beforeunload', () => {
     { id: 24, emoji: '🌶️', name: '辣椒酱',     category: 'shelfSeasoning', linkedSeasoning: 'chili'  },
     { id: 25, emoji: '🧈', name: '黄油块',     category: 'shelfSeasoning', linkedSeasoning: 'butter' },
     { id: 26, emoji: '🍯', name: '蜂蜜罐',     category: 'shelfSeasoning', linkedSeasoning: 'honey'  },
-    // --- 货架专属：沐浴用品类（消除后进工坊清洁道具背包给桌宠用）---
-    { id: 27, emoji: '🫧', name: '泡泡浴液',   category: 'shelfBath',  linkedShopCategory: 'clean', linkedShopIdx: 1 },
+    // --- 货架专属：沐浴用品类（每种独立映射到不同的工坊清洁道具）---
+    { id: 27, emoji: '🫧', name: '泡泡浴液',   category: 'shelfBath',  linkedShopCategory: 'clean', linkedShopIdx: 6 },
     { id: 28, emoji: '🪻', name: '薰衣草皂',   category: 'shelfBath',  linkedShopCategory: 'clean', linkedShopIdx: 4 },
-    // --- 货架专属：睡眠用品类（消除后进工坊睡眠道具背包给桌宠用）---
-    { id: 29, emoji: '🕯️', name: '香薰蜡烛',   category: 'shelfSleep', linkedShopCategory: 'energy', linkedShopIdx: 4 },
+    // --- 货架专属：睡眠用品类（每种独立映射到不同的工坊睡眠道具）---
+    { id: 29, emoji: '🕯️', name: '香薰蜡烛',   category: 'shelfSleep', linkedShopCategory: 'energy', linkedShopIdx: 8 },
     { id: 30, emoji: '🧣', name: '暖暖毛毯',   category: 'shelfSleep', linkedShopCategory: 'energy', linkedShopIdx: 1 },
     { id: 31, emoji: '🍛', name: '咖喱块',     category: 'shelfSeasoning', linkedSeasoning: 'curry'  },
     { id: 32, emoji: '🥥', name: '椰奶罐',     category: 'shelfSeasoning', linkedSeasoning: 'coconut' },
-
   ];
 
 
@@ -22107,39 +22122,7 @@ window.addEventListener('beforeunload', () => {
 
         // 给桌宠/餐厅联动 + 货架独有库存
         if (itemData) {
-          // === 原有联动：饮品/零食/宠物 → 冰箱库存 ===
-          const fridgeFoodMap = {
-            'drink': 'cola',
-            'snack': 'bread',
-            'pet':   'fish',
-          };
-          const mappedFoodId = fridgeFoodMap[itemData.category];
-          if (mappedFoodId) {
-            if (!state.fridgeInventory) state.fridgeInventory = [];
-            const existing = state.fridgeInventory.find(i => i.foodId === mappedFoodId);
-            if (existing) existing.count++;
-            else state.fridgeInventory.push({ foodId: mappedFoodId, count: 1 });
-          }
-
-          // === 原有联动：玩具 → 工坊睡眠道具 ===
-          if (itemData.category === 'toy') {
-            if (!state.gameInventory) state.gameInventory = [];
-            const toyRewardIdx = Math.floor(Math.random() * 2);
-            const existing = state.gameInventory.find(i => i.category === 'energy' && i.idx === toyRewardIdx);
-            if (existing) existing.count++;
-            else state.gameInventory.push({ category: 'energy', idx: toyRewardIdx, count: 1 });
-          }
-
-          // === 原有联动：清洁 → 工坊清洁道具 ===
-          if (itemData.category === 'clean') {
-            if (!state.gameInventory) state.gameInventory = [];
-            const cleanRewardIdx = Math.floor(Math.random() * 2);
-            const existing = state.gameInventory.find(i => i.category === 'clean' && i.idx === cleanRewardIdx);
-            if (existing) existing.count++;
-            else state.gameInventory.push({ category: 'clean', idx: cleanRewardIdx, count: 1 });
-          }
-
-          // === 新增：货架食物类 → 冰箱库存（给桌宠投喂+给餐厅食材）===
+          // === 货架食物/饮品/零食/宠物类 → 冰箱库存 ===
           if (itemData.linkedFoodId) {
             if (!state.fridgeInventory) state.fridgeInventory = [];
             const existing = state.fridgeInventory.find(i => i.foodId === itemData.linkedFoodId);
@@ -22608,15 +22591,15 @@ window.addEventListener('beforeunload', () => {
 
     let html = '<div style="font-size:11px;color:var(--sp-text-muted);margin-bottom:8px;line-height:1.7;">消除商品后，对应物资会进入相关背包/库存：<br/>🥤饮品→冰箱可乐 🍪零食→冰箱面包 🐟宠物→冰箱猫罐头<br/>🧸玩具→工坊睡眠道具 🧴清洁→工坊清洁道具<br/>🍄🦐🌽🥑🥟🍜食物→冰箱食材（投喂+餐厅）<br/>🍰🍦甜品→冰箱 🍡糖葫芦→工坊库存<br/>🧂🫙🌶️🧈🍯调料→餐厅（每组+2份）<br/>🫧🪻沐浴→清洁道具 🕯️🧣睡眠→睡眠道具<br/>💰所有消除→额外金币</div>';
 
-    // 冰箱联动库存
-    const fridgeItems = ['cola', 'bread', 'fish'];
-    const fridgeNames = { cola: '可乐（饮品→冰箱）', bread: '面包（零食→冰箱）', fish: '猫罐头（宠物→冰箱）' };
-    const fridgeEmoji = { cola: '🥤', bread: '🍞', fish: '🐟' };
+    // 冰箱联动库存（展示所有来自货架的冰箱食材）
+    const shelfLinkedFoodIds = SHELF_ITEMS.filter(it => it.linkedFoodId).map(it => it.linkedFoodId);
+    const uniqueFoodIds = [...new Set(shelfLinkedFoodIds)];
 
     const fridgeInv = state.fridgeInventory || [];
-    const mappedFridge = fridgeItems.map(fid => {
+    const mappedFridge = uniqueFoodIds.map(fid => {
       const inv = fridgeInv.find(i => i.foodId === fid);
-      return { fid, count: inv ? inv.count : 0 };
+      const foodData = FRIDGE_FOODS.find(f => f.id === fid);
+      return { fid, count: inv ? inv.count : 0, name: foodData ? foodData.name : fid, emoji: foodData ? foodData.emoji : '?' };
     }).filter(i => i.count > 0);
 
     if (mappedFridge.length > 0) {
@@ -22624,9 +22607,9 @@ window.addEventListener('beforeunload', () => {
       mappedFridge.forEach(item => {
         html += `
           <div class="sp-shelf-bag-item">
-            <span style="font-size:20px;width:28px;text-align:center;flex-shrink:0;">${fridgeEmoji[item.fid]}</span>
+            <span style="font-size:20px;width:28px;text-align:center;flex-shrink:0;">${getItemDisplayHtml('fridge_food_' + item.fid, item.emoji, 20)}</span>
             <div style="flex:1;">
-              <span style="font-size:12px;font-weight:600;color:var(--sp-text-primary);">${fridgeNames[item.fid]}</span>
+              <span style="font-size:12px;font-weight:600;color:var(--sp-text-primary);">${item.name}（货架→冰箱）</span>
             </div>
             <span style="font-size:14px;font-weight:700;color:var(--sp-text-primary);">×${item.count}</span>
           </div>
@@ -22687,26 +22670,6 @@ window.addEventListener('beforeunload', () => {
               <span style="font-size:12px;font-weight:600;color:var(--sp-text-primary);">${data.name}（调料→餐厅）</span>
             </div>
             <span style="font-size:14px;font-weight:700;color:var(--sp-text-primary);">×${count}</span>
-          </div>
-        `;
-      });
-    }
-
-    // 新增食材进冰箱的联动
-    const shelfFoodIds = ['mushroom', 'shrimp', 'corn', 'avocado', 'dumpling', 'noodle', 'cake', 'icecream'];
-    const shelfFridgeItems = (state.fridgeInventory || []).filter(i => shelfFoodIds.includes(i.foodId) && i.count > 0);
-    if (shelfFridgeItems.length > 0) {
-      html += '<div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);margin:8px 0 4px;">🧊 食材/甜品联动（冰箱）</div>';
-      shelfFridgeItems.forEach(inv => {
-        const data = FRIDGE_FOODS.find(f => f.id === inv.foodId);
-        if (!data) return;
-        html += `
-          <div class="sp-shelf-bag-item">
-            <span style="font-size:20px;width:28px;text-align:center;flex-shrink:0;">${data.emoji}</span>
-            <div style="flex:1;">
-              <span style="font-size:12px;font-weight:600;color:var(--sp-text-primary);">${data.name}（货架→冰箱→投喂/餐厅）</span>
-            </div>
-            <span style="font-size:14px;font-weight:700;color:var(--sp-text-primary);">×${inv.count}</span>
           </div>
         `;
       });
@@ -23450,6 +23413,7 @@ window.addEventListener('beforeunload', () => {
   // 获取某个key 的所有联动 key（包含自身）- 使用BFS传递闭包
   function getLinkedImageKeys(key) {
     // 构建所有直接联动边（只在首次调用时构建，后续缓存）
+    // 每次清除缓存，确保SHELF_ITEMS定义变更后能重建（开发阶段用，生产可去掉）
     if (!getLinkedImageKeys._edges) {
       const edges = [];
 
@@ -23474,7 +23438,7 @@ window.addEventListener('beforeunload', () => {
         }
       });
 
-      // 3. 货架商品 ↔ 冰箱食材/餐厅调料/糖葫芦
+      // 3. 货架商品 ↔ 冰箱食材/餐厅调料/糖葫芦/工坊道具（每个商品独立映射）
       SHELF_ITEMS.forEach(item => {
         const sk = `shelf_item_${item.id}`;
         if (item.linkedFoodId) {
@@ -23484,7 +23448,10 @@ window.addEventListener('beforeunload', () => {
           edges.push([sk, `restaurant_sea_${item.linkedSeasoning}`]);
         }
         if (item.linkedTanghulu) {
-          edges.push([sk, `tanghulu_fruit_${item.linkedTanghulu}`]);
+          edges.push([sk, `tanghulu_product_${item.linkedTanghulu}`]);
+        }
+        if (item.linkedShopCategory && item.linkedShopIdx !== undefined) {
+          edges.push([sk, `${item.linkedShopCategory}_shopitem_${item.linkedShopIdx}`]);
         }
       });
 
@@ -23754,7 +23721,7 @@ window.addEventListener('beforeunload', () => {
       const escapedName = name.replace(/"/g, '&quot;');
 
       return `
-        <div class="sp-unified-coll-item${lockedClass}${customLockedClass}" data-ukey="${key}" data-uname="${escapedName}" title="${name}${extraInfo ? ' | ' + extraInfo : ''}${hasLink ? ' | 🔗联动' : ''}${isLocked ? ' | 🔒未解锁' : ''}">
+        <div class="sp-unified-coll-item${lockedClass}${customLockedClass}" data-ukey="${key}" data-uname="${escapedName}" data-has-custom="${hasCustom ? '1' : '0'}" title="${name}${extraInfo ? ' | ' + extraInfo : ''}${hasLink ? ' | 🔗联动' : ''}${isLocked ? ' | 🔒未解锁' : ''}">
           ${display}
           <span class="sp-unified-coll-name">${displayName}</span>
           ${hasLink ? '<span class="sp-unified-coll-link">🔗</span>' : ''}
@@ -23946,19 +23913,18 @@ window.addEventListener('beforeunload', () => {
         <div class="sp-total-inv-header">
           <span>📖图鉴合集</span>
           <div class="sp-total-inv-header-right">
-            <button class="sp-unified-show-locked-names-btn ${showLockedNames ? 'active' : ''}" id="sp-unified-toggle-locked-names" title="显示/隐藏上锁物品的真实名字">🔒 ${showLockedNames ? '隐藏名字' : '显示名字'}</button>
             <span style="font-size:10px;color:var(--sp-text-muted);">已上传 ${totalImages} 张</span>
             <button class="sp-total-inv-close" id="sp-unified-coll-close" title="关闭">✕</button>
           </div>
         </div>
-        <div style="padding:8px 12px 0;flex-shrink:0;">
+        <div style="padding:8px 12px 0;flex-shrink:0;display:flex;flex-direction:column;gap:6px;">
           <input type="text" id="sp-unified-search-input" placeholder="🔍 搜索菜品/物品名称..." style="width:100%;padding:8px 12px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-light);color:var(--sp-text-primary);font-size:12px;outline:none;box-sizing:border-box;transition:border-color 0.2s;" />
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="sp-unified-show-locked-names-btn ${showLockedNames ? 'active' : ''}" id="sp-unified-toggle-locked-names" title="显示/隐藏上锁物品的真实名字">🔒 ${showLockedNames ? '隐藏名字' : '显示名字'}</button>
+            <button class="sp-unified-show-locked-names-btn ${showMissingOnly ? 'active' : ''}" id="sp-unified-toggle-missing" title="只显示未上传图片的物品，方便查漏补缺">📷 ${showMissingOnly ? '显示全部' : '查漏补缺'}</button>
+          </div>
         </div>
         <div class="sp-total-inv-body" style="padding:12px;">
-          <div style="text-align:center;font-size:11px;color:var(--sp-text-muted);margin-bottom:10px;line-height:1.6;">
-            汇总所有游戏图鉴，点击 📷 上传图片<br/>🔗 标记表示该物品与其他游戏联动，上传后自动同步<br/>
-            🔒 上锁物品也可以上传图片（会显示为半透明）
-          </div>
           ${bodyHtml}
         </div>
       </div>
@@ -23988,6 +23954,13 @@ window.addEventListener('beforeunload', () => {
       e.stopPropagation();
       showLockedNames = !showLockedNames;
       // 重新渲染整个图鉴合集
+      showUnifiedCollection();
+    };
+
+    // 查漏补缺按钮（只显示未上传图片的物品）
+    document.getElementById('sp-unified-toggle-missing').onclick = (e) => {
+      e.stopPropagation();
+      showMissingOnly = !showMissingOnly;
       showUnifiedCollection();
     };
 
@@ -24140,6 +24113,28 @@ window.addEventListener('beforeunload', () => {
 
     // 搜索功能
     const searchInput = document.getElementById('sp-unified-search-input');
+    // 查漏补缺模式：初始过滤
+    if (showMissingOnly) {
+      const allItems = overlay.querySelectorAll('.sp-unified-coll-item');
+      const allDetails = overlay.querySelectorAll('.sp-guide-details');
+
+      allItems.forEach(item => {
+        const hasCustom = item.dataset.hasCustom === '1';
+        if (hasCustom) {
+          item.style.display = 'none';
+        }
+      });
+
+      // 自动折叠没有未上传物品的折叠栏，展开有的
+      allDetails.forEach(detail => {
+        let hasVisible = false;
+        detail.querySelectorAll('.sp-unified-coll-item').forEach(item => {
+          if (item.style.display !== 'none') hasVisible = true;
+        });
+        detail.open = hasVisible;
+      });
+    }
+
     if (searchInput) {
       searchInput.addEventListener('input', () => {
         const query = searchInput.value.trim().toLowerCase();
@@ -24147,8 +24142,24 @@ window.addEventListener('beforeunload', () => {
         const allDetails = overlay.querySelectorAll('.sp-guide-details');
 
         if (!query) {
-          // 搜索框为空，显示所有物品，恢复折叠栏原样
-          allItems.forEach(item => { item.style.display = ''; });
+          // 搜索框为空，根据查漏补缺模式决定显示
+          allItems.forEach(item => {
+            if (showMissingOnly && item.dataset.hasCustom === '1') {
+              item.style.display = 'none';
+            } else {
+              item.style.display = '';
+            }
+          });
+          // 查漏补缺模式下自动折叠空折叠栏
+          if (showMissingOnly) {
+            allDetails.forEach(detail => {
+              let hasVisible = false;
+              detail.querySelectorAll('.sp-unified-coll-item').forEach(item => {
+                if (item.style.display !== 'none') hasVisible = true;
+              });
+              detail.open = hasVisible;
+            });
+          }
           return;
         }
 
@@ -24159,6 +24170,12 @@ window.addEventListener('beforeunload', () => {
           const hasCustom = item.classList.contains('sp-unified-has-custom');
 
           let matchable = false;
+          // 查漏补缺模式：已有图片的直接隐藏，不参与搜索
+          if (showMissingOnly && item.dataset.hasCustom === '1') {
+            item.style.display = 'none';
+            return;
+          }
+
 
           if (showLockedNames) {
             // 显示名字模式：已解锁和未解锁的都可以按真实名字搜索
