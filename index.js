@@ -10828,7 +10828,7 @@ window.addEventListener('beforeunload', () => {
         { level: 5, emoji: '🍯', name: '百花蜂蜜', sell: 25, seasoningId: 'honey' },
         { level: 6, emoji: '✨', name: '秘制五香粉', sell: 55, seasoningId: 'spice' },
         { level: 7, emoji: '🫗', name: '陈年老醋', sell: 120, seasoningId: 'vinegar' },
-        { level: 8, emoji: '🏺', name: '传说万味精华', sell: 280, seasoningId: 'spice' },
+        { level: 8, emoji: '🏺', name: '传说万味精华', sell: 280, seasoningId: 'essence' },
       ]
     },
     stamina: {
@@ -17071,6 +17071,7 @@ window.addEventListener('beforeunload', () => {
     { id: 'miso',    name: '味噌',   emoji: '🫘', price: 15, reputationRequired: 12 },
     { id: 'curry',   name: '咖喱粉', emoji: '🍛', price: 16, reputationRequired: 15 },
     { id: 'coconut', name: '椰浆',   emoji: '🥥', price: 14, reputationRequired: 10 },
+    { id: 'essence', name: '万味精华', emoji: '🏺', price: 30, reputationRequired: 20 },
 
   ];
 
@@ -23084,10 +23085,15 @@ window.addEventListener('beforeunload', () => {
         { level: 1, id: 'salt' }, { level: 2, id: 'soy' },
         { level: 3, id: 'pepper' }, { level: 4, id: 'butter' },
         { level: 5, id: 'honey' }, { level: 6, id: 'spice' },
-        { level: 7, id: 'vinegar' }, { level: 8, id: 'spice' },
+        { level: 7, id: 'vinegar' }, { level: 8, id: 'essence' },
       ];
+
+      const seenSeaIds = new Set();
       seasoningLinkMap.forEach(s => {
-        edges.push([`seasoning_${s.level}`, `restaurant_sea_${s.id}`]);
+        if (!seenSeaIds.has(s.id)) {
+          seenSeaIds.add(s.id);
+          edges.push([`seasoning_${s.level}`, `restaurant_sea_${s.id}`]);
+        }
       });
 
       // 3. 货架商品 ↔ 冰箱食材/餐厅调料/糖葫芦
