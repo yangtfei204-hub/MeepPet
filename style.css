@@ -839,6 +839,7 @@
   border-radius: 16px; padding: 24px; width: 90%; max-width: 480px; max-height: 70vh; overflow-y: auto;
   color: var(--sp-text-primary);
   margin: auto;
+  position: fixed;
 }
 #silly-pet-summary-modal h3 { margin: 0 0 12px; font-size: 16px; color: var(--sp-text-primary); }
 #silly-pet-summary-modal textarea {

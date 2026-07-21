@@ -1416,6 +1416,18 @@ function saveData() {
       </div>
     `;
     document.body.appendChild(diary);
+    // 总结弹窗拖拽
+    requestAnimationFrame(() => {
+      const summaryModal = document.getElementById('silly-pet-summary-modal');
+      if (summaryModal) {
+        const summaryContent = summaryModal.querySelector('.sp-modal-content');
+        const summaryH3 = summaryModal.querySelector('h3');
+        if (summaryH3 && summaryContent) {
+          bindPopupDrag(summaryH3, summaryContent);
+        }
+      }
+    });
+
 
     updateStatusBars();
     updateSpriteImage();
@@ -1918,6 +1930,11 @@ function clearSpriteLock() {
         box.style.margin = '0';
       }
     });
+    // 拖拽（用标题行作为拖拽手柄）
+    const confirmTitle = overlay.querySelector('.sp-confirm-title');
+    const confirmBox = document.getElementById('sp-confirm-dialog-box');
+    bindPopupDrag(confirmTitle, confirmBox);
+
 
     const cleanup = () => { overlay.remove(); };
 
@@ -1978,6 +1995,11 @@ function clearSpriteLock() {
         inputEl.select();
       }
     });
+    // 拖拽
+    const promptTitle = overlay.querySelector('.sp-confirm-title');
+    const promptBox = document.getElementById('sp-prompt-dialog-box');
+    bindPopupDrag(promptTitle, promptBox);
+
 
     const cleanup = () => { overlay.remove(); };
 
@@ -2042,6 +2064,11 @@ function clearSpriteLock() {
         box.style.margin = '0';
       }
     });
+    // 拖拽
+    const alertTitle = overlay.querySelector('.sp-confirm-title');
+    const alertBox = document.getElementById('sp-alert-dialog-box');
+    bindPopupDrag(alertTitle, alertBox);
+
 
     const cleanup = () => { overlay.remove(); };
 
@@ -2821,6 +2848,10 @@ function showInventoryPopup(category, quickKey, onUse) {
         box.style.margin = '0';
       }
     });
+    // 拖拽
+    const invHeader = overlay.querySelector('.sp-inv-popup-header');
+    const invBox = overlay.querySelector('.sp-inv-popup-box');
+    bindPopupDrag(invHeader, invBox);
 
     // 关闭
     overlay.querySelector('.sp-inv-popup-close').onclick = () => overlay.remove();
@@ -3199,6 +3230,11 @@ function showInventoryPopup(category, quickKey, onUse) {
       }
     });
 
+    // 拖拽
+    const selectorHeader = overlay.querySelector('.sp-game-selector-header');
+    const selectorBox = overlay.querySelector('.sp-game-selector-box');
+    bindPopupDrag(selectorHeader, selectorBox);
+
     // 关闭
     overlay.querySelector('.sp-game-selector-close').onclick = () => overlay.remove();
     overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
@@ -3396,6 +3432,10 @@ function showInventoryPopup(category, quickKey, onUse) {
         box.style.margin = '0';
       }
     });
+    // 拖拽
+    const helpHeader = document.getElementById('sp-game-help-header');
+    const helpBox = document.getElementById('sp-game-help-box');
+    bindPopupDrag(helpHeader, helpBox);
 
     // 关闭按钮
     document.getElementById('sp-game-help-close').onclick = () => helpOverlay.remove();
@@ -3652,6 +3692,11 @@ function showInventoryPopup(category, quickKey, onUse) {
         box.style.margin = '0';
       }
     });
+    // 拖拽
+    const totalInvHeader = overlay.querySelector('.sp-total-inv-header');
+    const totalInvBox = overlay.querySelector('.sp-total-inv-box');
+    bindPopupDrag(totalInvHeader, totalInvBox);
+
 
     // 关闭
     overlay.querySelector('.sp-total-inv-close').onclick = () => overlay.remove();
@@ -3684,6 +3729,11 @@ function showInventoryPopup(category, quickKey, onUse) {
         modal.style.transform = 'none';
       });
     }
+    // 拖拽
+    const emojiModalTitle = document.getElementById('sp-emoji-modal-title');
+    const emojiModalBox = document.getElementById('sp-emoji-modal');
+    bindPopupDrag(emojiModalTitle, emojiModalBox);
+
 
     // 保存
     document.getElementById('sp-emoji-modal-save').onclick = () => {
@@ -4069,6 +4119,54 @@ function toggleChat() {
         if (panel) panel.classList.remove('visible');
       };
     }
+  }
+
+  // ============================================================
+  // 通用弹窗拖拽工具
+  // ============================================================
+  function bindPopupDrag(dragHandleEl, popupBoxEl) {
+    if (!dragHandleEl || !popupBoxEl) return;
+    let dragging = false, offX = 0, offY = 0;
+
+    const down = (e) => {
+      // 跳过按钮、输入框、关闭按钮等交互元素
+      if (e.target.closest('button, input, textarea, select, a, .sp-settings-close, .sp-total-inv-close, .sp-inv-popup-close, .sp-game-selector-close')) return;
+      dragging = true;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const rect = popupBoxEl.getBoundingClientRect();
+      offX = clientX - rect.left;
+      offY = clientY - rect.top;
+      dragHandleEl.style.cursor = 'grabbing';
+    };
+
+    const move = (e) => {
+      if (!dragging) return;
+      if (e.cancelable) e.preventDefault();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      let x = clientX - offX;
+      let y = clientY - offY;
+      x = Math.max(0, Math.min(window.innerWidth - popupBoxEl.offsetWidth, x));
+      y = Math.max(0, Math.min(window.innerHeight - popupBoxEl.offsetHeight, y));
+      popupBoxEl.style.left = x + 'px';
+      popupBoxEl.style.top = y + 'px';
+      popupBoxEl.style.margin = '0';
+      popupBoxEl.style.transform = 'none';
+    };
+
+    const up = () => {
+      dragging = false;
+      dragHandleEl.style.cursor = 'grab';
+    };
+
+    dragHandleEl.style.cursor = 'grab';
+    dragHandleEl.addEventListener('mousedown', down);
+    dragHandleEl.addEventListener('touchstart', down, { passive: true });
+    document.addEventListener('mousemove', move);
+    document.addEventListener('touchmove', move, { passive: false });
+    document.addEventListener('mouseup', up);
+    document.addEventListener('touchend', up);
   }
 
   function bindSettingsDrag() {
@@ -11728,6 +11826,11 @@ window.addEventListener('beforeunload', () => {
         box.style.margin = '0';
       }
     });
+    // 拖拽
+    const staHeader = overlay.querySelector('.sp-inv-popup-header');
+    const staBox = overlay.querySelector('.sp-inv-popup-box');
+    bindPopupDrag(staHeader, staBox);
+
 
     overlay.querySelector('.sp-inv-popup-close').onclick = () => overlay.remove();
     overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
@@ -19011,6 +19114,11 @@ window.addEventListener('beforeunload', () => {
         box.style.margin = '0';
       }
     });
+    // 拖拽
+    const achHeader = overlay.querySelector('.sp-total-inv-header');
+    const achBox = overlay.querySelector('.sp-total-inv-box');
+    bindPopupDrag(achHeader, achBox);
+
 
     document.getElementById('sp-achievements-close').onclick = () => overlay.remove();
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
@@ -21968,6 +22076,11 @@ window.addEventListener('beforeunload', () => {
     `;
 
     document.body.appendChild(overlay);
+    // 拖拽
+    const recipeHeader = document.getElementById('sp-restaurant-recipe-modal-header');
+    const recipeBox = document.getElementById('sp-restaurant-recipe-modal');
+    bindPopupDrag(recipeHeader, recipeBox);
+
 
     document.getElementById('sp-restaurant-recipe-modal-close').onclick = () => overlay.remove();
     overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
@@ -24057,6 +24170,11 @@ window.addEventListener('beforeunload', () => {
         box.style.margin = '0';
       }
     });
+    // 拖拽
+    const uniHeader = overlay.querySelector('.sp-total-inv-header');
+    const uniBox = overlay.querySelector('.sp-total-inv-box');
+    bindPopupDrag(uniHeader, uniBox);
+
 
     // 关闭
     document.getElementById('sp-unified-coll-close').onclick = () => overlay.remove();
