@@ -14012,16 +14012,113 @@ window.addEventListener('beforeunload', () => {
 
     // 决定显示图标
     let displayIcon = '🎁';
-    if (result.type === 'gold') displayIcon = '🪙';
-    else if (result.type === 'match3prop') displayIcon = result.key === 'expand' ? '🪜' : result.key === 'sweep' ? '🧹' : '🌀';
-    else if (result.type === 'shopitem') displayIcon = GAME_SHOP_ITEMS[result.category]?.[result.idx]?.emoji || '🎁';
-    else if (result.type === 'boarditem') {
+    let isImgTag = false;
+
+    if (result.type === 'gold') {
+      displayIcon = '🪙';
+    } else if (result.type === 'match3prop') {
+      const imgKey = `match3_prop_${result.key}`;
+      const custom = getLinkedImage(imgKey);
+      const defaultEmojis = { expand: '🪜', sweep: '🧹', shuffle: '🌀' };
+      if (custom) {
+        displayIcon = `<img src="${custom}" style="width:48px;height:48px;object-fit:contain;border-radius:8px;" />`;
+        isImgTag = true;
+      } else {
+        displayIcon = defaultEmojis[result.key] || '🎁';
+      }
+    } else if (result.type === 'linkprop') {
+      const imgKey = `link_prop_${result.key}`;
+      const custom = getLinkedImage(imgKey);
+      const defaultEmojis = { hint: '🔍', shuffle: '🌀', bomb: '💣', compass: '🧭' };
+      if (custom) {
+        displayIcon = `<img src="${custom}" style="width:48px;height:48px;object-fit:contain;border-radius:8px;" />`;
+        isImgTag = true;
+      } else {
+        displayIcon = defaultEmojis[result.key] || '🎁';
+      }
+    } else if (result.type === 'staminaitem') {
+      const imgKey = `stamina_item_${result.key}`;
+      const custom = getLinkedImage(imgKey);
+      const item = GAME_STAMINA_ITEMS.find(i => i.key === result.key);
+      if (custom) {
+        displayIcon = `<img src="${custom}" style="width:48px;height:48px;object-fit:contain;border-radius:8px;" />`;
+        isImgTag = true;
+      } else {
+        displayIcon = item?.emoji || '⚡';
+      }
+    } else if (result.type === 'fridgeprop') {
+      const imgKey = `fridge_prop_${result.key}`;
+      const custom = getLinkedImage(imgKey);
+      const prop = FRIDGE_PROP_ITEMS[result.key];
+      if (custom) {
+        displayIcon = `<img src="${custom}" style="width:48px;height:48px;object-fit:contain;border-radius:8px;" />`;
+        isImgTag = true;
+      } else {
+        displayIcon = prop ? prop.name.split(' ')[0] : '🎁';
+      }
+    } else if (result.type === 'tanghuluprop') {
+      const imgKey = `tanghulu_prop_${result.key}`;
+      const custom = getLinkedImage(imgKey);
+      const prop = TANGHULU_PROPS[result.key];
+      if (custom) {
+        displayIcon = `<img src="${custom}" style="width:48px;height:48px;object-fit:contain;border-radius:8px;" />`;
+        isImgTag = true;
+      } else {
+        displayIcon = prop ? prop.name.split(' ')[0] : '🎁';
+      }
+    } else if (result.type === 'shelfprop') {
+      const imgKey = `shelf_prop_${result.key}`;
+      const custom = getLinkedImage(imgKey);
+      const prop = SHELF_PROPS[result.key];
+      if (custom) {
+        displayIcon = `<img src="${custom}" style="width:48px;height:48px;object-fit:contain;border-radius:8px;" />`;
+        isImgTag = true;
+      } else {
+        displayIcon = prop ? prop.name.split(' ')[0] : '🎁';
+      }
+    } else if (result.type === 'shopitem') {
+      const imgKey = `${result.category}_shopitem_${result.idx}`;
+      const custom = getLinkedImage(imgKey);
+      const itemData = GAME_SHOP_ITEMS[result.category]?.[result.idx];
+      if (custom) {
+        displayIcon = `<img src="${custom}" style="width:48px;height:48px;object-fit:contain;border-radius:8px;" />`;
+        isImgTag = true;
+      } else {
+        displayIcon = itemData?.emoji || '🎁';
+      }
+    } else if (result.type === 'boarditem') {
+      const imgKey = `${result.chain}_${result.level}`;
+      const custom = getLinkedImage(imgKey);
       const chainData = GAME_CHAINS[result.chain];
-      const custom = state.gameCustomImages?.[`${result.chain}_${result.level}`];
-      displayIcon = custom ? `<img src="${custom}" style="width:48px;height:48px;object-fit:contain;border-radius:8px;" />` : (chainData?.items[result.level - 1]?.emoji || '🎁');
+      if (custom) {
+        displayIcon = `<img src="${custom}" style="width:48px;height:48px;object-fit:contain;border-radius:8px;" />`;
+        isImgTag = true;
+      } else {
+        displayIcon = chainData?.items[result.level - 1]?.emoji || '🎁';
+      }
+    } else if (result.type === 'groceryitem') {
+      const imgKey = `fridge_food_${result.foodId}`;
+      const custom = getLinkedImage(imgKey);
+      const food = FRIDGE_FOODS.find(f => f.id === result.foodId);
+      if (custom) {
+        displayIcon = `<img src="${custom}" style="width:48px;height:48px;object-fit:contain;border-radius:8px;" />`;
+        isImgTag = true;
+      } else {
+        displayIcon = food?.emoji || '🥬';
+      }
+    } else if (result.type === 'tanghuluItem') {
+      const imgKey = `tanghulu_product_${result.fruitKey}`;
+      const custom = getLinkedImage(imgKey);
+      const fruit = TANGHULU_FRUITS.find(f => f.key === result.fruitKey);
+      if (custom) {
+        displayIcon = `<img src="${custom}" style="width:48px;height:48px;object-fit:contain;border-radius:8px;" />`;
+        isImgTag = true;
+      } else {
+        displayIcon = fruit ? '🍢' + fruit.emoji : '🍢';
+      }
     }
 
-    const isImgDisplay = result.type === 'boarditem' && state.gameCustomImages?.[`${result.chain}_${result.level}`];
+    const isImgDisplay = isImgTag;
 
     const overlay = document.createElement('div');
     overlay.id = 'sp-lottery-result-overlay';
@@ -21070,7 +21167,7 @@ window.addEventListener('beforeunload', () => {
                     <div class="sp-r-menu-recipe-name ${unlocked ? '' : 'sp-r-menu-locked-text'}">${r.name}</div>
                     <div class="sp-r-menu-recipe-materials">
                       ${ingText}
-                      ${r.seasonings.length > 0 ? `<span style="color:var(--sp-text-muted);">🧂</span>${seaText}` : ''}
+                      ${r.seasonings.length > 0 ? `<span style="color:var(--sp-text-muted);">+</span>${seaText}` : ''}
                       <span style="color:var(--sp-text-muted);">⏱️${r.cookTime}s</span>
                     </div>
                   </div>
@@ -21844,7 +21941,7 @@ window.addEventListener('beforeunload', () => {
         const seaDisplay = getItemDisplayHtml('restaurant_sea_' + s.id, sd?.emoji || '?', 14);
         return `${seaDisplay}×${s.count}${ok ? '✅' : '❌'}`;
       }).join(' ');
-      const materials = [ingText, seaText].filter(Boolean).join(' 🧂 ');
+      const materials = [ingText, seaText].filter(Boolean).join(' + ');
       return `
         <div class="sp-restaurant-recipe-item ${canMake ? '' : 'sp-restaurant-recipe-disabled'}" data-recipe-id="${r.id}">
           <span class="sp-restaurant-recipe-emoji">${restaurantGetItemDisplay('restaurant_recipe_' + r.id, r.emoji, 22)}</span>
