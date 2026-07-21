@@ -11383,7 +11383,10 @@ window.addEventListener('beforeunload', () => {
           title = '魔法猫爪生成器（点击消耗1体力）';
         } else if (i === state.gameSellPos) {
           cellClass += ' sp-game-sell';
-          content = '<span class="sp-game-cell-emoji">💰</span>';
+          const customSell = state.gameCustomImages?.sell;
+          content = customSell
+            ? `<img src="${customSell}" class="sp-game-cell-img" alt="售卖区" />`
+            : '<span class="sp-game-cell-emoji">💰</span>';
           title = '售卖区（拖入或轻触选中后点击此处售卖）';
         } else {
           const cellData = state.gameBoard[i];
@@ -11429,10 +11432,13 @@ window.addEventListener('beforeunload', () => {
           ? `<img src="${customGen}" class="sp-game-cell-img" alt="生成器" />`
           : '<span class="sp-game-cell-emoji">🐾</span>';
         title = '魔法猫爪生成器（点击消耗1体力）';
-      } else if (i === state.gameSellPos) {
-        cellClass += ' sp-game-sell';
-        content = '<span class="sp-game-cell-emoji">💰</span>';
-        title = '售卖区（拖入或轻触选中后点击此处售卖）';
+        } else if (i === state.gameSellPos) {
+          cellClass += ' sp-game-sell';
+          const customSell = state.gameCustomImages?.sell;
+          content = customSell
+            ? `<img src="${customSell}" class="sp-game-cell-img" alt="售卖区" />`
+            : '<span class="sp-game-cell-emoji">💰</span>';
+          title = '售卖区（拖入或轻触选中后点击此处售卖）';
       } else {
         const cellData = state.gameBoard[i];
         if (cellData) {
@@ -12154,8 +12160,10 @@ window.addEventListener('beforeunload', () => {
             <div class="sp-game-settings-title">🖼️ 自定义外观</div>
             <button class="sp-game-settings-btn" id="sp-game-upload-bg">上传游戏背景图</button>
             <button class="sp-game-settings-btn" id="sp-game-upload-gen">上传生成器图片</button>
+            <button class="sp-game-settings-btn" id="sp-game-upload-sell">上传售卖区图片</button>
             <button class="sp-game-settings-btn" id="sp-game-clear-bg">清除背景图</button>
             <button class="sp-game-settings-btn" id="sp-game-clear-gen">清除生成器图片</button>
+            <button class="sp-game-settings-btn" id="sp-game-clear-sell">清除售卖区图片</button>
             <p class="sp-game-settings-hint">💡 在图鉴中点击物品上的 📷 即可上传/替换物品图片（优先推荐链接）</p>
           </div>
           <div class="sp-game-settings-section">
@@ -12209,6 +12217,9 @@ window.addEventListener('beforeunload', () => {
     document.getElementById('sp-game-order-refresh-btn')?.addEventListener('click', (e) => { e.stopPropagation(); gameRefreshOrders(); });
     document.getElementById('sp-game-upload-bg')?.addEventListener('click', gameUploadBackground);
     document.getElementById('sp-game-upload-gen')?.addEventListener('click', gameUploadGenerator);
+    document.getElementById('sp-game-upload-sell')?.addEventListener('click', () => {
+      gamePromptImageUpload('sell');
+    });
     document.getElementById('sp-game-clear-gen')?.addEventListener('click', () => {
       if (!state.gameCustomImages) state.gameCustomImages = {};
       delete state.gameCustomImages['generator'];
@@ -12216,6 +12227,13 @@ window.addEventListener('beforeunload', () => {
       gameRenderBoard();
       gameRenderCollection();
       gameShowNotice('生成器图片已清除，恢复默认猫爪');
+    });
+    document.getElementById('sp-game-clear-sell')?.addEventListener('click', () => {
+      if (!state.gameCustomImages) state.gameCustomImages = {};
+      delete state.gameCustomImages['sell'];
+      saveDataImmediate('清除售卖区图片');
+      gameRenderBoard();
+      gameShowNotice('售卖区图片已清除，恢复默认💰');
     });
     document.getElementById('sp-game-clear-bg')?.addEventListener('click', () => {
       state.gameBgImage = '';
