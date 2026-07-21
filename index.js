@@ -998,7 +998,6 @@ function saveData() {
       gameIconKeys.forEach(k => {
         imageData.gameCustomImages[k] = state.gameCustomImages[k];
       });
-      count += gameIconKeys.length;
     }
 
     // 游戏背景图
