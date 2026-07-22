@@ -474,7 +474,15 @@
     bookshelfBookmarks: {},
     // 论坛
     forumPrompt: '你是一个论坛内容生成器。请根据提供的世界观设定，生成若干篇论坛帖子。\n\n请严格按以下JSON数组格式输出（不要输出任何其他内容，只输出JSON）：\n[\n  {\n    "author": "作者昵称(2-6个字)",\n    "avatarEmoji": "一个emoji表情作为头像",\n    "title": "帖子标题(5-20字)",\n    "content": "帖子正文(50-200字，符合世界观，语言风格像社交媒体/小红书)",\n    "coverEmoji": "一个能代表帖子内容的emoji",\n    "likes": 随机数100-9999,\n    "views": 随机数500-99999,\n    "comments": 随机数5-999,\n    "tags": ["标签1","标签2"]\n  }\n]\n\n要求：\n- 生成5到10篇帖子\n- 每篇帖子要有不同的作者和写作风格\n- 内容必须贴合世界观设定\n- 有的帖子可以是提问、有的是分享、有的是吐槽、有的是攻略\n- 标签1-3个\n- 数字字段请直接写数字，不要加引号',
+    forumSendWorldBook: true,        // 生成论坛时是否发送世界书
+    fanficSendWorldBook: true,       // 生成同人文时是否发送世界书
     forumPosts: [],
+    forumUserPosts: [],             // 玩家自己发的论坛帖子
+    forumFavorites: [],             // 收藏的论坛帖子ID
+    forumMyName: '',                   // 论坛「我」标签页自定义昵称
+    forumMyBio: '',                    // 论坛个性签名
+    forumMyAvatar: '',                 // 论坛「我」标签页自定义头像
+    forumCommentPrompt: '你是一个论坛评论生成器。请根据提供的帖子内容和世界观设定，生成若干条风格各异的论坛评论。\n\n请严格按以下JSON数组格式输出（不要输出任何其他内容，只输出JSON）：\n[\n  {\n    "author": "评论者昵称(2-6个字，符合世界观的名字风格)",\n    "avatarEmoji": "一个emoji表情作为头像",\n    "content": "评论内容(10-100字，语言风格像社交媒体/论坛评论，可以包含表情符号)",\n    "likes": 随机数0-999\n  }\n]\n\n要求：\n- 生成10到15条评论\n- 每条评论的作者和写作风格都不同\n- 评论类型要多样化：有赞同的、有反驳的、有提问的、有开玩笑的、有认真分析的、有纯凑热闹的、有分享自己经历的\n- 评论内容必须贴合帖子主题和世界观设定\n- 有的评论可以很短（如"6""笑死""前排""mark"等互联网梗风格）\n- 有的评论可以比较长（认真回复、分享观点）\n- 评论要有真实感，像真人在社区里互动\n- 数字字段请直接写数字，不要加引号',
     // 同人文
     fanficPosts: [],               // 生成的同人文 [{id, title, content, coverGradient, coverEmoji, authorName, authorAvatar, likes, views, tags, wordCount, timestamp}]
     fanficUserPosts: [],           // 玩家自写的同人文（同结构）
@@ -1965,7 +1973,27 @@ function saveData() {
             <div class="sp-phone-setting-block">
               <div class="sp-phone-setting-title">📰 论坛提示词</div>
               <textarea id="sp-forum-prompt" style="width:100%;min-height:80px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${settings.forumPrompt || ''}</textarea>
-              <p style="font-size:10px;color:var(--sp-text-muted);margin:4px 0 0;">生成论坛时只发送：世界书 + 破限 + 此提示词</p>
+              <label class="sp-phone-switch-row" style="margin-top:8px;">
+                <span>生成论坛时发送世界书</span>
+                <label class="sp-toggle-switch"><input type="checkbox" id="sp-forum-send-worldbook" ${settings.forumSendWorldBook !== false ? 'checked' : ''} /><span class="sp-toggle-slider"></span></label>
+              </label>
+              <p style="font-size:10px;color:var(--sp-text-muted);margin:4px 0 0;line-height:1.6;">生成论坛帖子时发送：${'{'}<span style="color:rgba(100,180,255,0.8);">世界书</span>${'}'}<span style="font-size:9px;">（由上方开关控制）</span> + <span style="color:rgba(255,180,100,0.8);">破限</span> + <span style="color:rgba(100,220,100,0.8);">此提示词</span><br/>在「📇 通讯录」中关联世界书，在上方「破限」区域编辑破限内容</p>
+            </div>
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">💬 论坛评论提示词</div>
+              <textarea id="sp-forum-comment-prompt" style="width:100%;min-height:80px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${settings.forumCommentPrompt || ''}</textarea>
+              <p style="font-size:10px;color:var(--sp-text-muted);margin:4px 0 0;line-height:1.6;">生成论坛评论时发送：${'{'}<span style="color:rgba(100,180,255,0.8);">世界书</span>${'}'}<span style="font-size:9px;">（由「论坛提示词」的开关控制）</span> + <span style="color:rgba(200,150,255,0.8);">帖子标题和正文</span> + <span style="color:rgba(255,180,100,0.8);">破限</span> + <span style="color:rgba(100,220,100,0.8);">此提示词</span><br/>每次生成10~15条风格各异的评论，生成后追加到帖子详情的评论区</p>
+            </div>
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">📝 同人文生成提示词</div>
+              <textarea id="sp-fanfic-generate-prompt" style="width:100%;min-height:80px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${settings.fanficGeneratePrompt || ''}</textarea>
+              <div class="sp-phone-setting-title" style="margin-top:10px;">📝 同人文续写提示词</div>
+              <textarea id="sp-fanfic-continue-prompt" style="width:100%;min-height:60px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${settings.fanficContinuePrompt || ''}</textarea>
+              <label class="sp-phone-switch-row" style="margin-top:8px;">
+                <span>生成同人文时发送世界书</span>
+                <label class="sp-toggle-switch"><input type="checkbox" id="sp-fanfic-send-worldbook" ${settings.fanficSendWorldBook !== false ? 'checked' : ''} /><span class="sp-toggle-slider"></span></label>
+              </label>
+              <p style="font-size:10px;color:var(--sp-text-muted);margin:4px 0 0;">生成同人文时发送：${'{'}世界书${'}'} + 破限 + 生成/续写提示词</p>
             </div>
             <button id="sp-profile-save" class="sp-phone-btn sp-phone-btn-primary">💾 保存</button>
           </div>
@@ -1994,28 +2022,21 @@ function saveData() {
         </div>
 
         <div id="sp-phone-forum" class="sp-phone-page">
-          <div class="sp-phone-page-header">
-            <button class="sp-phone-back" data-back="home">‹</button>
-            <span>📰 论坛</span>
-            <span style="width:24px;"></span>
-          </div>
-          <div class="sp-phone-page-content" id="sp-forum-page-content" style="padding:0;">
-            <div id="sp-forum-toolbar" style="display:flex;gap:6px;padding:10px 12px;border-bottom:1px solid var(--sp-border-light);align-items:center;background:var(--sp-bg-light);">
-              <button id="sp-forum-generate-btn" class="sp-phone-btn sp-phone-btn-primary" style="flex:1;font-size:13px;font-weight:600;">✨ 生成论坛内容</button>
-              <button id="sp-forum-clear-btn" class="sp-phone-btn" style="font-size:11px;padding:7px 10px;">🗑️</button>
+          <div id="sp-forum-container" style="display:flex;flex-direction:column;height:100%;">
+            <div id="sp-forum-topbar" style="display:flex;align-items:center;padding:8px 12px;border-bottom:1px solid var(--sp-border-light);flex-shrink:0;">
+              <button class="sp-phone-back" data-back="home" style="font-size:22px;background:none;border:none;color:var(--sp-text-primary);cursor:pointer;width:24px;line-height:1;padding:0;">‹</button>
+              <span style="flex:1;text-align:center;font-size:14px;font-weight:600;color:var(--sp-text-primary);">📰 论坛</span>
+              <span style="width:24px;"></span>
             </div>
-            <div id="sp-forum-loading" style="display:none;text-align:center;padding:40px 20px;color:var(--sp-text-muted);font-size:13px;">
-              <div style="font-size:28px;margin-bottom:12px;animation:sp-dots-pulse 1.2s ease-in-out infinite;">📝</div>
-              <div>正在生成论坛内容…</div>
-              <div style="font-size:11px;margin-top:6px;">世界书 + 破限 + 论坛提示词</div>
+            <div id="sp-forum-content" style="flex:1;overflow-y:auto;position:relative;">
+              <div id="sp-forum-home-view"></div>
+              <div id="sp-forum-me-view" style="display:none;"></div>
             </div>
-            <div id="sp-forum-empty" style="text-align:center;padding:50px 20px;color:var(--sp-text-muted);">
-              <div style="font-size:36px;margin-bottom:12px;">📰</div>
-              <div style="font-size:13px;margin-bottom:6px;">论坛空空如也</div>
-              <div style="font-size:11px;">点击「✨ 生成论坛内容」开始吧</div>
-              <div style="font-size:10px;margin-top:10px;color:var(--sp-text-muted);line-height:1.6;">会发送：世界书 + 破限 + 论坛提示词<br/>在「个人主页」中可编辑论坛提示词</div>
+            <div id="sp-forum-tabbar">
+              <button class="sp-forum-tab active" data-forum-tab="home">🏠 首页</button>
+              <button class="sp-forum-tab" data-forum-tab="create">➕</button>
+              <button class="sp-forum-tab" data-forum-tab="me">👤 我</button>
             </div>
-            <div id="sp-forum-posts-container" class="sp-forum-grid"></div>
           </div>
         </div>
 
@@ -6462,20 +6483,8 @@ if (hasEmoji) {
     document.getElementById('sp-bookreader-prev')?.addEventListener('click', () => bookReaderNav(-1));
     document.getElementById('sp-bookreader-next')?.addEventListener('click', () => bookReaderNav(1));
     
-    // ===== 论坛事件 =====
-    const forumGenBtn = document.getElementById('sp-forum-generate-btn');
-    if (forumGenBtn) {
-      forumGenBtn.onclick = () => generateForumPosts();
-    }
-    const forumClearBtn = document.getElementById('sp-forum-clear-btn');
-    if (forumClearBtn) {
-      forumClearBtn.onclick = () => {
-        state.forumPosts = [];
-        saveData();
-        renderForumPage();
-        showBubble('论坛已清空', 2000);
-      };
-    }
+    // ===== 论坛标签栏事件 =====
+    forumBindTabEvents();
 
     // ===== 同人文事件 =====
     fanficBindTabEvents();
@@ -6560,24 +6569,198 @@ if (hasEmoji) {
   // ============================================================
   // 📰 论坛模块
   // ============================================================
-  function renderForumPage() {
-    const container = document.getElementById('sp-forum-posts-container');
-    const emptyEl = document.getElementById('sp-forum-empty');
-    const loadingEl = document.getElementById('sp-forum-loading');
+  //论坛选择删除模式
+  let _forumSelectMode = false;
+  let _forumSelectedIds = new Set();
+  let _forumCurrentTab = 'home';
+
+  function forumBindTabEvents() {
+    const container = document.getElementById('sp-forum-container');
     if (!container) return;
+    container.querySelectorAll('.sp-forum-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const tabName = tab.dataset.forumTab;
+        container.querySelectorAll('.sp-forum-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        if (tabName === 'home') {
+          _forumCurrentTab = 'home';
+          renderForumHomePage();
+        } else if (tabName === 'create') {
+          showForumWriteDialog();
+          // 点完创建后不切换标签高亮，恢复之前的
+          container.querySelectorAll('.sp-forum-tab').forEach(t => t.classList.toggle('active', t.dataset.forumTab === _forumCurrentTab));
+        } else if (tabName === 'me') {
+          _forumCurrentTab = 'me';
+          renderForumMePage();
+        }
+      });
+    });
+  }
+
+  function renderForumPage() {
+    _forumCurrentTab = 'home';
+    renderForumHomePage();
+    //确保标签页状态正确
+    const tabbar = document.getElementById('sp-forum-tabbar');
+    if (tabbar) {
+      tabbar.querySelectorAll('.sp-forum-tab').forEach(t => t.classList.toggle('active', t.dataset.forumTab === 'home'));
+    }
+    document.getElementById('sp-forum-home-view').style.display = '';
+    document.getElementById('sp-forum-me-view').style.display = 'none';
+  }
+
+  function renderForumHomePage() {
+    const container = document.getElementById('sp-forum-home-view');
+    if (!container) return;
+    container.style.display = '';
+    document.getElementById('sp-forum-me-view').style.display = 'none';
 
     const posts = state.forumPosts || [];
+    const loading = state.forumGenerating;
 
-    if (loadingEl) loadingEl.style.display = 'none';
+    let html = `
+      <div style="display:flex;gap:6px;padding:10px 12px;border-bottom:1px solid var(--sp-border-light);align-items:center;background:var(--sp-bg-light);flex-wrap:wrap;">
+        <button id="sp-forum-generate-btn" class="sp-phone-btn sp-phone-btn-primary" style="flex:1;font-size:13px;font-weight:600;" ${loading ? 'disabled' : ''}>
+          ${loading ? '⏳ 生成中…' : '✨ 生成论坛内容'}
+        </button>
+        ${posts.length > 0 && !_forumSelectMode ? `<button id="sp-forum-select-mode-btn" class="sp-phone-btn" style="font-size:11px;padding:7px 10px;">🗑️ 管理</button>` : ''}${_forumSelectMode ? `
+          <button id="sp-forum-delete-selected-btn" class="sp-phone-btn" style="font-size:11px;padding:7px 10px;border-color:rgba(239,83,80,0.5);background:rgba(239,83,80,0.15);color:#f66;">🗑️ 删除所选(${_forumSelectedIds.size})</button>
+          <button id="sp-forum-cancel-select-btn" class="sp-phone-btn" style="font-size:11px;padding:7px 10px;">✕ 取消</button>
+        ` : ''}
+      </div>
+    `;
 
-    if (posts.length === 0) {
-      if (emptyEl) emptyEl.style.display = '';
-      container.innerHTML = '';
-      return;
+    if (loading) {
+      html += `<div style="text-align:center;padding:40px 20px;color:var(--sp-text-muted);font-size:13px;">
+        <div style="font-size:28px;margin-bottom:12px;animation:sp-dots-pulse 1.2s ease-in-out infinite;">📝</div>
+        <div>正在生成论坛内容…</div>
+      </div>`;
+    } else if (posts.length === 0) {
+      html += `<div style="text-align:center;padding:50px 20px;color:var(--sp-text-muted);">
+        <div style="font-size:36px;margin-bottom:12px;">📰</div>
+        <div style="font-size:13px;margin-bottom:6px;">论坛空空如也</div>
+        <div style="font-size:11px;">点击「✨ 生成论坛内容」开始吧</div>
+      </div>`;
+    } else {
+      html += '<div class="sp-forum-grid" style="padding:10px 10px 20px;">';
+      posts.forEach((post, idx) => {
+        if (!post.id) post.id = 'fp_' + Date.now() + '_' + idx;
+        const isLiked = (settings.forumLikedPosts || []).includes(post.id);
+        const isFav = (settings.forumFavorites || []).includes(post.id);
+        if (_forumSelectMode) {
+          const checked = _forumSelectedIds.has(post.id) ? 'checked' : '';
+          html += `<div class="sp-fanfic-select-wrapper" style="position:relative;">
+            <label class="sp-fanfic-select-checkbox" style="position:absolute;top:8px;left:8px;z-index:5;display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,0.5);border:2px solid rgba(255,255,255,0.4);cursor:pointer;">
+              <input type="checkbox" class="sp-forum-check-input" data-forum-id="${post.id}" ${checked} style="accent-color:#64b4ff;width:14px;height:14px;cursor:pointer;" />
+            </label>
+            ${renderForumCardHtml(post, idx)}
+          </div>`;
+        } else {
+          html += renderForumCardHtml(post, idx);
+        }
+      });
+      html += '</div>';
     }
 
-    if (emptyEl) emptyEl.style.display = 'none';
-    renderForumPosts(posts);
+    container.innerHTML = html;
+
+    // 绑定事件
+    document.getElementById('sp-forum-generate-btn')?.addEventListener('click', () => generateForumPosts());
+
+    document.getElementById('sp-forum-select-mode-btn')?.addEventListener('click', () => {
+      _forumSelectMode = true;
+      _forumSelectedIds.clear();
+      renderForumHomePage();
+    });
+
+    document.getElementById('sp-forum-cancel-select-btn')?.addEventListener('click', () => {
+      _forumSelectMode = false;
+      _forumSelectedIds.clear();
+      renderForumHomePage();
+    });
+
+    document.getElementById('sp-forum-delete-selected-btn')?.addEventListener('click', () => {
+      if (_forumSelectedIds.size === 0) { showBubble('请先勾选要删除的帖子', 2000); return; }
+      showConfirmDialog({
+        title: '🗑️ 删除所选帖子？',
+        desc: `将删除 ${_forumSelectedIds.size} 篇帖子，此操作不可撤销。`,
+        confirmText: '确认删除',
+        cancelText: '取消',
+        onConfirm: () => {
+          state.forumPosts = (state.forumPosts || []).filter(p => !_forumSelectedIds.has(p.id));
+          settings.forumFavorites = (settings.forumFavorites || []).filter(id => !_forumSelectedIds.has(id));
+          settings.forumLikedPosts = (settings.forumLikedPosts || []).filter(id => !_forumSelectedIds.has(id));
+          _forumSelectMode = false;
+          _forumSelectedIds.clear();
+          saveData();
+          renderForumHomePage();
+          showBubble('已删除所选帖子', 2000);
+        }
+      });
+    });
+
+    //勾选框
+    container.querySelectorAll('.sp-forum-check-input').forEach(cb => {
+      cb.addEventListener('change', () => {
+        if (cb.checked) _forumSelectedIds.add(cb.dataset.forumId);
+        else _forumSelectedIds.delete(cb.dataset.forumId);
+        const delBtn = document.getElementById('sp-forum-delete-selected-btn');
+        if (delBtn) delBtn.textContent = `🗑️ 删除所选 (${_forumSelectedIds.size})`;
+      });
+    });
+
+    // 卡片点击
+    if (!_forumSelectMode) {
+      container.querySelectorAll('.sp-forum-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const idx = parseInt(card.dataset.forumIdx);
+          const post = (state.forumPosts || [])[idx];
+          if (post) showForumDetail(post);
+        });
+      });
+    }
+  }
+
+  function renderForumCardHtml(post, idx) {
+    const coverGradients = [
+      'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+      'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+      'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+      'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+      'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)',
+      'linear-gradient(135deg, #fccb90 0%, #d57eeb 100%)',
+      'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)',
+    ];
+    const gradient = coverGradients[idx % coverGradients.length];
+    const fmtNum = (n) => {
+      if (n >= 10000) return (n / 10000).toFixed(1) + 'w';
+      if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+      return String(n);
+    };
+    const tagsHtml = (post.tags || []).map(t => `<span class="sp-forum-tag">#${t}</span>`).join('');
+    return `
+      <div class="sp-forum-card" data-forum-idx="${idx}">
+        <div class="sp-forum-cover" style="background:${gradient};">
+          <span class="sp-forum-cover-emoji">${post.coverEmoji || '📝'}</span>
+        </div>
+        <div class="sp-forum-card-body">
+          <div class="sp-forum-title">${post.title || '无题'}</div>
+          <div class="sp-forum-content">${(post.content || '').slice(0, 60)}</div>
+          ${tagsHtml ? `<div class="sp-forum-tags">${tagsHtml}</div>` : ''}
+          <div class="sp-forum-footer">
+            <div class="sp-forum-author">
+              <span class="sp-forum-avatar">${post.avatarEmoji || '😺'}</span>
+              <span class="sp-forum-author-name">${post.author || '匿名'}</span>
+            </div>
+            <div class="sp-forum-stats">
+              <span class="sp-forum-stat">❤️ ${fmtNum(post.likes || 0)}</span>
+              <span class="sp-forum-stat">💬 ${fmtNum(post.comments || 0)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   function renderForumPosts(posts) {
@@ -6658,6 +6841,10 @@ if (hasEmoji) {
   function showForumDetail(post) {
     document.getElementById('sp-forum-detail-overlay')?.remove();
 
+    if (!post.id) post.id = 'fp_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+    const isLiked = (settings.forumLikedPosts || []).includes(post.id);
+    const isFav = (settings.forumFavorites || []).includes(post.id);
+
     const overlay = document.createElement('div');
     overlay.id = 'sp-forum-detail-overlay';
     overlay.className = 'sp-confirm-overlay';
@@ -6668,6 +6855,26 @@ if (hasEmoji) {
       if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
       return String(n);
     };
+
+    //渲染已有评论
+    let commentsHtml = '';
+    if (post.generatedComments && post.generatedComments.length > 0) {
+      commentsHtml = `<div style="margin-top:12px;border-top:1px solid var(--sp-border-light);padding-top:10px;">
+        <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">💬 评论 (${post.generatedComments.length})</div>
+        ${post.generatedComments.map(c => `
+          <div style="display:flex;gap:8px;margin-bottom:8px;padding:6px 8px;background:rgba(255,255,255,0.04);border-radius:8px;">
+            <span style="font-size:16px;flex-shrink:0;">${c.avatarEmoji || '😺'}</span>
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+                <span style="font-size:11px;font-weight:600;color:var(--sp-text-primary);">${c.author || '匿名'}</span>
+                <span style="font-size:9px;color:var(--sp-text-muted);">❤️ ${c.likes || 0}</span>
+              </div>
+              <div style="font-size:12px;color:var(--sp-text-secondary);line-height:1.5;">${c.content || ''}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>`;
+    }
 
     overlay.innerHTML = `
       <div class="sp-forum-detail-box">
@@ -6682,19 +6889,425 @@ if (hasEmoji) {
           <div class="sp-forum-detail-title">${post.title || '无题'}</div>
           <div class="sp-forum-detail-content">${renderMarkdown(post.content || '')}</div>
           ${tagsHtml ? `<div class="sp-forum-tags" style="margin-top:10px;">${tagsHtml}</div>` : ''}
+          ${commentsHtml}
         </div>
         <div class="sp-forum-detail-footer">
-          <span class="sp-forum-stat-lg">❤️ ${fmtNum(post.likes || 0)}</span>
-          <span class="sp-forum-stat-lg">👁️ ${fmtNum(post.views || 0)}</span>
-          <span class="sp-forum-stat-lg">💬 ${fmtNum(post.comments || 0)}</span>
+          <button id="sp-forum-detail-like" style="background:none;border:none;font-size:13px;color:${isLiked ? '#f66' : 'var(--sp-text-secondary)'};cursor:pointer;font-weight:600;transition:color 0.2s;">${isLiked ? '❤️' : '🤍'} ${fmtNum(post.likes || 0)}</button>
+          <button id="sp-forum-detail-fav" style="background:none;border:none;font-size:13px;color:${isFav ? '#ffb347' : 'var(--sp-text-secondary)'};cursor:pointer;font-weight:600;transition:color 0.2s;">${isFav ? '⭐' : '☆'} 收藏</button>
+          <button id="sp-forum-detail-gen-comment" style="background:none;border:none;font-size:13px;color:var(--sp-text-secondary);cursor:pointer;font-weight:600;transition:color 0.2s;">💬 生成评论</button>
         </div>
       </div>
     `;
 
     document.body.appendChild(overlay);
 
+    requestAnimationFrame(() => {
+      const box = overlay.querySelector('.sp-forum-detail-box');
+      if (box) {
+        const boxH = box.offsetHeight || 400;
+        const boxW = box.offsetWidth || 300;
+        box.style.position = 'fixed';
+        box.style.top = Math.max(20, Math.floor((window.innerHeight - boxH) / 2)) + 'px';
+        box.style.left = Math.floor((window.innerWidth - boxW) / 2) + 'px';
+        box.style.margin = '0';
+      }
+    });
+
+    const forumDetailHeader = overlay.querySelector('.sp-forum-detail-header');
+    const forumDetailBox = overlay.querySelector('.sp-forum-detail-box');
+    bindPopupDrag(forumDetailHeader, forumDetailBox);
+
     document.getElementById('sp-forum-detail-close').onclick = () => overlay.remove();
     overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+    // 点赞
+    document.getElementById('sp-forum-detail-like').onclick = () => {
+      if (!settings.forumLikedPosts) settings.forumLikedPosts = [];
+      if (settings.forumLikedPosts.includes(post.id)) {
+        settings.forumLikedPosts = settings.forumLikedPosts.filter(id => id !== post.id);
+        if (post.likes > 0) post.likes--;
+      } else {
+        settings.forumLikedPosts.push(post.id);
+        post.likes = (post.likes || 0) + 1;
+      }
+      saveData();
+      overlay.remove();
+      showForumDetail(post);
+    };
+
+    // 收藏
+    document.getElementById('sp-forum-detail-fav').onclick = () => {
+      if (!settings.forumFavorites) settings.forumFavorites = [];
+      if (settings.forumFavorites.includes(post.id)) {
+        settings.forumFavorites = settings.forumFavorites.filter(id => id !== post.id);
+        showBubble('已取消收藏', 1500);
+      } else {
+        settings.forumFavorites.push(post.id);
+        showBubble('已收藏！可在「我」标签页查看', 2000);
+      }
+      saveData();
+      overlay.remove();
+      showForumDetail(post);
+    };
+
+    // 生成评论
+    document.getElementById('sp-forum-detail-gen-comment').onclick = () => {
+      generateForumComments(post, overlay);
+    };
+  }
+
+  // ===== 论坛评论生成 =====
+  async function generateForumComments(post, detailOverlay) {
+    const genBtn = document.getElementById('sp-forum-detail-gen-comment');
+    if (genBtn) { genBtn.textContent = '⏳ 生成中…'; genBtn.disabled = true; }
+
+    try {
+      const messages = [];
+      const commentPrompt = settings.forumCommentPrompt || DEFAULT_SETTINGS.forumCommentPrompt;
+      let sysContent = commentPrompt + '\n\n[帖子标题]\n' + (post.title || '无题') + '\n\n[帖子内容]\n' + (post.content || '');
+
+      // 根据开关决定是否发送世界书（与论坛生成共用同一个开关）
+      if (settings.forumSendWorldBook !== false) {
+        let worldInfo = '';
+        try { worldInfo = await getWorldBookContent(); } catch(e) { console.warn('[meep-pet] 论坛评论：世界书加载失败'); }
+        if (worldInfo) {
+          sysContent += '\n\n[世界观设定]\n' + worldInfo;
+        }
+      }
+
+      messages.push({ role: 'system', content: sysContent });
+      messages.push({ role: 'user', content: '请根据以上帖子内容和世界观设定，生成10到15条评论。严格输出JSON数组格式，不要输出任何其他文字。' });
+
+      // 破限
+      if (settings.jailbreak) {
+        messages.push({ role: 'system', content: settings.jailbreak });
+      }
+
+      let result = null;
+      if (settings.apiSource === 'tavern') {
+        result = await callViaTavern(messages);
+      } else {
+        result = await callViaCustom(messages);
+      }
+
+      if (!result) {
+        showBubble('评论生成失败检查API', 3000);
+        if (genBtn) { genBtn.textContent = '💬 生成评论'; genBtn.disabled = false; }
+        return;
+      }
+
+      let comments = [];
+      try {
+        const jsonMatch = result.match(/\[[\s\S]*\]/);
+        if (jsonMatch) comments = JSON.parse(jsonMatch[0]);
+        else comments = JSON.parse(result);
+      } catch (e) {
+        console.error('[meep-pet] 论坛评论 JSON 解析失败:', e);
+        showBubble('评论格式有误，请重试', 3000);
+        if (genBtn) { genBtn.textContent = '💬 生成评论'; genBtn.disabled = false; }
+        return;
+      }
+
+      if (!Array.isArray(comments) || comments.length === 0) {
+        showBubble('生成结果为空', 2000);
+        if (genBtn) { genBtn.textContent = '💬 生成评论'; genBtn.disabled = false; }
+        return;
+      }
+
+      if (!post.generatedComments) post.generatedComments = [];
+      post.generatedComments = post.generatedComments.concat(comments);
+      post.comments = post.generatedComments.length;
+      saveData();
+
+      if (detailOverlay) detailOverlay.remove();
+      showForumDetail(post);
+      showBubble(`💬 生成了 ${comments.length} 条评论！`, 2500);
+
+    } catch (err) {
+      console.error('[meep-pet] 论坛评论生成异常:', err);
+      showBubble(`生成出错: ${err.message}`, 3000);
+      if (genBtn) { genBtn.textContent = '💬 生成评论'; genBtn.disabled = false; }
+    }
+  }
+
+  // ===== 论坛「我」标签页 =====
+  function renderForumMePage() {
+    const container = document.getElementById('sp-forum-me-view');
+    if (!container) return;
+    container.style.display = '';
+    document.getElementById('sp-forum-home-view').style.display = 'none';
+
+    const allPosts = [...(state.forumPosts || []), ...(settings.forumUserPosts || [])];
+    const favIds = settings.forumFavorites || [];
+    const likedIds = settings.forumLikedPosts || [];
+    const userPosts = settings.forumUserPosts || [];
+    const favPosts = favIds.map(id => allPosts.find(p => p.id === id)).filter(Boolean);
+    const likedPosts = likedIds.map(id => allPosts.find(p => p.id === id)).filter(Boolean);
+
+    const forumMyName = settings.forumMyName || '我的论坛';
+    const forumMyBio = settings.forumMyBio || '点击编辑个性签名…';
+    const forumMyAvatar = settings.forumMyAvatar || '';
+    const forumAvatarDisplay = forumMyAvatar
+      ? `<img src="${forumMyAvatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`
+      : '👤';
+
+    container.innerHTML = `
+      <div style="padding:12px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+          <div id="sp-forum-me-avatar-btn" style="width:40px;height:40px;border-radius:50%;background:var(--sp-bg-secondary);border:2px solid var(--sp-border);display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;overflow:hidden;transition:all 0.2s;" title="点击更换头像">${forumAvatarDisplay}</div>
+          <div>
+            <div id="sp-forum-me-name-btn" style="font-size:14px;font-weight:600;color:var(--sp-text-primary);cursor:pointer;" title="点击修改昵称">${forumMyName}</div>
+            <div id="sp-forum-me-bio-btn" style="font-size:11px;color:var(--sp-text-muted);cursor:pointer;margin-top:2px;" title="点击编辑签名">${forumMyBio}</div>
+            <div style="font-size:10px;color:var(--sp-text-muted);margin-top:4px;">创作${userPosts.length} · 点赞 ${likedPosts.length} · 收藏 ${favPosts.length}</div>
+          </div>
+        </div>
+        <div id="sp-forum-me-tabs" style="display:flex;gap:4px;margin-bottom:10px;">
+          <button class="sp-forum-me-tab active" data-me-tab="myposts" style="flex:1;padding:7px 0;font-size:12px;font-weight:600;border-radius:8px;border:1px solid var(--sp-border);background:var(--sp-primary);color:#fff;cursor:pointer;transition:all 0.2s;">📝 我的作品</button>
+          <button class="sp-forum-me-tab" data-me-tab="liked" style="flex:1;padding:7px 0;font-size:12px;font-weight:600;border-radius:8px;border:1px solid var(--sp-border);background:var(--sp-bg-light);color:var(--sp-text-secondary);cursor:pointer;transition:all 0.2s;">❤️ 点赞</button>
+          <button class="sp-forum-me-tab" data-me-tab="favorites" style="flex:1;padding:7px 0;font-size:12px;font-weight:600;border-radius:8px;border:1px solid var(--sp-border);background:var(--sp-bg-light);color:var(--sp-text-secondary);cursor:pointer;transition:all 0.2s;">⭐ 收藏</button>
+        </div>
+        <div id="sp-forum-me-content"></div>
+      </div>
+    `;
+
+    // ===== 点击头像更换 =====
+    document.getElementById('sp-forum-me-avatar-btn')?.addEventListener('click', () => {
+      showConfirmDialog({
+        title: '🖼️ 更换头像',
+        desc: '选择头像来源',
+        confirmText: '📁 本地上传',
+        cancelText: '🔗 输入链接',
+        onConfirm: () => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+          input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (file.size > 2 * 1024 * 1024) { showBubble('图片不能超过2MB', 3000); return; }
+            const reader = new FileReader();
+            reader.onload = async (ev) => {
+              const compressed = await compressImage(ev.target.result, 120, 0.8);
+              settings.forumMyAvatar = compressed;
+              saveData();
+              renderForumMePage();
+              showBubble('头像已更新✨', 2000);
+            };
+            reader.readAsDataURL(file);
+          };
+          input.click();
+        },onCancel: () => {
+          showPromptDialog({
+            title: '🔗 头像链接',
+            placeholder: 'https://...',
+            defaultValue: (settings.forumMyAvatar || '').startsWith('http') ? settings.forumMyAvatar : '',
+            confirmText: '确认',
+            cancelText: '清除头像',
+            onConfirm: (url) => {
+              if (url && url.trim().startsWith('http')) {
+                settings.forumMyAvatar = url.trim();
+                saveData();
+                renderForumMePage();
+                showBubble('头像已更新 ✨', 2000);
+              }
+            },
+            onCancel: () => {
+              settings.forumMyAvatar = '';
+              saveData();
+              renderForumMePage();
+              showBubble('头像已清除', 1500);
+            }
+          });
+        }
+      });
+    });
+
+    // ===== 点击昵称修改 =====
+    document.getElementById('sp-forum-me-name-btn')?.addEventListener('click', () => {
+      showPromptDialog({
+        title: '✏️ 修改昵称',
+        desc: '给自己起一个论坛昵称吧',
+        placeholder: '我的昵称',
+        defaultValue: settings.forumMyName || '',
+        confirmText: '保存',
+        cancelText: '取消',
+        onConfirm: (name) => {
+          if (name !== null) {
+            settings.forumMyName = name.trim();
+            saveData();
+            renderForumMePage();
+            showBubble('昵称已更新', 1500);
+          }
+        }
+      });
+    });
+
+    // ===== 点击签名编辑 =====
+    document.getElementById('sp-forum-me-bio-btn')?.addEventListener('click', () => {
+      showPromptDialog({
+        title: '✏️ 编辑个性签名',
+        desc: '展示你的态度',
+        placeholder: '写点什么来介绍自己…',
+        defaultValue: settings.forumMyBio || '',
+        confirmText: '保存',
+        cancelText: '取消',
+        onConfirm: (bio) => {
+          if (bio !== null) {
+            settings.forumMyBio = bio.trim();
+            saveData();
+            renderForumMePage();
+            showBubble('签名已更新', 1500);
+          }
+        }
+      });
+    });
+
+    // 标签页切换
+    container.querySelectorAll('.sp-forum-me-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        container.querySelectorAll('.sp-forum-me-tab').forEach(t => {
+          t.classList.remove('active');
+          t.style.background = 'var(--sp-bg-light)';
+          t.style.color = 'var(--sp-text-secondary)';
+        });
+        tab.classList.add('active');
+        tab.style.background = 'var(--sp-primary)';
+        tab.style.color = '#fff';
+        renderForumMeContent(tab.dataset.meTab);
+      });
+    });
+
+    renderForumMeContent('myposts');
+  }
+
+
+  function renderForumMeContent(tab) {
+    const contentEl = document.getElementById('sp-forum-me-content');
+    if (!contentEl) return;
+
+    const allPosts = [...(state.forumPosts || []), ...(settings.forumUserPosts || [])];
+
+    let posts = [];
+    let emptyText = '';
+    if (tab === 'myposts') {
+      posts = settings.forumUserPosts || [];
+      emptyText = '还没有发过帖子～点「➕」发布你的第一篇';
+    } else if (tab === 'liked') {
+      posts = (settings.forumLikedPosts || []).map(id => allPosts.find(p => p.id === id)).filter(Boolean);
+      emptyText = '还没有点赞的帖子';
+    } else if (tab === 'favorites') {
+      posts = (settings.forumFavorites || []).map(id => allPosts.find(p => p.id === id)).filter(Boolean);
+      emptyText = '还没有收藏的帖子';
+    }
+
+    if (posts.length === 0) {
+      contentEl.innerHTML = `<div style="text-align:center;padding:30px 0;color:var(--sp-text-muted);font-size:12px;">${emptyText}</div>`;
+      return;
+    }
+
+    contentEl.innerHTML = '<div class="sp-forum-grid">' + posts.map((post, idx) => {
+      const realIdx = tab === 'myposts' ? idx : (state.forumPosts || []).indexOf(post);
+      return renderForumCardHtml(post, realIdx >= 0 ? realIdx : idx);
+    }).join('') + '</div>';
+
+    contentEl.querySelectorAll('.sp-forum-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const idx = parseInt(card.dataset.forumIdx);
+        let post;
+        if (tab === 'myposts') {
+          post = (settings.forumUserPosts || [])[idx];
+        } else {
+          post = allPosts.find((p, i) => i === idx) || (state.forumPosts || [])[idx];
+        }
+        if (post) showForumDetail(post);
+      });
+    });
+  }
+
+  // ===== 论坛发帖弹窗 =====
+  function showForumWriteDialog() {
+    document.getElementById('sp-forum-write-overlay')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-forum-write-overlay';
+    overlay.className = 'sp-confirm-overlay';
+    overlay.innerHTML = `
+      <div class="sp-confirm-box" style="max-width:320px;text-align:left;max-height:80vh;overflow-y:auto;">
+        <div class="sp-confirm-title">📝 发布新帖子</div>
+        <label style="font-size:11px;color:var(--sp-text-secondary);margin-bottom:3px;display:block;">标题</label>
+        <input type="text" id="sp-forum-write-title" placeholder="帖子标题" style="width:100%;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-light);color:var(--sp-text-primary);font-size:13px;margin-bottom:10px;box-sizing:border-box;" />
+        <label style="font-size:11px;color:var(--sp-text-secondary);margin-bottom:3px;display:block;">正文</label>
+        <textarea id="sp-forum-write-content" placeholder="写点什么…" style="width:100%;min-height:100px;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-light);color:var(--sp-text-primary);font-size:13px;resize:vertical;box-sizing:border-box;margin-bottom:10px;"></textarea>
+        <label style="font-size:11px;color:var(--sp-text-secondary);margin-bottom:3px;display:block;">标签（逗号分隔）</label>
+        <input type="text" id="sp-forum-write-tags" placeholder="讨论, 日常" style="width:100%;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-light);color:var(--sp-text-primary);font-size:12px;margin-bottom:14px;box-sizing:border-box;" />
+        <div class="sp-confirm-actions">
+          <button class="sp-confirm-btn sp-confirm-btn-cancel" id="sp-forum-write-cancel">取消</button>
+          <button class="sp-confirm-btn sp-confirm-btn-primary" id="sp-forum-write-publish">📤 发布</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    // 居中定位（兼容移动端）
+    requestAnimationFrame(() => {
+      const box = overlay.querySelector('.sp-confirm-box');
+      if (box) {
+        const boxH = box.offsetHeight || 350;
+        const boxW = box.offsetWidth || 300;
+        box.style.position = 'fixed';
+        box.style.top = Math.max(20, Math.floor((window.innerHeight - boxH) / 2)) + 'px';
+        box.style.left = Math.floor((window.innerWidth - boxW) / 2) + 'px';
+        box.style.margin = '0';
+      }
+    });
+    //拖拽支持
+    const writeTitle = overlay.querySelector('.sp-confirm-title');
+    const writeBox = overlay.querySelector('.sp-confirm-box');
+    bindPopupDrag(writeTitle, writeBox);
+
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    document.getElementById('sp-forum-write-cancel').onclick = () => overlay.remove();
+
+    document.getElementById('sp-forum-write-publish').onclick = () => {
+      const title = document.getElementById('sp-forum-write-title').value.trim();
+      const content = document.getElementById('sp-forum-write-content').value.trim();
+      const tags = document.getElementById('sp-forum-write-tags').value.split(/[,，]/).map(t => t.trim()).filter(Boolean);
+
+      if (!title && !content) { showBubble('标题和正文不能都为空', 2000); return; }
+
+      if (!settings.forumUserPosts) settings.forumUserPosts = [];
+      const coverGradients = [
+        'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+        'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+        'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',];
+
+      const newPost = {
+        id: 'fp_user_' + Date.now(),
+        author: settings.petName || '我',
+        avatarEmoji: '🧑',
+        title: title || '无题',
+        content: content,
+        coverEmoji: '✏️',
+        coverGradient: coverGradients[Math.floor(Math.random() * coverGradients.length)],
+        likes: 0,
+        views: 0,
+        comments: 0,
+        tags: tags,
+        timestamp: Date.now(),
+        isUserPost: true,
+        generatedComments: [],};
+
+      settings.forumUserPosts.push(newPost);
+      // 同时也加入主帖子列表，这样首页也能看到
+      if (!state.forumPosts) state.forumPosts = [];
+      state.forumPosts.unshift(newPost);
+
+      saveData();
+      overlay.remove();
+      renderForumHomePage();
+      showBubble('📤 帖子已发布！', 2000);
+    };
   }
 
   async function generateForumPosts() {
@@ -6718,13 +7331,15 @@ if (hasEmoji) {
       const forumPrompt = settings.forumPrompt || DEFAULT_SETTINGS.forumPrompt;
       let sysContent = forumPrompt;
 
-      // 2. 拼接世界书内容
-      let worldInfo = '';
-      try { worldInfo = await getWorldBookContent(); } catch(e) { console.warn('[meep-pet] 论坛：世界书加载失败'); }
-      if (worldInfo) {
-        sysContent += '\n\n[世界观设定]\n' + worldInfo;
-      } else {
-        sysContent += '\n\n[世界观设定]\n（未配置世界书，请生成通用的论坛内容）';
+      // 2. 拼接世界书内容（根据开关决定是否发送）
+      if (settings.forumSendWorldBook !== false) {
+        let worldInfo = '';
+        try { worldInfo = await getWorldBookContent(); } catch(e) { console.warn('[meep-pet] 论坛：世界书加载失败'); }
+        if (worldInfo) {
+          sysContent += '\n\n[世界观设定]\n' + worldInfo;
+        } else {
+          sysContent += '\n\n[世界观设定]\n（未配置世界书，请生成通用的论坛内容）';
+        }
       }
 
       messages.push({ role: 'system', content: sysContent });
@@ -6779,6 +7394,9 @@ if (hasEmoji) {
         return;
       }
 
+      // 确保每个帖子有唯一ID
+      posts = posts.map((p, i) => ({ ...p, id: p.id || ('fp_gen_' + Date.now() + '_' + i), generatedComments: [] }));
+
       // 存储
       state.forumPosts = posts;
       saveData();
@@ -6824,6 +7442,18 @@ if (hasEmoji) {
     if (manualRadio) manualRadio.checked = settings.userPersonaSource !== 'card';
     const manualSection = document.getElementById('sp-persona-manual-section');
     if (manualSection) manualSection.style.display = settings.userPersonaSource === 'card' ? 'none' : '';
+    // 论坛世界书开关同步
+    const forumWbToggle = document.getElementById('sp-forum-send-worldbook');
+    if (forumWbToggle) forumWbToggle.checked = settings.forumSendWorldBook !== false;
+    const forumCommentPrompt = document.getElementById('sp-forum-comment-prompt');
+    if (forumCommentPrompt) forumCommentPrompt.value = settings.forumCommentPrompt || '';
+    // 同人文提示词同步
+    const fanficGenPrompt = document.getElementById('sp-fanfic-generate-prompt');
+    if (fanficGenPrompt) fanficGenPrompt.value = settings.fanficGeneratePrompt || '';
+    const fanficContPrompt = document.getElementById('sp-fanfic-continue-prompt');
+    if (fanficContPrompt) fanficContPrompt.value = settings.fanficContinuePrompt || '';
+    const fanficWbToggle = document.getElementById('sp-fanfic-send-worldbook');
+    if (fanficWbToggle) fanficWbToggle.checked = settings.fanficSendWorldBook !== false;
     // 预设下拉同步
     const presetSelect = document.getElementById('sp-prompt-preset-select');
     if (presetSelect) presetSelect.value = settings.currentPreset || '';
@@ -13321,6 +13951,10 @@ document.getElementById('sp-export')?.addEventListener('click', async () => {
     settings.onlinePrompt = v('sp-online-prompt');
     settings.diaryPrompt = v('sp-diary-prompt');
     settings.forumPrompt = v('sp-forum-prompt') || DEFAULT_SETTINGS.forumPrompt;
+    settings.forumCommentPrompt = v('sp-forum-comment-prompt') || DEFAULT_SETTINGS.forumCommentPrompt;
+    settings.forumSendWorldBook = document.getElementById('sp-forum-send-worldbook')?.checked !== false;
+    settings.fanficSendWorldBook = document.getElementById('sp-fanfic-send-worldbook')?.checked !== false;settings.fanficGeneratePrompt = v('sp-fanfic-generate-prompt') || DEFAULT_SETTINGS.fanficGeneratePrompt;
+    settings.fanficContinuePrompt = v('sp-fanfic-continue-prompt') || DEFAULT_SETTINGS.fanficContinuePrompt;
     settings.summaryMode = v('sp-summary-mode') || 'incremental';
     settings.summaryTrigger = document.getElementById('sp-summary-auto')?.checked ? 'auto' : 'manual';
     settings.summaryKeepRecent = n('sp-summary-keep', 10);
@@ -27877,6 +28511,8 @@ window.addEventListener('beforeunload', () => {
   // ============================================================
 
   let _fanficCurrentTab = 'home';
+  let _fanficSelectMode = false;     // 同人文是否处于勾选删除模式
+  let _fanficSelectedIds = new Set(); // 勾选的同人文ID集合
   let _fanficReadingPost = null; // 当前正在阅读的同人文对象
 
   // ===== 标签页切换 =====
@@ -27912,10 +28548,15 @@ window.addEventListener('beforeunload', () => {
     const loading = state.fanficGenerating;
 
     let html = `
-      <div class="sp-fanfic-toolbar">
-        <button id="sp-fanfic-generate-btn" class="sp-fanfic-generate-btn" ${loading ? 'disabled' : ''}>
+      <div class="sp-fanfic-toolbar" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        <button id="sp-fanfic-generate-btn" class="sp-fanfic-generate-btn" style="flex:1;" ${loading ? 'disabled' : ''}>
           ${loading ? '⏳ 生成中…' : '✨ 生成同人文'}
         </button>
+        ${posts.length > 0 && !_fanficSelectMode ? `<button id="sp-fanfic-select-mode-btn" style="padding:8px 14px;font-size:12px;font-weight:600;border-radius:24px;border:1px solid var(--sp-border);background:var(--sp-bg-light);color:var(--sp-text-secondary);cursor:pointer;transition:all 0.2s;">🗑️ 管理</button>` : ''}
+        ${_fanficSelectMode ? `
+          <button id="sp-fanfic-delete-selected-btn" style="padding:8px 14px;font-size:12px;font-weight:600;border-radius:24px;border:1px solid rgba(239,83,80,0.5);background:rgba(239,83,80,0.15);color:#f66;cursor:pointer;">🗑️ 删除所选 (${_fanficSelectedIds.size})</button>
+          <button id="sp-fanfic-cancel-select-btn" style="padding:8px 14px;font-size:12px;font-weight:600;border-radius:24px;border:1px solid var(--sp-border);background:var(--sp-bg-light);color:var(--sp-text-secondary);cursor:pointer;">✕ 取消</button>
+        ` : ''}
       </div>
     `;
 
@@ -27926,7 +28567,17 @@ window.addEventListener('beforeunload', () => {
     } else {
       html += '<div class="sp-fanfic-feed">';
       posts.forEach((post, idx) => {
-        html += fanficRenderCard(post, idx, 'generated');
+        if (_fanficSelectMode) {
+          const checked = _fanficSelectedIds.has(post.id) ? 'checked' : '';
+          html += `<div class="sp-fanfic-select-wrapper" style="position:relative;">
+            <label class="sp-fanfic-select-checkbox" style="position:absolute;top:8px;left:8px;z-index:5;display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,0.5);border:2px solid rgba(255,255,255,0.4);cursor:pointer;">
+              <input type="checkbox" class="sp-fanfic-check-input" data-fanfic-id="${post.id}" ${checked} style="accent-color:#64b4ff;width:14px;height:14px;cursor:pointer;" />
+            </label>
+            ${fanficRenderCard(post, idx, 'generated')}
+          </div>`;
+        } else {
+          html += fanficRenderCard(post, idx, 'generated');
+        }
       });
       html += '</div>';
     }
@@ -27938,21 +28589,75 @@ window.addEventListener('beforeunload', () => {
       generateFanficPosts();
     });
 
-    // 绑定卡片点击
-    container.querySelectorAll('.sp-fanfic-card').forEach(card => {
-      card.addEventListener('click', () => {
-        const source = card.dataset.source;
-        const idx = parseInt(card.dataset.idx);
-        let post;
-        if (source === 'generated') {
-          post = (settings.fanficPosts || [])[idx];
-        } else if (source === 'user') {
-          post = (settings.fanficUserPosts || [])[idx];
+    // 绑定「管理」按钮 → 进入勾选模式
+    document.getElementById('sp-fanfic-select-mode-btn')?.addEventListener('click', () => {
+      _fanficSelectMode = true;
+      _fanficSelectedIds.clear();
+      renderFanficHomePage();
+    });
+
+    // 绑定「取消」按钮 → 退出勾选模式
+    document.getElementById('sp-fanfic-cancel-select-btn')?.addEventListener('click', () => {
+      _fanficSelectMode = false;
+      _fanficSelectedIds.clear();
+      renderFanficHomePage();
+    });
+
+    // 绑定「删除所选」按钮
+    document.getElementById('sp-fanfic-delete-selected-btn')?.addEventListener('click', () => {
+      if (_fanficSelectedIds.size === 0) {
+        showBubble('请先勾选要删除的同人文', 2000);
+        return;
+      }
+      showConfirmDialog({
+        title: '🗑️ 删除所选同人文？',
+        desc: `将删除 ${_fanficSelectedIds.size} 篇同人文，此操作不可撤销。`,
+        confirmText: '确认删除',
+        cancelText: '取消',
+        onConfirm: () => {settings.fanficPosts = (settings.fanficPosts || []).filter(p => !_fanficSelectedIds.has(p.id));
+          // 同时清理收藏
+          settings.fanficFavorites = (settings.fanficFavorites || []).filter(id => !_fanficSelectedIds.has(id));
+          _fanficSelectMode = false;
+          _fanficSelectedIds.clear();
+          saveData();
+          renderFanficHomePage();
+          showBubble('已删除所选同人文', 2000);
         }
-        if (post) openFanficReader(post);
       });
     });
+
+    // 绑定勾选框变化事件
+    container.querySelectorAll('.sp-fanfic-check-input').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const fanficId = cb.dataset.fanficId;
+        if (cb.checked) {
+          _fanficSelectedIds.add(fanficId);
+        } else {
+          _fanficSelectedIds.delete(fanficId);
+        }
+        // 更新删除按钮上的计数
+        const delBtn = document.getElementById('sp-fanfic-delete-selected-btn');
+        if (delBtn) delBtn.textContent = `🗑️ 删除所选 (${_fanficSelectedIds.size})`;});
+    });
+
+    // 绑定卡片点击（非勾选模式才打开阅读）
+    if (!_fanficSelectMode) {
+      container.querySelectorAll('.sp-fanfic-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const source = card.dataset.source;
+          const idx = parseInt(card.dataset.idx);
+          let post;
+          if (source === 'generated') {
+            post = (settings.fanficPosts || [])[idx];
+          } else if (source === 'user') {
+            post = (settings.fanficUserPosts || [])[idx];
+          }
+          if (post) openFanficReader(post);
+        });
+      });
+    }
   }
+
 
   // ===== 渲染单张卡片 =====
   function fanficRenderCard(post, idx, source) {
@@ -28014,11 +28719,13 @@ window.addEventListener('beforeunload', () => {
       // 1. 系统消息：同人文生成提示词
       let sysContent = settings.fanficGeneratePrompt || DEFAULT_SETTINGS.fanficGeneratePrompt;
 
-      // 2. 拼接世界书内容
-      let worldInfo = '';
-      try { worldInfo = await getWorldBookContent(); } catch(e) {}
-      if (worldInfo) {
-        sysContent += '\n\n[世界观设定]\n' + worldInfo;
+      // 2. 拼接世界书内容（根据开关决定是否发送）
+      if (settings.fanficSendWorldBook !== false) {
+        let worldInfo = '';
+        try { worldInfo = await getWorldBookContent(); } catch(e) {}
+        if (worldInfo) {
+          sysContent += '\n\n[世界观设定]\n' + worldInfo;
+        }
       }
 
       // 3. 拼接角色卡信息

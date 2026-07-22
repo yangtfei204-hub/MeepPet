@@ -10425,3 +10425,123 @@
   color: var(--sp-text-secondary) !important;
   text-decoration: underline;
 }
+
+/* ============================================================ */
+/* 📝 同人文勾选删除模式样式                                     */
+/* ============================================================ */
+
+.sp-fanfic-select-wrapper {
+  position: relative;
+}
+
+.sp-fanfic-select-wrapper .sp-fanfic-card {
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+.sp-fanfic-select-wrapper .sp-fanfic-select-checkbox {
+  pointer-events: auto;
+  transition: all 0.2s;
+}
+
+.sp-fanfic-select-wrapper .sp-fanfic-select-checkbox:hover {
+  transform: scale(1.1);
+  background: rgba(0,0,0,0.7) !important;
+}
+
+.sp-fanfic-select-wrapper .sp-fanfic-check-input:checked + .sp-fanfic-card,
+.sp-fanfic-select-wrapper:has(.sp-fanfic-check-input:checked) .sp-fanfic-card {
+  opacity: 1;
+  outline: 2px solid rgba(239,83,80,0.6);
+  outline-offset: 2px;
+}
+
+.sp-fanfic-select-wrapper:has(.sp-fanfic-check-input:checked) .sp-fanfic-select-checkbox {
+  background: rgba(239,83,80,0.7) !important;
+  border-color: rgba(239,83,80,0.9) !important;
+}
+
+/* ============================================================ */
+/* 📰 论坛标签栏 & 个人中心样式                */
+/* ============================================================ */
+
+/* 论坛底部标签栏 */
+#sp-forum-tabbar {
+  display: flex;
+  border-top: 1px solid var(--sp-border-light);
+  background: var(--sp-bg-secondary);
+  flex-shrink: 0;
+}
+
+.sp-forum-tab {
+  flex: 1;
+  padding: 10px 0;
+  border: none;
+  background: none;
+  color: var(--sp-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+  text-align: center;
+}
+
+.sp-forum-tab:hover {
+  color: var(--sp-text-secondary);
+  background: rgba(255,255,255,0.04);
+}
+
+.sp-forum-tab.active {
+  color: var(--sp-text-primary);
+  background: rgba(100,180,255,0.08);border-top: 2px solid var(--sp-primary);
+}
+
+/* 论坛「我」标签页子标签 */
+.sp-forum-me-tab {
+  transition: all 0.2s !important;
+}
+
+.sp-forum-me-tab:hover {
+  opacity: 0.85;
+}
+
+/* 论坛内容滚动 */
+#sp-forum-content {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.2) transparent;
+}
+
+#sp-forum-content::-webkit-scrollbar {
+  width: 4px;
+}
+
+#sp-forum-content::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.2);
+  border-radius: 2px;
+}
+
+/* 论坛勾选删除沿用同人文样式 */
+#sp-forum-home-view .sp-fanfic-select-wrapper .sp-forum-card {
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+#sp-forum-home-view .sp-fanfic-select-wrapper .sp-fanfic-select-checkbox {
+  pointer-events: auto;
+}
+
+/* 可选：论坛个人中心头像 hover 效果 */
+#sp-forum-me-avatar-btn:hover {
+  border-color: var(--sp-primary-border) !important;
+  box-shadow: 0 0 12px var(--sp-primary);transform: scale(1.05);
+}
+
+#sp-forum-me-name-btn:hover {
+  color: var(--sp-primary) !important;
+  text-decoration: underline;
+}
+
+#sp-forum-me-bio-btn:hover {
+  color: var(--sp-text-secondary) !important;
+  text-decoration: underline;
+}
