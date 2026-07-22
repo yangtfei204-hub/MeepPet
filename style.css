@@ -8201,6 +8201,21 @@
   display: none;
 }
 
+/* ===== 手机壁纸背景层（伪元素）===== */
+#silly-pet-chat::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--sp-wp-image, none);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: var(--sp-wp-opacity, 0);
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
 /* 状态栏 */
 #sp-phone-statusbar {
   display: flex;
@@ -8213,6 +8228,9 @@
   cursor: grab;
   user-select: none;
   flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+  background: transparent;
 }
 #sp-phone-statusbar:active { cursor: grabbing; }
 #sp-phone-status-right { display: flex; align-items: center; gap: 6px; }
@@ -8223,6 +8241,7 @@
   min-height: 0;
   position: relative;
   overflow: hidden;
+  z-index: 1;
 }
 
 /* 页面通用 */
@@ -8907,9 +8926,7 @@
 
 /* ===== 手机壁纸/聊天背景 ===== */
 #sp-phone-home {
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  position: relative;
 }
 #sp-phone-chat {
   background-size: cover;
@@ -9046,6 +9063,23 @@
 }
 #sp-bs-history-bar::-webkit-scrollbar {
   display: none;
+}
+
+/* ===== 阅读器自定义背景层 ===== */
+#sp-br-bg-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  transition: opacity 0.3s ease, filter 0.3s ease;
+}
+
+#sp-br-body {
+  position: relative;
+  z-index: 1;
 }
 
 /* ===== 书架阅读器滑轨美化 ===== */
@@ -9476,4 +9510,918 @@
 /* 编辑模式页面增减按钮显示 */
 #sp-phone-page-controls.sp-editing-visible {
   display: flex !important;
+}
+
+/* ===== 通讯录和个人主页页面补充样式 ===== */
+#sp-phone-contacts .sp-search-select input,
+#sp-phone-profile textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+#sp-phone-contacts label,
+#sp-phone-profile label {
+  display: block;
+  font-size: 12px;
+  color: var(--sp-text-secondary);
+  margin-bottom: 4px;
+}
+
+#sp-phone-contacts .sp-preview-box,
+#sp-phone-contacts .sp-preview-header,
+#sp-phone-contacts .sp-preview-content {
+  font-size: 12px;
+}
+
+/* ============================================================ */
+/* 📱 锁屏悬浮通知样式                                          */
+/* ============================================================ */
+
+#sp-lock-notifications {
+  position: absolute;
+  top: 40px;
+  left: 12px;
+  right: 12px;
+  z-index: 35;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.sp-lock-notification {
+  background: rgba(40, 40, 55, 0.82);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 10px 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateY(-20px) scale(0.95);
+  transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: pointer;
+}
+
+.sp-lock-notification.sp-lock-notif-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.sp-lock-notification.sp-lock-notif-hiding {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.97);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.sp-lock-notif-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.sp-lock-notif-app-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.sp-lock-notif-app-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 5px;
+}
+
+.sp-lock-notif-app-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  flex: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sp-lock-notif-time {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.sp-lock-notif-body {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.sp-lock-notif-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  font-size: 18px;
+}
+
+.sp-lock-notif-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sp-lock-notif-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.sp-lock-notif-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sp-text-primary, #eee);
+  margin-bottom: 2px;
+  line-height: 1.2;
+}
+
+.sp-lock-notif-text {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.4;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 点击通知解锁 */
+.sp-lock-notification:active {
+  transform: scale(0.97);
+}
+
+@media (max-width: 480px) {
+  #sp-lock-notifications {
+    top: 30px;
+    left: 8px;
+    right: 8px;
+  }
+
+  .sp-lock-notification {
+    padding: 8px 10px;
+    border-radius: 14px;
+  }
+
+  .sp-lock-notif-avatar {
+    width: 30px;
+    height: 30px;
+  }
+
+  .sp-lock-notif-name {
+    font-size: 12px;
+  }
+
+  .sp-lock-notif-text {
+    font-size: 11px;
+  }
+}
+
+/* ============================================================ */
+/* 📰 论坛（小红书风格）                                          */
+/* ============================================================ */
+
+/* 论坛帖子网格（瀑布流双列） */
+.sp-forum-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding: 10px 10px 20px;
+  align-items: start;
+}
+
+/* 单个帖子卡片 */
+.sp-forum-card {
+  background: var(--sp-bg-secondary);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  border: 1px solid var(--sp-border-light);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.sp-forum-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+}
+
+.sp-forum-card:active {
+  transform: scale(0.97);
+}
+
+/* 封面区域 */
+.sp-forum-cover {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.sp-forum-cover-emoji {
+  font-size: 42px;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.3));
+  animation: sp-forum-cover-float 3s ease-in-out infinite;
+}
+
+@keyframes sp-forum-cover-float {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-6px) scale(1.05); }
+}
+
+/* 卡片内容区 */
+.sp-forum-card-body {
+  padding: 10px;
+}
+
+/* 标题 */
+.sp-forum-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sp-text-primary);
+  line-height: 1.4;
+  margin-bottom: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 正文预览 */
+.sp-forum-content {
+  font-size: 11px;
+  color: var(--sp-text-secondary);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 6px;
+}
+
+/* 标签 */
+.sp-forum-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.sp-forum-tag {
+  font-size: 10px;
+  color: rgba(100,180,255,0.9);
+  background: rgba(100,180,255,0.1);
+  border: 1px solid rgba(100,180,255,0.2);
+  border-radius: 10px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+
+/* 底部（作者+互动数据） */
+.sp-forum-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sp-forum-author {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+}
+
+.sp-forum-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--sp-bg-light);
+  border: 1px solid var(--sp-border-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.sp-forum-author-name {
+  font-size: 10px;
+  color: var(--sp-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60px;
+}
+
+.sp-forum-stats {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.sp-forum-stat {
+  font-size: 9px;
+  color: var(--sp-text-muted);
+  white-space: nowrap;
+}
+
+/* ===== 帖子详情弹窗 ===== */
+.sp-forum-detail-box {
+  background: var(--sp-bg-secondary);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--sp-border);
+  border-radius: 16px;
+  width: 300px;
+  max-width: 90vw;
+  max-height: 75vh;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: sp-fade-in 0.2s ease;
+}
+
+.sp-forum-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--sp-border-light);
+  background: var(--sp-bg-light);
+  flex-shrink: 0;
+}
+
+.sp-forum-detail-author {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sp-forum-avatar-lg {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--sp-bg-light);
+  border: 1px solid var(--sp-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.sp-forum-detail-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sp-text-primary);
+}
+
+.sp-forum-detail-close {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: var(--sp-text-muted);
+  padding: 2px 6px;
+  transition: color 0.2s;
+}
+
+.sp-forum-detail-close:hover {
+  color: #fff;
+}
+
+.sp-forum-detail-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.2) transparent;
+}
+
+.sp-forum-detail-body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sp-forum-detail-body::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.2);
+  border-radius: 2px;
+}
+
+.sp-forum-detail-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--sp-text-primary);
+  line-height: 1.4;
+  margin-bottom: 12px;
+}
+
+.sp-forum-detail-content {
+  font-size: 14px;
+  color: var(--sp-text-secondary);
+  line-height: 1.8;
+  word-break: break-word;
+}
+
+.sp-forum-detail-footer {
+  display: flex;
+  justify-content: space-around;
+  padding: 12px 16px;
+  border-top: 1px solid var(--sp-border-light);
+  background: var(--sp-bg-light);
+  flex-shrink: 0;
+}
+
+.sp-forum-stat-lg {
+  font-size: 13px;
+  color: var(--sp-text-secondary);
+  font-weight: 600;
+}
+
+/* 移动端适配 */
+@media (max-width: 480px) {
+  .sp-forum-grid {
+    gap: 6px;
+    padding: 8px 8px 16px;
+  }
+
+  .sp-forum-cover-emoji {
+    font-size: 32px;
+  }
+
+  .sp-forum-card-body {
+    padding: 8px;
+  }
+
+  .sp-forum-title {
+    font-size: 12px;
+  }
+
+  .sp-forum-content {
+    font-size: 10px;
+  }
+
+  .sp-forum-stat {
+    font-size: 8px;
+  }
+
+  .sp-forum-detail-box {
+    width: calc(100vw - 30px);
+  }
+}
+
+/* ============================================================ */
+/* 📝 同人文 App 样式                                            */
+/* ============================================================ */
+
+/* 底部标签栏 */
+#sp-fanfic-tabbar {
+  display: flex;
+  border-top: 1px solid var(--sp-border-light);
+  background: var(--sp-bg-secondary);
+  flex-shrink: 0;
+}
+
+.sp-fanfic-tab {
+  flex: 1;
+  padding: 10px 0;
+  border: none;
+  background: none;
+  color: var(--sp-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+  text-align: center;
+}
+
+.sp-fanfic-tab:hover {
+  color: var(--sp-text-secondary);
+  background: rgba(255,255,255,0.04);
+}
+
+.sp-fanfic-tab.active {
+  color: var(--sp-text-primary);
+  background: rgba(100,180,255,0.08);
+  border-top: 2px solid var(--sp-primary);
+}
+
+/* 工具栏 */
+.sp-fanfic-toolbar {
+  padding: 12px;
+  display: flex;
+  justify-content: center;
+}
+
+.sp-fanfic-generate-btn {
+  padding: 10px 28px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 24px;
+  border: 1px solid var(--sp-primary-border);
+  background: var(--sp-primary);
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 16px rgba(100,180,255,0.3);
+}
+
+.sp-fanfic-generate-btn:hover:not(:disabled) {
+  background: var(--sp-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(100,180,255,0.4);
+}
+
+.sp-fanfic-generate-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 空状态/加载 */
+.sp-fanfic-empty,
+.sp-fanfic-loading {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--sp-text-muted);
+  font-size: 13px;
+}
+
+/* 信息流 */
+.sp-fanfic-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 10px 16px;
+}
+
+/* 卡片 */
+.sp-fanfic-card {
+  background: var(--sp-bg-secondary);
+  border-radius: 14px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.18s, box-shadow 0.18s;
+  border: 1px solid var(--sp-border-light);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.sp-fanfic-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+}
+
+.sp-fanfic-card:active {
+  transform: scale(0.98);
+}
+
+.sp-fanfic-card-cover {
+  width: 100%;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sp-fanfic-card-cover-emoji {
+  font-size: 36px;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.3));
+}
+
+.sp-fanfic-card-body {
+  padding: 10px 12px;
+}
+
+.sp-fanfic-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--sp-text-primary);
+  margin-bottom: 4px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.sp-fanfic-card-preview {
+  font-size: 11px;
+  color: var(--sp-text-muted);
+  line-height: 1.5;
+  margin-bottom: 6px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.sp-fanfic-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.sp-fanfic-tag {
+  font-size: 10px;
+  color: rgba(100,180,255,0.9);
+  background: rgba(100,180,255,0.1);
+  border: 1px solid rgba(100,180,255,0.2);
+  border-radius: 10px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+
+.sp-fanfic-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sp-fanfic-card-author {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.sp-fanfic-card-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--sp-bg-light);
+  border: 1px solid var(--sp-border-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.sp-fanfic-card-author-name {
+  font-size: 11px;
+  color: var(--sp-text-muted);
+}
+
+.sp-fanfic-card-stats {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--sp-text-muted);
+}
+
+/* 阅读器 */
+.sp-fanfic-reader {
+  padding: 0;
+}
+
+.sp-fanfic-reader-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--sp-border-light);
+  position: sticky;
+  top: 0;
+  background: var(--sp-bg-main);
+  z-index: 5;
+}
+
+.sp-fanfic-reader-back {
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: var(--sp-text-primary);
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.sp-fanfic-reader-fav {
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 16px;
+  border: 1px solid rgba(255,200,50,0.4);
+  background: rgba(255,200,50,0.1);
+  color: #ffb347;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sp-fanfic-reader-fav:hover {
+  background: rgba(255,200,50,0.25);
+}
+
+.sp-fanfic-reader-author-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+}
+
+.sp-fanfic-reader-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--sp-bg-light);
+  border: 1px solid var(--sp-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.sp-fanfic-reader-author-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sp-text-primary);
+  flex: 1;
+}
+
+.sp-fanfic-reader-stats {
+  display: flex;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--sp-text-muted);
+}
+
+.sp-fanfic-reader-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--sp-text-primary);
+  padding: 0 14px 6px;
+  line-height: 1.4;
+}
+
+.sp-fanfic-reader-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 14px 12px;
+}
+
+.sp-fanfic-reader-body {
+  padding: 0 14px 20px;
+  font-size: 14px;
+  line-height: 1.9;
+  color: var(--sp-text-secondary);
+  word-break: break-word;
+}
+
+.sp-fanfic-reader-body em {
+  font-style: italic;
+  color: rgba(200,180,255,0.9);
+}
+
+.sp-fanfic-reader-body strong {
+  font-weight: 700;
+  color: var(--sp-text-primary);
+}
+
+.sp-fanfic-reader-actions {
+  padding: 12px 14px 20px;
+  display: flex;
+  justify-content: center;
+}
+
+.sp-fanfic-continue-btn {
+  padding: 10px 28px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 20px;
+  border: 1px solid var(--sp-primary-border);
+  background: var(--sp-primary);
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sp-fanfic-continue-btn:hover {
+  background: var(--sp-primary-hover);
+  transform: translateY(-1px);
+}
+
+/* 写作页 */
+.sp-fanfic-write-page {
+  padding: 0;
+}
+
+.sp-fanfic-write-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--sp-border-light);
+}
+
+.sp-fanfic-new-post-btn {
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 16px;
+  border: 1px solid var(--sp-primary-border);
+  background: var(--sp-primary);
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sp-fanfic-new-post-btn:hover {
+  background: var(--sp-primary-hover);
+}
+
+#sp-fanfic-user-posts-list {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 我的主页 */
+.sp-fanfic-me-page {
+  padding: 0;
+}
+
+.sp-fanfic-me-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 14px;
+  border-bottom: 1px solid var(--sp-border-light);
+  background: var(--sp-bg-light);
+}
+
+.sp-fanfic-me-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--sp-bg-secondary);
+  border: 2px solid var(--sp-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.sp-fanfic-me-info {
+  flex: 1;
+}
+
+/* 同人文内容区滚动 */
+#sp-fanfic-content {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.2) transparent;
+}
+
+#sp-fanfic-content::-webkit-scrollbar {
+  width: 4px;
+}
+
+#sp-fanfic-content::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.2);
+  border-radius: 2px;
+}
+
+/*我的主页头像 hover 效果 */
+.sp-fanfic-me-avatar:hover {
+  border-color: var(--sp-primary-border);
+  box-shadow: 0 0 12px var(--sp-primary);transform: scale(1.05);
+  transition: all 0.2s;
+}
+
+/* 名字和签名 hover 效果 */
+#sp-fanfic-me-name-btn:hover {
+  color: var(--sp-primary) !important;
+  text-decoration: underline;
+}
+
+#sp-fanfic-me-bio-btn:hover {
+  color: var(--sp-text-secondary) !important;
+  text-decoration: underline;
 }

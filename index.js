@@ -331,6 +331,8 @@
     maxTokens: 300,
     enableStreaming: false,   // 是否启用流式输出
     enableTimeAwareness: false, // 是否启用时间感知
+    enableAutoMessage: false,      // 是否启用API自动发消息
+    autoMessageInterval: 5,        // 自动发消息间隔（分钟）
     enableVision: false,        // 是否启用多模态图片识别
 
     // 角色卡 & 世界书
@@ -442,12 +444,15 @@
     phoneLockPasswordEnabled: false, // 是否启用锁屏密码
     phoneLockPassword: '',         // 锁屏密码（空=无密码）
     phoneWallpaper: '',            // 手机主屏壁纸
+    phoneWallpaperOpacity: 1.0,    // 主屏壁纸透明度
     chatBackground: '',            // 聊天背景
     appIcons: {                    // app 图标
       chat: '',
       settings: '',
       theme: '',
       bookshelf: '',
+      contacts: '',
+      profile: '',
     },
     // 书架
     bookshelfBooks: [],
@@ -456,9 +461,27 @@
     bookshelfSort: 'time-desc',
     bookshelfLayout: 'grid',
     bookshelfReaderBg: '',
+    bookshelfReaderBgColor: '',
+    bookshelfReaderBgImage: '',    // 阅读器自定义背景图
+    bookshelfReaderBgOpacity: 0.3, // 阅读器背景图透明度
+    bookshelfReaderBrightness: 1.0, // 阅读器背景图明暗
     bookshelfReaderFont: 16,
+    bookshelfReaderFontFamily: '',
+    bookshelfCustomFonts: [],
     bookshelfReadingHistory: [],
     bookshelfBookmarks: {},
+    // 论坛
+    forumPrompt: '你是一个论坛内容生成器。请根据提供的世界观设定，生成若干篇论坛帖子。\n\n请严格按以下JSON数组格式输出（不要输出任何其他内容，只输出JSON）：\n[\n  {\n    "author": "作者昵称(2-6个字)",\n    "avatarEmoji": "一个emoji表情作为头像",\n    "title": "帖子标题(5-20字)",\n    "content": "帖子正文(50-200字，符合世界观，语言风格像社交媒体/小红书)",\n    "coverEmoji": "一个能代表帖子内容的emoji",\n    "likes": 随机数100-9999,\n    "views": 随机数500-99999,\n    "comments": 随机数5-999,\n    "tags": ["标签1","标签2"]\n  }\n]\n\n要求：\n- 生成5到10篇帖子\n- 每篇帖子要有不同的作者和写作风格\n- 内容必须贴合世界观设定\n- 有的帖子可以是提问、有的是分享、有的是吐槽、有的是攻略\n- 标签1-3个\n- 数字字段请直接写数字，不要加引号',
+    forumPosts: [],
+    // 同人文
+    fanficPosts: [],               // 生成的同人文 [{id, title, content, coverGradient, coverEmoji, authorName, authorAvatar, likes, views, tags, wordCount, timestamp}]
+    fanficUserPosts: [],           // 玩家自写的同人文（同结构）
+    fanficFavorites: [],           // 收藏的同人文ID列表
+    fanficMyName: '',                  // 同人文「我」标签页自定义名字
+    fanficMyBio: '',                   // 同人文个性签名
+    fanficMyAvatar: '',                // 同人文「我」标签页自定义头像
+    fanficGeneratePrompt: '你是一个同人文生成器。请根据提供的世界观设定，生成若干篇同人文。\n\n请严格按以下JSON数组格式输出（不要输出任何其他内容，只输出JSON）：\n[\n  {\n    "title": "同人文标题(5-20字)",\n    "content": "同人文正文(800-2000字，包含场景描写、人物对话、心理活动，文笔细腻，感情丰富)",\n    "authorName": "作者笔名(2-6字)",\n    "authorAvatar": "一个emoji表情作为头像",\n    "coverEmoji": "一个能代表文章氛围的emoji",\n    "likes": 随机数100-9999,\n    "views": 随机数500-99999,\n    "tags": ["标签1","标签2"]\n  }\n]\n\n要求：\n- 生成5到10篇同人文\n- 每篇要有不同的作者和写作风格\n- 内容必须贴合世界观设定\n- 包含不同类型：甜文、虐文、日常、冒险等\n- 标签1-3个\n- 数字字段请直接写数字，不要加引号\n- content字段内容要丰富，至少800字',
+    fanficContinuePrompt: '请根据以下同人文内容进行续写。续写要求：\n1. 保持原文的文风和人物性格\n2. 情节自然衔接\n3. 续写内容800-1500字\n4. 直接输出续写的正文内容，不要输出JSON或其他格式标记\n5. 不要重复原文内容',
 
     // 自定义动作精灵图
     customSprites: [],        // [{name: '动作名', image: 'base64...'}]
@@ -584,6 +607,9 @@
     achievements: [],             // 已解锁的成就ID列表
     achievementNotified: [],      // 已弹窗通知过的成就ID（防重复弹窗）
     achievementClaimed: [],       // 已领取奖励的成就ID
+    forumPosts: [],               // 论坛生成的帖子 [{author, avatarEmoji, title, content, ...}]
+    forumGenerating: false,       // 是否正在生成中
+    fanficGenerating: false,          // 同人文是否正在生成中
 
   };
 
@@ -611,6 +637,7 @@
   let spriteStateLockTimer = null; // 对应的恢复定时器
   let chatMode = 'pet';             // 'pet'(桌宠模式) | 'online'(线上模式) | 'offline'(线下模式)
   let selectedEmoji = null;        // 当前选中的表情包 (base64 或 URL)
+  let autoMessageTimer = null;     // API自动发消息定时器
   let showLockedNames = false;     // 是否显示上锁物品的真实名字
   let showMissingOnly = false;     // 是否只显示未上传图片的物品
   let emojiStickers = [];          // 用户上传的表情包列表
@@ -760,11 +787,21 @@
       updateMoodDisplay();
     });
 
+    // 加载已保存的自定义阅读字体
+    (settings.bookshelfCustomFonts || []).forEach(cf => {
+      if (cf.type === 'css') {
+        bsRegisterCSSImportFont(cf.name, cf.url);
+      } else {
+        bsRegisterCustomFont(cf.name, cf.url);
+      }
+    });
+
     if (settings.enabled) {
       showPet();
       startWandering();
       startDecayTimer();
       checkReturnReward();
+      if (settings.enableAutoMessage) startAutoMessage();
     } else {
       hidePet();
     }
@@ -897,21 +934,28 @@
     }
   }
 
+let _lastCleanupTime = 0;
+
 function saveData() {
   state.lastOnlineTimestamp = Date.now();
-  if (state.petChatArchive && state.petChatArchive.length > 10) {
-    state.petChatArchive = state.petChatArchive.slice(-10);
-  }
-  if (state.diaryEntries && state.diaryEntries.length > 60) {
-    state.diaryEntries = state.diaryEntries.slice(-60);
-  }
-  if (state.gameShopBuyLog) {
-    const today = new Date().toISOString().slice(0, 10);
-    Object.keys(state.gameShopBuyLog).forEach(k => {
-      if (k < today.slice(0, 8)) delete state.gameShopBuyLog[k];
-    });
-  }
-  if (_isSaving) return;
+
+  // 清理逻辑每60 秒最多执行一次，不在每次保存时都跑
+  const now = Date.now();
+  if (now - _lastCleanupTime > 60000) {
+    _lastCleanupTime = now;
+    if (state.petChatArchive && state.petChatArchive.length > 10) {
+      state.petChatArchive = state.petChatArchive.slice(-10);
+    }
+    if (state.diaryEntries && state.diaryEntries.length > 60) {
+      state.diaryEntries = state.diaryEntries.slice(-60);
+    }
+    if (state.gameShopBuyLog) {
+      const today = new Date().toISOString().slice(0, 10);
+      Object.keys(state.gameShopBuyLog).forEach(k => {
+        if (k < today.slice(0, 8)) delete state.gameShopBuyLog[k];
+      });
+    }
+  }if (_isSaving) return;
   _isSaving = true;
   idbSet(STORAGE_KEY, { settings, state }).then(() => {
     _isSaving = false;
@@ -1328,6 +1372,118 @@ function saveData() {
     }
   }
 
+  // ============================================================
+  // 🤖 API 自动消息系统
+  // ============================================================
+  function startAutoMessage() {
+    stopAutoMessage();
+    if (!settings.enableAutoMessage) return;
+    const intervalMs = (settings.autoMessageInterval || 5) * 60 * 1000;
+    autoMessageTimer = setInterval(() => {
+      autoMessageTick();
+    }, intervalMs);
+    console.log(`[${PLUGIN_NAME}] 自动消息已启动，间隔 ${settings.autoMessageInterval || 5} 分钟`);
+  }
+
+  function stopAutoMessage() {
+    if (autoMessageTimer) {
+      clearInterval(autoMessageTimer);
+      autoMessageTimer = null;
+      console.log(`[${PLUGIN_NAME}] 自动消息已停止`);
+    }
+  }
+
+  async function autoMessageTick() {
+    if (!settings.enabled || !settings.enableAutoMessage) return;
+
+    // 临时切换为线上模式，使用线上提示词
+    const prevMode = chatMode;
+    chatMode = 'online';
+
+    try {
+      const reply = await callPetAPI('chat', '');
+      chatMode = prevMode;
+
+      if (reply) {
+        // 处理线上模式的 ||| 分隔
+        if (reply.includes('|||')) {
+          const parts = reply.split('|||').map(s => s.trim()).filter(Boolean);
+          const now = Date.now();
+          parts.forEach((part, i) => {
+            state.petChatHistory.push({ role: 'assistant', content: part, timestamp: now + i });
+          });
+        } else {
+          state.petChatHistory.push({ role: 'assistant', content: reply, timestamp: Date.now() });
+        }
+
+        renderChatHistory();
+        saveData();
+
+        // 气泡提示
+        const previewText = reply.split('|||')[0].trim().slice(0, 50) + (reply.length > 50 ? '…' : '');
+        showBubble(previewText, 5000);
+
+        // 锁屏通知
+        showLockScreenNotification(reply.split('|||')[0].trim());
+      }
+    } catch (err) {
+      chatMode = prevMode;
+      console.error(`[${PLUGIN_NAME}] 自动消息失败:`, err);
+    }
+  }
+
+  // ============================================================
+  // 📱 锁屏悬浮通知
+  // ============================================================
+  function showLockScreenNotification(text) {
+    const lockEl = document.getElementById('sp-phone-lockscreen');
+    const container = document.getElementById('sp-lock-notifications');
+    if (!container) return;
+    // 只在锁屏可见时显示通知
+    if (!lockEl || !lockEl.classList.contains('visible')) return;
+
+    const charAvatar = settings.chatCharAvatar || '';
+    const charName = settings.chatRemark || settings.petName || '咪噗';
+    const appIcon = (settings.appIcons && settings.appIcons.chat) || '';
+    const truncatedText = text.length > 80 ? text.slice(0, 80) + '…' : text;
+
+    const notif = document.createElement('div');
+    notif.className = 'sp-lock-notification';
+    notif.innerHTML = `
+      <div class="sp-lock-notif-header">
+        <span class="sp-lock-notif-app-icon">${appIcon ? '<img src="' + appIcon + '" />' : '💬'}</span>
+        <span class="sp-lock-notif-app-name">聊天</span>
+        <span class="sp-lock-notif-time">刚刚</span>
+      </div>
+      <div class="sp-lock-notif-body">
+        <div class="sp-lock-notif-avatar">${charAvatar ? '<img src="' + charAvatar + '" />' : '🐾'}</div>
+        <div class="sp-lock-notif-content">
+          <div class="sp-lock-notif-name">${charName}</div>
+          <div class="sp-lock-notif-text">${truncatedText}</div>
+        </div>
+      </div>
+    `;
+
+    container.appendChild(notif);
+
+    // 弹入动画（下一帧触发）
+    requestAnimationFrame(() => {
+      notif.classList.add('sp-lock-notif-visible');
+    });
+
+    // 5秒后自动消失
+    setTimeout(() => {
+      notif.classList.remove('sp-lock-notif-visible');
+      notif.classList.add('sp-lock-notif-hiding');
+      setTimeout(() => notif.remove(), 400);
+    }, 5000);
+
+    // 最多显示3条，多了移除最早的
+    while (container.children.length > 3) {
+      container.removeChild(container.firstChild);
+    }
+  }
+
   // 👇 在 renderPetUI 函数上面添加这个
     function renderMenuButtons() {
       const buttons = [
@@ -1401,6 +1557,7 @@ function saveData() {
             <div id="sp-lock-time">00:00</div>
             <div id="sp-lock-date">--</div>
           </div>
+          <div id="sp-lock-notifications"></div>
           <div id="sp-lock-hint">▲ 轻触解锁</div>
           <div id="sp-lock-password-panel">
             <div id="sp-lock-dots"></div>
@@ -1482,6 +1639,25 @@ function saveData() {
               <div class="sp-phone-setting-title">📱 App 布局</div>
               <p style="font-size:10px;color:var(--sp-text-muted);margin:0 0 8px;">长按 App 图标可拖拽排序，松手自动对齐网格</p>
               <button class="sp-phone-btn" id="sp-phone-reset-app-order">🔄 重置 App 排列</button>
+            </div>
+
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">⏰ 时间感知</div>
+              <label class="sp-phone-switch-row">
+                <span>启用时间感知（桌宠知道当前时间）</span>
+                <label class="sp-toggle-switch"><input type="checkbox" id="sp-phone-time-awareness-toggle" /><span class="sp-toggle-slider"></span></label>
+              </label>
+              <p style="font-size:10px;color:var(--sp-text-muted);margin:6px 0 0;">开启后桌宠会感知当前日期、星期、时段，对话更自然</p>
+            </div>
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">🤖 API 自动消息</div>
+              <label class="sp-phone-switch-row">
+                <span>启用自动消息</span>
+                <label class="sp-toggle-switch"><input type="checkbox" id="sp-phone-automsg-toggle" /><span class="sp-toggle-slider"></span></label>
+              </label>
+              <p style="font-size:10px;color:var(--sp-text-muted);margin:0 0 8px;">启用后，桌宠会每隔一段时间主动给你发消息（使用线上模式提示词）</p>
+              <label>发送间隔（分钟）</label>
+              <input type="number" id="sp-phone-automsg-interval" min="1" max="60" value="5" />
             </div>
 
             <div class="sp-phone-setting-block">
@@ -1584,6 +1760,8 @@ function saveData() {
                 <button class="sp-phone-btn" id="sp-phone-wallpaper-upload">📁 上传</button>
                 <button class="sp-phone-btn" id="sp-phone-wallpaper-clear">清除</button>
               </div>
+              <label style="margin-top:8px;">壁纸透明度: <span id="sp-phone-wp-opacity-val">${((settings.phoneWallpaperOpacity ?? 1.0) * 100).toFixed(0)}%</span></label>
+              <input type="range" id="sp-phone-wp-opacity" min="0" max="100" step="5" value="${((settings.phoneWallpaperOpacity ?? 1.0) * 100).toFixed(0)}" style="width:100%;" />
             </div>
             <div class="sp-phone-setting-block">
               <div class="sp-phone-setting-title">📱 软件图标</div>
@@ -1611,16 +1789,30 @@ function saveData() {
                 <button class="sp-phone-btn" id="sp-app-icon-bookshelf-upload">📁 上传</button>
                 <button class="sp-phone-btn" id="sp-app-icon-bookshelf-clear">清除</button>
               </div>
+              <label>通讯录 app</label>
+              <div class="sp-chat-avatar-row">
+                <div class="sp-chat-avatar-preview" id="sp-app-icon-contacts-preview">📇</div>
+                <button class="sp-phone-btn" id="sp-app-icon-contacts-upload">📁 上传</button>
+                <button class="sp-phone-btn" id="sp-app-icon-contacts-clear">清除</button>
+              </div>
+              <label>个人主页 app</label>
+              <div class="sp-chat-avatar-row">
+                <div class="sp-chat-avatar-preview" id="sp-app-icon-profile-preview">👤</div>
+                <button class="sp-phone-btn" id="sp-app-icon-profile-upload">📁 上传</button>
+                <button class="sp-phone-btn" id="sp-app-icon-profile-clear">清除</button>
+              </div>
+
             </div>
             <button id="sp-phone-theme-save" class="sp-phone-btn sp-phone-btn-primary">💾 保存</button>
           </div>
         </div>
 
+
         <div id="sp-phone-bookshelf" class="sp-phone-page">
           <div class="sp-phone-page-header">
             <button class="sp-phone-back" data-back="home">‹</button>
             <span>📚 书架</span>
-            <span style="width:24px;"></span>
+            <button id="sp-bs-reader-settings-btn" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--sp-text-secondary);padding:2px 6px;transition:color 0.2s;" title="阅读设置">⚙️</button>
           </div>
           <div class="sp-phone-page-content" id="sp-bookshelf-page-content" style="padding:8px;">
             <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;">
@@ -1653,7 +1845,120 @@ function saveData() {
           </div>
         </div>
 
+        <div id="sp-phone-contacts" class="sp-phone-page">
+          <div class="sp-phone-page-header">
+            <button class="sp-phone-back" data-back="home">‹</button>
+            <span>📇 通讯录</span>
+            <span style="width:24px;"></span>
+          </div>
+          <div class="sp-phone-page-content" id="sp-contacts-page-content">
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">🎭 角色卡</div>
+              <div class="sp-search-select">
+                <input type="text" id="sp-character-id" value="${settings.characterId}" placeholder="搜索角色卡..." autocomplete="off" />
+                <div class="sp-search-dropdown" id="sp-char-dropdown"></div>
+              </div>
+              <div class="sp-preview-box" id="sp-char-preview" style="display:none;">
+                <div class="sp-preview-header">
+                  <span>📋 角色描述预览</span>
+                  <button class="sp-btn sp-preview-toggle" id="sp-char-preview-toggle">展开</button>
+                </div>
+                <div class="sp-preview-content" id="sp-char-preview-content"></div>
+              </div>
+            </div>
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">📖 世界书</div>
+              <div class="sp-search-select">
+                <input type="text" id="sp-worldbook-id" value="${settings.worldBookId}" placeholder="搜索世界书..." autocomplete="off" />
+                <div class="sp-search-dropdown" id="sp-world-dropdown"></div>
+              </div>
+              <div class="sp-preview-box" id="sp-world-preview" style="display:none;">
+                <div class="sp-preview-header">
+                  <span>📋 世界书条目 (<span id="sp-world-count">0</span>)</span>
+                </div>
+                <div class="sp-preview-content sp-world-entries-list" id="sp-world-preview-content"></div>
+              </div>
+            </div>
+            <button id="sp-contacts-save" class="sp-phone-btn sp-phone-btn-primary">💾 保存</button>
+          </div>
+        </div>
+
+        <div id="sp-phone-profile" class="sp-phone-page">
+          <div class="sp-phone-page-header">
+            <button class="sp-phone-back" data-back="home">‹</button>
+            <span>👤 个人主页</span>
+            <span style="width:24px;"></span>
+          </div>
+          <div class="sp-phone-page-content" id="sp-profile-page-content">
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">📋 提示词预设</div>
+              <p style="font-size:11px;color:var(--sp-text-muted);margin-bottom:8px;">快速切换不同的桌宠性格设定</p>
+              <select id="sp-prompt-preset-select" style="width:100%;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-light);color:var(--sp-text-primary);font-size:12px;margin-bottom:8px;box-sizing:border-box;">
+                <option value="">— 不使用预设 —</option>
+                ${PROMPT_PRESETS_BUILTIN.map(p => `<option value="builtin:${p.name}" ${settings.currentPreset === 'builtin:' + p.name ? 'selected' : ''}>${p.name}</option>`).join('')}
+                ${(settings.promptPresets || []).map(p => `<option value="custom:${p.name}" ${settings.currentPreset === 'custom:' + p.name ? 'selected' : ''}>⭐ ${p.name}</option>`).join('')}
+              </select>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                <button class="sp-phone-btn" id="sp-preset-apply" type="button">✅ 应用</button>
+                <button class="sp-phone-btn" id="sp-preset-save" type="button">💾 保存预设</button>
+                <button class="sp-phone-btn" id="sp-preset-delete" type="button" style="color:#f66;">🗑️ 删除</button>
+              </div>
+            </div>
+            <div class="sp-phone-setting-block">
+              <label>桌宠名字</label>
+              <input type="text" id="sp-pet-name" value="${settings.petName || '咪噗'}" placeholder="给桌宠取个名字" />
+            </div>
+            <div class="sp-phone-setting-block">
+              <label>系统提示词</label>
+              <textarea id="sp-system-prompt" style="width:100%;min-height:80px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${settings.systemPrompt}</textarea>
+            </div>
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">🤝 与 {{user}} 的关系</div>
+              <textarea id="sp-relationship-prompt" style="width:100%;min-height:60px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;" placeholder="例如：你是主人养了三年的小猫咪…">${settings.relationshipPrompt}</textarea>
+            </div>
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">👤 {{user}} 人设</div>
+              <label class="sp-phone-radio"><input type="radio" name="sp-user-persona-source" value="card" id="sp-persona-source-card" ${settings.userPersonaSource === 'card' ? 'checked' : ''} /><span>从酒馆 Persona 获取</span></label>
+              <label class="sp-phone-radio"><input type="radio" name="sp-user-persona-source" value="manual" id="sp-persona-source-manual" ${settings.userPersonaSource !== 'card' ? 'checked' : ''} /><span>手动填写</span></label>
+              <div id="sp-persona-manual-section" ${settings.userPersonaSource === 'card' ? 'style="display:none;"' : ''}>
+                <textarea id="sp-user-persona-text" style="width:100%;min-height:60px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;" placeholder="描述主人的身份、性格…">${settings.userPersonaText}</textarea>
+              </div>
+            </div>
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">🌙 线下提示词</div>
+              <textarea id="sp-offline-prompt" style="width:100%;min-height:60px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${settings.offlinePrompt}</textarea>
+            </div>
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">💬 线上提示词</div>
+              <textarea id="sp-online-prompt" style="width:100%;min-height:60px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${settings.onlinePrompt}</textarea>
+            </div>
+            <div class="sp-phone-setting-block">
+              <label>破限 (Jailbreak)</label>
+              <textarea id="sp-jailbreak" style="width:100%;min-height:60px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${settings.jailbreak}</textarea>
+            </div>
+            <div class="sp-phone-setting-block">
+              <label>总结提示词</label>
+              <textarea id="sp-summary-prompt" style="width:100%;min-height:60px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${settings.summaryPrompt}</textarea>
+            </div>
+            <div class="sp-phone-setting-block">
+              <label>日记提示词</label>
+              <textarea id="sp-diary-prompt" style="width:100%;min-height:60px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${settings.diaryPrompt || '请以桌宠的第一人称视角，根据以下信息写一篇简短的日记（100-200字）。记录今天发生的有趣的事、和主人的互动、心情变化等。语气要符合桌宠的性格设定。'}</textarea>
+            </div>
+            <div class="sp-phone-setting-block">
+              <label>AI提取记忆提示词</label>
+              <textarea id="sp-extract-prompt" style="width:100%;min-height:60px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${settings.extractPrompt}</textarea>
+            </div>
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">📰 论坛提示词</div>
+              <textarea id="sp-forum-prompt" style="width:100%;min-height:80px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${settings.forumPrompt || ''}</textarea>
+              <p style="font-size:10px;color:var(--sp-text-muted);margin:4px 0 0;">生成论坛时只发送：世界书 + 破限 + 此提示词</p>
+            </div>
+            <button id="sp-profile-save" class="sp-phone-btn sp-phone-btn-primary">💾 保存</button>
+          </div>
+        </div>
+
         <div id="sp-phone-bookreader" class="sp-phone-page" style="position:relative;">
+          <div id="sp-br-bg-layer"></div>
           <div id="sp-br-top-bar" class="sp-br-bar sp-br-bar-visible" style="position:absolute;top:0;left:0;right:0;z-index:10;background:var(--sp-bg-main,rgba(20,20,30,0.92));backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--sp-border-light,rgba(255,255,255,0.08));display:flex;align-items:center;padding:8px 12px;gap:8px;transition:transform 0.3s ease,opacity 0.3s ease;">
             <button class="sp-phone-back" id="sp-br-back-btn" style="font-size:20px;background:none;border:none;color:var(--sp-text-primary);cursor:pointer;padding:0;line-height:1;">‹</button>
             <span id="sp-br-title" style="flex:1;text-align:center;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--sp-text-primary);">阅读中</span>
@@ -1670,6 +1975,53 @@ function saveData() {
               <button class="sp-phone-btn" id="sp-br-next" style="padding:3px 8px;font-size:12px;">▶</button>
               <button id="sp-br-font-dec" class="sp-phone-btn" style="padding:2px 5px;font-size:10px;">A-</button>
               <button id="sp-br-font-inc" class="sp-phone-btn" style="padding:2px 5px;font-size:11px;">A+</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="sp-phone-forum" class="sp-phone-page">
+          <div class="sp-phone-page-header">
+            <button class="sp-phone-back" data-back="home">‹</button>
+            <span>📰 论坛</span>
+            <span style="width:24px;"></span>
+          </div>
+          <div class="sp-phone-page-content" id="sp-forum-page-content" style="padding:0;">
+            <div id="sp-forum-toolbar" style="display:flex;gap:6px;padding:10px 12px;border-bottom:1px solid var(--sp-border-light);align-items:center;background:var(--sp-bg-light);">
+              <button id="sp-forum-generate-btn" class="sp-phone-btn sp-phone-btn-primary" style="flex:1;font-size:13px;font-weight:600;">✨ 生成论坛内容</button>
+              <button id="sp-forum-clear-btn" class="sp-phone-btn" style="font-size:11px;padding:7px 10px;">🗑️</button>
+            </div>
+            <div id="sp-forum-loading" style="display:none;text-align:center;padding:40px 20px;color:var(--sp-text-muted);font-size:13px;">
+              <div style="font-size:28px;margin-bottom:12px;animation:sp-dots-pulse 1.2s ease-in-out infinite;">📝</div>
+              <div>正在生成论坛内容…</div>
+              <div style="font-size:11px;margin-top:6px;">世界书 + 破限 + 论坛提示词</div>
+            </div>
+            <div id="sp-forum-empty" style="text-align:center;padding:50px 20px;color:var(--sp-text-muted);">
+              <div style="font-size:36px;margin-bottom:12px;">📰</div>
+              <div style="font-size:13px;margin-bottom:6px;">论坛空空如也</div>
+              <div style="font-size:11px;">点击「✨ 生成论坛内容」开始吧</div>
+              <div style="font-size:10px;margin-top:10px;color:var(--sp-text-muted);line-height:1.6;">会发送：世界书 + 破限 + 论坛提示词<br/>在「个人主页」中可编辑论坛提示词</div>
+            </div>
+            <div id="sp-forum-posts-container" class="sp-forum-grid"></div>
+          </div>
+        </div>
+
+        <div id="sp-phone-fanfic" class="sp-phone-page">
+          <div id="sp-fanfic-container" style="display:flex;flex-direction:column;height:100%;">
+            <div id="sp-fanfic-topbar" style="display:flex;align-items:center;padding:8px 12px;border-bottom:1px solid var(--sp-border-light);flex-shrink:0;">
+              <button class="sp-phone-back" data-back="home" style="font-size:22px;background:none;border:none;color:var(--sp-text-primary);cursor:pointer;width:24px;line-height:1;padding:0;">‹</button>
+              <span style="flex:1;text-align:center;font-size:14px;font-weight:600;color:var(--sp-text-primary);">📝 同人文</span>
+              <span style="width:24px;"></span>
+            </div>
+            <div id="sp-fanfic-content" style="flex:1;overflow-y:auto;position:relative;">
+              <div id="sp-fanfic-home-view"></div>
+              <div id="sp-fanfic-reader-view" style="display:none;"></div>
+              <div id="sp-fanfic-write-view" style="display:none;"></div>
+              <div id="sp-fanfic-me-view" style="display:none;"></div>
+            </div>
+            <div id="sp-fanfic-tabbar">
+              <button class="sp-fanfic-tab active" data-fanfic-tab="home">🏠 主页</button>
+              <button class="sp-fanfic-tab" data-fanfic-tab="write">✏️</button>
+              <button class="sp-fanfic-tab" data-fanfic-tab="me">👤 我</button>
             </div>
           </div>
         </div>
@@ -2539,6 +2891,11 @@ function clearSpriteLock() {
     if (walkSprite && walkSprite !== settings.spriteIdle) {
       const walkDuration = (settings.spriteDurations && settings.spriteDurations.spriteWalk) || 2000;
       setSpriteWithLock('walk', walkSprite, walkDuration);
+    }
+
+    // 只有在没有精灵锁的时候才执行闲逛动作，避免连锁 DOM 操作
+    if (!spriteStateLock) {
+      maybeDoIdleAction();
     }
 
     maybeDoIdleAction();
@@ -3647,7 +4004,7 @@ function showInventoryPopup(category, quickKey, onUse) {
 
   }
 
-  // ============================================================
+  //============================================================
   // ❓ 游戏帮助悬浮窗
   // ============================================================
   function showGameHelpModal() {
@@ -3665,13 +4022,21 @@ function showInventoryPopup(category, quickKey, onUse) {
             <summary class="sp-guide-summary">🐱 小猫餐厅</summary>
             <div class="sp-guide-details-content">
               <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                经营猫咪餐厅，烹饪上菜赚金币。<br/>
-                • 点「🟢开店」→ 客人自动到来→ 在烹饪台选食谱做菜 → 出锅后点桌子上的菜品图标上菜<br/>
-                • 客人有耐心倒计时，超时会走且扣声望<br/>
-                • 声望升级解锁新菜谱和新客人<br/>
-                • 出餐台的菜也可以直接投喂桌宠<br/><br/>
-                <strong style="color:var(--sp-text-primary);">食材来源：</strong>冰箱整理·货架消除·补货商店·抽奖<br/>
-                <strong style="color:var(--sp-text-primary);">调料来源：</strong>合成工坊调料链·补货商店·货架消除·抽奖
+                经营猫咪餐厅，烹饪上菜赚金币，声望升级解锁新菜谱和客人。<br/><br/>
+                <strong style="color:var(--sp-text-primary);">基本流程：</strong><br/>
+                点🟢开店 → 客人自动到来 → 在烹饪台📋选食谱做菜 → 出锅后点桌上菜品图标给客人上菜<br/><br/>
+                <strong style="color:var(--sp-text-primary);">核心机制：</strong><br/>
+                • 客人有耐心倒计时⏱️，超时离开扣2点声望<br/>
+                • 不同客人想要不同类型菜品（饮品/小食/菜品/高级菜/甜品/随机）<br/>
+                • 声望⭐升级（共10级：路边小摊→传说·喵神殿），解锁更多餐桌位、菜谱和高级客人<br/>
+                • 客人小费倍率不同（普通×1.0~猫之神×8.0），高级客人还有额外金币奖励<br/><br/>
+                <strong style="color:var(--sp-text-primary);">标签页说明：</strong><br/>🍳厨房 — 开店/关店、餐桌区（上菜）、烹饪台、出餐台<br/>
+                📋菜单 — 查看所有食谱、所需材料和解锁条件<br/>🛒补货 — 花金币买调料和基础蔬菜，酱油瓶🫙可转换为调料<br/>
+                🎒库存 — 查看食材/调料/甜品库存和营业数据<br/>
+                📖图鉴 — 食材/调料/菜品/客人图鉴，可自定义图片<br/><br/>
+                <strong style="color:var(--sp-text-primary);">甜品上菜：</strong>客人要甜品🍰时，可用糖葫芦🍢/冰箱甜品🍦🎂/完美糖砂✨直接上菜，售价有加成<br/><br/>
+                <strong style="color:var(--sp-text-primary);">食材来源：</strong>冰箱整理·货架消除·补货商店·消消看/连连看联动·抽奖<br/>
+                <strong style="color:var(--sp-text-primary);">调料来源：</strong>合成工坊调料链（实时同步）·补货商店·货架消除·抽奖
               </p>
             </div>
           </details>
@@ -3680,12 +4045,20 @@ function showInventoryPopup(category, quickKey, onUse) {
             <summary class="sp-guide-summary">🧶 合成工坊</summary>
             <div class="sp-guide-details-content">
               <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                点猫爪（消耗1⚡）→ 生成随机物品 → 两个相同种类+等级的物品可合成升级。<br/>
-                9条合成链（玩具/零食/宝石/药剂/音律/花卉/星辰/调料/体力），每链8级。<br/><br/>
-                • 完成订单交付指定物品赚金币（🔄可刷新订单）<br/>
-                • 多余物品拖到💰售卖区卖掉<br/>
-                • 商店买投喂/洗护/睡眠道具存入背包，桌宠互动时消耗<br/>
-                •🧂调料链物品 ↔ 餐厅调料库存实时同步
+                生成、合成、完成订单，是金币和道具的核心产出地。<br/><br/>
+                <strong style="color:var(--sp-text-primary);">基本操作：</strong><br/>
+                点🐾猫爪生成器（消耗1⚡）→ 随机产出物品到棋盘空格→ 将两个相同种类+等级的物品拖到一起合成升级<br/><br/>
+                <strong style="color:var(--sp-text-primary);">9条合成链（每链8级）：</strong><br/>🧶玩具 ·🍪零食 · 💎宝石 · 🧪药剂 · 🎵音律 · 🌺花卉 · ⭐星辰 · 🧂调料 · ⚡体力<br/><br/>
+                <strong style="color:var(--sp-text-primary);">棋盘操作：</strong><br/>
+                • 轻触选中 → 轻触目标格移动/合成/售卖（也支持拖拽）<br/>
+                • 多余物品拖到💰售卖区换金币<br/>
+                • ⚡体力链物品售卖 = 直接恢复体力（不给金币）<br/><br/>
+                <strong style="color:var(--sp-text-primary);">订单系统：</strong><br/>棋盘上方3个订单，交付指定物品赚金币（2~4倍售价）。🔄可刷新订单（10分钟冷却）<br/>
+                棋盘有匹配物品时订单会绿色高亮提示<br/><br/>
+                <strong style="color:var(--sp-text-primary);">标签页：</strong><br/>
+                棋盘 — 生成/合成/订单 | 商店 — 买投喂/洗护/睡眠/体力道具 | 图鉴 — 所有物品+自定义图片 | ⚙️设置 — 背景图/重置<br/><br/>
+                <strong style="color:var(--sp-text-primary);">联动：</strong>🧂调料链物品 ↔ 餐厅调料库存实时双向同步（合成产调料→餐厅+1，售卖/烹饪消耗→棋盘格消失）<br/>
+                生成时5%概率附赠⚡体力链碎片，完成订单8%概率附赠
               </p>
             </div>
           </details>
@@ -3694,11 +4067,20 @@ function showInventoryPopup(category, quickKey, onUse) {
             <summary class="sp-guide-summary">🃏 消消看</summary>
             <div class="sp-guide-details-content">
               <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                多层堆叠的图案牌，点击未被遮挡的牌收集到暂存栏，凑齐3个相同即消除。<br/>
-                清空所有牌 = 通关，暂存栏满了 = 失败。<br/><br/>
-                道具（每局限3个）：🪜扩充暂存格/ 🧹随机消3个 / 🌀打乱位置<br/>
-                开局5⚡，通关奖30~60🪙<br/>
-                <strong style="color:var(--sp-text-primary);">联动：</strong>消除的图案会产出对应食材/调料/道具到冰箱和餐厅
+                多层堆叠的图案牌，三消通关。<br/><br/>
+                <strong style="color:var(--sp-text-primary);">规则：</strong><br/>
+                点击未被遮挡的牌→收集到暂存栏→凑齐3个相同自动消除<br/>
+                清空所有牌 = 通关🎉| 暂存栏满且无法消除 = 失败😿<br/><br/>
+                <strong style="color:var(--sp-text-primary);">难度（随机）：</strong>简单(4层8图案) ~ 深渊(9层20图案)<br/>
+                <strong style="color:var(--sp-text-primary);">消耗：</strong>开局5⚡<br/>
+                <strong style="color:var(--sp-text-primary);">奖励：</strong>每消一组1~2🪙 + 通关额外30~60🪙<br/><br/>
+                <strong style="color:var(--sp-text-primary);">道具（每局最多用3个，从背包扣）：</strong><br/>
+                🪜扩充神架 — 暂存栏+1格（上限10）<br/>
+                🧹魔法扫帚 — 随机消除场景中3个相同可见图案<br/>
+                🌀混沌风暴 — 打乱所有可见图案位置<br/><br/>
+                <strong style="color:var(--sp-text-primary);">联动产出：</strong>消除的图案按类型自动进入对应库存：<br/>
+                🧂🫗🌶️ →餐厅调料 |🥟🦞🍜🍄🍇🐳→ 冰箱食材<br/>
+                🌸🎀→ 清洁道具 | 🎈🌈→ 睡眠道具
               </p>
             </div>
           </details>
@@ -3707,10 +4089,16 @@ function showInventoryPopup(category, quickKey, onUse) {
             <summary class="sp-guide-summary">🔗 连连看</summary>
             <div class="sp-guide-details-content">
               <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                选两个相同图案，能用≤2次转折的折线连通就消除。清空通关。<br/><br/>
-                道具：🔍提示 / 🌀洗牌 / 💣强制消除 / 🧭10秒透视同伴<br/>
-                棋盘8×8~18×18随机，体力5~16⚡，通关奖40~500🪙<br/>
-                <strong style="color:var(--sp-text-primary);">联动：</strong>同消消看，消除产食材/调料/道具
+                选两个相同图案，能用≤2次转折的折线连通就消除。<br/><br/>
+                <strong style="color:var(--sp-text-primary);">规则：</strong><br/>
+                点选第一个方块→点选第二个同图案方块→自动判定路径（最多2次拐弯）→消除并显示连线动画<br/>
+                清空所有方块 = 通关 | 无解时建议用🌀洗牌<br/><br/>
+                <strong style="color:var(--sp-text-primary);">难度（随机）：</strong><br/>
+                8×8(5⚡,奖40🪙) → 10×10(5⚡,70🪙) → 12×12(8⚡,120🪙) → 14×14(10⚡,200🪙) → 16×16(13⚡,320🪙) → 18×18(16⚡,500🪙)<br/><br/>
+                <strong style="color:var(--sp-text-primary);">道具（从背包扣，有每局使用上限）：</strong><br/>🔍寻路放大镜 — 高亮一对可连通方块（限3次）<br/>
+                🌀重组旋风 — 打乱所有剩余方块位置（限3次）<br/>
+                💣友情炸弹 — 选两个相同图案无视路径强制消除（限2次）<br/>🧭罗盘透视 — 10秒内点任意方块显示它能连到的同伴（限1次）<br/><br/>
+                <strong style="color:var(--sp-text-primary);">联动产出：</strong>同消消看，消除的图案按映射表进入冰箱/调料/道具库存
               </p>
             </div>
           </details>
@@ -3719,22 +4107,44 @@ function showInventoryPopup(category, quickKey, onUse) {
             <summary class="sp-guide-summary">🧊 冰箱整理</summary>
             <div class="sp-guide-details-content">
               <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                把购物筐里的食材塞进随机大小的冰箱网格。食材有不同尺寸（含异形），可旋转。<br/>
-                填充率越高奖励越多，全塞进去有额外奖金。<br/><br/>
-                道具：🧃压缩缩小 / 🎒跳过不扣率 / 🧹自动码放<br/>
-                <strong style="color:var(--sp-text-primary);">联动：</strong>塞进去的食材存入冰箱库存 → 投喂桌宠 /餐厅烹饪
+                把购物筐里的食材塞进随机大小的冰箱，挑战空间极限。<br/><br/>
+                <strong style="color:var(--sp-text-primary);">规则：</strong><br/>
+                购物筐里有各种不同尺寸的食材（含L形/T形/Z形等异形）→ 点选食材 → 点冰箱空格放入<br/>
+                🔄旋转可改变朝向（部分食材🔒不可旋转）| 点已放置的食材可取出回筐<br/>
+                关上冰箱门结算，填充率和完成率越高奖励越多<br/><br/>
+                <strong style="color:var(--sp-text-primary);">冰箱类型（随机）：</strong><br/>
+                小单门5×5(5⚡) → 中型6×6(8⚡) → 双开门7×7(12⚡) → 超大8×8(15⚡) → 豪华巨无霸10×10(18⚡) → 仓库级12×12(22⚡) → 极限挑战14×14(28⚡)<br/><br/>
+                <strong style="color:var(--sp-text-primary);">道具（从背包扣，有每局使用上限）：</strong><br/>
+                🧃压缩魔法 — 缩小选中食材的长边（限2次）<br/>
+                🎒放进背包 — 跳过一个食材，不计入完成率（限1次）<br/>🧹一键整理 — 自动将已放食材靠左靠上码放（限3次）<br/><br/>
+                <strong style="color:var(--sp-text-primary);">联动：</strong>成功塞进冰箱的食材自动存入冰箱库存 → 投喂桌宠 /餐厅烹饪使用<br/>
+                酱油瓶🫙可在餐厅补货页转换为酱油调料（1瓶=3份）
               </p>
             </div>
           </details>
 
           <details class="sp-guide-details">
-            <summary class="sp-guide-summary">🍢糖葫芦工坊</summary>
+            <summary class="sp-guide-summary">🍢 糖葫芦工坊</summary>
             <div class="sp-guide-details-content">
               <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                竹签上穿着乱序水果，目标让每根签上都是同色。<br/>
-                点源签→ 点目标签移动顶端水果（同色可批量移，目标必须同色或为空）。<br/><br/>
-                道具：🥢加空签 / ↩️撤销 / 🌀强行移动（无视颜色）<br/>
-                <strong style="color:var(--sp-text-primary);">联动：</strong>通关糖葫芦存入库存 → 卖金币 / 投喂桌宠 / 餐厅甜品上菜。10%概率掉✨糖砂（投喂+50饱食）
+                水果排序归类，做出漂亮的糖葫芦串。<br/><br/>
+                <strong style="color:var(--sp-text-primary);">规则：</strong><br/>
+                竹签上穿着乱序水果，目标是让每根签上只有同一种颜色<br/>
+                点源签→ 点目标签，顶端水果移动过去。同色连续的可批量移动<br/>
+                目标签必须为空或顶端同色才能放入<br/>
+                所有有水果的签都是单色 = 通关🎉<br/><br/>
+                <strong style="color:var(--sp-text-primary);">难度（随机，10档）：</strong><br/>
+                入门(3种果3⚡) → 简单(4种5⚡) → … → 修罗(11种28⚡) → 天道(12种32⚡)<br/>
+                开局前可看到难度和体力消耗，不满意可「换一局」重新随机<br/><br/>
+                <strong style="color:var(--sp-text-primary);">20种水果：</strong>🍓🍊🥝🍇🍒🍌🍅🍑🥭🫐🥥🪷🍉🍍🐲🍈🫒🌟🫛💛<br/><br/>
+                <strong style="color:var(--sp-text-primary);">道具（从背包扣）：</strong><br/>
+                🥢赠送竹签 — 额外增加一根空竹签（限1次）<br/>
+                ↩️悔步撤销 — 撤销上一步移动（限3次）<br/>
+                🌀顺滑剂 — 无视颜色规则强行移动一颗水果（限2次）<br/><br/>
+                <strong style="color:var(--sp-text-primary);">联动：</strong><br/>
+                通关后每种水果产出1串糖葫芦存入库存<br/>
+                糖葫芦可以：💰卖金币(15~35🪙) /🍖投喂桌宠(+6~20饱食) / 🐱餐厅甜品上菜(售价×1.8)<br/>
+                通关10%概率掉落✨完美的亮晶晶糖砂（投喂+50饱食/卖150🪙/餐厅甜品上菜）
               </p>
             </div>
           </details>
@@ -3743,50 +4153,128 @@ function showInventoryPopup(category, quickKey, onUse) {
             <summary class="sp-guide-summary">🛒 整理货架</summary>
             <div class="sp-guide-details-content">
               <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                货架隔间里有各种商品（每隔间3格），把3个相同商品凑到同一隔间即三消消除。<br/>
-                点选一个商品 → 点另一个空格移动过去。清空通关。有后排自动补位。<br/><br/>
-                道具：🪵解锁底部3格背包 / 🧹自动消一组 / 🔄洗牌<br/>
-                <strong style="color:var(--sp-text-primary);">联动：</strong>消除的商品按类型自动进入对应库存：<br/>
-                饮品/零食/宠物→冰箱 |玩具→睡眠道具 | 清洁→清洁道具<br/>
-                食物→冰箱食材 | 甜品→冰箱/糖葫芦 | 调味料→餐厅调料<br/>沐浴品→清洁道具 | 睡眠品→睡眠道具
+                货架三消，清空所有商品通关。<br/><br/>
+                <strong style="color:var(--sp-text-primary);">规则：</strong><br/>
+                货架有多个隔间，每隔间3格。后排还有多层商品等待补位<br/>
+                点选一个商品 → 点另一个空格移动 → 同一隔间凑齐3个相同 = 自动三消消除<br/>
+                前排3格全空时，后排自动补位一层<br/>
+                清空通关 | 全满且无法消除 = 卡住（用道具破局）<br/><br/>
+                <strong style="color:var(--sp-text-primary);">难度（随机，6档）：</strong><br/>
+                简单(4行2列5⚡) → 普通(4行3列7⚡) → 困难(5行3列10⚡) → 噩梦(5行4列13⚡) → 地狱(6行4列16⚡) → 深渊(6行5列20⚡)<br/>
+                支持PC端拖拽操作<br/><br/>
+                <strong style="color:var(--sp-text-primary);">道具（从背包扣）：</strong><br/>🪵临时扩展篮 — 解锁底部3格临时收纳区（限1次）<br/>
+                🧹喵喵爪理货 — 自动找一组3个相同并消除（限2次）<br/>
+                🔄货架大洗牌 — 打乱所有前排可见商品位置（限3次）<br/><br/>
+                <strong style="color:var(--sp-text-primary);">联动（32种商品，消除后按类型进入对应库存）：</strong><br/>
+                🥤🍺🧃饮品 → 冰箱 | 🍪🍫🍭零食 → 冰箱 | 🐟🌿宠物 → 冰箱<br/>
+                🧸🪀🎯玩具 → 睡眠道具 | 🧴洗护 → 清洁道具<br/>
+                🍄🦐🌽🥑🥟🍜食物 → 冰箱食材 | 🍰🍦甜品 → 冰箱 | 🍡糖葫芦串 → 糖葫芦库存<br/>
+                🧂🫙🌶️🧈🍯🍛🥥调料 → 餐厅调料(每组+2份)<br/>
+                🫧🪻沐浴 → 清洁道具 | 🕯️🧣睡眠 → 睡眠道具<br/>
+                所有消除额外给1~2🪙
               </p>
             </div>
           </details>
 
           <details class="sp-guide-details">
-            <summary class="sp-guide-summary">🎰幸运抽奖</summary>
+            <summary class="sp-guide-summary">🎰 幸运抽奖</summary>
             <div class="sp-guide-details-content">
               <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                花金币抽奖获得道具和物品：<br/>
-                🎲10🪙/次（日限10）→ 基础奖励<br/>
-                ✨ 30🪙/次（日限5）→ 中等奖励<br/>💫 50🪙/次（日限3）→ 高价值奖励<br/><br/>
-                奖品包括：金币、各游戏道具、工坊背包物品、合成棋盘物品、食材、糖葫芦等。
+                花金币抽奖获得各类道具和物品。<br/><br/>
+                <strong style="color:var(--sp-text-primary);">三档奖池：</strong><br/>
+                🎲小试牛刀 — 10🪙/次，日限10次，基础奖励<br/>✨ 锦鲤附体 — 30🪙/次，日限5次，中等奖励<br/>
+                💫欧皇时刻 — 50🪙/次，日限3次，高价值奖励<br/><br/>
+                <strong style="color:var(--sp-text-primary);">奖品类型：</strong><br/>🪙金币 |🃏消消看道具 | 🔗连连看道具 | 🛒货架道具 | 🧊冰箱道具 | 🍢糖葫芦道具 | ⚡体力道具<br/>
+                🍖喂食/🧴清洁/🛏️睡眠道具 | 🧶合成棋盘物品(Lv1~5) | 🥬基础蔬菜 | 🍢糖葫芦成品<br/><br/>
+                <strong style="color:var(--sp-text-primary);">特殊规则：</strong><br/>
+                •棋盘物品直接放入合成工坊棋盘空格，棋盘满了转为双倍金币补偿<br/>
+                • 🧂调料链物品同时同步到餐厅调料库存<br/>
+                • 抽奖结果弹窗会根据品质等级显示不同颜色和动画（普通/稀有/史诗/传说）<br/>
+                • 每日限额凌晨12点重置
               </p>
             </div>
           </details>
 
           <details class="sp-guide-details">
-            <summary class="sp-guide-summary">💡 通用机制与联动总览</summary>
+            <summary class="sp-guide-summary">🎒 总背包 &⚡ 体力</summary>
             <div class="sp-guide-details-content">
               <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                <strong style="color:var(--sp-text-primary);">🪙 金币</strong> — 所有游戏共享，合成工坊和餐厅最稳定产出<br/>
-                <strong style="color:var(--sp-text-primary);">⚡ 体力</strong> — 所有游戏共享，每5分钟恢复1点，点⊕用道具补充<br/>
-                <strong style="color:var(--sp-text-primary);">📖 图鉴</strong> — 各游戏支持自定义图片（📷按钮），图鉴合集可统一管理并联动同步<br/>
-                <strong style="color:var(--sp-text-primary);">🎒 背包</strong> — 投喂/洗澡/睡觉时从背包选物品消耗，可设快捷物品<br/>
-                <strong style="color:var(--sp-text-primary);">🏆 成就</strong> — 300+个成就，解锁后可领取金币/体力/道具奖励<br/>
-                <strong style="color:var(--sp-text-primary);">⚠️ 重置</strong> — 合成工坊设置⚙️中可重置所有游戏数据（24h冷却）<br/><br/>
-                <strong style="color:var(--sp-text-primary);">核心联动链路：</strong><br/>
-                🧶工坊调料链↔ 🐱餐厅调料（实时同步）<br/>🧊冰箱/🛒货架 →🐱餐厅食材 → 🍖投喂桌宠<br/>
-                🍢糖葫芦 → 💰卖金币 /🍖投喂 / 🐱餐厅甜品<br/>
-                🃏消消看+🔗连连看 → 消除产食材/调料/道具<br/>
-                🎰抽奖 → 各类物品直接进对应背包/棋盘
+                <strong style="color:var(--sp-text-primary);">🎒 总背包</strong> — 汇总查看所有物资：<br/>
+                🍖喂食道具 / 🧴清洁道具 / 🛏️睡眠道具（投喂/洗澡/睡觉时从此消耗）<br/>
+                🧊冰箱库存（存放食材，投喂+餐厅烹饪双用）<br/>
+                🧊冰箱道具 / 🍢糖葫芦成品+道具 / ✨珍贵糖砂<br/>
+                ⚡体力道具 / 🃏消消看道具 / 🔗连连看道具 / 🛒货架道具<br/>
+                底部有完整的物品联动说明<br/><br/>
+                <strong style="color:var(--sp-text-primary);">⚡ 体力系统</strong><br/>
+                • 所有游戏共享体力，每5分钟自动恢复1点<br/>
+                • 点体力数字旁的⊕按钮可使用体力道具快速补充<br/>
+                • 体力道具来源：合成工坊商店购买 / 合成工坊体力链售出 / 抽奖获得<br/>
+                • 体力可超过上限（最高999），但超上限后不再自动恢复<br/><br/>
+                <strong style="color:var(--sp-text-primary);">🎒 投喂/洗澡/睡觉时的物品选择</strong><br/>
+                • 可从工坊背包+冰箱库存+糖葫芦+餐厅出餐台菜品中选择<br/>
+                • 点☆设为快捷物品 → 下次直接使用不弹窗<br/>
+                • 快捷物品用完自动清除，需重新设置
+              </p>
+            </div>
+          </details>
+
+          <details class="sp-guide-details">
+            <summary class="sp-guide-summary">🏆 成就 & 📖 图鉴合集</summary>
+            <div class="sp-guide-details-content">
+              <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
+                <strong style="color:var(--sp-text-primary);">🏆 成就系统（300+个）</strong><br/>
+                分8大类：💬互动 / 💰经济 / 🧶合成 / 🐱餐厅 / 🎮小游戏 / 📦收集 / ⭐特殊 / 🏅里程碑<br/><br/>
+                5档奖励等级：<br/>
+                Tier 1 →8🪙 | Tier 2 → 20🪙+5⚡ | Tier 3 → 50🪙+10⚡+1道具<br/>
+                Tier 4 → 120🪙+20⚡+2道具 | Tier 5 → 300🪙+50⚡+3道具+✨糖砂<br/><br/>
+                解锁后需手动领取奖励，也可一键领取全部。成就进度会在气泡中通知<br/><br/>
+                <strong style="color:var(--sp-text-primary);">📖 图鉴合集</strong><br/>
+                所有游戏图鉴汇总到一个面板中统一管理：<br/>
+                🧶合成链物品 /🃏消消看图案 / 🔗连连看图案 / 🧊冰箱食材 / 🍓糖葫芦水果+成品 / 🛒货架商品 / 🧂调料 / 🍽️菜品/ 😺客人/ 各游戏道具 / ⚡体力道具 / 🎒工坊道具 / 🎮游戏图标<br/><br/>
+                • 所有物品都可点📷上传自定义图片（优先推荐用URL链接节省内存）<br/>
+                •🔗联动标记：有关联的物品共享图片（如冰箱食材↔餐厅食材↔货架商品）<br/>
+                • 🔍搜索框可按名称快速定位<br/>
+                • 🔒显示名字按钮：查看未解锁物品的真实名字<br/>
+                • 📷查漏补缺按钮：只显示还没上传图片的物品
+              </p>
+            </div>
+          </details>
+
+          <details class="sp-guide-details">
+            <summary class="sp-guide-summary">💡 核心联动总览</summary>
+            <div class="sp-guide-details-content">
+              <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
+                <strong style="color:var(--sp-text-primary);">🪙 金币</strong> — 所有游戏共享。工坊订单和餐厅是最稳定产出<br/>
+                <strong style="color:var(--sp-text-primary);">⚡ 体力</strong> — 所有游戏共享。每5分钟恢复1点，⊕补充道具<br/><br/>
+                <strong style="color:var(--sp-text-primary);">食材链路：</strong><br/>
+                🧊冰箱整理 → 食材存入冰箱库存<br/>
+                🛒货架消除 → 食材/饮品/零食进冰箱<br/>
+                🐱餐厅补货 → 花金币买基础蔬菜进冰箱<br/>
+                🃏消消看 +🔗连连看 → 消除产食材进冰箱<br/>
+                🎰抽奖 → 蔬菜直接进冰箱<br/>
+                冰箱库存 → 🐱餐厅烹饪 / 🍖投喂桌宠<br/><br/>
+                <strong style="color:var(--sp-text-primary);">调料链路：</strong><br/>
+                🧶工坊调料链 ↔ 🐱餐厅调料（实时双向同步）<br/>🛒货架消除调料 → 餐厅调料(每组+2)<br/>
+                🃏消消看 + 🔗连连看 → 消除产调料<br/>
+                🐱餐厅补货 → 花金币买调料<br/>
+                🐱餐厅烹饪消耗调料 → 工坊棋盘对应格子消失<br/><br/>
+                <strong style="color:var(--sp-text-primary);">糖葫芦链路：</strong><br/>
+                🍢糖葫芦工坊通关 → 库存<br/>
+                🛒货架消除🍡→ 草莓糖葫芦+1<br/>
+                🎰抽奖 → 各种糖葫芦<br/>
+                糖葫芦库存 → 💰卖金币 / 🍖投喂桌宠 / 🐱餐厅甜品上菜<br/><br/>
+                <strong style="color:var(--sp-text-primary);">道具链路：</strong><br/>
+                🛒货架消除 → 清洁道具/睡眠道具<br/>
+                🃏消消看 + 🔗连连看 → 清洁道具/睡眠道具<br/>
+                🧶工坊商店 /🎰抽奖 → 各类道具<br/>
+                投喂/洗澡/睡觉时从背包消耗道具<br/><br/>
+                <strong style="color:var(--sp-text-primary);">⚠️ 重置：</strong>合成工坊⚙️设置中可重置所有游戏数据（24小时冷却，不可撤销）
               </p>
             </div>
           </details>
 
         </div>
-      </div>
-    `;
+      </div>`;
     document.body.appendChild(helpOverlay);
 
     // 居中定位
@@ -3801,7 +4289,7 @@ function showInventoryPopup(category, quickKey, onUse) {
         box.style.margin = '0';
       }
     });
-    // 拖拽
+    //拖拽
     const helpHeader = document.getElementById('sp-game-help-header');
     const helpBox = document.getElementById('sp-game-help-box');
     bindPopupDrag(helpHeader, helpBox);
@@ -4329,6 +4817,8 @@ if (hasEmoji) {
         renderChatHistory();
         showBubble(reply.split('|||')[0].trim().slice(0, 50) + (reply.length > 50 ? '…' : ''), 4000);
         saveData();
+        // 锁屏通知
+        showLockScreenNotification(reply.split('|||')[0].trim());
 
         petUnsummarizedCount++;
         if (settings.summaryTrigger === 'auto' && settings.autoSummaryRounds > 0 && petUnsummarizedCount >= settings.autoSummaryRounds) {
@@ -4357,6 +4847,11 @@ if (hasEmoji) {
       theme: 'sp-phone-theme',
       bookshelf: 'sp-phone-bookshelf',
       bookreader: 'sp-phone-bookreader',
+      contacts: 'sp-phone-contacts',
+      profile: 'sp-phone-profile',
+      forum: 'sp-phone-forum',
+      fanfic: 'sp-phone-fanfic',
+
     };
     Object.keys(map).forEach(p => {
       const el = document.getElementById(map[p]);
@@ -4369,8 +4864,22 @@ if (hasEmoji) {
   }
 
   function applyPhoneWallpaper() {
+    const chatEl = document.getElementById('silly-pet-chat');
+    if (chatEl) {
+      if (settings.phoneWallpaper) {
+        chatEl.style.setProperty('--sp-wp-image', `url(${settings.phoneWallpaper})`);
+        chatEl.style.setProperty('--sp-wp-opacity', settings.phoneWallpaperOpacity ?? 1.0);
+      } else {
+        chatEl.style.setProperty('--sp-wp-image', 'none');
+        chatEl.style.setProperty('--sp-wp-opacity', '0');
+      }
+    }
+    // 移除旧的 home 页背景（兼容迁移）
     const home = document.getElementById('sp-phone-home');
-    if (home) home.style.backgroundImage = settings.phoneWallpaper ? `url(${settings.phoneWallpaper})` : 'none';
+    if (home) {
+      home.style.backgroundImage = 'none';
+    }
+    // 聊天页背景保持独立
     const chatPage = document.getElementById('sp-phone-chat');
     if (chatPage) chatPage.style.backgroundImage = settings.chatBackground ? `url(${settings.chatBackground})` : 'none';
   }
@@ -4461,6 +4970,15 @@ if (hasEmoji) {
     }
     const lockPwdInput = document.getElementById('sp-phone-lockpwd-input');
     if (lockPwdInput) lockPwdInput.value = settings.phoneLockPassword || '';
+
+    // 时间感知
+    const timeAwarenessToggle = document.getElementById('sp-phone-time-awareness-toggle');
+    if (timeAwarenessToggle) timeAwarenessToggle.checked = !!settings.enableTimeAwareness;
+    // 自动消息
+    const autoMsgToggle = document.getElementById('sp-phone-automsg-toggle');
+    if (autoMsgToggle) autoMsgToggle.checked = !!settings.enableAutoMessage;
+    const autoMsgInterval = document.getElementById('sp-phone-automsg-interval');
+    if (autoMsgInterval) autoMsgInterval.value = settings.autoMessageInterval || 5;
 
   }
 
@@ -5052,11 +5570,15 @@ if (hasEmoji) {
     settings:  { emoji: '⚙️', name: '设置' },
     theme:     { emoji: '🎨', name: '主题' },
     bookshelf: { emoji: '📚', name: '书架' },
+    contacts:  { emoji: '📇', name: '通讯录' },
+    profile:   { emoji: '👤', name: '个人主页' },
+    forum:     { emoji: '📰', name: '论坛' },
+    fanfic:    { emoji: '📝', name: '同人文' },
   };
 
   function getDefaultAppLayout() {
     return ['chat', 'settings', 'theme', 'bookshelf',
-            null, null, null, null,
+            'contacts', 'profile', 'forum', 'fanfic',
             null, null, null, null,
             null, null, null, null];
   }
@@ -5323,6 +5845,11 @@ if (hasEmoji) {
         else if (target === 'settings') { switchPhonePage('settings'); syncPhoneSettingsUI(); }
         else if (target === 'theme') { switchPhonePage('theme'); renderThemePage(); }
         else if (target === 'bookshelf') { switchPhonePage('bookshelf'); bsRenderShelf(); bsRenderHistory(); bsRenderTagBar(); }
+        else if (target === 'contacts') { switchPhonePage('contacts'); renderContactsPage(); }
+        else if (target === 'profile') { switchPhonePage('profile'); renderProfilePage(); }
+        else if (target === 'forum') { switchPhonePage('forum'); renderForumPage(); }
+        else if (target === 'fanfic') { switchPhonePage('fanfic'); renderFanficHomePage(); }
+
       });
 
       // 长按进入编辑
@@ -5432,6 +5959,10 @@ if (hasEmoji) {
   }
 
   function bindPhoneEvents() {
+    // 防止重复绑定：整个函数只执行一次
+    if (bindPhoneEvents._done) return;
+    bindPhoneEvents._done = true;
+
     // 渲染 4×4 主屏网格
     renderPhoneGrid();
 
@@ -5510,7 +6041,7 @@ if (hasEmoji) {
             settings.phonePageCount--;
             if (_phoneCurrentPage >= settings.phonePageCount) _phoneCurrentPage = settings.phonePageCount - 1;
             saveData();
-            renderPhoneGrid();
+            switchHomePage(_phoneCurrentPage);
             showBubble('已删除最后一页', 1500);
           }
         });
@@ -5579,11 +6110,69 @@ if (hasEmoji) {
         if (lockPwdInput && lockPwdInput.value.trim()) {
           settings.phoneLockPassword = lockPwdInput.value.trim();
         }
+        // 时间感知
+        const timeAwarenessToggle = document.getElementById('sp-phone-time-awareness-toggle');
+        settings.enableTimeAwareness = timeAwarenessToggle ? timeAwarenessToggle.checked : false;
+        // 自动消息
+        const autoMsgToggle = document.getElementById('sp-phone-automsg-toggle');
+        settings.enableAutoMessage = autoMsgToggle ? autoMsgToggle.checked : false;
+        const autoMsgInterval = document.getElementById('sp-phone-automsg-interval');
+        if (autoMsgInterval) settings.autoMessageInterval = parseInt(autoMsgInterval.value) || 5;
+        // 启动/停止自动消息定时器
+        if (settings.enableAutoMessage) {
+          startAutoMessage();
+        } else {
+          stopAutoMessage();
+        }
+
         saveData();
         updatePhoneClock();
         updatePhoneBattery();
         showBubble('手机设置已保存', 2000);
         switchPhonePage('home');
+      };
+    }
+
+    // 通讯录保存
+    const contactsSaveBtn = document.getElementById('sp-contacts-save');
+    if (contactsSaveBtn) {
+      contactsSaveBtn.onclick = () => {
+        const charInput = document.getElementById('sp-character-id');
+        if (charInput) settings.characterId = charInput.value.trim();
+        const worldInput = document.getElementById('sp-worldbook-id');
+        if (worldInput) settings.worldBookId = worldInput.value.trim();
+        saveData();
+        showBubble('通讯录已保存 ✨', 2000);
+        switchPhonePage('home');
+      };
+    }
+
+    // 个人主页保存
+    const profileSaveBtn = document.getElementById('sp-profile-save');
+    if (profileSaveBtn) {
+      profileSaveBtn.onclick = () => {
+        syncSettingsFromDOM();
+        saveData();
+        const chatTitle = document.getElementById('sp-chat-title-name');
+        if (chatTitle) chatTitle.textContent = settings.petName || '咪噗';
+        showBubble('个人主页已保存 ✨', 2000);
+        switchPhonePage('home');
+      };
+    }
+
+    // 个人主页：人设来源切换
+    const profileCardRadio = document.getElementById('sp-persona-source-card');
+    const profileManualRadio = document.getElementById('sp-persona-source-manual');
+    if (profileCardRadio) {
+      profileCardRadio.onchange = () => {
+        const sec = document.getElementById('sp-persona-manual-section');
+        if (sec) sec.style.display = 'none';
+      };
+    }
+    if (profileManualRadio) {
+      profileManualRadio.onchange = () => {
+        const sec = document.getElementById('sp-persona-manual-section');
+        if (sec) sec.style.display = '';
       };
     }
 
@@ -5763,14 +6352,28 @@ if (hasEmoji) {
     const wpClear = document.getElementById('sp-phone-wallpaper-clear');
     if (wpClear) wpClear.onclick = () => {
       settings.phoneWallpaper = '';
+      settings.phoneWallpaperOpacity = 1.0;
       saveData();
       const p = document.getElementById('sp-phone-wallpaper-preview');
       if (p) p.innerHTML = '无';
       applyPhoneWallpaper();
     };
 
+    // 壁纸透明度滑轨
+    const wpOpacitySlider = document.getElementById('sp-phone-wp-opacity');
+    if (wpOpacitySlider) {
+      wpOpacitySlider.oninput = () => {
+        const val = parseInt(wpOpacitySlider.value) / 100;
+        settings.phoneWallpaperOpacity = val;
+        const valEl = document.getElementById('sp-phone-wp-opacity-val');
+        if (valEl) valEl.textContent = wpOpacitySlider.value + '%';
+        applyPhoneWallpaper();
+        saveDataDebounced('壁纸透明度');
+      };
+    }
+
     // app 图标上传
-    ['chat', 'settings', 'theme', 'bookshelf'].forEach(app => {
+    ['chat', 'settings', 'theme', 'bookshelf', 'contacts', 'profile'].forEach(app => {
       const upload = document.getElementById(`sp-app-icon-${app}-upload`);
       const clear = document.getElementById(`sp-app-icon-${app}-clear`);
       if (upload) upload.onclick = () => phoneUploadImage(`appIcons.${app}`, (url) => {
@@ -5825,6 +6428,12 @@ if (hasEmoji) {
       };
     }
 
+    // 阅读设置按钮
+    document.getElementById('sp-bs-reader-settings-btn')?.addEventListener('click', () => {
+      bsShowReaderSettings();
+    });
+
+
     // 阅读器返回
     const brBack = document.getElementById('sp-bookreader-back');
     if (brBack) {
@@ -5839,6 +6448,24 @@ if (hasEmoji) {
     document.getElementById('sp-bookreader-prev')?.addEventListener('click', () => bookReaderNav(-1));
     document.getElementById('sp-bookreader-next')?.addEventListener('click', () => bookReaderNav(1));
     
+    // ===== 论坛事件 =====
+    const forumGenBtn = document.getElementById('sp-forum-generate-btn');
+    if (forumGenBtn) {
+      forumGenBtn.onclick = () => generateForumPosts();
+    }
+    const forumClearBtn = document.getElementById('sp-forum-clear-btn');
+    if (forumClearBtn) {
+      forumClearBtn.onclick = () => {
+        state.forumPosts = [];
+        saveData();
+        renderForumPage();
+        showBubble('论坛已清空', 2000);
+      };
+    }
+
+    // ===== 同人文事件 =====
+    fanficBindTabEvents();
+
     // ===== 书架事件 =====
     bsBindEvents();
     // 绑定锁屏事件
@@ -5884,6 +6511,301 @@ if (hasEmoji) {
     const bookPrev = document.getElementById('sp-app-icon-bookshelf-preview');
     if (bookPrev) bookPrev.innerHTML = settings.appIcons.bookshelf ? `<img src="${settings.appIcons.bookshelf}" />` : '📚';
 
+    const contactsPrev = document.getElementById('sp-app-icon-contacts-preview');
+    if (contactsPrev) contactsPrev.innerHTML = settings.appIcons.contacts ? `<img src="${settings.appIcons.contacts}" />` : '📇';
+
+    const profilePrev = document.getElementById('sp-app-icon-profile-preview');
+    if (profilePrev) profilePrev.innerHTML = settings.appIcons.profile ? `<img src="${settings.appIcons.profile}" />` : '👤';
+
+    const wpOpacity = document.getElementById('sp-phone-wp-opacity');
+    if (wpOpacity) wpOpacity.value = ((settings.phoneWallpaperOpacity ?? 1.0) * 100).toFixed(0);
+    const wpOpacityVal = document.getElementById('sp-phone-wp-opacity-val');
+    if (wpOpacityVal) wpOpacityVal.textContent = ((settings.phoneWallpaperOpacity ?? 1.0) * 100).toFixed(0) + '%';
+
+  }
+
+  function renderContactsPage() {
+    // 同步当前值到表单
+    const charInput = document.getElementById('sp-character-id');
+    if (charInput) charInput.value = settings.characterId || '';
+    const worldInput = document.getElementById('sp-worldbook-id');
+    if (worldInput) worldInput.value = settings.worldBookId || '';
+    // 绑定搜索下拉（每次打开都绑定，因为元素已在 DOM 中）
+    bindSearchSelects();
+    if (settings.characterId) refreshCharPreview();
+    if (settings.worldBookId) refreshWorldPreview();
+  }
+
+  // ============================================================
+  // 📰 论坛模块
+  // ============================================================
+  function renderForumPage() {
+    const container = document.getElementById('sp-forum-posts-container');
+    const emptyEl = document.getElementById('sp-forum-empty');
+    const loadingEl = document.getElementById('sp-forum-loading');
+    if (!container) return;
+
+    const posts = state.forumPosts || [];
+
+    if (loadingEl) loadingEl.style.display = 'none';
+
+    if (posts.length === 0) {
+      if (emptyEl) emptyEl.style.display = '';
+      container.innerHTML = '';
+      return;
+    }
+
+    if (emptyEl) emptyEl.style.display = 'none';
+    renderForumPosts(posts);
+  }
+
+  function renderForumPosts(posts) {
+    const container = document.getElementById('sp-forum-posts-container');
+    if (!container) return;
+
+    // 预定义的封面渐变色
+    const coverGradients = [
+      'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+      'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+      'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+      'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+      'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)',
+      'linear-gradient(135deg, #fccb90 0%, #d57eeb 100%)',
+      'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)',
+      'linear-gradient(135deg, #f5576c 0%, #ff9a9e 100%)',
+      'linear-gradient(135deg, #667eea 0%, #00c6fb 100%)',
+    ];
+
+    container.innerHTML = posts.map((post, idx) => {
+      const gradient = coverGradients[idx % coverGradients.length];
+      const coverEmoji = post.coverEmoji || '📝';
+      const avatarEmoji = post.avatarEmoji || '😺';
+      const author = post.author || '匿名用户';
+      const title = post.title || '无题';
+      const content = post.content || '';
+      const likes = typeof post.likes === 'number' ? post.likes : Math.floor(Math.random() * 9000 + 100);
+      const views = typeof post.views === 'number' ? post.views : Math.floor(Math.random() * 90000 + 500);
+      const comments = typeof post.comments === 'number' ? post.comments : Math.floor(Math.random() * 900 + 5);
+      const tags = Array.isArray(post.tags) ? post.tags : [];
+
+      // 格式化数字（1000+ 显示为 1k）
+      const fmtNum = (n) => {
+        if (n >= 10000) return (n / 10000).toFixed(1) + 'w';
+        if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+        return String(n);
+      };
+
+      const tagsHtml = tags.map(t => `<span class="sp-forum-tag">#${t}</span>`).join('');
+
+      return `
+        <div class="sp-forum-card" data-forum-idx="${idx}">
+          <div class="sp-forum-cover" style="background:${gradient};">
+            <span class="sp-forum-cover-emoji">${coverEmoji}</span>
+          </div>
+          <div class="sp-forum-card-body">
+            <div class="sp-forum-title">${title}</div>
+            <div class="sp-forum-content">${content}</div>
+            ${tagsHtml ? `<div class="sp-forum-tags">${tagsHtml}</div>` : ''}
+            <div class="sp-forum-footer">
+              <div class="sp-forum-author">
+                <span class="sp-forum-avatar">${avatarEmoji}</span>
+                <span class="sp-forum-author-name">${author}</span>
+              </div>
+              <div class="sp-forum-stats">
+                <span class="sp-forum-stat">❤️ ${fmtNum(likes)}</span>
+                <span class="sp-forum-stat">👁️ ${fmtNum(views)}</span>
+                <span class="sp-forum-stat">💬 ${fmtNum(comments)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // 点击帖子展开详情
+    container.querySelectorAll('.sp-forum-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const idx = parseInt(card.dataset.forumIdx);
+        const post = posts[idx];
+        if (!post) return;
+        showForumDetail(post);
+      });
+    });
+  }
+
+  function showForumDetail(post) {
+    document.getElementById('sp-forum-detail-overlay')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-forum-detail-overlay';
+    overlay.className = 'sp-confirm-overlay';
+
+    const tagsHtml = (post.tags || []).map(t => `<span class="sp-forum-tag">#${t}</span>`).join('');
+    const fmtNum = (n) => {
+      if (n >= 10000) return (n / 10000).toFixed(1) + 'w';
+      if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+      return String(n);
+    };
+
+    overlay.innerHTML = `
+      <div class="sp-forum-detail-box">
+        <div class="sp-forum-detail-header">
+          <div class="sp-forum-detail-author">
+            <span class="sp-forum-avatar-lg">${post.avatarEmoji || '😺'}</span>
+            <span class="sp-forum-detail-name">${post.author || '匿名'}</span>
+          </div>
+          <button class="sp-forum-detail-close" id="sp-forum-detail-close">✕</button>
+        </div>
+        <div class="sp-forum-detail-body">
+          <div class="sp-forum-detail-title">${post.title || '无题'}</div>
+          <div class="sp-forum-detail-content">${renderMarkdown(post.content || '')}</div>
+          ${tagsHtml ? `<div class="sp-forum-tags" style="margin-top:10px;">${tagsHtml}</div>` : ''}
+        </div>
+        <div class="sp-forum-detail-footer">
+          <span class="sp-forum-stat-lg">❤️ ${fmtNum(post.likes || 0)}</span>
+          <span class="sp-forum-stat-lg">👁️ ${fmtNum(post.views || 0)}</span>
+          <span class="sp-forum-stat-lg">💬 ${fmtNum(post.comments || 0)}</span>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    document.getElementById('sp-forum-detail-close').onclick = () => overlay.remove();
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  }
+
+  async function generateForumPosts() {
+    if (state.forumGenerating) {
+      showBubble('正在生成中，请稍候…', 2000);
+      return;
+    }
+
+    const loadingEl = document.getElementById('sp-forum-loading');
+    const emptyEl = document.getElementById('sp-forum-empty');
+
+    state.forumGenerating = true;
+    if (loadingEl) loadingEl.style.display = '';
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    try {
+      // 构建消息：只包含世界书 + 破限 + 论坛提示词
+      const messages = [];
+
+      // 1. 系统消息：论坛提示词
+      const forumPrompt = settings.forumPrompt || DEFAULT_SETTINGS.forumPrompt;
+      let sysContent = forumPrompt;
+
+      // 2. 拼接世界书内容
+      let worldInfo = '';
+      try { worldInfo = await getWorldBookContent(); } catch(e) { console.warn('[meep-pet] 论坛：世界书加载失败'); }
+      if (worldInfo) {
+        sysContent += '\n\n[世界观设定]\n' + worldInfo;
+      } else {
+        sysContent += '\n\n[世界观设定]\n（未配置世界书，请生成通用的论坛内容）';
+      }
+
+      messages.push({ role: 'system', content: sysContent });
+
+      // 3. 用户消息：触发生成
+      messages.push({ role: 'user', content: '请根据以上世界观设定，生成5到10篇论坛帖子。严格输出JSON数组格式，不要输出任何其他文字。' });
+
+      // 4. 破限（如果有）
+      if (settings.jailbreak) {
+        messages.push({ role: 'system', content: settings.jailbreak });
+      }
+
+      // 调用 API
+      let result = null;
+      if (settings.apiSource === 'tavern') {
+        result = await callViaTavern(messages);
+      } else {
+        result = await callViaCustom(messages);
+      }
+
+      state.forumGenerating = false;
+
+      if (!result) {
+        if (loadingEl) loadingEl.style.display = 'none';
+        showBubble('生成失败了…检查 API 连接？', 3000);
+        renderForumPage();
+        return;
+      }
+
+      // 解析 JSON
+      let posts = [];
+      try {
+        // 尝试提取 JSON 部分（AI 可能会在 JSON 前后加文字）
+        const jsonMatch = result.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          posts = JSON.parse(jsonMatch[0]);
+        } else {
+          posts = JSON.parse(result);
+        }
+      } catch (parseErr) {
+        console.error('[meep-pet] 论坛 JSON 解析失败:', parseErr, result);
+        showBubble('AI 返回格式有误，请重试', 3000);
+        if (loadingEl) loadingEl.style.display = 'none';
+        renderForumPage();
+        return;
+      }
+
+      if (!Array.isArray(posts) || posts.length === 0) {
+        showBubble('生成结果为空，请重试', 2000);
+        if (loadingEl) loadingEl.style.display = 'none';
+        renderForumPage();
+        return;
+      }
+
+      // 存储
+      state.forumPosts = posts;
+      saveData();
+      renderForumPage();
+      showBubble(`📰 生成了 ${posts.length} 篇论坛帖子！`, 3000);
+
+    } catch (err) {
+      state.forumGenerating = false;
+      console.error('[meep-pet] 论坛生成异常:', err);
+      if (loadingEl) loadingEl.style.display = 'none';
+      showBubble(`生成出错: ${err.message}`, 3000);
+      renderForumPage();
+    }
+  }
+
+
+  function renderProfilePage() {
+    // 同步当前值到表单
+    const petNameInput = document.getElementById('sp-pet-name');
+    if (petNameInput) petNameInput.value = settings.petName || '咪噗';
+    const sysPrompt = document.getElementById('sp-system-prompt');
+    if (sysPrompt) sysPrompt.value = settings.systemPrompt || '';
+    const relPrompt = document.getElementById('sp-relationship-prompt');
+    if (relPrompt) relPrompt.value = settings.relationshipPrompt || '';
+    const jb = document.getElementById('sp-jailbreak');
+    if (jb) jb.value = settings.jailbreak || '';
+    const sumPrompt = document.getElementById('sp-summary-prompt');
+    if (sumPrompt) sumPrompt.value = settings.summaryPrompt || '';
+    const extPrompt = document.getElementById('sp-extract-prompt');
+    if (extPrompt) extPrompt.value = settings.extractPrompt || '';
+    const offPrompt = document.getElementById('sp-offline-prompt');
+    if (offPrompt) offPrompt.value = settings.offlinePrompt || '';
+    const onPrompt = document.getElementById('sp-online-prompt');
+    if (onPrompt) onPrompt.value = settings.onlinePrompt || '';
+    const diaryPrompt = document.getElementById('sp-diary-prompt');
+    if (diaryPrompt) diaryPrompt.value = settings.diaryPrompt || '';
+    const userPersona = document.getElementById('sp-user-persona-text');
+    if (userPersona) userPersona.value = settings.userPersonaText || '';
+    // 人设来源单选
+    const cardRadio = document.getElementById('sp-persona-source-card');
+    const manualRadio = document.getElementById('sp-persona-source-manual');
+    if (cardRadio) cardRadio.checked = settings.userPersonaSource === 'card';
+    if (manualRadio) manualRadio.checked = settings.userPersonaSource !== 'card';
+    const manualSection = document.getElementById('sp-persona-manual-section');
+    if (manualSection) manualSection.style.display = settings.userPersonaSource === 'card' ? 'none' : '';
+    // 预设下拉同步
+    const presetSelect = document.getElementById('sp-prompt-preset-select');
+    if (presetSelect) presetSelect.value = settings.currentPreset || '';
   }
 
   function applyAppIcons() {
@@ -5926,6 +6848,10 @@ function toggleChat() {
     bindPhoneEvents();
     applyPhoneWallpaper();
     renderPhoneGrid();
+
+    // 恢复时钟显示状态（防止删页后时钟消失）
+    const phoneClock = document.getElementById('sp-phone-clock');
+    if (phoneClock) phoneClock.style.display = _phoneCurrentPage === 0 ? '' : 'none';
 
     // 锁屏检查
     if (settings.phoneLockScreenEnabled) {
@@ -6175,93 +7101,119 @@ function toggleChat() {
   }
 
 
+  function _createChatRow(msg) {
+    const isPet = msg.role === 'assistant';
+
+    // 消息行（含头像）
+    const row = document.createElement('div');
+    row.className = `sp-chat-row ${isPet ? 'pet' : 'user'}`;
+
+    // 头像（含显隐 + 头像框）
+    const avatarVisible = isPet
+      ? (settings.chatCharAvatarVisible !== false)
+      : (settings.chatUserAvatarVisible !== false);
+
+    const avatar = document.createElement('div');
+    avatar.className = 'sp-chat-avatar';
+
+    if (!avatarVisible) {
+      avatar.style.visibility = 'hidden';
+      avatar.style.width = '0';
+      avatar.style.minWidth = '0';
+      avatar.style.margin = '0';
+      avatar.style.padding = '0';
+      avatar.style.overflow = 'hidden';
+    } else {
+      const avatarUrl = isPet ? settings.chatCharAvatar : settings.chatUserAvatar;
+      const frameUrl = isPet ? settings.chatCharAvatarFrame : settings.chatUserAvatarFrame;
+      if (avatarUrl) {
+        let avatarHtml = `<img src="${avatarUrl}" alt="" />`;
+        if (frameUrl) {
+          avatarHtml += `<img src="${frameUrl}" class="sp-chat-avatar-frame" alt="" />`;
+        }
+        avatar.innerHTML = avatarHtml;
+      } else {
+        avatar.classList.add('sp-chat-avatar-default');
+        avatar.textContent = isPet ? '🐾' : '🧑';
+        if (frameUrl) {
+          avatar.innerHTML = `<span style="font-size:18px;">${isPet ? '🐾' : '🧑'}</span><img src="${frameUrl}" class="sp-chat-avatar-frame" alt="" />`;
+        }
+      }
+    }
+
+    const div = document.createElement('div');
+    div.className = `sp-chat-msg ${isPet ? 'pet' : 'user'}`;
+
+    // 时间戳
+    let timeStr = '';
+    if (msg.timestamp) {
+      const d = new Date(msg.timestamp);
+      timeStr = `<span style="font-size:9px;color:var(--sp-text-muted);opacity:0.6;display:block;margin-bottom:2px;">${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}</span>`;
+    }
+
+    // 如果有图片（表情包）
+    if (msg.image) {
+      div.innerHTML = `${timeStr}<img src="${msg.image}" style="max-width:60px;max-height:60px;border-radius:6px;display:block;margin-bottom:4px;" alt="表情" />`;
+      if (msg.content && msg.content !== '[表情包]') {
+        div.innerHTML += `<span>${renderMarkdown(msg.content)}</span>`;
+      }
+    } else {
+      div.innerHTML = `${timeStr}${renderMarkdown(msg.content)}`;
+    }
+
+    // 桌宠的回复支持右键/长按重新生成
+    if (msg.role === 'assistant') {
+      div.style.cursor = 'context-menu';
+      const doRegenerate = () => {
+        const msgIdx = state.petChatHistory.indexOf(msg);
+        if (msgIdx < 0) return;
+        showRegenConfirm(msgIdx);
+      };
+      div.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        if (document.getElementById('sp-regen-confirm')) return;
+        doRegenerate();
+      });
+      let longPressTimer = null;
+      div.addEventListener('touchstart', () => {
+        longPressTimer = setTimeout(() => { doRegenerate(); }, 600);
+      }, { passive: true });
+      div.addEventListener('touchend', () => { clearTimeout(longPressTimer); });
+      div.addEventListener('touchmove', () => { clearTimeout(longPressTimer); });
+    }
+
+    row.appendChild(avatar);
+    row.appendChild(div);
+    return row;
+  }
+
   function renderChatHistory() {
     const container = document.getElementById('silly-pet-chat-messages');
     if (!container) return;
+
+    const msgs = state.petChatHistory.slice(-30);
+    const existingRows = container.querySelectorAll('.sp-chat-row');
+    const existingCount = existingRows.length;
+
+    // 快速路径：只新增了1条消息（最常见的发送/收到消息场景）
+    if (existingCount > 0 && msgs.length === existingCount + 1) {
+      const newMsg = msgs[msgs.length - 1];
+      const row = _createChatRow(newMsg);
+      container.appendChild(row);
+      container.scrollTop = container.scrollHeight;
+      return;
+    }
+
+    // 快速路径：消息数量没变（重复调用，什么都不做）
+    if (existingCount === msgs.length && existingCount > 0) {
+      container.scrollTop = container.scrollHeight;
+      return;
+    }
+
+    // 完整重绘（编辑/删除/首次加载/消息数量变化超过1条）
     container.innerHTML = '';
-    state.petChatHistory.slice(-30).forEach(msg => {
-      const isPet = msg.role === 'assistant';
-
-      // 消息行（含头像）
-      const row = document.createElement('div');
-      row.className = `sp-chat-row ${isPet ? 'pet' : 'user'}`;
-
-      // 头像（含显隐 + 头像框）
-      const avatarVisible = isPet
-        ? (settings.chatCharAvatarVisible !== false)
-        : (settings.chatUserAvatarVisible !== false);
-
-      const avatar = document.createElement('div');
-      avatar.className = 'sp-chat-avatar';
-
-      if (!avatarVisible) {
-        avatar.style.visibility = 'hidden';
-        avatar.style.width = '0';
-        avatar.style.minWidth = '0';
-        avatar.style.margin = '0';
-        avatar.style.padding = '0';
-        avatar.style.overflow = 'hidden';
-      } else {
-        const avatarUrl = isPet ? settings.chatCharAvatar : settings.chatUserAvatar;
-        const frameUrl = isPet ? settings.chatCharAvatarFrame : settings.chatUserAvatarFrame;
-        if (avatarUrl) {
-          let avatarHtml = `<img src="${avatarUrl}" alt="" />`;
-          if (frameUrl) {
-            avatarHtml += `<img src="${frameUrl}" class="sp-chat-avatar-frame" alt="" />`;
-          }
-          avatar.innerHTML = avatarHtml;
-        } else {
-          avatar.classList.add('sp-chat-avatar-default');
-          avatar.textContent = isPet ? '🐾' : '🧑';
-          if (frameUrl) {
-            avatar.innerHTML = `<span style="font-size:18px;">${isPet ? '🐾' : '🧑'}</span><img src="${frameUrl}" class="sp-chat-avatar-frame" alt="" />`;
-          }
-        }
-      }
-
-      const div = document.createElement('div');
-      div.className = `sp-chat-msg ${isPet ? 'pet' : 'user'}`;
-
-      // 时间戳
-      let timeStr = '';
-      if (msg.timestamp) {
-        const d = new Date(msg.timestamp);
-        timeStr = `<span style="font-size:9px;color:var(--sp-text-muted);opacity:0.6;display:block;margin-bottom:2px;">${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}</span>`;
-      }
-
-      // 如果有图片（表情包）
-      if (msg.image) {
-        div.innerHTML = `${timeStr}<img src="${msg.image}" style="max-width:60px;max-height:60px;border-radius:6px;display:block;margin-bottom:4px;" alt="表情" />`;
-        if (msg.content && msg.content !== '[表情包]') {
-          div.innerHTML += `<span>${renderMarkdown(msg.content)}</span>`;
-        }
-      } else {
-        div.innerHTML = `${timeStr}${renderMarkdown(msg.content)}`;
-      }
-
-      // 桌宠的回复支持右键/长按重新生成
-      if (msg.role === 'assistant') {
-        div.style.cursor = 'context-menu';
-        const doRegenerate = () => {
-          const msgIdx = state.petChatHistory.indexOf(msg);
-          if (msgIdx < 0) return;
-          showRegenConfirm(msgIdx);
-        };
-        div.addEventListener('contextmenu', (e) => {
-          e.preventDefault();
-          if (document.getElementById('sp-regen-confirm')) return;
-          doRegenerate();
-        });
-        let longPressTimer = null;
-        div.addEventListener('touchstart', () => {
-          longPressTimer = setTimeout(() => { doRegenerate(); }, 600);
-        }, { passive: true });
-        div.addEventListener('touchend', () => { clearTimeout(longPressTimer); });
-        div.addEventListener('touchmove', () => { clearTimeout(longPressTimer); });
-      }
-
-      row.appendChild(avatar);
-      row.appendChild(div);
+    msgs.forEach(msg => {
+      const row = _createChatRow(msg);
       container.appendChild(row);
     });
     container.scrollTop = container.scrollHeight;
@@ -6316,6 +7268,9 @@ function toggleChat() {
         renderChatHistory();
         showBubble(reply.split('|||')[0].trim().slice(0, 50) + (reply.length > 50 ? '…' : ''), 4000);
         saveData();
+        // 锁屏通知
+        showLockScreenNotification(reply.split('|||')[0].trim());
+
         checkAchievements();
       petUnsummarizedCount++;
       if (settings.summaryTrigger === 'auto' && settings.autoSummaryRounds > 0 && petUnsummarizedCount >= settings.autoSummaryRounds) {
@@ -9257,8 +10212,6 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
       <div class="sp-settings-body">
         <div class="sp-tabs" id="sp-tabs-bar">
           <div class="sp-tab active" data-tab="api">🔑 API</div>
-          <div class="sp-tab" data-tab="persona">📖 人设</div>
-          <div class="sp-tab" data-tab="prompt">💬 提示词</div>
           <div class="sp-tab" data-tab="behavior">⚙️ 行为</div>
           <div class="sp-tab" data-tab="display">🎨 外观</div>
           <div class="sp-tab" data-tab="memory">🧠 记忆</div>
@@ -9306,105 +10259,6 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
             </div>
           </div>
 
-          <!-- 人设 -->
-          <div class="sp-tab-panel" data-panel="persona">
-            <div class="sp-section">
-              <div class="sp-section-title">角色卡</div>
-              <div class="sp-search-select">
-                <input type="text" id="sp-character-id" value="${settings.characterId}" placeholder="搜索角色卡..." autocomplete="off" />
-                <div class="sp-search-dropdown" id="sp-char-dropdown"></div>
-              </div>
-              <div class="sp-preview-box" id="sp-char-preview" style="display:none;">
-                <div class="sp-preview-header">
-                  <span>📋 角色描述预览</span>
-                  <button class="sp-btn sp-preview-toggle" id="sp-char-preview-toggle">展开</button>
-                </div>
-                <div class="sp-preview-content" id="sp-char-preview-content"></div>
-              </div>
-            </div>
-            <div class="sp-section">
-              <div class="sp-section-title">世界书</div>
-              <div class="sp-search-select">
-                <input type="text" id="sp-worldbook-id" value="${settings.worldBookId}" placeholder="搜索世界书..." autocomplete="off" />
-                <div class="sp-search-dropdown" id="sp-world-dropdown"></div>
-              </div>
-              <div class="sp-preview-box" id="sp-world-preview" style="display:none;">
-                <div class="sp-preview-header">
-                  <span>📋 世界书条目 (<span id="sp-world-count">0</span>)</span>
-                </div>
-                <div class="sp-preview-content sp-world-entries-list" id="sp-world-preview-content"></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 提示词 -->
-          <div class="sp-tab-panel" data-panel="prompt">
-            <div class="sp-section">
-              <div class="sp-section-title">📋 提示词预设</div>
-              <p style="font-size:11px;color:#999;margin-bottom:8px;">快速切换不同的桌宠性格设定，也可以保存当前设定为新预设</p>
-              <select id="sp-prompt-preset-select" style="margin-bottom:8px;">
-                <option value="">— 不使用预设 —</option>
-                ${PROMPT_PRESETS_BUILTIN.map(p => `<option value="builtin:${p.name}" ${settings.currentPreset === 'builtin:' + p.name ? 'selected' : ''}>${p.name}</option>`).join('')}
-                ${(settings.promptPresets || []).map(p => `<option value="custom:${p.name}" ${settings.currentPreset === 'custom:' + p.name ? 'selected' : ''}>⭐ ${p.name}</option>`).join('')}
-              </select>
-              <div class="sp-row" style="flex-wrap:wrap;">
-                <button class="sp-btn" id="sp-preset-apply" type="button">✅ 应用预设</button>
-                <button class="sp-btn" id="sp-preset-save" type="button">💾 保存为预设</button>
-                <button class="sp-btn sp-btn-danger" id="sp-preset-delete" type="button">🗑️ 删除预设</button>
-              </div>
-            </div>
-            <div class="sp-section">
-              <label>桌宠名字</label>
-              <input type="text" id="sp-pet-name" value="${settings.petName || '咪噗'}" placeholder="给桌宠取个名字" />
-            </div>
-            <div class="sp-section">
-              <label>系统提示词</label>
-              <textarea id="sp-system-prompt">${settings.systemPrompt}</textarea>
-            </div>
-            <div class="sp-section">
-              <div class="sp-section-title">🤝 与 {{user}} 的关系</div>
-              <p style="font-size:11px;color:#999;margin-bottom:8px;">描述桌宠和主人之间的关系、称呼、互动方式等。会自动注入系统提示词。</p>
-              <textarea id="sp-relationship-prompt" placeholder="例如：你是主人养了三年的小猫咪，最喜欢蹭主人的手。主人叫你"小团子"，你叫主人"铲屎官"。">${settings.relationshipPrompt}</textarea>
-            </div>
-            <div class="sp-section">
-              <div class="sp-section-title">👤 {{user}} 人设</div>
-              <div class="sp-radio-group">
-                <label class="sp-radio"><input type="radio" name="sp-user-persona-source" value="card" id="sp-persona-source-card" ${settings.userPersonaSource === 'card' ? 'checked' : ''} /><span>从酒馆当前 Persona 获取</span></label>
-                <label class="sp-radio"><input type="radio" name="sp-user-persona-source" value="manual" id="sp-persona-source-manual" ${settings.userPersonaSource !== 'card' ? 'checked' : ''} /><span>手动填写</span></label>
-              </div>
-              <div id="sp-persona-manual-section" ${settings.userPersonaSource === 'card' ? 'style="display:none;"' : ''}>
-                <textarea id="sp-user-persona-text" placeholder="描述主人的身份、性格、外貌等…">${settings.userPersonaText}</textarea>
-              </div>
-            </div>
-            <div class="sp-section">
-              <div class="sp-section-title">🌙 线下提示词</div>
-              <p style="font-size:11px;color:#999;margin-bottom:8px;">开启线下模式时会追加到系统提示词中。在聊天框右上角点 🌙 切换。</p>
-              <textarea id="sp-offline-prompt">${settings.offlinePrompt}</textarea>
-            </div>
-            <div class="sp-section">
-              <div class="sp-section-title">💬 线上提示词</div>
-              <p style="font-size:11px;color:#999;margin-bottom:8px;">开启线上模式时会追加到系统提示词中。AI回复中的 ||| 会被自动拆分为多条消息，模拟真实线上聊天效果。在聊天框右上角点模式按钮切换（🐾→💬→🌙 循环）。</p>
-              <textarea id="sp-online-prompt">${settings.onlinePrompt}</textarea>
-            </div>
-            <div class="sp-section">
-              <label>破限 (Jailbreak)</label>
-              <textarea id="sp-jailbreak">${settings.jailbreak}</textarea>
-            </div>
-            <div class="sp-section">
-              <label>总结提示词</label>
-              <textarea id="sp-summary-prompt">${settings.summaryPrompt}</textarea>
-            </div>
-            <div class="sp-section">
-              <div class="sp-section-title">📔 日记提示词</div>
-              <p style="font-size:11px;color:#999;margin-bottom:8px;">生成日记时使用的提示词。桌宠会根据你选择的记忆和聊天范围来写日记。</p>
-              <textarea id="sp-diary-prompt">${settings.diaryPrompt || '请以桌宠的第一人称视角，根据以下信息写一篇简短的日记（100-200字）。记录今天发生的有趣的事、和主人的互动、心情变化等。语气要符合桌宠的性格设定。'}</textarea>
-            </div>
-            <div class="sp-section">
-              <label>AI提取记忆提示词</label>
-              <p style="font-size:11px;color:#999;margin-bottom:8px;">用于"🤖 AI提取记忆"按钮。对话内容会自动追加在后面。</p>
-              <textarea id="sp-extract-prompt">${settings.extractPrompt}</textarea>
-            </div>
-          </div>
 
           <!-- 行为 -->
           <div class="sp-tab-panel" data-panel="behavior">
@@ -9419,7 +10273,6 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
               <input type="number" id="sp-peek-rounds" value="${settings.peekRounds}" min="1" max="20" />
               <label>桌宠聊天读取轮数</label>
               <input type="number" id="sp-pet-chat-rounds" value="${settings.petChatRounds}" min="1" max="100" />
-              <div class="sp-row"><label style="margin:0;"><input type="checkbox" id="sp-enable-time-awareness" ${settings.enableTimeAwareness ? 'checked' : ''} /> 启用时间感知（桌宠知道当前时间）</label></div>
               <label>走动频率: <span id="sp-wander-display">${settings.wanderInterval}s</span></label>
               <input type="range" id="sp-wander-interval" min="3" max="30" value="${settings.wanderInterval}" />
               <p style="font-size:11px;color:#999;margin:4px 0 12px;">3s频繁走 ─ 15s偶尔 ─ 30s基本不动</p>
@@ -9642,6 +10495,7 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
               <div id="sp-status-overview"></div>
             </div>
           </div>
+
           <!-- 使用说明 -->
           <div class="sp-tab-panel" data-panel="guide">
             <div class="sp-section">
@@ -9653,11 +10507,11 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
                 <div class="sp-guide-details-content">
                   <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
                     <strong style="color:var(--sp-text-primary);">1. 配置 API</strong><br/>
-                    「🔑 API」标签页 → 选「使用酒馆当前 API」（零配置）或手动填写独立 API Key + Base URL。<br/><br/>
-                    <strong style="color:var(--sp-text-primary);">2. 选个性格</strong><br/>
-                    「💬 提示词」→「📋 预设」→ 选一个 → 点「✅ 应用」→ 底部「💾 保存」。<br/><br/>
+                    在「🔑 API」标签页选择「使用酒馆当前 API」（零配置）或手动填写独立 API Key + Base URL。可选开启流式输出、视觉识别。<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">2. 设定性格</strong><br/>
+                    打开手机界面 → 📇通讯录关联角色卡/世界书→ 👤个人主页选择提示词预设或手动编写。<br/><br/>
                     <strong style="color:var(--sp-text-primary);">3. 开始互动</strong><br/>
-                    点击/双击桌宠打开菜单 → 💬聊天 → 输入消息按Enter 发送，点➤ 让AI 回复。
+                    点击桌宠（手机端双击）打开菜单 → 💬聊天 → 输入消息按Enter 发送，点➤ 让AI 回复。
                   </p>
                 </div>
               </details>
@@ -9666,29 +10520,71 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
                 <summary class="sp-guide-summary">🐾 基础操作</summary>
                 <div class="sp-guide-details-content">
                   <div class="sp-guide-table">
-                    <div class="sp-guide-row"><span class="sp-guide-key">点击桌宠</span><span class="sp-guide-val">打开菜单（手机双击）</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">拖拽桌宠</span><span class="sp-guide-val">移动位置，拖到边缘自动吸附</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">🍖 投喂</span><span class="sp-guide-val">恢复饱食度（从背包选物品）</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">🛁 洗澡</span><span class="sp-guide-val">恢复清洁度</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">🛏️ 睡觉</span><span class="sp-guide-val">恢复精力值</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">📔 日记</span><span class="sp-guide-val">AI 以桌宠视角写日记</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">🏠 小屋</span><span class="sp-guide-val">立绘+对话+换装的沉浸空间</span></div>
-                </div>
-                  <p style="font-size:11px;color:#999;margin-top:8px;">三项状态随时间下降。低于20%时心情变差（困/饿/脏），影响对话语气。</p>
+                    <div class="sp-guide-row"><span class="sp-guide-key">点击桌宠</span><span class="sp-guide-val">打开圆形发散菜单（手机双击）</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">拖拽桌宠</span><span class="sp-guide-val">移动位置，拖到屏幕边缘自动吸附挂起</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">🍖 投喂</span><span class="sp-guide-val">恢复饱食度，从背包/冰箱/糖葫芦/餐厅出餐台选物品</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">🛁 洗澡</span><span class="sp-guide-val">恢复清洁度，从背包选洗护道具</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">🛏️ 睡觉</span><span class="sp-guide-val">恢复精力值，从背包选睡眠道具</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">💬 聊天</span><span class="sp-guide-val">打开手机界面，包含聊天、设置、书架等App</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">📔 日记</span><span class="sp-guide-val">选择记忆和聊天范围，AI 以桌宠视角写日记</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">🎮 游戏</span><span class="sp-guide-val">打开游戏选择器，8种小游戏 + 抽奖 + 成就</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">🏠 小屋</span><span class="sp-guide-val">沉浸式立绘对话空间，含换装系统</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">⚙️ 设置</span><span class="sp-guide-val">打开悬浮设置面板</span></div>
+                  </div>
+                  <p style="font-size:11px;color:#999;margin-top:8px;">三项状态随时间自然下降，低于 20% 时心情变差（困/饿/脏），影响对话语气。离线后回来会根据时间计算衰减。</p>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">💬 聊天框</summary>
+                <summary class="sp-guide-summary">📱 手机界面</summary>
+                <div class="sp-guide-details-content">
+                  <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
+                    点击菜单的「💬 聊天」打开手机界面，包含以下 App：<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">💬 聊天</strong> — 与桌宠对话，支持三种模式切换<br/>
+                    <strong style="color:var(--sp-text-primary);">⚙️ 设置</strong> — 时间显示、电量、天气、锁屏密码、时间感知、自动消息<br/>
+                    <strong style="color:var(--sp-text-primary);">🎨 主题</strong> — 主屏壁纸、App 图标自定义<br/>
+                    <strong style="color:var(--sp-text-primary);">📚 书架</strong> — 导入漫画(图片/ZIP/PDF)、小说(TXT/EPUB)阅读<br/>
+                    <strong style="color:var(--sp-text-primary);">📇 通讯录</strong> — 关联酒馆角色卡和世界书<br/>
+                    <strong style="color:var(--sp-text-primary);">👤 个人主页</strong> — 桌宠名字、系统提示词、预设管理、关系描述、各类提示词编辑<br/>
+                    <strong style="color:var(--sp-text-primary);">📰 论坛</strong> — 根据世界书生成论坛风格帖子<br/>
+                    <strong style="color:var(--sp-text-primary);">📝 同人文</strong> — AI 生成/续写同人文，支持自己创作<br/><br/>
+                    长按 App 图标进入编辑模式，可拖拽排序、添加小组件（拍立得/相框/便签/日历/自定义HTML）。支持多页（最多5页），左右滑动翻页。<br/>
+                    锁屏功能可在 ⚙️ 设置中开启，支持密码保护和消息通知悬浮。
+                  </p>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">💬 聊天系统</summary>
                 <div class="sp-guide-details-content">
                   <div class="sp-guide-table">
-                    <div class="sp-guide-row"><span class="sp-guide-key">📨 发送</span><span class="sp-guide-val">只发消息不回复（可连发多条）</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">➤ 生成</span><span class="sp-guide-val">发送+触发 AI 回复</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">Enter</span><span class="sp-guide-val">等同于📨发送</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">😺 表情</span><span class="sp-guide-val">上传/发送自定义表情包</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">🐾💬🌙</span><span class="sp-guide-val">切换桌宠/线上（多条消息）/线下模式</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">右键回复</span><span class="sp-guide-val">重新生成桌宠的回复</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">📨 发送</span><span class="sp-guide-val">只发消息不触发 AI 回复，可连发多条</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">➤ 生成</span><span class="sp-guide-val">发送当前输入 + 触发 AI 回复</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">Enter</span><span class="sp-guide-val">等同于 📨 发送</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">😺 表情</span><span class="sp-guide-val">打开表情面板，可上传/发送/右键编辑/删除</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">模式切换</span><span class="sp-guide-val">🐾 桌宠 →💬 线上（多条||| 分隔）→🌙 线下</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">右键/长按回复</span><span class="sp-guide-val">重新生成该条及之后的桌宠回复</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">⚙️ 聊天设置</span><span class="sp-guide-val">备注名、头像、头像框、头像显隐、聊天背景</span></div>
                   </div>
+                  <p style="font-size:11px;color:#999;margin-top:8px;">开启「视觉识别」后，发送的表情包图片会以多模态格式发给AI。开启「自动消息」后桌宠会按设定间隔主动发消息。</p>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">🏠 桌宠小屋 & 👗 换装</summary>
+                <div class="sp-guide-details-content">
+                  <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
+                    小屋是沉浸式立绘对话空间（2:3 竖屏），带打字机效果和关键词表情匹配。<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">场景构成：</strong>房间背景 + 人物立绘 + 底部毛玻璃对话区<br/>
+                    <strong style="color:var(--sp-text-primary);">右侧按钮：</strong>🍖喂食🛁洗澡 🛏️睡觉 👗更衣（各按钮均可自定义图标）<br/>
+                    <strong style="color:var(--sp-text-primary);">对话框：</strong>支持输入对话、重新生成、展开/收起/折叠<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">👗 更衣系统：</strong><br/>
+                    点击小屋右侧👗按钮弹出快捷面板，可快速切换服装。点击⚙️进入更衣设置弹窗：<br/>
+                    • 新建/编辑/删除服装套装<br/>
+                    • 每套服装含独立的：默认立绘、喂食/洗澡/睡觉动作立绘、表情立绘组<br/>
+                    • 全局设置：房间背景、对话框头像、各按钮图标<br/>
+                    • 表情立绘通过关键词匹配，对话中出现对应词自动切换立绘
+                  </p>
                 </div>
               </details>
 
@@ -9696,11 +10592,11 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
                 <summary class="sp-guide-summary">🧠 记忆系统</summary>
                 <div class="sp-guide-details-content">
                   <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                    桌宠记忆分三层：<br/>
-                    •<strong style="color:var(--sp-text-primary);">对话记录</strong> — 最近N轮聊天，直接进上下文<br/>
-                    • <strong style="color:var(--sp-text-primary);">记忆条目</strong> — 手动添加或AI提取的关键信息（⭐1~5星优先级）<br/>
-                    • <strong style="color:var(--sp-text-primary);">对话总结</strong> — 用AI压缩旧对话，长期保留<br/><br/>
-                    在「🧠 记忆」标签页可手动管理。点「手动总结」选范围后AI生成总结，旧记录自动归档。
+                桌宠记忆分三层，发送API 时自动拼入上下文：<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">对话记录</strong> — 最近 N轮聊天（可在行为设置中调整轮数）<br/>
+                    <strong style="color:var(--sp-text-primary);">记忆条目</strong> — 手动添加或🤖AI提取，支持标签和⭐1~5 星优先级排序<br/>
+                    <strong style="color:var(--sp-text-primary);">对话总结</strong> — 手动触发 AI 压缩旧对话，支持增量/覆盖/追加三种策略<br/><br/>
+                    在「🧠 记忆」标签页管理。点「手动总结」可选范围后AI 生成总结，确认后旧记录自动归档。归档记录可查看或导出。
                   </p>
                 </div>
               </details>
@@ -9709,14 +10605,55 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
                 <summary class="sp-guide-summary">🎨 外观定制</summary>
                 <div class="sp-guide-details-content">
                   <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                    「🎨 外观」标签页可设置：<br/>
-                    • <strong style="color:var(--sp-text-primary);">主题配色</strong> — 8种预设 + 自定义RGB<br/>
-                    • <strong style="color:var(--sp-text-primary);">精灵图</strong> — 闲置/走路/睡觉/吃东西/洗澡/拖拽/挂墙等状态图（支持GIF动图）<br/>
-                    • <strong style="color:var(--sp-text-primary);">菜单图标</strong> — 替换圆形菜单按钮的emoji<br/>
-                    • <strong style="color:var(--sp-text-primary);">互动贴图</strong> — 投喂/洗澡/睡觉时飘出的物品图<br/>
-                    • <strong style="color:var(--sp-text-primary);">心情图标</strong> — 替换右上角状态emoji<br/>
-                    • <strong style="color:var(--sp-text-primary);">桌宠大小</strong> — 0.5x~2.0x 自由缩放<br/><br/>
-                    🏠 小屋立绘在「更衣系统」中管理（小屋右侧👗按钮）。
+                    在「🎨 外观」标签页设置：<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">主题配色</strong> — 8 种预设（深色/赛博/粉色/深海/森林/淡蓝/淡紫/淡黄）+ 自定义 RGB，可导出/导入主题文件<br/>
+                    <strong style="color:var(--sp-text-primary);">精灵图</strong> — 17 种状态图（闲置/四方向走路/睡觉/开心/难过/拖拽/晕乎/吃东西/洗澡/打招呼/思考/三方向挂墙），支持 GIF 动图和 URL 链接，每个可调播放时长<br/>
+                    <strong style="color:var(--sp-text-primary);">菜单图标</strong> — 替换 8 个圆形菜单按钮和 3 个聊天按钮的图标<br/>
+                    <strong style="color:var(--sp-text-primary);">自定义动作</strong> — 添加额外动作精灵图，桌宠闲逛时随机播放<br/>
+                    <strong style="color:var(--sp-text-primary);">互动贴图</strong> — 投喂/洗澡/睡觉时飘出的物品图<br/>
+                    <strong style="color:var(--sp-text-primary);">心情图标</strong> — 替换右上角 6 种心情的emoji<br/>
+                    <strong style="color:var(--sp-text-primary);">桌宠大小</strong> — 0.5x~2.0x 自由缩放<br/>
+                    <strong style="color:var(--sp-text-primary);">状态条</strong> — 可显示/隐藏底部饱食/清洁/精力条
+                  </p>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">📚 书架 & 阅读器</summary>
+                <div class="sp-guide-details-content">
+                  <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
+                    手机界面的📚书架 App，支持导入和阅读：<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">支持格式：</strong>图片(漫画)、ZIP 压缩包、PDF、TXT 小说、EPUB 电子书<br/>
+                    <strong style="color:var(--sp-text-primary);">书架功能：</strong>搜索、排序（时间/名称/最近读）、标签分类、网格/列表布局切换、封面自定义、最近阅读历史<br/>
+                    <strong style="color:var(--sp-text-primary);">阅读器：</strong>触摸/点击翻页、进度滑轨、目录跳转、字号调节、沉浸模式（自动隐藏工具栏）<br/>
+                    <strong style="color:var(--sp-text-primary);">阅读设置：</strong>背景颜色/背景图（含透明度和明暗调节）、字体选择（内置+本地文件+网络URL+CSS @import 导入）<br/>
+                    <strong style="color:var(--sp-text-primary);">书签：</strong>长按段落添加书签/高亮，可附带笔记<br/>
+                    <strong style="color:var(--sp-text-primary);">数据：</strong>支持备份/还原整个书架（含所有页面数据）
+                  </p>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">🎮 游戏系统</summary>
+                <div class="sp-guide-details-content">
+                  <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
+                    所有游戏共享 <strong style="color:#ffb347;">🪙金币</strong> 和 <strong style="color:var(--sp-status-energy);">⚡体力</strong>（每 5 分钟恢复 1 点）。点游戏选择弹窗的<strong style="color:var(--sp-text-primary);">❓</strong> 按钮可查看详细规则。<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">🐱 小猫餐厅</strong> — 经营猫咪餐厅，烹饪上菜赚金币。声望升级解锁新菜谱和客人（10级体系）。食材来自冰箱/货架/进货区<br/>
+                    <strong style="color:var(--sp-text-primary);">🧶 合成工坊</strong> — 9 条合成链（含调料链↔餐厅实时同步），猫爪生成→合成升级→完成订单→商店买道具<br/>
+                    <strong style="color:var(--sp-text-primary);">🃏 消消看</strong> — 多层堆叠图案牌，收集到暂存栏凑三消。消除产出食材/调料/道具联动<br/>
+                    <strong style="color:var(--sp-text-primary);">🔗 连连看</strong> — 相同图案两折连线消除。8×8~18×18 随机棋盘，同样有物品联动产出<br/>
+                    <strong style="color:var(--sp-text-primary);">🧊 冰箱整理</strong> — 把食材塞进随机大小冰箱，含异形食材和旋转。塞进去的存入冰箱库存<br/>
+                    <strong style="color:var(--sp-text-primary);">🍢糖葫芦工坊</strong> — 水果排序归类。通关产出糖葫芦可卖/投喂/餐厅甜品上菜<br/>
+                    <strong style="color:var(--sp-text-primary);">🛒 整理货架</strong> — 货架三消，消除的商品按类型进入对应库存（冰箱/道具/调料等）<br/>
+                    <strong style="color:var(--sp-text-primary);">🎰幸运抽奖</strong> — 三档奖池，产出金币/各类道具/棋盘物品/食材/糖葫芦等<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">🎒 总背包</strong> — 查看所有道具和物资汇总<br/>
+                    <strong style="color:var(--sp-text-primary);">🏆 成就</strong> — 300+ 个成就，解锁后可领取金币/体力/道具奖励，支持一键领取<br/>
+                    <strong style="color:var(--sp-text-primary);">📖 图鉴合集</strong> — 所有游戏图鉴汇总，支持搜索、查漏补缺、联动物品共享图片。包含游戏图标自定义<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">核心联动：</strong><br/>
+                    冰箱/货架 → 餐厅食材 → 烹饪出菜 → 投喂桌宠<br/>
+                    工坊调料链↔ 餐厅调料 |糖葫芦 → 卖/喂/上菜<br/>
+                    消消看+连连看消除 → 食材/调料/道具 |抽奖 → 各类物品<br/>
+                    金币 → 商店道具 → 投喂/洗澡/睡觉时消耗
                   </p>
                 </div>
               </details>
@@ -9724,50 +10661,61 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
               <details class="sp-guide-details">
                 <summary class="sp-guide-summary">💾 数据管理</summary>
                 <div class="sp-guide-details-content">
-                  <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                    • <strong style="color:var(--sp-text-primary);">多桌宠存档</strong> — 保存/加载不同桌宠配置（含聊天记录/图片/游戏进度）<br/>
-                    • <strong style="color:var(--sp-text-primary);">导出/导入</strong> — 完整备份为JSON文件，也可单独导出图片<br/>
-                    • <strong style="color:var(--sp-text-primary);">GitHub托管</strong> — 将本地图片上传到你的GitHub仓库，释放空间<br/><br/>
-                    <span style="color:#f66;">⚠️ 换浏览器/清缓存 = 数据丢失！务必定期导出备份</span>
+                  <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;"><strong style="color:var(--sp-text-primary);">多桌宠存档</strong> — 保存/加载/删除不同桌宠配置（含聊天记录、图片、游戏进度全部状态）<br/>
+                    <strong style="color:var(--sp-text-primary);">导出/导入</strong> — 完整备份为 JSON 文件，也可单独导出/导入图片配置<br/>
+                    <strong style="color:var(--sp-text-primary);">☁️ GitHub 图片托管</strong> — 配置 Token 和仓库后，一键将所有 base64 图片上传到 GitHub 仓库并替换为 CDN 链接，大幅释放本地存储空间<br/>
+                    <strong style="color:var(--sp-text-primary);">危险操作</strong> — 清空所有聊天数据、重置全部数据（不可撤销）<br/>
+                    <strong style="color:var(--sp-text-primary);">状态总览</strong> — 查看当前状态、存储空间占用、Token 估算<br/><br/>
+                    <span style="color:#f66;">⚠️ 数据存储在浏览器 IndexedDB 中，换浏览器/清缓存 = 数据丢失！务必定期导出备份。</span>
                   </p>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">⚡斜杠指令</summary>
+                <summary class="sp-guide-summary">⚙️ 行为设置</summary>
                 <div class="sp-guide-details-content">
-                  <div class="sp-guide-table">
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet status</span><span class="sp-guide-val">查看状态</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet feed</span><span class="sp-guide-val">投喂</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet bath</span><span class="sp-guide-val">洗澡</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet sleep</span><span class="sp-guide-val">睡觉</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet summon</span><span class="sp-guide-val">召唤到屏幕中心（跑飞了用这个）</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet toggle</span><span class="sp-guide-val">显示/隐藏桌宠</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet chat你好</span><span class="sp-guide-val">隔空发消息给桌宠</span></div>
-                  </div>
+                  <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
+                    在「⚙️ 行为」标签页可调节：<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">活跃度</strong> — 0% 安静 ~ 100% 话痨，控制闲逛时碎碎念和自动评论频率<br/>
+                    <strong style="color:var(--sp-text-primary);">自动反应</strong> — 是否监听酒馆主聊天并自动发表旁观评论<br/>
+                    <strong style="color:var(--sp-text-primary);">冷却/窥探/聊天轮数</strong> — 控制反应间隔、读取酒馆聊天范围、桌宠聊天上下文长度<br/>
+                    <strong style="color:var(--sp-text-primary);">走动频率</strong> — 3s 频繁走动 ~ 30s 基本不动<br/>
+                    <strong style="color:var(--sp-text-primary);">总结策略</strong> — 手动/自动触发，增量合并/覆盖/追加，可设置总结后保留条数<br/>
+                    <strong style="color:var(--sp-text-primary);">离线衰减</strong> — 衰减率和安全阈值<br/>
+                    <strong style="color:var(--sp-text-primary);">反应语言</strong> — 自定义投喂/洗澡/睡觉/拖拽/闲逛/回归等场景的反应文案（用| 分隔多条随机）
+                  </p>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🎮 游戏系统概览</summary>
+                <summary class="sp-guide-summary">⚡ 斜杠指令</summary>
+                <div class="sp-guide-details-content">
+                  <div class="sp-guide-table">
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet status</span><span class="sp-guide-val">查看桌宠状态（饱食/清洁/精力/心情）</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet feed</span><span class="sp-guide-val">投喂</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet bath</span><span class="sp-guide-val">洗澡</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet sleep</span><span class="sp-guide-val">睡觉</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet summon</span><span class="sp-guide-val">强行召唤到屏幕正中心（桌宠跑飞了用这个）</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet toggle</span><span class="sp-guide-val">显示/隐藏桌宠</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">/pet chat &lt;内容&gt;</span><span class="sp-guide-val">在酒馆输入框隔空给桌宠发消息</span></div></div>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">✏️ 自定义 CSS</summary>
                 <div class="sp-guide-details-content">
                   <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                    所有游戏共享<strong style="color:#ffb347;">🪙金币</strong> 和 <strong style="color:var(--sp-status-energy);">⚡体力</strong>（每5分钟恢复1点）。<br/><br/>
-                    8种小游戏 + 抽奖 + 总背包 + 成就 + 图鉴合集。<br/>
-                    游戏产出的物品可以投喂桌宠、烹饪菜品、卖金币。<br/>
-                    详细规则点游戏选择弹窗右上角的<strong style="color:var(--sp-text-primary);">❓</strong> 按钮查看。<br/><br/>
-                    <strong style="color:var(--sp-text-primary);">联动一句话总结：</strong><br/>
-                    冰箱/货架产食材 → 餐厅烹饪 → 出菜投喂桌宠<br/>
-                    工坊产调料 → 餐厅做菜 /卖金币<br/>
-                    糖葫芦 → 卖金币 / 投喂 / 餐厅甜品上菜<br/>
-                    消消看+连连看 → 消除产联动物品（食材/调料/道具）<br/>
-                    抽奖 → 各类道具和物品<br/>
-                    金币 → 商店买道具 → 投喂/洗澡/睡觉消耗
+                    在「✏️ 自定义CSS」标签页编写 CSS 代码美化插件界面。<br/><br/>
+                    • 点「▶ 实时预览」立即查看效果，不满意可撤销<br/>
+                    • 点底部「💾 保存所有设置」永久生效<br/>
+                    • 支持导出/导入 .css 文件<br/>
+                    • 标签页下方提供了所有选择器参考（桌宠主体、聊天框、设置面板、小屋、日记、各游戏面板、弹窗、CSS 变量等），展开对应分类即可查看
                   </p>
                 </div>
               </details>
             </div>
           </div>
+
           <!-- 自定义CSS -->
           <div class="sp-tab-panel" data-panel="customcss">
             <div class="sp-section">
@@ -9785,213 +10733,533 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
                 <input type="file" id="sp-custom-css-import-file" accept=".css,.txt" style="display:none;" />
               </div>
             </div>
-            <div class="sp-section">
-              <div class="sp-section-title">💡 常用选择器参考</div>
+            <div class="sp-section"><div class="sp-section-title">💡 常用选择器参考</div>
+              <p style="font-size:11px;color:var(--sp-text-muted);margin-bottom:12px;">按功能模块分类，每个选择器附带简短说明。在「✏️ 自定义CSS」标签页中使用。</p>
+
               <details class="sp-guide-details">
                 <summary class="sp-guide-summary">🐾 桌宠主体</summary>
                 <div class="sp-guide-details-content">
-                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 桌宠容器（整个桌宠的外层盒子）===== */
-#silly-pet-container { }
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 桌宠容器 ===== */
+#silly-pet-container { }              /* 最外层定位盒子，fixed定位 */
+#silly-pet-container.dragging { }     /* 拖拽中（transition:none） */
 
-/* ===== 精灵图（桌宠本体图片）===== */
-#silly-pet-sprite { }
+/* ===== 精灵图 ===== */
+#silly-pet-sprite { }                 /*桌宠本体图片区域 */
+#silly-pet-sprite.idle { }            /* 闲置状态（bob动画） */
+#silly-pet-sprite.sleep { }           /* 睡觉状态（变暗+慢bob） */
+#silly-pet-sprite.eating { }          /* 吃东西状态（摇摆动画） */
+#silly-pet-sprite.bathing { }         /* 洗澡状态（左右晃动画） */
+#silly-pet-sprite.flip { }            /* 水平翻转（走路方向） */
 
-/* ===== 气泡（桌宠说话的对话气泡）===== */
-#silly-pet-bubble { }
-#silly-pet-bubble.visible { }
-#silly-pet-bubble::after { }
+/* ===== 对话气泡 ===== */
+#silly-pet-bubble { }/* 气泡容器（默认隐藏） */
+#silly-pet-bubble.visible { }/* 气泡显示时*/
+#silly-pet-bubble::after { }          /* 气泡底部小三角 */
 
-/* ===== 心情图标（右上角emoji）===== */
-#silly-pet-mood { }
+/* ===== 心情图标 ===== */
+#silly-pet-mood { }                   /* 右上角心情emoji/图片 */
 
-/* ===== 状态条（底部饱食/清洁/精力三条）===== */
-#silly-pet-status-bar { }
-#silly-pet-status-bar.visible { }
-.sp-stat { }
-.sp-stat-icon { }
-.sp-stat-bar { }
-.sp-stat-fill { }
-.sp-stat-fill.hunger { }
-.sp-stat-fill.clean { }
-.sp-stat-fill.energy { }
-.sp-stat-pct { }
+/* ===== 状态条 ===== */
+#silly-pet-status-bar { }             /* 底部三条状态栏容器 */
+#silly-pet-status-bar.visible { }     /* 菜单打开时显示 */
+.sp-stat { }                          /* 单条状态行 */
+.sp-stat-icon { }                     /* 状态图标emoji */
+.sp-stat-bar { }                      /* 进度条背景槽 */
+.sp-stat-fill { }                     /* 进度条填充 */
+.sp-stat-fill.hunger { }              /* 饱食度（橙色） */
+.sp-stat-fill.clean { }               /* 清洁度（蓝色） */
+.sp-stat-fill.energy { }              /* 精力值（绿色） */
+.sp-stat-pct { }                      /* 百分比数字 */
 
-/* ===== 菜单按钮（圆形发散的8个按钮）===== */
-#silly-pet-menu { }
-#silly-pet-menu.visible { }
-.sp-menu-btn { }
-.sp-menu-btn.has-custom-icon { }
-.sp-menu-btn[data-action="feed"] { }
-.sp-menu-btn[data-action="bath"] { }
-.sp-menu-btn[data-action="sleep"] { }
-.sp-menu-btn[data-action="chat"] { }
-.sp-menu-btn[data-action="diary"] { }
-.sp-menu-btn[data-action="game"] { }
-.sp-menu-btn[data-action="house"] { }
-.sp-menu-btn[data-action="settings"] { }
+/* ===== 菜单按钮（圆形发散） ===== */
+#silly-pet-menu { }                   /* 菜单容器（绝对定位原点） */
+#silly-pet-menu.visible { }           /* 菜单展开时 */
+.sp-menu-btn { }                      /* 单个圆形按钮（共8个） */
+.sp-menu-btn.has-custom-icon { }      /* 有自定义图标时（去边框） */
+.sp-menu-btn:hover { }                /* 悬停放大发光 */
+.sp-menu-btn[data-action="feed"] { }  /* 投喂按钮 */
+.sp-menu-btn[data-action="bath"] { }  /* 洗澡按钮 */
+.sp-menu-btn[data-action="sleep"] { } /* 睡觉按钮 */
+.sp-menu-btn[data-action="chat"] { }  /* 聊天按钮 */
+.sp-menu-btn[data-action="diary"] { } /* 日记按钮 */
+.sp-menu-btn[data-action="game"] { }  /* 游戏按钮 */
+.sp-menu-btn[data-action="house"] { } /* 小屋按钮 */
+.sp-menu-btn[data-action="settings"] { } /* 设置按钮 */
+.sp-menu-btn img { }                  /* 自定义图标图片 */
 
-/* ===== 互动贴图（投喂/洗澡/睡觉时飘出的物品）===== */
-#silly-pet-interaction-item { }
-#silly-pet-interaction-item.active { }
-#silly-pet-interaction-item img { }</pre>
+/* ===== 互动贴图 ===== */
+#silly-pet-interaction-item { }       /* 投喂/洗澡/睡觉飘出的物品 */
+#silly-pet-interaction-item.active { } /* 出现时 */
+#silly-pet-interaction-item.floating { } /* 飘动动画中 */
+#silly-pet-interaction-item img { }   /* 贴图图片 */</pre>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">💬 聊天框（手机界面）</summary>
+                <summary class="sp-guide-summary">📱 手机界面 — 外壳 & 主屏</summary>
                 <div class="sp-guide-details-content">
-                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 聊天面板容器（手机外壳）===== */
-#silly-pet-chat { }
-#silly-pet-chat.visible { }
-#silly-pet-chat.sp-chat-minimized { }
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 手机外壳 ===== */
+#silly-pet-chat { }                   /* 手机容器（圆角矩形） */
+#silly-pet-chat.visible { }           /* 显示时 */
+#silly-pet-chat.sp-chat-minimized { } /* 折叠/最小化时 */
+#silly-pet-chat::before { }           /* 壁纸背景伪元素层 */
 
-/* ===== 手机状态栏（可拖拽）===== */
-#sp-phone-statusbar { }
-#sp-phone-status-time { }
-#sp-phone-status-right { }
-#sp-phone-signal { }
-#sp-phone-battery { }
+/* ===== 状态栏（顶部，可拖拽） ===== */
+#sp-phone-statusbar { }              /* 时间+信号+电池 */
+#sp-phone-status-time { }            /* 时间文字 */
+#sp-phone-status-right { }           /* 右侧信号+电池区 */
+#sp-phone-signal { }                 /* 信号SVG图标 */
+#sp-phone-battery { }                /* 电池SVG图标 */
 
-/* ===== 手机主页 ===== */
-#sp-phone-home { }
-#sp-phone-clock { }
-#sp-phone-clock-time { }
-#sp-phone-clock-date { }
-#sp-phone-clock-weather { }
-#sp-phone-apps { }
-.sp-phone-app { }
-.sp-phone-app-icon { }
-.sp-phone-app-name { }
-#sp-phone-home-actions { }
-#sp-phone-minimize { }
-#sp-phone-close { }
+/* ===== 手机主体 ===== */
+#sp-phone-body { }                   /* 状态栏下方的主体区域 */
 
-/* ===== 手机页面通用 ===== */
-.sp-phone-page { }
-.sp-phone-page.active { }
-.sp-phone-page-header { }
-.sp-phone-back { }
-.sp-phone-page-content { }
-.sp-phone-setting-block { }
-.sp-phone-setting-title { }
-.sp-phone-radio { }
-.sp-phone-switch-row { }
-.sp-phone-btn { }
-.sp-phone-btn-primary { }
-.sp-phone-wallpaper-preview { }
+/* ===== 主屏首页 ===== */
+#sp-phone-home { }                   /* 主屏页面 */
+#sp-phone-clock { }                  /* 时钟区域容器 */
+#sp-phone-clock-time { }             /* 大号时间文字 */
+#sp-phone-clock-date { }             /* 日期+星期 */
+#sp-phone-clock-weather { }          /* 天气显示 */
 
-/* ===== 聊天页头部 ===== */
-#sp-phone-chat-topbar { }
-#sp-chat-title-name { }
-#sp-chat-mode-toggle { }
-#sp-chat-settings-btn { }
+/* ===== 4×N App 网格 ===== */
+#sp-phone-apps { }                   /* App网格容器（CSS Grid） */
+#sp-phone-apps.sp-phone-apps-editing { } /* 编辑模式（抖动） */
+.sp-phone-slot { }                   /* 网格单元格 */
+.sp-phone-slot-empty { }             /* 空格子（编辑模式可见） */
+.sp-phone-app { }                    /* 单个App */
+.sp-phone-app:active { }             /* 按下缩小效果 */
+.sp-phone-app.sp-phone-app-selected { } /* 编辑模式选中态 */
+.sp-phone-app-icon { }               /* App图标容器（圆角方块） */
+.sp-phone-app-icon img { }           /* 自定义App图标图片 */
+.sp-phone-app-name { }               /* App名称文字 */
 
-/* ===== 聊天消息区 ===== */
-#silly-pet-chat-messages { }
-#silly-pet-chat-messages::-webkit-scrollbar { }
-#silly-pet-chat-messages::-webkit-scrollbar-thumb { }
+/* ===== 多页系统 ===== */
+#sp-phone-apps-wrapper { }           /* 翻页滑动容器 */
+#sp-phone-page-dots { }              /* 底部页码圆点容器 */
+.sp-phone-page-dot { }               /* 单个圆点 */
+.sp-phone-page-dot.active { }        /* 当前页圆点（放大高亮） */
 
-/* ===== 聊天消息行（含头像）===== */
-.sp-chat-row { }
-.sp-chat-row.pet { }
-.sp-chat-row.user { }
+/* ===== 编辑模式工具栏 ===== */
+#sp-phone-edit-toolbar { }           /* 顶部浮动编辑工具栏 */
+#sp-phone-edit-toolbar.visible { }   /* 工具栏显示时 */
+#sp-phone-edit-cancel { }            /* 取消按钮 */
+#sp-phone-edit-save { }              /* 保存按钮 */
+#sp-phone-edit-add-widget { }        /* 添加组件按钮 */
+
+/* ===== 加页/删页按钮 ===== */
+#sp-phone-page-controls { }          /* 增减页按钮容器 */
+#sp-phone-page-controls.sp-editing-visible { } /* 编辑模式显示 */
+.sp-page-ctrl-btn { }                /* 加页/删页按钮 */
+
+/* ===== 底部操作按钮 ===== */
+#sp-phone-home-actions { }           /* 底部缩小+关闭按钮 */
+#sp-phone-minimize { }               /* 缩小悬挂按钮 */
+#sp-phone-close { }                  /* 关闭按钮 */</pre>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">🔒 手机锁屏</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 锁屏覆盖层 ===== */
+#sp-phone-lockscreen { }             /* 锁屏容器（模糊主屏） */
+#sp-phone-lockscreen.visible { }     /* 锁屏显示时 */
+
+/* ===== 锁屏时钟 ===== */
+#sp-lock-clock { }                   /* 时钟区域（浮动动画） */
+#sp-lock-time { }                    /* 大号时间数字 */
+#sp-lock-date { }                    /* 日期文字 */
+
+/* ===== 解锁提示 ===== */
+#sp-lock-hint { }                    /* "▲轻触解锁"提示文字 */
+
+/* ===== 密码面板 ===== */
+#sp-lock-password-panel { }          /* 密码输入区容器 */
+#sp-lock-password-panel.visible { }  /* 密码面板显示时 */
+#sp-lock-dots { }                    /* 密码圆点容器 */
+.sp-lock-dot { }                     /* 单个密码圆点（空心） */
+.sp-lock-dot.filled { }              /* 已输入的圆点（实心） */
+.sp-lock-dot.wrong { }               /* 密码错误抖动 */
+#sp-lock-error-msg { }               /* 密码错误提示文字 */
+#sp-lock-keypad { }                  /* 数字键盘网格 */
+.sp-lock-key { }                     /* 数字键（圆形） */
+.sp-lock-key:active { }              /* 按下效果 */
+.sp-lock-key-action { }              /* 功能键（清除/删除） */
+
+/* ===== 锁屏悬浮通知 ===== */
+#sp-lock-notifications { }           /* 通知列表容器 */
+.sp-lock-notification { }            /* 单条通知卡片 */
+.sp-lock-notification.sp-lock-notif-visible { } /* 通知弹入*/
+.sp-lock-notification.sp-lock-notif-hiding { }  /* 通知消失 */
+.sp-lock-notif-header { }            /* 通知头部（app名+时间） */
+.sp-lock-notif-app-icon { }          /* App图标 */
+.sp-lock-notif-app-icon img { }      /* App图标图片 */
+.sp-lock-notif-app-name { }          /* App名称 */
+.sp-lock-notif-time { }              /* 时间"刚刚" */
+.sp-lock-notif-body { }              /* 通知内容区 */
+.sp-lock-notif-avatar { }            /* 发送者头像 */
+.sp-lock-notif-avatar img { }        /* 头像图片 */
+.sp-lock-notif-content { }           /* 通知文字区 */
+.sp-lock-notif-name { }              /* 发送者名字 */
+.sp-lock-notif-text { }              /* 通知正文 */</pre>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">📱 主屏小组件</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 小组件通用===== */
+.sp-phone-widget { }                 /* 所有小组件基础样式 */
+.sp-phone-widget:hover { }           /* 悬停放大 */
+.sp-phone-widget:active { }          /* 按下缩小 */
+
+/* ===== 拍立得（2×2，图片+文字） ===== */
+.sp-phone-widget-polaroid { }        /* 拍立得容器 */
+.sp-phone-widget-polaroid .sp-widget-img { } /* 图片区 */
+.sp-phone-widget-polaroid .sp-widget-img img { } /* 图片 */
+.sp-phone-widget-polaroid .sp-widget-img-placeholder { } /* 占位图标 */
+.sp-phone-widget-polaroid .sp-widget-caption { } /* 底部文字 */
+
+/* ===== 相框（2×2，纯图片） ===== */
+.sp-phone-widget-photo { }
+.sp-phone-widget-photo .sp-widget-img { }
+.sp-phone-widget-photo .sp-widget-img img { }
+
+/* ===== 便签（2×2，纯文字） ===== */
+.sp-phone-widget-memo { }
+.sp-phone-widget-memo .sp-widget-memo-text { }
+.sp-phone-widget-memo .sp-widget-memo-placeholder { }
+
+/* ===== 日历（2×2） ===== */
+.sp-phone-widget-calendar { }
+.sp-phone-widget-calendar .sp-widget-cal-month { } /* 月份（红字） */
+.sp-phone-widget-calendar .sp-widget-cal-day { }/* 日期（大号） */
+.sp-phone-widget-calendar .sp-widget-cal-week { }   /* 星期 */
+
+/* ===== 小相框 1×1 / 横幅 4×1 / 大横幅 4×2 ===== */
+.sp-phone-widget-photo1x1 { }
+.sp-phone-widget-photo4x1 { }
+.sp-phone-widget-photo4x2 { }
+
+/* ===== 短便签 2×1 ===== */
+.sp-phone-widget-memo2x1 { }
+
+/* ===== 自定义HTML组件 ===== */
+.sp-phone-widget-custom { }          /* 自定义组件外壳 */
+.sp-widget-custom-content { }        /* 用户HTML内容区 */
+.sp-widget-custom-placeholder { }    /* 空内容占位 */</pre>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">💬 聊天系统</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 聊天页头部 ===== */
+#sp-phone-chat-topbar { }            /* 顶栏（名字+模式+设置） */
+#sp-chat-title-name { }              /* 聊天对象名字 */
+#sp-chat-mode-toggle { }             /* 🐾/💬/🌙 模式切换按钮 */
+#sp-chat-settings-btn { }            /* ⚙️ 聊天设置按钮 */
+
+/* ===== 消息区域 ===== */
+#silly-pet-chat-messages { }/* 消息滚动容器 */
+#silly-pet-chat-messages::-webkit-scrollbar { }/* 滚动条 */
+#silly-pet-chat-messages::-webkit-scrollbar-thumb { }  /* 滚动条滑块 */
+
+/* ===== 消息行（头像+气泡） ===== */
+.sp-chat-row { }                     /* 消息行容器 */
+.sp-chat-row.pet { }                 /* 桌宠消息（左对齐） */
+.sp-chat-row.user { }                /* 用户消息（右对齐，flex反转） */
 
 /* ===== 聊天头像 ===== */
-.sp-chat-avatar { }
-.sp-chat-avatar img { }
-.sp-chat-avatar-default { }
+.sp-chat-avatar { }                  /* 头像容器（圆形，含头像框） */
+.sp-chat-avatar img { }              /* 头像图片 */
+.sp-chat-avatar-default { }          /* 无头像时的默认emoji */
+.sp-chat-avatar-frame { }            /* 头像框叠加层（绝对定位） */
 
-/* ===== 头像框叠加层 ===== */
-.sp-chat-avatar-frame { }
+/* ===== 消息气泡 ===== */
+.sp-chat-msg { }                     /* 气泡通用样式 */
+.sp-chat-msg.pet { }                 /* 桌宠气泡（主色调背景） */
+.sp-chat-msg.user { }                /* 用户气泡（浅色背景，右对齐） */
+.sp-chat-msg em { }                  /* Markdown斜体 */
+.sp-chat-msg strong { }              /* Markdown 加粗 */
+.sp-chat-msg code { }                /* Markdown 行内代码 */
+.sp-chat-msg.sp-thinking { }         /* AI思考中的气泡 */
+.sp-thinking-dots { }                /*●●● 思考动画 */
 
-/* ===== 聊天消息气泡 ===== */
-.sp-chat-msg { }
-.sp-chat-msg.pet { }
-.sp-chat-msg.user { }
-.sp-chat-msg em { }
-.sp-chat-msg strong { }
-.sp-chat-msg code { }
-.sp-chat-msg.sp-thinking { }
-.sp-thinking-dots { }
+/* ===== Token显示 ===== */
+#sp-chat-token-bar { }               /* Token估算栏 */
+#sp-token-display { }                /* Token数字 */
 
-/* ===== Token 显示栏 ===== */
-#sp-chat-token-bar { }
-#sp-token-display { }
-
-/* ===== 聊天输入区 ===== */
-#silly-pet-chat-input { }
-#silly-pet-chat-input-row { }
-#sp-chat-input-field { }
-#sp-chat-emoji-toggle { }
-#sp-chat-send-msg-btn { }
-#sp-chat-generate-btn { }
+/* ===== 输入区域 ===== */
+#silly-pet-chat-input { }/* 输入区外壳 */
+#silly-pet-chat-input-row { }        /* 输入行（输入框+按钮） */
+#sp-chat-input-field { }             /* 文字输入框 */
+#sp-chat-emoji-toggle { }            /* 😺 表情包按钮（黄色圆形） */
+#sp-chat-send-msg-btn { }            /* 📨 发送按钮（绿色圆形） */
+#sp-chat-generate-btn { }            /* ➤ 生成按钮（蓝色圆形） */
+/* 有自定义图标时按钮背景透明 */
+#sp-chat-emoji-toggle:has(img) { }
+#sp-chat-send-msg-btn:has(img) { }
+#sp-chat-generate-btn:has(img) { }
 
 /* ===== 表情包面板 ===== */
-#sp-emoji-panel { }
-#sp-emoji-panel.visible { }
-.sp-emoji-item { }
-.sp-emoji-item.selected { }
-.sp-emoji-item img { }
-.sp-emoji-add-btn { }
-#sp-emoji-preview-bar { }
-#sp-emoji-preview-bar.visible { }
+#sp-emoji-panel { }                  /* 面板容器（默认隐藏） */
+#sp-emoji-panel.visible { }          /* 展开时 */
+.sp-emoji-item { }                   /* 单个表情包 */
+.sp-emoji-item.selected { }          /* 选中态（绿色边框+发光） */
+.sp-emoji-item img { }               /* 表情图片 */
+.sp-emoji-add-btn { }                /* ＋ 添加按钮（虚线框） */
 
-/* ===== 聊天设置页 ===== */
-#sp-phone-chatsettings { }
-.sp-chat-avatar-row { }
-.sp-chat-avatar-preview { }
-.sp-chat-avatar-preview img { }
-
-/* ===== 手机主题页 ===== */
-#sp-phone-theme { }
-
-/* ===== 手机设置页 ===== */
-#sp-phone-settings { }
-.sp-toggle-switch { }
-.sp-toggle-slider { }
-.sp-toggle-switch input:checked + .sp-toggle-slider { }</pre>
+/* ===== 已选表情预览条 ===== */
+#sp-emoji-preview-bar { }            /* 预览条（默认隐藏） */
+#sp-emoji-preview-bar.visible { }    /* 有选中表情时显示 */
+#sp-emoji-preview-bar img { }        /* 预览缩略图 */
+.sp-emoji-preview-remove { }         /* ✕ 移除按钮 */</pre>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">⚙️ 设置面板</summary>
+                <summary class="sp-guide-summary">📱 手机 App 页面（设置/主题/聊天设置/通讯录/个人主页）</summary>
                 <div class="sp-guide-details-content">
-                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 设置面板容器 ===== */
-#silly-pet-settings { }
-#silly-pet-settings.visible { }
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 页面通用 ===== */
+.sp-phone-page { }                   /* 所有子页面基础 */
+.sp-phone-page.active { }            /* 当前激活页面 */
+.sp-phone-page-header { }            /* 页面顶栏（‹返回+标题） */
+.sp-phone-back { }                   /* ‹ 返回按钮 */
+.sp-phone-page-content { }           /* 页面滚动内容区 */
 
-/* ===== 设置头部 ===== */
-.sp-settings-header { }
-.sp-settings-header-icon { }
-.sp-settings-header-title { }
-.sp-settings-header-ver { }
-.sp-settings-close { }
+/* ===== 设置页表单元素 ===== */
+.sp-phone-setting-block { }          /* 设置区块（圆角卡片） */
+.sp-phone-setting-title { }          /* 区块标题 */
+.sp-phone-radio { }                  /* 单选项 */
+.sp-phone-switch-row { }             /* 开关行（标签+toggle） */
+.sp-phone-btn { }                    /* 普通按钮 */
+.sp-phone-btn-primary { }            /* 主按钮（蓝色） */
 
-/* ===== 标签栏 ===== */
-.sp-tabs { }
-.sp-tab { }
-.sp-tab:hover { }
-.sp-tab.active { }
+/* ===== 开关控件 ===== */
+.sp-toggle-switch { }                /* 开关外壳 */
+.sp-toggle-slider { }                /* 滑块背景 */
+.sp-toggle-slider::before { }        /* 滑块圆点 */
+.sp-toggle-switch input:checked + .sp-toggle-slider { } /* 打开态 */
 
-/* ===== 标签页面板容器 ===== */
-.sp-tab-panels { }
-.sp-tab-panel { }
-.sp-tab-panel.active { }
-.sp-tab-panel[data-panel="api"] { }
-.sp-tab-panel[data-panel="persona"] { }
-.sp-tab-panel[data-panel="prompt"] { }
-.sp-tab-panel[data-panel="behavior"] { }
-.sp-tab-panel[data-panel="display"] { }
-.sp-tab-panel[data-panel="memory"] { }
-.sp-tab-panel[data-panel="data"] { }
-.sp-tab-panel[data-panel="guide"] { }
-.sp-tab-panel[data-panel="customcss"] { }
+/* ===== 各具体页面容器 ===== */
+#sp-phone-settings { }               /* ⚙️ 手机设置页 */
+#sp-phone-theme { }                  /* 🎨 主题页 */
+#sp-phone-chatsettings { }           /* 💬 聊天设置页 */
+#sp-phone-contacts { }               /* 📇 通讯录页 */
+#sp-phone-profile { }                /* 👤 个人主页 */
 
-/* ===== 区块 ===== */
-#silly-pet-settings .sp-section { }
-#silly-pet-settings .sp-section-title { }
+/* ===== 聊天设置 ===== */
+.sp-chat-avatar-row { }              /* 头像上传行 */
+.sp-chat-avatar-preview { }          /* 头像/头像框预览圆形 */
+.sp-chat-avatar-preview img { }      /* 预览图片 */
 
-/* ===== 输入控件 ===== */
+/* ===== 壁纸预览 ===== */
+.sp-phone-wallpaper-preview { }      /* 壁纸预览方块 */
+.sp-phone-wallpaper-preview img { }  /* 壁纸缩略图 */</pre>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">📚 书架 & 阅读器</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 书架页 ===== */
+#sp-phone-bookshelf { }/* 书架App页面 */
+#sp-bookshelf-page-content { }       /* 书架内容区 */
+#sp-bs-shelf-list { }                /* 书籍列表/网格容器 */
+#sp-bs-search { }                    /* 搜索输入框 */
+#sp-bs-sort { }                      /* 排序下拉 */
+#sp-bs-layout-toggle { }             /* 网格/列表切换按钮 */
+#sp-bs-tag-bar { }                   /* 标签过滤栏 */
+#sp-bs-history-bar { }               /* 最近阅读历史栏 */
+#sp-bs-import-btn { }                /* 导入按钮 */
+#sp-bs-import-type { }               /* 导入类型下拉 */
+#sp-bs-reader-settings-btn { }       /* ⚙️ 阅读设置按钮 */
+#sp-bs-backup-btn { }                /* 💾 备份按钮 */
+#sp-bs-restore-btn { }               /* 📂 还原按钮 */
+
+/* ===== 阅读器页===== */
+#sp-phone-bookreader { }             /* 阅读器页面 */
+#sp-br-bg-layer { }                  /* 阅读器背景图层 */
+
+/* ===== 阅读器工具栏 ===== */
+.sp-br-bar { }                       /* 工具栏通用 */
+.sp-br-bar-visible { }               /* 工具栏可见 */
+.sp-br-bar-hidden { }                /* 工具栏隐藏（沉浸模式） */
+#sp-br-top-bar { }                   /* 顶部工具栏 */
+#sp-br-bottom-bar { }                /* 底部工具栏 */
+#sp-br-top-bar.sp-br-bar-hidden { }  /* 顶栏隐藏动画 */
+#sp-br-bottom-bar.sp-br-bar-hidden { } /* 底栏隐藏动画 */
+#sp-br-title { }                     /* 书名标题 */
+#sp-br-toc-btn { }                   /* 📖 目录按钮 */
+#sp-br-back-btn { }                  /* ‹ 返回按钮 */
+
+/* ===== 阅读区域 ===== */
+#sp-br-body { }                      /* 阅读内容滚动区 */
+#sp-br-body.sp-br-immersive { }      /* 沉浸模式（padding减小） */
+
+/* ===== 翻页/进度/字号 ===== */
+#sp-br-progress-bar { }              /* 页码文字 "3/ 120" */
+#sp-br-slider { }                    /* 进度滑轨 */
+#sp-br-slider::-webkit-slider-thumb { } /* 滑块圆形手柄 */
+#sp-br-slider::-moz-range-thumb { }  /* Firefox滑块 */
+#sp-br-prev { }                      /* ◀ 上一页 */
+#sp-br-next { }                      /* ▶ 下一页 */
+#sp-br-font-dec { }                  /* A-缩小字号 */
+#sp-br-font-inc { }                  /* A+ 放大字号 */
+
+/* ===== 目录弹窗 ===== */
+#sp-bs-toc-overlay { }               /* 目录遮罩层 */
+
+/* ===== 阅读设置弹窗 ===== */
+#sp-bs-reader-settings-overlay { }   /* 阅读设置遮罩 */
+#sp-bs-reader-settings-box { }       /* 设置内容盒 */</pre>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">📰 论坛 & 📝 同人文</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 论坛页 ===== */
+#sp-phone-forum { }                  /* 论坛App页面 */
+#sp-forum-toolbar { }                /* 顶部工具栏（生成+清空） */
+#sp-forum-generate-btn { }           /* ✨ 生成论坛内容 */
+#sp-forum-clear-btn { }              /* 🗑️ 清空 */
+#sp-forum-loading { }                /* 生成中loading */
+#sp-forum-empty { }                  /* 空状态提示 */
+
+/* ===== 论坛帖子网格（小红书风格双列） ===== */
+.sp-forum-grid { }                   /* 瀑布流网格容器 */
+.sp-forum-card { }                   /* 单个帖子卡片 */
+.sp-forum-card:hover { }             /* 悬停上浮 */
+.sp-forum-cover { }                  /* 封面渐变区 */
+.sp-forum-cover-emoji { }            /* 封面大emoji */
+.sp-forum-card-body { }              /* 卡片内容区 */
+.sp-forum-title { }                  /* 帖子标题 */
+.sp-forum-content { }                /* 正文预览 */
+.sp-forum-tags { }                   /* 标签容器 */
+.sp-forum-tag { }                    /* 单个#标签 */
+.sp-forum-footer { }                 /* 底部作者+数据 */
+.sp-forum-author { }                 /* 作者区 */
+.sp-forum-avatar { }                 /* 作者头像emoji */
+.sp-forum-author-name { }            /* 作者名*/
+.sp-forum-stats { }                  /* 互动数据区 */
+.sp-forum-stat { }                   /* ❤️数/👁️数/💬数 */
+
+/* ===== 论坛详情弹窗 ===== */
+.sp-forum-detail-box { }             /* 详情弹窗容器 */
+.sp-forum-detail-header { }          /* 详情头部 */
+.sp-forum-avatar-lg { }              /* 大头像 */
+.sp-forum-detail-name { }            /* 作者名 */
+.sp-forum-detail-close { }           /* ✕ 关闭 */
+.sp-forum-detail-body { }            /* 正文滚动区 */
+.sp-forum-detail-title { }           /* 标题 */
+.sp-forum-detail-content { }         /* 正文 */
+.sp-forum-detail-footer { }          /* 底部数据 */
+.sp-forum-stat-lg { }                /* 大号数据文字 */
+
+/* ===== 同人文App===== */
+#sp-phone-fanfic { }                 /* 同人文页面 */
+#sp-fanfic-container { }             /* 主容器 */
+#sp-fanfic-topbar { }                /* 顶栏 */
+#sp-fanfic-content { }               /* 内容滚动区 */
+
+/* ===== 同人文标签栏 ===== */
+#sp-fanfic-tabbar { }                /* 底部标签栏 */
+.sp-fanfic-tab { }                   /* 单个标签 */
+.sp-fanfic-tab.active { }            /* 激活标签 */
+
+/* ===== 同人文卡片 ===== */
+.sp-fanfic-feed { }                  /* 卡片列表容器 */
+.sp-fanfic-card { }                  /* 单张卡片 */
+.sp-fanfic-card:hover { }            /* 悬停上浮 */
+.sp-fanfic-card-cover { }            /* 封面渐变区 */
+.sp-fanfic-card-cover-emoji { }      /* 封面emoji */
+.sp-fanfic-card-body { }             /* 卡片内容 */
+.sp-fanfic-card-title { }            /* 标题 */
+.sp-fanfic-card-preview { }          /* 正文预览 */
+.sp-fanfic-card-tags { }             /* 标签区 */
+.sp-fanfic-card-footer { }           /* 底部 */
+.sp-fanfic-card-author { }           /* 作者 */
+.sp-fanfic-card-avatar { }           /* 作者头像 */
+.sp-fanfic-card-author-name { }      /* 作者名 */
+.sp-fanfic-card-stats { }            /* 数据 */
+
+/* ===== 同人文阅读器 ===== */
+.sp-fanfic-reader { }                /* 阅读容器 */
+.sp-fanfic-reader-header { }         /* 头部（返回+收藏） */
+.sp-fanfic-reader-back { }           /* ‹ 返回 */
+.sp-fanfic-reader-fav { }            /* ☆/⭐ 收藏按钮 */
+.sp-fanfic-reader-author-bar { }     /* 作者信息行 */
+.sp-fanfic-reader-avatar { }         /* 作者头像 */
+.sp-fanfic-reader-author-name { }    /* 作者名 */
+.sp-fanfic-reader-stats { }          /* 数据 */
+.sp-fanfic-reader-title { }          /* 文章标题 */
+.sp-fanfic-reader-tags { }           /* 标签 */
+.sp-fanfic-reader-body { }           /* 正文区 */
+.sp-fanfic-reader-body em { }        /* 斜体 */
+.sp-fanfic-reader-body strong { }/* 加粗 */
+.sp-fanfic-reader-actions { }        /* 底部操作区 */
+.sp-fanfic-continue-btn { }          /* ✏️ 续写按钮 */
+
+/* ===== 同人文「我」页面 ===== */
+.sp-fanfic-me-page { }               /* 我的主页容器 */
+.sp-fanfic-me-header { }             /* 头部（头像+信息） */
+.sp-fanfic-me-avatar { }             /* 我的头像 */
+.sp-fanfic-me-info { }               /* 名字+签名+收藏数 */
+
+/* ===== 同人文写作页 ===== */
+.sp-fanfic-write-page { }            /* 写作页容器 */
+.sp-fanfic-write-header { }          /* 头部 */
+.sp-fanfic-new-post-btn { }          /* + 新建按钮 */
+#sp-fanfic-user-posts-list { }       /* 用户作品列表 */
+
+/* ===== 同人文工具栏 ===== */
+.sp-fanfic-toolbar { }               /* 生成按钮区 */
+.sp-fanfic-generate-btn { }          /* ✨ 生成同人文 */
+.sp-fanfic-empty { }                 /* 空状态 */
+.sp-fanfic-loading { }               /* 生成中 */</pre>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">⚙️ 悬浮设置面板</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 面板容器 ===== */
+#silly-pet-settings { }              /* 设置面板（fixed悬浮） */
+#silly-pet-settings.visible { }      /* 显示时 */
+
+/* ===== 头部（可拖拽） ===== */
+.sp-settings-header { }              /* 头部栏 */
+.sp-settings-header-left { }         /* 左侧图标+标题 */
+.sp-settings-header-icon { }         /* 🐾 图标 */
+.sp-settings-header-title { }        /* "咪噗☆ MeepPet" */
+.sp-settings-header-ver { }          /* 版本号标签 */
+.sp-settings-close { }               /* ✕ 关闭按钮 */
+
+/* ===== 标签栏（水平滚动） ===== */
+.sp-tabs { }                         /* 标签栏容器 */
+.sp-tab { }                          /* 单个标签 */
+.sp-tab:hover { }                    /* 标签悬停 */
+.sp-tab.active { }                   /* 当前标签（蓝色+阴影） */
+
+/* ===== 标签页内容 ===== */
+.sp-tab-panels { }                   /* 面板滚动容器 */
+.sp-tab-panel { }                    /* 单个面板（默认隐藏） */
+.sp-tab-panel.active { }/* 当前面板 */
+.sp-tab-panel[data-panel="api"] { }       /* 🔑 API */
+.sp-tab-panel[data-panel="behavior"] { }  /* ⚙️ 行为*/
+.sp-tab-panel[data-panel="display"] { }   /* 🎨 外观 */
+.sp-tab-panel[data-panel="memory"] { }    /* 🧠 记忆 */
+.sp-tab-panel[data-panel="data"] { }      /* 💾 数据 */
+.sp-tab-panel[data-panel="guide"] { }     /* 📖 说明 */
+.sp-tab-panel[data-panel="customcss"] { } /* ✏️ CSS */
+
+/* ===== 区块===== */
+#silly-pet-settings .sp-section { }        /* 设置区块（圆角卡片） */
+#silly-pet-settings .sp-section-title { }  /* 区块标题 */
+
+/* ===== 表单控件 ===== */
 #silly-pet-settings input[type="text"] { }
 #silly-pet-settings input[type="number"] { }
 #silly-pet-settings input[type="password"] { }
@@ -10000,137 +11268,159 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 #silly-pet-settings label { }
 
 /* ===== 按钮 ===== */
-#silly-pet-settings .sp-btn { }
-#silly-pet-settings .sp-btn-primary { }
-#silly-pet-settings .sp-btn-danger { }
+#silly-pet-settings .sp-btn { }            /* 普通按钮 */
+#silly-pet-settings .sp-btn-primary { }    /* 蓝色主按钮 */
+#silly-pet-settings .sp-btn-danger { }     /* 红色危险按钮 */
 
-/* ===== 底部保存栏 ===== */
-.sp-settings-footer { }
-
-/* ===== 搜索下拉 ===== */
-.sp-search-select { }
-.sp-search-dropdown { }
-.sp-search-dropdown.visible { }
-.sp-search-dropdown-item { }
+/* ===== 搜索下拉（角色卡/世界书） ===== */
+.sp-search-select { }                /* 搜索框容器 */
+.sp-search-dropdown { }              /* 下拉列表 */
+.sp-search-dropdown.visible { }      /* 下拉显示 */
+.sp-search-dropdown-item { }         /* 下拉选项 */
+.sp-search-dropdown-item:hover { }   /* 选项悬停 */
+.sp-search-dropdown-empty { }        /* 无结果提示 */
+.sp-item-avatar { }                  /* 选项头像圆 */
 
 /* ===== 图片上传 ===== */
-.sp-upload-group { }
-.sp-upload-preview { }
-.sp-upload-preview img { }
-.sp-upload-preview .sp-upload-remove { }
-.sp-upload-btn { }
-.sp-upload-url-btn { }
-.sp-upload-hint { }
+.sp-upload-group { }                 /* 上传组 */
+.sp-upload-preview { }               /* 预览框（虚线边框） */
+.sp-upload-preview:hover { }         /* 预览框悬停 */
+.sp-upload-preview img { }           /* 预览图片 */
+.sp-upload-preview .sp-upload-remove { } /* ✕ 移除按钮 */
+.sp-upload-preview .sp-upload-placeholder { } /* ＋ 占位符 */
+.sp-upload-btn { }                   /* 📁 选择按钮 */
+.sp-upload-url-btn { }               /* 🔗 链接按钮 */
+.sp-upload-hint { }                  /* 提示文字 */
 
 /* ===== 记忆条目 ===== */
-.sp-memory-item { }
-.sp-memory-item textarea { }
-.sp-memory-tag { }
-.sp-memory-stars { }
+.sp-memory-item { }                  /* 单条记忆 */
+.sp-memory-item textarea { }         /* 记忆内容输入 */
+.sp-memory-tag { }                   /* 标签输入 */
+.sp-memory-stars { }                 /* ★☆ 重要度星星 */
+.sp-memory-delete { }                /* ✕ 删除按钮 */
 
-/* ===== 聊天记录条目 ===== */
-.sp-chat-history-item { }
-.sp-chat-history-header { }
-.sp-chat-history-text { }
+/* =====聊天记录管理 ===== */
+.sp-chat-history-item { }            /* 单条记录 */
+.sp-chat-history-header { }          /* 头部（👤/🐾+操作） */
+.sp-chat-history-actions { }         /* 操作按钮区 */
+.sp-chat-history-text { }            /* 内容编辑框 */
 
-/* ===== 主题配色卡片 ===== */
-.sp-theme-grid { }
-.sp-theme-card { }
-.sp-theme-card.active { }
-.sp-theme-preview { }
-.sp-theme-dot { }
-.sp-theme-name { }
-#sp-custom-theme-editor { }
-.sp-theme-color-input { }
-.sp-theme-color-picker { }
+/* ===== 主题配色 ===== */
+.sp-theme-grid { }                   /* 主题卡片网格 */
+.sp-theme-card { }                   /* 单个主题卡 */
+.sp-theme-card.active { }            /* 当前主题（蓝色边框） */
+.sp-theme-preview { }                /* 主题颜色预览 */
+.sp-theme-dot { }                    /* 预览色点 */
+.sp-theme-name { }                   /* 主题名称 */
+#sp-custom-theme-editor { }          /* 自定义主题编辑器 */
+.sp-color-input-group { }            /* 颜色输入组 */
+.sp-color-input-wrapper { }          /* 输入+取色器行 */
+.sp-theme-color-input { }            /* 颜色文本输入 */
+.sp-theme-color-picker { }           /* 取色器方块 */
 
-/* ===== 自定义CSS编辑器 ===== */
-#sp-custom-css-editor { }
-
-/* ===== 预览区 ===== */
-.sp-preview-box { }
-.sp-preview-header { }
-.sp-preview-content { }
-.sp-preview-content.expanded { }
+/* ===== 预览区（角色卡描述等） ===== */
+.sp-preview-box { }                  /* 预览容器 */
+.sp-preview-header { }               /* 预览标题行 */
+.sp-preview-content { }              /* 预览内容（默认折叠） */
+.sp-preview-content.expanded { }     /* 展开状态 */
+.sp-preview-content::after { }       /* 底部渐隐遮罩 */
 
 /* ===== 世界书条目 ===== */
-.sp-wi-entry { }
-.sp-wi-entry.sp-wi-expanded { }
-.sp-wi-entry.sp-wi-excluded { }
-.sp-wi-entry-header { }
-.sp-wi-name { }
-.sp-wi-keys { }
-.sp-wi-entry-body { }
+.sp-wi-entry { }                     /* 单条条目 */
+.sp-wi-entry.sp-wi-expanded { }      /* 展开状态 */
+.sp-wi-entry.sp-wi-excluded { }      /* 被排除（半透明） */
+.sp-wi-entry-header { }              /* 头部行(勾选+名称+关键词) */
+.sp-wi-header-left { }               /* 左侧信息 */
+.sp-wi-check { }                     /* 勾选框 */
+.sp-wi-index { }                     /* #序号 */
+.sp-wi-name { }                      /* 条目名 */
+.sp-wi-keys { }                      /* 关键词 */
+.sp-wi-expand-arrow { }              /* ▶ 展开箭头 */
+.sp-wi-entry-body { }                /* 条目正文 */
 
-/* ===== 自定义动作条目 ===== */
-.sp-custom-sprite-item { }
-.sp-custom-sprite-preview { }
-.sp-custom-sprite-info { }
-.sp-custom-sprite-actions { }
+/* ===== 自定义动作 ===== */
+.sp-custom-sprite-item { }           /* 单个动作条目 */
+.sp-custom-sprite-preview { }        /* 动作预览框 */
+.sp-custom-sprite-info { }           /* 名称+时长区 */
+.sp-custom-sprite-actions { }        /* 按钮区 */
 
-/* ===== 时间滑轨 ===== */
-.sp-duration-row { }
-.sp-duration-label { }
-.sp-duration-row input[type="range"] { }</pre>
+/* ===== 时长滑轨 ===== */
+.sp-duration-row { }                 /* 滑轨行 */
+.sp-duration-label { }               /* 标签"⏱️ 2.0s" */
+.sp-duration-row input[type="range"] { } /* 滑轨本体 */
+
+/* ===== 模型列表下拉 ===== */
+.sp-models-dropdown-inner { }        /* 模型列表滚动区 */
+.sp-model-option { }                 /* 单个模型选项 */
+
+/* ===== CSS编辑器 ===== */
+#sp-custom-css-editor { }            /* 代码编辑器textarea */</pre>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🏠 桌宠小屋 + 👗 更衣系统</summary>
+                <summary class="sp-guide-summary">🏠 桌宠小屋 &👗 更衣系统</summary>
                 <div class="sp-guide-details-content">
                   <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 小屋面板 ===== */
-#silly-pet-house { }
-#silly-pet-house.visible { }
-#silly-pet-house.sp-house-minimized { }
-#sp-house-header { }
+#silly-pet-house { }                 /* 小屋面板 */
+#silly-pet-house.visible { }         /* 显示时 */
+#silly-pet-house.sp-house-minimized { } /* 最小化*/
+#sp-house-header { }                 /* 顶栏（可拖拽） */
 
-/* ===== 场景区域（2:3竖屏）===== */
-#sp-house-scene { }
-#sp-house-bg-layer { }
-#sp-house-char-layer { }
-#sp-house-char-layer img { }
+/* ===== 场景区域 ===== */
+#sp-house-scene { }                  /* 场景容器（2:3竖屏） */
+#sp-house-bg-layer { }               /* 房间背景层 */
+#sp-house-char-layer { }             /* 人物立绘层 */
+#sp-house-char-layer img { }         /* 立绘图片 */
 
-/* ===== 动作按钮（右上角）===== */
-#sp-house-actions { }
-#sp-house-feed-btn { }
-#sp-house-bath-btn { }
-#sp-house-sleep-btn { }
-#sp-house-wardrobe-btn { }
+/* ===== 右侧动作按钮 ===== */
+#sp-house-actions { }                /* 按钮列容器 */
+#sp-house-feed-btn { }               /* 🍖 喂食 */
+#sp-house-bath-btn { }               /* 🛁 洗澡 */
+#sp-house-sleep-btn { }              /* 🛏️ 睡觉 */
+#sp-house-wardrobe-btn { }           /* 👗 更衣 */
 
-/* ===== 对话覆盖层（底部毛玻璃）===== */
-#sp-house-dialogue-overlay { }
-#sp-house-dialogue-overlay.sp-house-dialogue-collapsed { }
+/* ===== 底部对话覆盖层 ===== */
+#sp-house-dialogue-overlay { }       /* 毛玻璃对话区 */
+#sp-house-dialogue-overlay.sp-house-dialogue-collapsed { } /* 折叠态 */
 
 /* ===== 对话框 ===== */
-#sp-house-dialogue-box { }
-#sp-house-dialogue-box.sp-house-dialogue-expanded { }
-#sp-house-char-name { }
-#sp-house-avatar { }
-#sp-house-avatar img { }
-#sp-house-name-text { }
+#sp-house-dialogue-box { }           /* 对话框容器 */
+#sp-house-dialogue-box.sp-house-dialogue-expanded { } /* 展开态 */
+#sp-house-char-name { }              /* 角色名行 */
+#sp-house-avatar { }                 /* 对话框头像 */
+#sp-house-avatar img { }             /* 头像图片 */
+#sp-house-name-text { }              /* 名字文字 */
+#sp-house-expand-btn { }             /* ▼ 展开按钮 */
+#sp-house-collapse-btn { }           /* ⬇ 折叠按钮 */
 
 /* ===== 对话文字 ===== */
-#sp-house-dialogue-text { }
-#sp-house-dialogue-text.sp-house-typing-done { }
-#sp-house-dialogue-text::after { }
-#sp-house-dialogue-text em { }
-#sp-house-dialogue-text strong { }
+#sp-house-dialogue-text { }          /* 文字区域（打字机效果） */
+#sp-house-dialogue-text.sp-house-typing-done { } /* 打字完成（隐藏光标） */
+#sp-house-dialogue-text::after { }   /* ▎闪烁光标 */
+#sp-house-dialogue-text em { }       /* 斜体（紫色调） */
+#sp-house-dialogue-text strong { }   /* 加粗（白色） */
+#sp-house-dialogue-text code { }     /* 代码（青色） */
 
-/* ===== 输入区 ===== */
-#sp-house-input-area { }
-#sp-house-input-field { }
-#sp-house-send-btn { }
-#sp-house-regen-btn { }
+/* ===== 输入区===== */
+#sp-house-input-area { }             /* 输入行容器 */
+#sp-house-input-field { }            /* 文字输入框 */
+#sp-house-send-btn { }               /* ➤ 发送按钮 */
+#sp-house-regen-btn { }              /* 🔄 重新生成按钮 */
 
-/* ===== 更衣快捷面板（小屋右侧圆形按钮列）===== */
-#sp-wardrobe-quick { }
-#sp-wardrobe-quick-settings { }
+/* ===== 更衣快捷面板 ===== */
+#sp-wardrobe-quick { }               /* 右侧快捷服装列 */
+#sp-wardrobe-quick-settings { }      /* ⚙️ 更衣设置入口 */
 
-/* ===== 更衣系统弹窗 ===== */
-#sp-wardrobe-modal-overlay { }
-#sp-wardrobe-modal { }
-#sp-wardrobe-header { }
-#sp-wardrobe-body { }</pre>
+/* ===== 更衣弹窗 ===== */
+#sp-wardrobe-modal-overlay { }       /* 遮罩层 */
+#sp-wardrobe-modal { }               /* 弹窗主体 */
+#sp-wardrobe-header { }              /* 弹窗头部（可拖拽） */
+#sp-wardrobe-body { }                /* 弹窗内容区 */
+#sp-wardrobe-editing-label { }       /* 当前编辑提示 */
+#sp-wardrobe-outfit-list { }         /* 服装列表区 */
+#sp-wardrobe-expressions-list { }    /* 表情立绘列表 */
+#sp-wardrobe-save { }                /* 💾 保存按钮 */</pre>
                 </div>
               </details>
 
@@ -10138,106 +11428,117 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
                 <summary class="sp-guide-summary">📔 日记面板</summary>
                 <div class="sp-guide-details-content">
                   <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 日记面板 ===== */
-#silly-pet-diary { }
-#silly-pet-diary.visible { }
-#sp-diary-header { }
+#silly-pet-diary { }                 /* 日记悬浮窗 */
+#silly-pet-diary.visible { }         /* 显示时 */
+#sp-diary-header { }                 /* 顶栏（可拖拽） */
+#sp-diary-body { }                   /* 内容滚动区 */
 
-/* ===== 日历网格 ===== */
-.sp-diary-calendar { }
-.sp-diary-calendar-header { }
-.sp-diary-weekdays { }
-.sp-diary-weekday { }
-.sp-diary-day { }
-.sp-diary-day.today { }
-.sp-diary-day.has-diary { }
-.sp-diary-day.selected { }
-.sp-diary-day.has-diary::after { }
+/* ===== 日历===== */
+.sp-diary-calendar { }               /* 日历组件容器 */
+.sp-diary-calendar-header { }        /* ◀ 年月 ▶ */
+.sp-diary-weekdays { }               /* 星期标题行 */
+.sp-diary-weekday { }                /* 单个星期字*/
+.sp-diary-days { }                   /* 日期网格 */
+.sp-diary-day { }                    /* 单个日期格*/
+.sp-diary-day.today { }              /* 今天（蓝色边框） */
+.sp-diary-day.has-diary { }          /* 有日记（蓝色背景） */
+.sp-diary-day.has-diary::after { }   /* 有日记的小圆点 */
+.sp-diary-day.selected { }           /* 选中日期（实心蓝） */
+.sp-diary-day.empty { }              /* 空占位 */
 
 /* ===== 日记内容 ===== */
-.sp-diary-entry { }
-.sp-diary-entry-header { }
-.sp-diary-entry-date { }
-.sp-diary-entry-content { }
-.sp-diary-empty { }
+.sp-diary-entry { }                  /* 单篇日记卡片 */
+.sp-diary-entry-header { }           /* 日期+编辑/删除 */
+.sp-diary-entry-date { }             /* 📅 日期 */
+.sp-diary-entry-actions { }          /* 操作按钮 */
+.sp-diary-entry-content { }          /* 日记正文 */
+.sp-diary-empty { }                  /* 无日记提示 */
 
 /* ===== 生成控制区 ===== */
-#sp-diary-generate-section { }
-.sp-diary-range-row { }
-.sp-diary-range-hint { }
-#sp-diary-generate-btn { }</pre>
+#sp-diary-generate-section { }       /* 底部生成区 */
+.sp-diary-range-row { }              /* 范围选择行 */
+.sp-diary-range-hint { }             /* 上次范围提示 */
+#sp-diary-generate-btn { }           /* ✨ 生成按钮 */
+#sp-diary-export-btn { }             /* 📄 导出全部 */
+
+/* ===== 快速跳转面板 ===== */
+#sp-diary-jump-panel { }             /* 年月跳转面板 */</pre>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🗨️ 弹窗（确认/输入/提示/总结/表情编辑）</summary>
+                <summary class="sp-guide-summary">🗨️ 弹窗系统（确认/输入/提示/总结/表情编辑）</summary>
                 <div class="sp-guide-details-content">
-                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 确认弹窗 ===== */
-.sp-confirm-overlay { }
-.sp-confirm-box { }
-.sp-confirm-title { }
-.sp-confirm-desc { }
-.sp-confirm-actions { }
-.sp-confirm-btn { }
-.sp-confirm-btn-primary { }
-.sp-confirm-btn-cancel { }
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 确认弹窗（替代 confirm） ===== */
+.sp-confirm-overlay { }              /* 遮罩层 */
+.sp-confirm-box { }                  /* 弹窗盒子 */
+.sp-confirm-title { }                /* 标题 */
+.sp-confirm-desc { }                 /* 描述文字 */
+.sp-confirm-actions { }              /* 按钮行 */
+.sp-confirm-btn { }                  /* 按钮通用 */
+.sp-confirm-btn-primary { }          /* 主按钮（蓝色） */
+.sp-confirm-btn-cancel { }           /* 取消按钮 */
 
-/* ===== 输入弹窗（替代prompt）===== */
-#sp-prompt-dialog-overlay { }
-#sp-prompt-dialog-box { }
-.sp-prompt-input { }
+/* ===== 输入弹窗（替代 prompt） ===== */
+#sp-prompt-dialog-overlay { }        /* 遮罩层 */
+#sp-prompt-dialog-box { }            /* 弹窗盒子 */
+.sp-prompt-input { }                 /* 输入框 */
 
-/* ===== 提示弹窗（替代alert）===== */
-#sp-alert-dialog-overlay { }
-#sp-alert-dialog-box { }
+/* ===== 提示弹窗（替代 alert） ===== */
+#sp-alert-dialog-overlay { }         /* 遮罩层 */
+#sp-alert-dialog-box { }             /* 弹窗盒子 */
 
 /* ===== 总结弹窗 ===== */
-#silly-pet-summary-modal { }
-#silly-pet-summary-modal.visible { }
-#silly-pet-summary-modal .sp-modal-content { }
-#silly-pet-summary-modal h3 { }
-#silly-pet-summary-modal textarea { }
-.sp-modal-actions { }
+#silly-pet-summary-modal { }         /* 遮罩层容器 */
+#silly-pet-summary-modal.visible { } /* 显示时 */
+#silly-pet-summary-modal .sp-modal-content { } /* 内容盒 */
+#silly-pet-summary-modal h3 { }      /* 标题 */
+#silly-pet-summary-modal textarea { } /* 总结编辑框 */
+.sp-modal-actions { }                /* 按钮行 */
 
 /* ===== 表情包编辑弹窗 ===== */
-#sp-emoji-modal-overlay { }
-#sp-emoji-modal-overlay.visible { }
-#sp-emoji-modal { }
-#sp-emoji-modal h4 { }
-#sp-emoji-modal input[type="text"] { }
-.sp-emoji-modal-actions { }
-.sp-emoji-modal-confirm { }
-.sp-emoji-modal-delete { }</pre>
+#sp-emoji-modal-overlay { }          /* 遮罩（默认隐藏） */
+#sp-emoji-modal-overlay.visible { }/* 显示时 */
+#sp-emoji-modal { }                  /* 弹窗盒子 */
+#sp-emoji-modal-title { }            /* 标题 */
+.sp-emoji-modal-preview { }          /* 表情预览区 */
+#sp-emoji-modal-img { }              /* 预览图片 */
+#sp-emoji-modal-input { }            /* 名字输入框 */
+.sp-emoji-modal-actions { }          /* 按钮行 */
+.sp-emoji-modal-confirm { }          /* ✓ 保存 */
+.sp-emoji-modal-delete { }           /* 🗑️ 删除 */</pre>
                 </div>
               </details>
 
               <details class="sp-guide-details">
                 <summary class="sp-guide-summary">🧶 合成工坊</summary>
                 <div class="sp-guide-details-content">
-                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 合成工坊面板 ===== */
-#sp-game-panel { }
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 面板===== */
+#sp-game-panel { }                   /* 合成工坊面板 */
 #sp-game-panel.visible { }
-#sp-game-panel.sp-game-minimized { }
-#sp-game-header { }
-#sp-game-status-bar { }
-.sp-game-stat { }
-#sp-game-notice { }
+#sp-game-panel.sp-game-minimized { } /* 最小化（只显示标题栏） */
+#sp-game-header { }                  /* 顶栏（可拖拽） */
+#sp-game-status-bar { }              /* 金币+体力状态栏 */
+.sp-game-stat { }                    /* 单项数据 */
+#sp-game-notice { }                  /* 浮动通知条 */
 #sp-game-notice.visible { }
 
-/* ===== 标签页切换 ===== */
-.sp-game-tab { }
+/* ===== 标签页 ===== */
+.sp-game-tab { }                     /* 通用游戏标签 */
 .sp-game-tab.active { }
-.sp-game-tab-content { }
+.sp-game-tab-content { }             /* 内容区 */
 .sp-game-tab-content.active { }
 
-/* ===== 棋盘 ===== */
-#sp-game-board { }
-.sp-game-cell { }
-.sp-game-cell.sp-game-has-item { }
-.sp-game-cell.sp-game-selected { }
-.sp-game-cell.sp-game-generator { }
-.sp-game-cell.sp-game-sell { }
-.sp-game-cell.sp-game-dragging { }
-.sp-game-cell.sp-game-dragover { }
+/* ===== 6×8棋盘 ===== */
+#sp-game-board { }                   /* 棋盘网格 */
+.sp-game-cell { }                    /* 单个格子 */
+.sp-game-cell.sp-game-has-item { }   /* 有物品 */
+.sp-game-cell.sp-game-selected { }   /* 选中态（绿色发光） */
+.sp-game-cell.sp-game-generator { }  /* 🐾 生成器 */
+.sp-game-cell.sp-game-sell { }       /* 💰 售卖区 */
+.sp-game-cell.sp-game-dragging { }   /* 拖拽源 */
+.sp-game-cell.sp-game-dragover { }   /* 拖入目标 */
+/* 各链颜色 */
 .sp-game-cell.sp-game-chain-toy { }
 .sp-game-cell.sp-game-chain-food { }
 .sp-game-cell.sp-game-chain-gem { }
@@ -10247,102 +11548,140 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 .sp-game-cell.sp-game-chain-star { }
 .sp-game-cell.sp-game-chain-seasoning { }
 .sp-game-cell.sp-game-chain-stamina { }
-.sp-game-cell-emoji { }
-.sp-game-cell-img { }
-.sp-game-level-badge { }
+.sp-game-cell-emoji { }              /* 物品emoji */
+.sp-game-cell-img { }                /* 自定义图片 */
+.sp-game-level-badge { }             /* 等级标记"L3" */
+.sp-game-touch-clone { }             /* 触摸拖拽克隆体 */
+.sp-game-board-hint { }              /* 底部操作提示 */
 
-/* ===== 订单 ===== */
-#sp-game-orders { }
-.sp-game-order-card { }
-.sp-game-order-card.sp-game-order-matched { }
-.sp-game-order-emoji { }
-.sp-game-order-name { }
-.sp-game-order-reward { }
-.sp-game-order-btn { }
-.sp-game-order-refresh-btn { }
+/* ===== 订单===== */
+#sp-game-orders { }                  /* 订单列表 */
+.sp-game-order-card { }              /* 单个订单卡*/
+.sp-game-order-card.sp-game-order-matched { } /* 棋盘有可交付物品 */
+.sp-game-order-item { }              /* 物品图标区 */
+.sp-game-order-emoji { }             /* 物品emoji */
+.sp-game-order-img { }               /* 自定义物品图 */
+.sp-game-order-info { }              /* 名称+金币 */
+.sp-game-order-name { }              /* 物品名 */
+.sp-game-order-reward { }            /* 金币数*/
+.sp-game-order-btn { }               /* 交付按钮 */
+.sp-game-order-refresh-btn { }       /* 🔄 刷新订单 */
 
 /* ===== 商店 ===== */
-#sp-game-shop-content { }
-.sp-game-shop-category { }
-.sp-game-shop-cat-title { }
-.sp-game-shop-item { }
-.sp-game-shop-item.sp-game-shop-disabled { }
-.sp-game-shop-item-emoji { }
-.sp-game-shop-item-name { }
-.sp-game-shop-buy { }
-.sp-game-shop-limit { }
-.sp-game-shop-limit.sold-out { }
+#sp-game-shop-content { }            /* 商店内容 */
+.sp-game-shop-category { }           /* 分类区块 */
+.sp-game-shop-cat-title { }          /* 分类标题 */
+.sp-game-shop-item { }               /* 单个商品 */
+.sp-game-shop-item.sp-game-shop-disabled { } /* 不可购买 */
+.sp-game-shop-item-emoji { }         /* 商品emoji */
+.sp-game-shop-item-name { }          /* 商品名 */
+.sp-game-shop-item-info { }          /* 恢复值 */
+.sp-game-shop-buy { }                /* 购买按钮 */
+.sp-game-shop-limit { }              /* 限购标签 */
+.sp-game-shop-limit.sold-out { }     /* 已售罄（红色） */
 
 /* ===== 图鉴 ===== */
-#sp-game-collection-content { }
-.sp-game-collection-chain { }
-.sp-game-collection-chain-title { }
-.sp-game-coll-item { }
-.sp-game-coll-item.unlocked { }
-.sp-game-coll-item.locked { }
-.sp-game-coll-item-name { }
-.sp-game-coll-upload-overlay { }
+#sp-game-collection-content { }      /* 图鉴内容 */
+.sp-game-collection-chain { }        /* 单条链 */
+.sp-game-collection-chain-title { }  /* 链名 */
+.sp-game-collection-items { }        /* 物品网格 */
+.sp-game-coll-item { }               /* 单个物品 */
+.sp-game-coll-item.unlocked { }      /* 已解锁 */
+.sp-game-coll-item.locked { }        /* 未解锁 */
+.sp-game-coll-item.sp-coll-has-custom { } /* 未解锁但有自定义图*/
+.sp-game-coll-item-name { }          /* 物品名 */
+.sp-game-coll-upload-overlay { }     /* 📷 上传按钮 */
+.sp-game-coll-img { }                /* 自定义图片 */
 
-/* ===== 游戏设置 ===== */
-.sp-game-settings-section { }
-.sp-game-settings-title { }
-.sp-game-settings-btn { }
-.sp-game-btn-danger { }</pre>
+/* ===== 设置 ===== */
+.sp-game-settings-section { }        /* 设置区块 */
+.sp-game-settings-title { }          /* 区块标题 */
+.sp-game-settings-btn { }            /* 操作按钮 */
+.sp-game-btn-danger { }              /* 红色危险按钮 */</pre>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🃏 消消看 + 🔗 连连看</summary>
+                <summary class="sp-guide-summary">🃏 消消看 &🔗 连连看</summary>
                 <div class="sp-guide-details-content">
-                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 消消看面板 ===== */
-#sp-match3-panel { }
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ========== 🃏 消消看 ========== */
+#sp-match3-panel { }                 /* 面板 */
 #sp-match3-panel.visible { }
 #sp-match3-panel.sp-match3-minimized { }
-#sp-match3-header { }
-#sp-match3-notice { }
-#sp-match3-board { }
-.sp-match3-card { }
-.sp-match3-clickable { }
-.sp-match3-blocked { }
+#sp-match3-header { }                /* 顶栏 */
+#sp-match3-notice { }                /* 通知 */
+#sp-match3-info { }                  /* 信息行 */
+
+/* 棋盘（多层堆叠） */
+#sp-match3-board { }                 /* 棋盘容器 */
+.sp-match3-card { }                  /* 单张牌 */
+.sp-match3-clickable { }             /* 可点击的牌 */
+.sp-match3-clickable:hover { }       /* 悬停放大 */
+.sp-match3-blocked { }               /* 被遮挡的牌 */
+
+/* 暂存栏 */
 #sp-match3-slots-wrapper { }
-#sp-match3-slots { }
-.sp-match3-slot { }
-.sp-match3-slot-empty { }
-.sp-match3-slot-filled { }
-#sp-match3-props { }
-.sp-match3-prop-btn { }
-.sp-match3-prop-icon { }
-.sp-match3-prop-count { }
+#sp-match3-slots { }                 /* 暂存格容器 */
+.sp-match3-slot { }                  /* 单格*/
+.sp-match3-slot-empty { }            /* 空格（虚线） */
+.sp-match3-slot-filled { }           /* 有图案（弹入动画） */
+
+/* 道具 */
+#sp-match3-props { }                 /* 道具按钮行 */
+.sp-match3-prop-btn { }              /* 道具按钮 */
+.sp-match3-prop-icon { }             /* 道具图标 */
+.sp-match3-prop-count { }            /* 库存数 */
+.sp-match3-prop-price { }            /* 价格 */
+#sp-match3-props-used { }            /* "本局已用:0/3" */
+
+/* 控制 */
 #sp-match3-controls { }
-.sp-match3-ctrl-btn { }
-.sp-match3-ctrl-quit { }
-.sp-match3-result-box { }
+.sp-match3-ctrl-btn { }              /* 重开/结束按钮 */
+.sp-match3-ctrl-quit { }             /* 退出（红色） */
+
+/* 结算 */
+.sp-match3-result-box { }            /* 结算弹窗 */
 .sp-match3-result-title { }
+.sp-match3-result-info { }
 .sp-match3-result-btn { }
+.sp-match3-result-close { }
+
+/* 背包/商店 */
 .sp-match3-bag-item { }
 .sp-match3-shop-item { }
 .sp-match3-shop-buy { }
 
-/* ===== 连连看面板 ===== */
+/* ========== 🔗 连连看 ========== */
 #sp-link-panel { }
 #sp-link-panel.visible { }
 #sp-link-panel.sp-link-minimized { }
 #sp-link-header { }
 #sp-link-notice { }
-#sp-link-board { }
-.sp-link-cell { }
-.sp-link-cell-empty { }
-.sp-link-cell-tile { }
-.sp-link-cell-tile:hover { }
-.sp-link-cell-tile.sp-link-selected { }
-.sp-link-cell-tile.sp-link-hint { }
-.sp-link-cell-tile.sp-link-compass-highlight { }
-.sp-link-cell-img { }
-#sp-link-path-svg { }
-#sp-link-path-svg line { }
+#sp-link-info { }
+
+/* 棋盘 */
+#sp-link-board { }                   /* 棋盘网格 */
+.sp-link-cell { }                    /* 格子通用 */
+.sp-link-cell-empty { }              /* 空格 */
+.sp-link-cell-tile { }               /* 有图案的方块 */
+.sp-link-cell-tile:hover { }         /* 悬停 */
+.sp-link-cell-tile.sp-link-selected { } /* 选中（绿色发光） */
+.sp-link-cell-tile.sp-link-hint { }  /* 提示高亮（金色脉冲） */
+.sp-link-cell-tile.sp-link-compass-highlight { } /* 罗盘透视高亮 */
+.sp-link-cell-img { }                /* 自定义图片 */
+
+/* 连线SVG */
+#sp-link-path-svg { }                /* SVG覆盖层 */
+#sp-link-path-svg line { }           /* 连线段 */
+
+/* 道具 */
+#sp-link-props { }
 .sp-link-prop-btn { }
 .sp-link-prop-icon { }
+.sp-link-prop-name { }
 .sp-link-prop-count { }
+
+/* 控制/结算/背包/商店 */
 .sp-link-ctrl-btn { }
 .sp-link-ctrl-quit { }
 .sp-link-result-box { }
@@ -10361,31 +11700,39 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🧊 冰箱整理 + 🍢 糖葫芦工坊</summary>
+                <summary class="sp-guide-summary">🧊 冰箱整理 & 🍢糖葫芦工坊</summary>
                 <div class="sp-guide-details-content">
-                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 冰箱面板 ===== */
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ========== 🧊 冰箱整理 ========== */
 #sp-fridge-panel { }
 #sp-fridge-panel.visible { }
 #sp-fridge-panel.sp-fridge-minimized { }
 #sp-fridge-header { }
 #sp-fridge-notice { }
-.sp-fridge-grid { }
-.sp-fridge-cell { }
-.sp-fridge-cell-occupied { }
-.sp-fridge-cell.sp-fridge-preview-ok { }
-.sp-fridge-cell.sp-fridge-preview-bad { }
-.sp-fridge-placed-item { }
-.sp-fridge-placed-item:hover { }
-.sp-fridge-placed-emoji { }
-.sp-fridge-placed-name { }
-.sp-fridge-placed-cell { }
-.sp-fridge-basket { }
-.sp-fridge-basket-item { }
-.sp-fridge-basket-item.sp-fridge-basket-selected { }
-.sp-fridge-basket-emoji { }
-.sp-fridge-basket-name { }
-.sp-fridge-basket-size { }
-.sp-fridge-basket-empty { }
+
+/* 冰箱网格 */
+.sp-fridge-grid { }  /* 网格容器 */
+.sp-fridge-cell { }                  /* 空格子 */
+.sp-fridge-cell-occupied { }         /* 被食材占据 */
+.sp-fridge-cell.sp-fridge-preview-ok { }  /* 可放置预览（绿色） */
+.sp-fridge-cell.sp-fridge-preview-bad { } /* 不可放置预览（红色） */
+
+/* 已放置食材 */
+.sp-fridge-placed-item { }           /* 矩形食材块 */
+.sp-fridge-placed-item:hover { }     /* 悬停变红（可取出） */
+.sp-fridge-placed-emoji { }          /* 食材emoji */
+.sp-fridge-placed-name { }           /* 食材名字 */
+.sp-fridge-placed-cell { }           /* 异形食材单格 */
+
+/* 购物筐 */
+.sp-fridge-basket { }                /* 底部购物筐容器 */
+.sp-fridge-basket-item { }           /* 单个待放食材 */
+.sp-fridge-basket-item.sp-fridge-basket-selected { } /* 选中态 */
+.sp-fridge-basket-emoji { }          /* 食材emoji */
+.sp-fridge-basket-name { }           /* 名字 */
+.sp-fridge-basket-size { }           /* 尺寸"2×3" */
+.sp-fridge-basket-empty { }          /* 筐清空提示 */
+
+/* 道具/控制/结算 */
 .sp-fridge-prop-btn { }
 .sp-fridge-ctrl-btn { }
 .sp-fridge-ctrl-quit { }
@@ -10393,326 +11740,391 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 .sp-fridge-result-title { }
 .sp-fridge-bag-item { }
 
-/* ===== 糖葫芦面板 ===== */
+/* ========== 🍢 糖葫芦工坊 ========== */
 #sp-tanghulu-panel { }
 #sp-tanghulu-panel.visible { }
 #sp-tanghulu-panel.sp-tanghulu-minimized { }
 #sp-tanghulu-header { }
 #sp-tanghulu-notice { }
-.sp-tanghulu-board { }
-.sp-tanghulu-stick { }
-.sp-tanghulu-stick:hover { }
-.sp-tanghulu-stick.sp-tanghulu-stick-selected { }
-.sp-tanghulu-stick-fruits { }
-.sp-tanghulu-fruit { }
-.sp-tanghulu-fruit-top { }
-.sp-tanghulu-slot-empty { }
-.sp-tanghulu-stick-base { }
-.sp-tanghulu-stick-label { }</pre>
+
+/* 竹签棋盘 */
+.sp-tanghulu-board { }               /* 棋盘容器（棕色背景） */
+.sp-tanghulu-stick { }               /* 单根竹签 */
+.sp-tanghulu-stick:hover { }         /* 悬停上浮 */
+.sp-tanghulu-stick.sp-tanghulu-stick-selected { } /* 选中（绿色发光） */
+.sp-tanghulu-stick-fruits { }        /* 水果容器列*/
+.sp-tanghulu-fruit { }               /* 单颗水果球 */
+.sp-tanghulu-fruit-top { }           /* 顶部水果（弹跳动画） */
+.sp-tanghulu-slot-empty { }          /* 空位（虚线圆） */
+.sp-tanghulu-stick-base { }          /* 竹签底座 */
+.sp-tanghulu-stick-label { }         /* 数量标签"3/4" */</pre>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🛒 货架整理 + 🐱 小猫餐厅</summary>
+                <summary class="sp-guide-summary">🛒 货架整理 & 🐱 小猫餐厅</summary>
                 <div class="sp-guide-details-content">
-                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 货架面板 ===== */
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ========== 🛒 货架整理 ========== */
 #sp-shelf-panel { }
 #sp-shelf-panel.visible { }
 #sp-shelf-panel.sp-shelf-minimized { }
 #sp-shelf-header { }
 #sp-shelf-notice { }
-#sp-shelf-area { }
-.sp-shelf-bay { }
+#sp-shelf-info { }   /* 信息行 */
+
+/* 货架区*/
+#sp-shelf-area { }                   /* 货架网格（列数JS动态设） */
+.sp-shelf-bay { }                    /* 单个隔间（含3槽） */
 .sp-shelf-bay:hover { }
-.sp-shelf-bay.sp-shelf-bay-drop-ok { }
-.sp-shelf-bay.sp-shelf-bay-drop-bad { }
-.sp-shelf-slot { }
+.sp-shelf-bay.sp-shelf-bay-drop-ok { }  /* 拖拽可放（绿色） */
+.sp-shelf-bay.sp-shelf-bay-drop-bad { } /* 拖拽不可放（红色） */
+.sp-shelf-slot { }                   /* 隔间内单槽 */
 .sp-shelf-slot:hover { }
-.sp-shelf-slot.sp-shelf-slot-filled { }
-.sp-shelf-slot.sp-shelf-slot-selected { }
-.sp-shelf-slot.sp-shelf-slot-dragging { }
-#sp-shelf-bag-area { }
-.sp-shelf-bag-slot { }
-.sp-shelf-bag-slot.sp-shelf-bag-filled { }
-.sp-shelf-bag-slot.sp-shelf-bag-locked { }
+.sp-shelf-slot.sp-shelf-slot-filled { }    /* 有商品 */
+.sp-shelf-slot.sp-shelf-slot-selected { }  /* 选中态*/
+.sp-shelf-slot.sp-shelf-slot-dragging { }  /* 拖拽中 */
+.sp-shelf-slot.sp-shelf-slot-eliminating { } /* 三消消除动画 */
+.sp-shelf-slot.sp-shelf-slot-advance { }   /* 后排补位动画 */
+
+/* 临时收纳篮（底部3格） */
+#sp-shelf-bag-area { }               /* 背包区容器 */
+.sp-shelf-bag-slot { }               /* 单个背包格 */
+.sp-shelf-bag-slot.sp-shelf-bag-filled { }/* 有物品 */
+.sp-shelf-bag-slot.sp-shelf-bag-locked { }  /* 🔒 未解锁 */
+
+/* 道具/结算 */
+#sp-shelf-props { }
 .sp-shelf-prop-btn { }
+.sp-shelf-prop-icon { }
+.sp-shelf-prop-name { }
+.sp-shelf-prop-count { }
 .sp-shelf-result-box { }
 .sp-shelf-result-title { }
 
-/* ===== 小猫餐厅面板 ===== */
+/* ========== 🐱 小猫餐厅 ========== */
 #sp-restaurant-panel { }
 #sp-restaurant-header { }
 #sp-restaurant-notice { }
 
 /* 桌子网格 */
-.sp-restaurant-tables { }
-.sp-restaurant-table { }
-.sp-restaurant-table-empty { }
-.sp-restaurant-table-occupied { }
-.sp-restaurant-table-urgent { }
-.sp-restaurant-table-emoji { }
-.sp-restaurant-table-name { }
-.sp-restaurant-table-dialogue { }
-.sp-restaurant-table-timer { }
-.sp-restaurant-table-timer.urgent { }
-.sp-restaurant-table-wants { }
-.sp-restaurant-table-number { }
-.sp-restaurant-table-serve-btn { }
-.sp-restaurant-table-dessert-btn { }
+.sp-restaurant-tables { }            /* 桌子网格（2列） */
+.sp-restaurant-table { }             /* 单桌 */
+.sp-restaurant-table-empty { }       /* 空桌（🪑） */
+.sp-restaurant-table-occupied { }    /* 有客人 */
+.sp-restaurant-table-urgent { }      /* 倒计时紧急（红色脉冲） */
+.sp-restaurant-table-emoji { }       /* 客人emoji */
+.sp-restaurant-table-name { }        /* 客人名 */
+.sp-restaurant-table-dialogue { }    /* 客人台词 */
+.sp-restaurant-table-timer { }       /* ⏱️倒计时 */
+.sp-restaurant-table-timer.urgent { } /* 紧急（红色） */
+.sp-restaurant-table-wants { }       /* 想要类型标签 */
+.sp-restaurant-table-number { }      /* 桌号"#1" */
+.sp-restaurant-table-actions { }     /* 上菜按钮区 */
+.sp-restaurant-table-serve-btn { }   /* 上菜按钮（绿色） */
+.sp-restaurant-table-dessert-btn { } /* 甜品按钮（粉色） */
 
-/* 厨房 */
-.sp-r-kitchen-section { }
-.sp-r-kitchen-title { }
-.sp-r-shop-toggle { }
-.sp-r-cooking-active { }
-.sp-r-cooking-idle { }
-.sp-r-cooking-name { }
-.sp-r-cooking-timer { }
-.sp-r-cook-btn { }
+/* 厨房区 */
+.sp-r-kitchen-section { }            /* 厨房区块 */
+.sp-r-kitchen-header { }             /* 标题+开店按钮 */
+.sp-r-kitchen-title { }              /* 区块标题 */
+.sp-r-shop-toggle { }                /* 🟢开店/🔴关店 */
+.sp-r-cooking-active { }             /* 烹饪中状态 */
+.sp-r-cooking-idle { }               /* 空闲状态 */
+.sp-r-cooking-name { }               /* 正在烹饪的菜名 */
+.sp-r-cooking-timer { }              /* 剩余秒数 */
+.sp-r-cook-btn { }                   /* 📋选择食谱按钮 */
 
 /* 出餐台 */
-.sp-r-dishes-row { }
-.sp-r-dish-tag { }
+.sp-r-dishes-row { }                 /* 菜品行 */
+.sp-r-dish-tag { }                   /* 单个菜品标签 */
 .sp-r-dish-name { }
 .sp-r-dish-count { }
-.sp-restaurant-feed-btn { }
+.sp-restaurant-feed-btn { }          /* 🍖 投喂桌宠按钮 */
 
-/* 菜单 */
-.sp-r-menu-group { }
-.sp-r-menu-group-summary { }
-.sp-r-menu-recipe { }
-.sp-r-menu-canmake { }
+/* 菜单标签页 */
+.sp-r-menu-group { }                 /* 食谱分组（details） */
+.sp-r-menu-group-summary { }         /* 分组标题 */
+.sp-r-menu-locked-text { }           /* 未解锁文字（灰色） */
+.sp-r-menu-recipe { }                /* 单个食谱行 */
+.sp-r-menu-canmake { }               /* 可制作（绿色背景） */
 .sp-r-menu-recipe-emoji { }
 .sp-r-menu-recipe-name { }
-.sp-r-menu-recipe-price { }
+.sp-r-menu-recipe-materials { }      /* 材料列表 */
+.sp-r-menu-recipe-price-area { }
+.sp-r-menu-recipe-price { }          /* 售价 */
+.sp-r-menu-recipe-feed { }           /* 投喂值 */
 
-/* 补货 */
+/* 补货标签页 */
 .sp-r-supply-title { }
-.sp-r-supply-row { }
-.sp-r-supply-locked { }
+.sp-r-supply-hint { }
+.sp-r-supply-row { }                 /* 单个商品行 */
+.sp-r-supply-locked { }              /* 未解锁商品 */
 .sp-r-supply-emoji { }
+.sp-r-supply-info { }
 .sp-r-supply-name { }
-.sp-r-convert-area { }
+.sp-r-supply-detail { }
+.sp-r-convert-area { }               /* 酱油瓶转换区 */
 
-/* 库存 */
-.sp-r-stock-card { }
-.sp-r-stock-card-earnings { }
-.sp-r-stock-section { }
-.sp-r-stock-section-header { }
-.sp-r-stock-item { }
-.sp-r-stock-empty { }
-.sp-r-stock-gold { }
+/* 库存标签页 */
+.sp-r-stock-card { }                 /* 营业数据卡 */
+.sp-r-stock-card-earnings { }        /* 收入数据卡 */
+.sp-r-stock-card-title { }
+.sp-r-stock-card-body { }
+.sp-r-stock-section { }              /* 库存分区 */
+.sp-r-stock-section-header { }       /* 分区标题 */
+.sp-r-stock-section-body { }
+.sp-r-stock-item { }                 /* 单个库存项 */
+.sp-r-stock-item-emoji { }
+.sp-r-stock-item-name { }
+.sp-r-stock-item-count { }
+.sp-r-stock-empty { }                /* 空库存提示 */
+.sp-r-stock-gold { }                 /* 金币高亮 */
 
 /* 食谱选择弹窗 */
 #sp-restaurant-recipe-modal-overlay { }
 #sp-restaurant-recipe-modal { }
 #sp-restaurant-recipe-modal-header { }
-.sp-restaurant-recipe-item { }
+#sp-restaurant-recipe-modal-body { }
+.sp-restaurant-recipe-item { }       /* 单个食谱选项 */
+.sp-restaurant-recipe-item:hover { }
 .sp-restaurant-recipe-item.sp-restaurant-recipe-disabled { }
+.sp-restaurant-recipe-item.sp-restaurant-recipe-wanted { } /* 客人想要 */
 .sp-restaurant-recipe-emoji { }
+.sp-restaurant-recipe-info { }
 .sp-restaurant-recipe-name { }
+.sp-restaurant-recipe-detail { }
 .sp-restaurant-recipe-price { }
-.sp-restaurant-recipe-lock { }</pre>
+.sp-restaurant-recipe-lock { }       /* "缺料"标签 */</pre>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🎰 抽奖 / 🎮 游戏选择 / 🎒 背包 / 🏆 成就 / 📖 图鉴</summary>
+                <summary class="sp-guide-summary">🎰抽奖 & 🎮 游戏选择 & ❓ 帮助</summary>
                 <div class="sp-guide-details-content">
-                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 抽奖面板 ===== */
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ========== 🎰 抽奖 ========== */
 #sp-lottery-panel { }
 #sp-lottery-panel.visible { }
 #sp-lottery-header { }
 #sp-lottery-notice { }
-#sp-lottery-pools { }
-.sp-lottery-pool-card { }
+#sp-lottery-body { }
+#sp-lottery-pools { }                /*奖池列表 */
+.sp-lottery-pool-card { }            /* 单个奖池卡 */
 .sp-lottery-pool-card.sp-lottery-pool-disabled { }
-.sp-lottery-pool-name { }
-.sp-lottery-pool-cost { }
-.sp-lottery-pool-desc { }
-.sp-lottery-pool-preview { }
-.sp-lottery-preview-tag { }
-.sp-lottery-draw-btn { }
-.sp-lottery-limit-badge { }
-.sp-lottery-result-overlay { }
-.sp-lottery-rarity-common { }
-.sp-lottery-rarity-rare { }
-.sp-lottery-rarity-epic { }
-.sp-lottery-rarity-legendary { }
-.sp-lottery-result-box { }
-.sp-lottery-rarity-badge { }
-.sp-lottery-result-icon { }
-.sp-lottery-result-label { }
-.sp-lottery-result-msg { }
-.sp-lottery-result-gold { }
-.sp-lottery-result-close-btn { }
+.sp-lottery-pool-header { }          /* 奖池标题行 */
+.sp-lottery-pool-name { }            /* 奖池名 */
+.sp-lottery-pool-cost { }            /* 费用 */
+.sp-lottery-pool-desc { }            /* 描述 */
+.sp-lottery-pool-preview { }         /* 奖品预览 */
+.sp-lottery-preview-tag { }          /* 单个预览标签 */
+.sp-lottery-draw-btn { }             /* 抽一次按钮 */
+.sp-lottery-limit-badge { }          /* 限额标签 */
 
-/* ===== 游戏选择弹窗 ===== */
-.sp-game-selector-box { }
+/* 抽奖结果 */
+.sp-lottery-result-overlay { }       /* 结果遮罩 */
+.sp-lottery-rarity-common { }        /* 普通品质背景 */
+.sp-lottery-rarity-rare { }          /* 稀有品质背景 */
+.sp-lottery-rarity-epic { }          /* 史诗品质背景 */
+.sp-lottery-rarity-legendary { }     /* 传说品质背景 */
+.sp-lottery-result-box { }           /* 结果弹窗 */
+.sp-lottery-rarity-badge { }         /* 品质标签 */
+.sp-lottery-result-icon { }          /* 物品图标 */
+.sp-lottery-result-label { }         /* 物品名*/
+.sp-lottery-result-msg { }           /* 描述文字 */
+.sp-lottery-result-gold { }          /* 当前金币 */
+.sp-lottery-result-close-btn { }     /* 继续抽奖按钮 */
+
+/* ========== 🎮 游戏选择弹窗 ========== */
+.sp-game-selector-box { }            /* 弹窗主体 */
 .sp-game-selector-header { }
 .sp-game-selector-close { }
-.sp-game-selector-body { }
-.sp-game-selector-card { }
-.sp-game-selector-card:hover { }
-.sp-game-selector-icon { }
-.sp-game-selector-name { }
-.sp-game-selector-desc { }
-.sp-game-selector-help { }
+.sp-game-selector-body { }           /* 游戏卡片网格 */
+.sp-game-selector-card { }           /* 单个游戏卡 */
+.sp-game-selector-card:hover { }     /* 悬停上浮 */
+.sp-game-selector-icon { }           /* 游戏图标 */
+.sp-game-selector-icon img { }       /* 自定义图标 */
+.sp-game-selector-info { }
+.sp-game-selector-name { }           /* 游戏名 */
+.sp-game-selector-desc { }           /* 描述 */
+.sp-game-selector-help { }           /* ❓ 帮助按钮 */
 
-/* ===== 游戏帮助弹窗 ===== */
+/* ========== ❓ 帮助弹窗 ========== */
 #sp-game-help-overlay { }
 #sp-game-help-box { }
 #sp-game-help-header { }
-#sp-game-help-body { }
+#sp-game-help-close { }
+#sp-game-help-body { }</pre>
+                </div>
+              </details>
 
-/* ===== 物品背包弹窗 ===== */
-.sp-inv-popup-box { }
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">🎒 背包 & 🏆 成就 & 📖 图鉴合集</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ========== 🎒 物品背包弹窗 ========== */
+.sp-inv-popup-box { }                /* 弹窗主体 */
 .sp-inv-popup-header { }
-.sp-inv-popup-body { }
-.sp-inv-item { }
-.sp-inv-item-emoji { }
-.sp-inv-item-name { }
-.sp-inv-item-detail { }
-.sp-inv-use-btn { }
-.sp-inv-quick-btn { }
-.sp-inv-quick-btn.active { }
-.sp-inv-empty { }
-.sp-inv-popup-hint { }
+.sp-inv-popup-close { }
+.sp-inv-popup-body { }               /* 物品列表 */
+.sp-inv-item { }                     /* 单个物品行 */
+.sp-inv-item-emoji { }               /* 物品图标 */
+.sp-inv-item-info { }
+.sp-inv-item-name { }                /* 物品名 */
+.sp-inv-item-detail { }              /* 详情(+值| 库存) */
+.sp-inv-item-actions { }
+.sp-inv-use-btn { }                  /* 使用按钮 */
+.sp-inv-quick-btn { }                /* ☆ 快捷按钮 */
+.sp-inv-quick-btn.active { }         /* ⭐ 已设为快捷 */
+.sp-inv-empty { }                    /* 空背包提示 */
+.sp-inv-popup-hint { }               /* 底部提示文字 */
 
-/* ===== 总背包弹窗 ===== */
-.sp-total-inv-box { }
+/* ==========🎒 总背包弹窗 ========== */
+.sp-total-inv-box { }                /* 总背包弹窗主体 */
 .sp-total-inv-header { }
-.sp-total-inv-body { }
-.sp-total-inv-section { }
-.sp-total-inv-section-title { }
-.sp-total-inv-row { }
+.sp-total-inv-header-right { }       /* 金币+体力+关闭 */
+.sp-total-inv-gold { }               /* 金币显示 */
+.sp-total-inv-stamina { }            /* 体力显示 */
+.sp-total-inv-close { }              /* ✕ 关闭 */
+.sp-total-inv-body { }               /* 内容滚动区 */
+.sp-total-inv-section { }            /* 分类区块 */
+.sp-total-inv-section-title { }      /* 分类标题 */
+.sp-total-inv-section-content { }
+.sp-total-inv-row { }                /* 单行物品 */
 .sp-total-inv-emoji { }
 .sp-total-inv-name { }
-.sp-total-inv-count { }
-.sp-total-inv-empty { }
+.sp-total-inv-detail { }
+.sp-total-inv-count { }              /* 数量 */
+.sp-total-inv-empty { }              /* 空提示 */
 
-/* ===== 体力背包弹窗 ===== */
+/* ========== ⚡ 体力背包弹窗 ========== */
 #sp-stamina-inv-popup .sp-inv-popup-box { }
 
-/* ===== 成就弹窗 ===== */
+/* ========== 🏆 成就弹窗 ========== */
 #sp-achievements-overlay { }
 #sp-achievements-overlay .sp-total-inv-box { }
 #sp-achievements-overlay .sp-total-inv-body { }
-#sp-achievements-overlay details { }
-#sp-achievements-overlay details[open] { }
-#sp-achievements-overlay details summary { }
-.sp-achievement-claim-btn { }
-#sp-achievements-claim-all { }
+#sp-achievements-overlay details { }          /* 分类折叠栏 */
+#sp-achievements-overlay details[open] { }    /* 展开的分类 */
+#sp-achievements-overlay details summary { }  /* 分类标题行 */
+#sp-achievements-overlay details > div { }    /* 成就列表区 */
+.sp-achievement-claim-btn { }                /* 🎁 领取单个 */
+#sp-achievements-claim-all { }                /* 🎁 一键领取全部 */
 
-/* ===== 图鉴合集弹窗 ===== */
+/* ========== 📖 图鉴合集弹窗 ========== */
 #sp-unified-collection-overlay { }
 #sp-unified-collection-overlay .sp-total-inv-box { }
 #sp-unified-collection-overlay .sp-total-inv-body { }
-#sp-unified-collection-overlay .sp-guide-details { }
-#sp-unified-collection-overlay .sp-guide-details-content { }
-.sp-unified-coll-grid { }
-.sp-unified-coll-item { }
-.sp-unified-coll-item:hover { }
-.sp-unified-coll-item.sp-unified-locked { }
-.sp-unified-coll-item.sp-unified-has-custom { }
-.sp-unified-coll-name { }
-.sp-unified-coll-link { }
-.sp-unified-coll-upload { }
-.sp-unified-game-icon-grid { }
-.sp-unified-game-icon-item { }
-.sp-unified-game-icon-preview { }
-.sp-unified-game-icon-name { }
-.sp-unified-game-icon-upload { }
-.sp-unified-show-locked-names-btn { }
-.sp-unified-show-locked-names-btn.active { }
-#sp-unified-search-input { }</pre>
+#sp-unified-collection-overlay .sp-guide-details { }         /* 分类折叠栏 */
+#sp-unified-collection-overlay .sp-guide-details-content { } /* 内容区 */
+#sp-unified-collection-overlay .sp-guide-summary { }         /* 分类标题 */
+
+/* 图鉴物品网格 */
+.sp-unified-coll-grid { }            /* 4列网格 */
+.sp-unified-coll-item { }            /* 单个物品格 */
+.sp-unified-coll-item:hover { }      /* 悬停 */
+.sp-unified-coll-item.sp-unified-locked { }       /* 🔒 未解锁 */
+.sp-unified-coll-item.sp-unified-has-custom { }   /* 未解锁但有图*/
+.sp-unified-coll-name { }            /* 物品名字 */
+.sp-unified-coll-link { }            /* 🔗 联动标记 */
+.sp-unified-coll-upload { }          /* 📷 上传按钮 */
+
+/* 游戏图标自定义 */
+.sp-unified-game-icon-grid { }       /* 图标网格 */
+.sp-unified-game-icon-item { }       /* 单个图标卡 */
+.sp-unified-game-icon-preview { }    /* 图标预览 */
+.sp-unified-game-icon-preview img { }
+.sp-unified-game-icon-name { }       /* 游戏名 */
+.sp-unified-game-icon-upload { }     /* 📷 上传 */
+
+/* 工具按钮 */
+.sp-unified-show-locked-names-btn { }          /* 🔒 显示名字 */
+.sp-unified-show-locked-names-btn.active { }   /* 激活态 */
+#sp-unified-search-input { }                   /* 🔍 搜索框 */</pre>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">📚 书架 + 阅读器</summary>
+                <summary class="sp-guide-summary">🎨 CSS 变量（覆盖即可改变全局颜色）</summary>
                 <div class="sp-guide-details-content">
-                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 书架页面 ===== */
-#sp-phone-bookshelf { }
-#sp-bookshelf-page-content { }
-#sp-bs-shelf-list { }
-#sp-bs-search { }
-#sp-bs-sort { }
-#sp-bs-layout-toggle { }
-#sp-bs-tag-bar { }
-#sp-bs-history-bar { }
-#sp-bs-import-btn { }
-
-/* ===== 阅读器页面 ===== */
-#sp-phone-bookreader { }
-
-/* 顶部/底部工具栏 */
-.sp-br-bar { }
-.sp-br-bar-visible { }
-.sp-br-bar-hidden { }
-#sp-br-top-bar { }
-#sp-br-bottom-bar { }
-#sp-br-top-bar.sp-br-bar-hidden { }
-#sp-br-bottom-bar.sp-br-bar-hidden { }
-#sp-br-title { }
-#sp-br-toc-btn { }
-#sp-br-back-btn { }
-
-/* 阅读区域 */
-#sp-br-body { }
-#sp-br-body.sp-br-immersive { }
-
-/* 进度条/翻页 */
-#sp-br-progress-bar { }
-#sp-br-slider { }
-#sp-br-slider::-webkit-slider-thumb { }
-#sp-br-slider::-moz-range-thumb { }
-#sp-br-prev { }
-#sp-br-next { }
-#sp-br-font-dec { }
-#sp-br-font-inc { }
-
-/* 目录弹窗 */
-#sp-bs-toc-overlay { }</pre>
-                </div>
-              </details>
-
-              <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🎨 CSS 变量（主题色）</summary>
-                <div class="sp-guide-details-content">
-                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* 覆盖这些变量可以改变整体颜色 */
-:root {
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">:root {
+  /* 主色调（按钮、高亮、选中态） */
   --sp-primary: rgba(100,180,255,0.4);
   --sp-primary-hover: rgba(100,180,255,0.6);
   --sp-primary-border: rgba(100,180,255,0.5);
-  --sp-bg-main: rgba(20,20,30,0.85);
-  --sp-bg-secondary: rgba(30,30,40,0.9);
-  --sp-bg-light: rgba(255,255,255,0.06);
-  --sp-border: rgba(255,255,255,0.12);
-  --sp-border-light: rgba(255,255,255,0.08);
-  --sp-text-primary: #eee;
-  --sp-text-secondary: #bbb;
-  --sp-text-muted: #888;
-  --sp-status-hunger: #ffb347;
-  --sp-status-clean: #87ceeb;
-  --sp-status-energy: #90ee90;
+
+  /* 背景色 */
+  --sp-bg-main: rgba(20,20,30,0.85);      /* 面板主背景 */
+  --sp-bg-secondary: rgba(30,30,40,0.9);   /* 弹窗/卡片背景 */
+  --sp-bg-light: rgba(255,255,255,0.06);   /* 输入框/浅色区块 */
+
+  /* 边框色 */
+  --sp-border: rgba(255,255,255,0.12);     /* 主要边框 */
+  --sp-border-light: rgba(255,255,255,0.08); /* 次要边框 */
+
+  /* 文字色 */
+  --sp-text-primary: #eee;    /* 主标题/重要文字 */
+  --sp-text-secondary: #bbb;  /* 正文/次要文字 */
+  --sp-text-muted: #888;      /* 提示/灰色文字 */
+
+  /* 状态条颜色 */
+  --sp-status-hunger: #ffb347; /* 饱食度（橙色） */
+  --sp-status-clean: #87ceeb;  /* 清洁度（天蓝） */
+  --sp-status-energy: #90ee90; /* 精力值（浅绿） */
+
+  /* 气泡 */
   --sp-bubble-bg: rgba(20,20,30,0.85);
   --sp-bubble-border: rgba(255,255,255,0.15);
+}
+
+/* 手机壁纸变量（由JS设置） */
+#silly-pet-chat {
+  --sp-wp-image: none;   /* 壁纸图片URL */
+  --sp-wp-opacity: 0;/* 壁纸透明度 */
 }</pre>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">📐 杂项 / 滚动条 / 动画 / 迁移进度条</summary>
+                <summary class="sp-guide-summary">📐 动画关键帧 & 滚动条 & 杂项</summary>
                 <div class="sp-guide-details-content">
-                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 使用说明折叠栏 ===== */
-.sp-guide-details { }
-.sp-guide-details[open] { }
-.sp-guide-summary { }
-.sp-guide-summary::before { }
-.sp-guide-details-content { }
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 可覆盖的动画关键帧 ===== */
+@keyframes sp-menu-float { }         /* 菜单按钮浮动 */
+@keyframes sp-menu-float-fast { }    /* 悬停时快速浮动 */
+@keyframes sp-idle-bob { }           /* 闲置上下晃动 */
+@keyframes sp-mood-bounce { }        /* 心情图标弹跳 */
+@keyframes sp-fade-in { }            /* 通用淡入 */
+@keyframes sp-dots-pulse { }         /* ●●● 思考动画 */
+@keyframes sp-app-wiggle { }         /* 编辑模式App抖动 */
+@keyframes sp-lock-float { }         /* 锁屏时钟浮动 */
+@keyframes sp-lock-pulse { }         /* 解锁提示闪烁 */
+@keyframes sp-lock-shake { }         /* 密码错误抖动 */
+@keyframes sp-match3-slot-pop { }    /* 消消看槽位弹入 */
+@keyframes sp-link-hint-pulse { }    /* 连连看提示脉冲 */
+@keyframes sp-link-line-fade { }     /* 连线淡出 */
+@keyframes sp-fridge-place-pop { }   /* 冰箱放置弹入 */
+@keyframes sp-tanghulu-bounce { }    /* 糖葫芦顶部水果弹跳 */
+@keyframes sp-shelf-eliminate { }    /* 货架三消消除 */
+@keyframes sp-shelf-advance { }/* 货架后排补位 */
+@keyframes sp-game-gen-pulse { }     /* 生成器发光脉冲 */
+@keyframes sp-game-order-pulse { }   /* 订单匹配脉冲 */
+@keyframes sp-item-float { }        /* 互动贴图飘动 */
+@keyframes sp-forum-cover-float { }  /* 论坛封面emoji浮动 */
 
-/* ===== 所有游戏的通知条（统一覆盖）===== */
+/* ===== 使用说明折叠栏 ===== */
+.sp-guide-details { }                /* 折叠容器 */
+.sp-guide-details[open] { }          /* 展开状态 */
+.sp-guide-summary { }                /* 折叠标题 */
+.sp-guide-summary::before { }        /* ▶ 箭头 */
+.sp-guide-details-content { }        /* 内容区 */
+.sp-guide-table { }                  /* 说明表格 */
+.sp-guide-row { }                    /* 表格行 */
+.sp-guide-key { }                    /* 操作名（蓝色代码风格） */
+.sp-guide-val { }                    /* 说明文字 */
+
+/* ===== 全局滚动条 ===== */
+*::-webkit-scrollbar { }/* 滚动条宽度 */
+*::-webkit-scrollbar-thumb { }       /* 滚动条滑块 */
+*::-webkit-scrollbar-track { }       /* 滚动条轨道 */
+
+/* ===== 所有游戏通知条统一覆盖 ===== */
 #sp-game-notice,
 #sp-match3-notice,
 #sp-link-notice,
@@ -10722,28 +12134,20 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 #sp-lottery-notice,
 #sp-restaurant-notice { }
 
-/* ===== 全局滚动条 ===== */
-*::-webkit-scrollbar { }
-*::-webkit-scrollbar-thumb { }
-*::-webkit-scrollbar-track { }
-
 /* ===== GitHub迁移进度条 ===== */
-#sp-migrate-progress-overlay { }
-#sp-migrate-progress-box { }
-#sp-migrate-bar { }
+#sp-migrate-progress-overlay { }     /* 遮罩 */
+#sp-migrate-progress-box { }         /* 进度盒 */
+#sp-migrate-bar { }                  /* 进度条 */
 
-/* ===== 动画关键帧（可覆盖）===== */
-@keyframes sp-menu-float { }
-@keyframes sp-idle-bob { }
-@keyframes sp-mood-bounce { }
-@keyframes sp-fade-in { }</pre>
+/* ===== 扩展设置区顶部控制条 ===== */
+#meep-pet-top-control { }            /* 酒馆设置区的启用开关 */</pre>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">✨ 示例：圆角加大 + 气泡渐变 + 头像框美化</summary>
+                <summary class="sp-guide-summary">✨ CSS 美化示例</summary>
                 <div class="sp-guide-details-content">
-                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* 所有面板圆角加大 */
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 所有面板圆角加大 ===== */
 #silly-pet-chat,
 #silly-pet-settings,
 #silly-pet-house,
@@ -10751,7 +12155,7 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
   border-radius: 24px;
 }
 
-/* 气泡渐变背景 */
+/* ===== 气泡渐变背景 ===== */
 #silly-pet-bubble {
   background: linear-gradient(
     135deg,
@@ -10761,31 +12165,51 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
   border: 1px solid rgba(200,100,255,0.4);
 }
 
-/* 聊天消息更圆润 */
-.sp-chat-msg {
-  border-radius: 18px;
-}
+/* ===== 聊天消息更圆润 ===== */
+.sp-chat-msg { border-radius: 18px; }
 
-/* 菜单按钮方形化 */
-.sp-menu-btn {
-  border-radius: 8px;
-}
+/* ===== 菜单按钮方形化 ===== */
+.sp-menu-btn { border-radius: 8px; }
 
-/* 头像框加发光效果 */
+/* ===== 头像框加发光效果 ===== */
 .sp-chat-avatar-frame {
   filter: drop-shadow(0 0 4px rgba(255,200,50,0.5));
 }
 
-/* 隐藏头像时聊天气泡占满整行 */
-.sp-chat-row .sp-chat-msg {
-  max-width: 90%;
+/* ===== 隐藏气泡小三角 ===== */
+#silly-pet-bubble::after { display: none; }
+
+/* ===== 给小屋场景加滤镜 ===== */
+#sp-house-bg-layer {
+  filter: brightness(0.8) saturate(1.3);
 }
 
-/* 给面板加背景图 */
-#silly-pet-chat {
-  background-image: url("https://example.com/bg.jpg");
-  background-size: cover;
-  background-position: center;
+/* =====锁屏时钟换字体 ===== */
+#sp-lock-time {
+  font-family: 'Georgia', serif;
+  font-weight: 100;
+}
+
+/* ===== 游戏棋盘格子加圆角 ===== */
+.sp-game-cell { border-radius: 12px; }
+
+/* ===== 论坛卡片加阴影 ===== */
+.sp-forum-card {
+  box-shadow: 0 4px 20px rgba(100,180,255,0.15);
+}
+
+/* ===== 全局一键切换为亮色模式 ===== */
+:root {
+  --sp-bg-main: rgba(245,245,250,0.95);
+  --sp-bg-secondary: rgba(235,235,240,0.95);
+  --sp-bg-light: rgba(0,0,0,0.04);
+  --sp-border: rgba(0,0,0,0.1);
+  --sp-border-light: rgba(0,0,0,0.06);
+  --sp-text-primary: #222;
+  --sp-text-secondary: #555;
+  --sp-text-muted: #999;
+  --sp-bubble-bg: rgba(245,245,250,0.95);
+  --sp-bubble-border: rgba(0,0,0,0.1);
 }</pre>
                 </div>
               </details>
@@ -10801,15 +12225,16 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
     panel.className = '';  // 清空自动生成的 class
     document.body.appendChild(panel);
 
-    renderUploadAreas();
-    renderMemoriesList();
-    renderChatHistoryList();
-    renderChatArchive(); 
-    renderStatusOverview();
+    // 只渲染默认激活的 API 标签页需要的内容，其他懒加载
+    // renderUploadAreas();    // 延迟到切换到 display 标签页
+    // renderMemoriesList();// 延迟到切换到 memory 标签页
+    // renderChatHistoryList();
+    // renderChatArchive();
+    // renderStatusOverview(); // 延迟到切换到 data 标签页
     bindTabSwitching();
     bindSettingsClose();
     bindSettingsDrag();
-    bindSettingsEvents(); // 👈 新增：让设置面板渲染完后，立刻自动绑定它里面的所有按钮和输入框事件
+    bindSettingsEvents();
   }
 
   // ============================================================
@@ -11874,6 +13299,7 @@ document.getElementById('sp-export')?.addEventListener('click', async () => {
     settings.offlinePrompt = v('sp-offline-prompt');
     settings.onlinePrompt = v('sp-online-prompt');
     settings.diaryPrompt = v('sp-diary-prompt');
+    settings.forumPrompt = v('sp-forum-prompt') || DEFAULT_SETTINGS.forumPrompt;
     settings.summaryMode = v('sp-summary-mode') || 'incremental';
     settings.summaryTrigger = document.getElementById('sp-summary-auto')?.checked ? 'auto' : 'manual';
     settings.summaryKeepRecent = n('sp-summary-keep', 10);
@@ -11889,7 +13315,8 @@ document.getElementById('sp-export')?.addEventListener('click', async () => {
     settings.cooldownSeconds = n('sp-cooldown', 30);
     settings.peekRounds = n('sp-peek-rounds', 5);
     settings.petChatRounds = n('sp-pet-chat-rounds', 20);
-    settings.enableTimeAwareness = document.getElementById('sp-enable-time-awareness')?.checked || false;
+    // 时间感知已移至手机设置页，此处不再从悬浮面板读取
+    // settings.enableTimeAwareness 由手机设置保存按钮处理
     settings.autoSummaryRounds = n('sp-auto-summary', 20);
 
     settings.displayMode = v('sp-display-mode');
@@ -11960,6 +13387,14 @@ function bindTabSwitching() {
       tab.classList.add('active');
       panels.forEach(p => p.classList.toggle('active', p.dataset.panel === target));
       tab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      // 懒加载：切换到记忆标签才渲染记忆列表
+      if (target === 'memory') {
+        renderMemoriesList();
+        renderChatHistoryList();
+        renderChatArchive();
+      }
+      if (target === 'display') renderUploadAreas();
+      if (target === 'data') renderStatusOverview();
     });
   });
 
@@ -12702,6 +14137,7 @@ window.addEventListener('beforeunload', () => {
       energy: state.energy,
     }));
   } catch(e) {}
+  stopAutoMessage();
   saveData();
 });
 
@@ -13187,9 +14623,11 @@ window.addEventListener('beforeunload', () => {
       }
 
       saveDataDebounced('游戏合成');
-      gameRenderBoard();
-      gameRenderStatus();
-      gameRenderOrders();
+      requestAnimationFrame(() => {
+        gameRenderBoard();
+        gameRenderStatus();
+        gameRenderOrders();
+      });
 
       return true;
     }
@@ -20852,17 +22290,35 @@ window.addEventListener('beforeunload', () => {
 
 
   // ===== 成就检查（在关键操作后调用）=====
+  let _achievementCheckTimer = null;
+  let _achievementsUnlockedSet = null;
+
   function checkAchievements() {
+    // 节流：2秒内多次调用只执行最后一次
+    if (_achievementCheckTimer) return;
+    _achievementCheckTimer = setTimeout(() => {
+      _achievementCheckTimer = null;
+      _checkAchievementsImpl();
+    }, 2000);}
+
+  function _checkAchievementsImpl() {
     if (!state.achievements) state.achievements = [];
-    if (!state.achievementNotified) state.achievementNotified = [];if (!state.achievementClaimed) state.achievementClaimed = [];
+    if (!state.achievementNotified) state.achievementNotified = [];
+    if (!state.achievementClaimed) state.achievementClaimed = [];
+
+    // 用 Set 替代 Array.includes，O(1) 查找
+    if (!_achievementsUnlockedSet || _achievementsUnlockedSet.size !== state.achievements.length) {
+      _achievementsUnlockedSet = new Set(state.achievements);
+    }
 
     let newlyUnlocked = [];
 
     ACHIEVEMENTS.forEach(ach => {
-      if (state.achievements.includes(ach.id)) return;
+      if (_achievementsUnlockedSet.has(ach.id)) return;
       try {
         if (ach.check()) {
           state.achievements.push(ach.id);
+          _achievementsUnlockedSet.add(ach.id);
           newlyUnlocked.push(ach);
         }
       } catch (e) {
@@ -23887,14 +25343,23 @@ window.addEventListener('beforeunload', () => {
     restaurantCountdownTimer = setInterval(() => {
       if (!isRestaurantOpen) return;
       restaurantCheckTimeout();
-      // 每秒刷新厨房界面（更新倒计时显示 + 桌子状态）
-      const activeTab = document.querySelector('#sp-restaurant-panel .sp-game-tab.active[data-rtab]');
-      if (activeTab && activeTab.dataset.rtab === 'kitchen') {
-        restaurantRenderKitchen();
-      }
-      // 烹饪完成后也刷新烹饪台倒计时
+      // 只更新计时器文字，不重建整个 DOM
+      const now = Date.now();
+      restaurantRuntime.customers.forEach((customer, i) => {
+        const elapsed = Math.floor((now - customer.arriveTime) / 1000);
+        const remaining = Math.max(0, customer.patience - elapsed);
+        const timerEl = document.querySelector(`.sp-restaurant-table[data-table-idx="${i}"] .sp-restaurant-table-timer`);
+        if (timerEl) {
+          timerEl.textContent = `⏱️${remaining}s`;
+          timerEl.classList.toggle('urgent', remaining < 10);
+        }
+      });
+      // 烹饪台倒计时
       if (restaurantRuntime.cooking) {
-        const elapsed = Date.now() - restaurantRuntime.cooking.startTime;
+        const elapsed = now - restaurantRuntime.cooking.startTime;
+        const remaining = Math.max(0, Math.ceil((restaurantRuntime.cooking.duration - elapsed) / 1000));
+        const cookTimerEl = document.querySelector('.sp-r-cooking-timer');
+        if (cookTimerEl) cookTimerEl.textContent = `剩余 ${remaining} 秒…`;
         if (elapsed >= restaurantRuntime.cooking.duration) {
           restaurantFinishCooking();
         }
@@ -26387,6 +27852,717 @@ window.addEventListener('beforeunload', () => {
   }
 
   // ============================================================
+  // 📝 同人文 App 模块 - MeepFanfic
+  // ============================================================
+
+  let _fanficCurrentTab = 'home';
+  let _fanficReadingPost = null; // 当前正在阅读的同人文对象
+
+  // ===== 标签页切换 =====
+  function fanficBindTabEvents() {
+    const container = document.getElementById('sp-fanfic-container');
+    if (!container) return;
+    container.querySelectorAll('.sp-fanfic-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const tabName = tab.dataset.fanficTab;
+        _fanficCurrentTab = tabName;
+        container.querySelectorAll('.sp-fanfic-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('sp-fanfic-home-view').style.display = tabName === 'home' ? '' : 'none';
+        document.getElementById('sp-fanfic-write-view').style.display = tabName === 'write' ? '' : 'none';
+        document.getElementById('sp-fanfic-me-view').style.display = tabName === 'me' ? '' : 'none';
+        document.getElementById('sp-fanfic-reader-view').style.display = 'none';
+        if (tabName === 'home') renderFanficHomePage();
+        if (tabName === 'write') renderFanficWritePage();
+        if (tabName === 'me') renderFanficMePage();
+      });
+    });
+  }
+
+  // ===== 主页渲染 =====
+  function renderFanficHomePage() {
+    const container = document.getElementById('sp-fanfic-home-view');
+    if (!container) return;
+    // 确保显示
+    container.style.display = '';
+    document.getElementById('sp-fanfic-reader-view').style.display = 'none';
+
+    const posts = settings.fanficPosts || [];
+    const loading = state.fanficGenerating;
+
+    let html = `
+      <div class="sp-fanfic-toolbar">
+        <button id="sp-fanfic-generate-btn" class="sp-fanfic-generate-btn" ${loading ? 'disabled' : ''}>
+          ${loading ? '⏳ 生成中…' : '✨ 生成同人文'}
+        </button>
+      </div>
+    `;
+
+    if (loading) {
+      html += `<div class="sp-fanfic-loading"><div style="font-size:28px;animation:sp-dots-pulse 1.2s ease-in-out infinite;">📝</div><div>正在生成同人文…</div><div style="font-size:11px;margin-top:4px;">破限 + 同人文提示词</div></div>`;
+    } else if (posts.length === 0) {
+      html += `<div class="sp-fanfic-empty"><div style="font-size:36px;margin-bottom:10px;">📝</div><div>还没有同人文</div><div style="font-size:11px;margin-top:4px;">点击「✨ 生成同人文」开始</div></div>`;
+    } else {
+      html += '<div class="sp-fanfic-feed">';
+      posts.forEach((post, idx) => {
+        html += fanficRenderCard(post, idx, 'generated');
+      });
+      html += '</div>';
+    }
+
+    container.innerHTML = html;
+
+    // 绑定生成按钮
+    document.getElementById('sp-fanfic-generate-btn')?.addEventListener('click', () => {
+      generateFanficPosts();
+    });
+
+    // 绑定卡片点击
+    container.querySelectorAll('.sp-fanfic-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const source = card.dataset.source;
+        const idx = parseInt(card.dataset.idx);
+        let post;
+        if (source === 'generated') {
+          post = (settings.fanficPosts || [])[idx];
+        } else if (source === 'user') {
+          post = (settings.fanficUserPosts || [])[idx];
+        }
+        if (post) openFanficReader(post);
+      });
+    });
+  }
+
+  // ===== 渲染单张卡片 =====
+  function fanficRenderCard(post, idx, source) {
+    const coverGradients = [
+      'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+      'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+      'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+      'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+      'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)',
+      'linear-gradient(135deg, #fccb90 0%, #d57eeb 100%)',
+      'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)',
+    ];
+    const gradient = post.coverGradient || coverGradients[idx % coverGradients.length];
+    const isFav = (settings.fanficFavorites || []).includes(post.id);
+    const fmtNum = (n) => {
+      if (n >= 10000) return (n / 10000).toFixed(1) + 'w';
+      if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+      return String(n);
+    };
+    const tagsHtml = (post.tags || []).map(t => `<span class="sp-fanfic-tag">#${t}</span>`).join('');
+    const wordCount = post.content ? post.content.length : 0;
+    const preview = post.content ? post.content.slice(0, 60) + '…' : '';
+
+    return `
+      <div class="sp-fanfic-card" data-idx="${idx}" data-source="${source}">
+        <div class="sp-fanfic-card-cover" style="background:${gradient};">
+          <span class="sp-fanfic-card-cover-emoji">${post.coverEmoji || '📖'}</span>
+        </div>
+        <div class="sp-fanfic-card-body">
+          <div class="sp-fanfic-card-title">${post.title || '无题'}</div>
+          <div class="sp-fanfic-card-preview">${preview}</div>
+          ${tagsHtml ? `<div class="sp-fanfic-card-tags">${tagsHtml}</div>` : ''}
+          <div class="sp-fanfic-card-footer">
+            <div class="sp-fanfic-card-author">
+              <span class="sp-fanfic-card-avatar">${post.authorAvatar || '😺'}</span>
+              <span class="sp-fanfic-card-author-name">${post.authorName || '匿名'}</span>
+            </div>
+            <div class="sp-fanfic-card-stats">
+              <span>❤️ ${fmtNum(post.likes || 0)}</span>
+              <span>👁️ ${fmtNum(post.views || 0)}</span>
+              <span>${isFav ? '⭐' : '☆'}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // ===== 生成同人文 =====
+  async function generateFanficPosts() {
+    if (state.fanficGenerating) return;
+    state.fanficGenerating = true;
+    renderFanficHomePage();
+
+    try {
+      const messages = [];
+
+      // 1. 系统消息：同人文生成提示词
+      let sysContent = settings.fanficGeneratePrompt || DEFAULT_SETTINGS.fanficGeneratePrompt;
+
+      // 2. 拼接世界书内容
+      let worldInfo = '';
+      try { worldInfo = await getWorldBookContent(); } catch(e) {}
+      if (worldInfo) {
+        sysContent += '\n\n[世界观设定]\n' + worldInfo;
+      }
+
+      // 3. 拼接角色卡信息
+      const charDesc = getCharacterDescription();
+      if (charDesc) {
+        sysContent += '\n\n[角色设定]\n' + charDesc;
+      }
+
+      messages.push({ role: 'system', content: sysContent });
+      messages.push({ role: 'user', content: '请根据以上世界观和角色设定，生成5到10篇同人文。严格输出JSON数组格式，不要输出任何其他文字。' });
+
+      // 4. 破限
+      if (settings.jailbreak) {
+        messages.push({ role: 'system', content: settings.jailbreak });
+      }
+
+      let result = null;
+      if (settings.apiSource === 'tavern') {
+        result = await callViaTavern(messages);
+      } else {
+        result = await callViaCustom(messages);
+      }
+
+      state.fanficGenerating = false;
+
+      if (!result) {
+        renderFanficHomePage();
+        showBubble('生成失败了…检查 API 连接？', 3000);
+        return;
+      }
+
+      // 解析 JSON
+      let posts = [];
+      try {
+        const jsonMatch = result.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          posts = JSON.parse(jsonMatch[0]);
+        } else {
+          posts = JSON.parse(result);
+        }
+      } catch (parseErr) {
+        console.error('[meep-pet] 同人文 JSON 解析失败:', parseErr);
+        showBubble('AI 返回格式有误，请重试', 3000);
+        renderFanficHomePage();
+        return;
+      }
+
+      if (!Array.isArray(posts) || posts.length === 0) {
+        showBubble('生成结果为空，请重试', 2000);
+        renderFanficHomePage();
+        return;
+      }
+
+      // 给每篇文赋予 id 和时间戳
+      const coverGradients = [
+        'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+        'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+        'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+        'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+        'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)',
+        'linear-gradient(135deg, #fccb90 0%, #d57eeb 100%)',
+        'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)',
+      ];
+      posts = posts.map((p, i) => ({
+        id: 'ff_' + Date.now() + '_' + i,
+        title: p.title || '无题',
+        content: p.content || '',
+        coverGradient: coverGradients[i % coverGradients.length],
+        coverEmoji: p.coverEmoji || '📖',
+        authorName: p.authorName || p.author || '匿名',
+        authorAvatar: p.avatarEmoji || p.authorAvatar || '😺',
+        likes: typeof p.likes === 'number' ? p.likes : Math.floor(Math.random() * 9000 + 100),
+        views: typeof p.views === 'number' ? p.views : Math.floor(Math.random() * 90000 + 500),
+        tags: Array.isArray(p.tags) ? p.tags : [],
+        wordCount: (p.content || '').length,
+        timestamp: Date.now(),
+        continuations: [],
+      }));
+
+      settings.fanficPosts = posts;
+      saveData();
+      renderFanficHomePage();
+      showBubble(`📝 生成了 ${posts.length} 篇同人文！`, 3000);
+
+    } catch (err) {
+      state.fanficGenerating = false;
+      console.error('[meep-pet] 同人文生成异常:', err);
+      renderFanficHomePage();
+      showBubble(`生成出错: ${err.message}`, 3000);
+    }
+  }
+
+  // ===== 打开阅读视图 =====
+  function openFanficReader(post) {
+    _fanficReadingPost = post;
+    document.getElementById('sp-fanfic-home-view').style.display = 'none';
+    document.getElementById('sp-fanfic-write-view').style.display = 'none';
+    document.getElementById('sp-fanfic-me-view').style.display = 'none';
+    const readerView = document.getElementById('sp-fanfic-reader-view');
+    readerView.style.display = '';
+
+    const isFav = (settings.fanficFavorites || []).includes(post.id);
+    const fullContent = post.content + (post.continuations || []).map(c => '\n\n---\n\n' + c).join('');
+
+    readerView.innerHTML = `
+      <div class="sp-fanfic-reader">
+        <div class="sp-fanfic-reader-header">
+          <button id="sp-fanfic-reader-back" class="sp-fanfic-reader-back">‹ 返回</button>
+          <button id="sp-fanfic-reader-fav" class="sp-fanfic-reader-fav">${isFav ? '⭐ 已收藏' : '☆ 收藏'}</button>
+        </div>
+        <div class="sp-fanfic-reader-author-bar">
+          <span class="sp-fanfic-reader-avatar">${post.authorAvatar || '😺'}</span>
+          <span class="sp-fanfic-reader-author-name">${post.authorName || '匿名'}</span>
+          <div class="sp-fanfic-reader-stats">
+            <span>❤️ ${post.likes || 0}</span>
+            <span>👁️ ${post.views || 0}</span>
+          </div>
+        </div>
+        <div class="sp-fanfic-reader-title">${post.title || '无题'}</div>
+        <div class="sp-fanfic-reader-tags">${(post.tags || []).map(t => '<span class="sp-fanfic-tag">#' + t + '</span>').join('')}</div>
+        <div class="sp-fanfic-reader-body">${renderMarkdown(fullContent)}</div>
+        <div class="sp-fanfic-reader-actions">
+          <button id="sp-fanfic-continue-btn" class="sp-fanfic-continue-btn">✏️ 续写</button>
+        </div>
+      </div>
+    `;
+
+    // 返回按钮
+    document.getElementById('sp-fanfic-reader-back').onclick = () => {
+      readerView.style.display = 'none';
+      if (_fanficCurrentTab === 'home') {
+        document.getElementById('sp-fanfic-home-view').style.display = '';
+      } else if (_fanficCurrentTab === 'me') {
+        document.getElementById('sp-fanfic-me-view').style.display = '';
+        renderFanficMePage();
+      } else if (_fanficCurrentTab === 'write') {
+        document.getElementById('sp-fanfic-write-view').style.display = '';
+      }
+      _fanficReadingPost = null;
+    };
+
+    // 收藏按钮
+    document.getElementById('sp-fanfic-reader-fav').onclick = () => {
+      if (!settings.fanficFavorites) settings.fanficFavorites = [];
+      if (settings.fanficFavorites.includes(post.id)) {
+        settings.fanficFavorites = settings.fanficFavorites.filter(id => id !== post.id);
+        document.getElementById('sp-fanfic-reader-fav').textContent = '☆ 收藏';
+        showBubble('已取消收藏', 1500);
+      } else {
+        settings.fanficFavorites.push(post.id);
+        document.getElementById('sp-fanfic-reader-fav').textContent = '⭐ 已收藏';
+        showBubble('已收藏！可在「我」标签页查看', 2000);
+      }
+      saveData();
+    };
+
+    // 续写按钮
+    document.getElementById('sp-fanfic-continue-btn').onclick = () => {
+      fanficShowContinueDialog(post);
+    };
+
+    // 滚动到顶部
+    const contentEl = document.getElementById('sp-fanfic-content');
+    if (contentEl) contentEl.scrollTop = 0;
+  }
+
+  // ===== 续写对话框 =====
+  function fanficShowContinueDialog(post) {
+    document.getElementById('sp-fanfic-continue-overlay')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-fanfic-continue-overlay';
+    overlay.className = 'sp-confirm-overlay';
+    overlay.innerHTML = `
+      <div class="sp-confirm-box" style="max-width:300px;text-align:left;">
+        <div class="sp-confirm-title">✏️ 续写同人文</div>
+        <div style="margin-bottom:12px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sp-text-secondary);margin-bottom:8px;cursor:pointer;">
+            <input type="radio" name="sp-fanfic-continue-mode" value="free" checked style="accent-color:#64b4ff;" />
+            <span>🤖 AI 自由发挥</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sp-text-secondary);cursor:pointer;">
+            <input type="radio" name="sp-fanfic-continue-mode" value="guided" style="accent-color:#64b4ff;" />
+            <span>🎯 我来操控剧情走向</span>
+          </label>
+        </div>
+        <div id="sp-fanfic-continue-guide-section" style="display:none;margin-bottom:12px;">
+          <textarea id="sp-fanfic-continue-guide-input" placeholder="描述你想要的剧情走向…\n例如：两人在雨中重逢，误会解开" style="width:100%;min-height:60px;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-light);color:var(--sp-text-primary);font-size:12px;resize:vertical;box-sizing:border-box;"></textarea>
+        </div>
+        <div class="sp-confirm-actions">
+          <button class="sp-confirm-btn sp-confirm-btn-cancel" id="sp-fanfic-continue-cancel">取消</button>
+          <button class="sp-confirm-btn sp-confirm-btn-primary" id="sp-fanfic-continue-send">发送续写</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    // 切换模式时显示/隐藏输入框
+    overlay.querySelectorAll('input[name="sp-fanfic-continue-mode"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        const section = document.getElementById('sp-fanfic-continue-guide-section');
+        if (section) section.style.display = radio.value === 'guided' ? '' : 'none';
+      });
+    });
+
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    document.getElementById('sp-fanfic-continue-cancel').onclick = () => overlay.remove();
+
+    document.getElementById('sp-fanfic-continue-send').onclick = async () => {
+      const mode = overlay.querySelector('input[name="sp-fanfic-continue-mode"]:checked')?.value || 'free';
+      const guideText = document.getElementById('sp-fanfic-continue-guide-input')?.value?.trim() || '';
+      overlay.remove();
+
+      // 显示生成中
+      const actionsEl = document.querySelector('.sp-fanfic-reader-actions');
+      if (actionsEl) {
+        actionsEl.innerHTML = '<div style="text-align:center;padding:10px;color:var(--sp-text-muted);font-size:12px;"><span style="animation:sp-dots-pulse 1.2s ease-in-out infinite;">✏️ 续写中…</span></div>';
+      }
+
+      await fanficContinuePost(post, mode, guideText);
+    };
+  }
+
+  // ===== 续写API调用 =====
+  async function fanficContinuePost(post, mode, guideText) {
+    try {
+      const messages = [];
+
+      // 续写提示词
+      let sysContent = settings.fanficContinuePrompt || DEFAULT_SETTINGS.fanficContinuePrompt;
+
+      // 世界书
+      let worldInfo = '';
+      try { worldInfo = await getWorldBookContent(); } catch(e) {}
+      if (worldInfo) sysContent += '\n\n[世界观设定]\n' + worldInfo;
+
+      messages.push({ role: 'system', content: sysContent });
+
+      // 原文内容
+      const fullContent = post.content + (post.continuations || []).map(c => '\n\n' + c).join('');
+      let userContent = `[原文标题] ${post.title}\n\n[原文内容]\n${fullContent}\n\n请续写以上同人文。`;
+
+      if (mode === 'guided' && guideText) {
+        userContent += `\n\n[玩家指定的剧情走向]\n${guideText}\n\n请按照以上剧情走向续写。`;
+      }
+
+      messages.push({ role: 'user', content: userContent });
+
+      // 破限
+      if (settings.jailbreak) {
+        messages.push({ role: 'system', content: settings.jailbreak });
+      }
+
+      let result = null;
+      if (settings.apiSource === 'tavern') {
+        result = await callViaTavern(messages);
+      } else {
+        result = await callViaCustom(messages);
+      }
+
+      if (!result) {
+        showBubble('续写失败了…检查 API', 3000);
+        openFanficReader(post);
+        return;
+      }
+
+      // 将续写内容追加到帖子
+      if (!post.continuations) post.continuations = [];
+      post.continuations.push(result.trim());
+      saveData();
+
+      showBubble('✏️ 续写完成！', 2000);
+      openFanficReader(post); // 重新渲染阅读页
+
+    } catch (err) {
+      console.error('[meep-pet] 同人文续写异常:', err);
+      showBubble(`续写出错: ${err.message}`, 3000);
+      openFanficReader(post);
+    }
+  }
+
+  // ===== 写作页渲染 =====
+  function renderFanficWritePage() {
+    const container = document.getElementById('sp-fanfic-write-view');
+    if (!container) return;
+
+    const userPosts = settings.fanficUserPosts || [];
+
+    container.innerHTML = `
+      <div class="sp-fanfic-write-page">
+        <div class="sp-fanfic-write-header">
+          <span style="font-size:14px;font-weight:600;color:var(--sp-text-primary);">✏️ 我的创作</span>
+          <button id="sp-fanfic-new-post-btn" class="sp-fanfic-new-post-btn">+ 新建</button>
+        </div>
+        <div id="sp-fanfic-user-posts-list">
+          ${userPosts.length === 0
+            ? '<div class="sp-fanfic-empty" style="padding:30px 0;"><div style="font-size:28px;margin-bottom:8px;">✏️</div><div>还没有创作</div><div style="font-size:11px;margin-top:4px;">点击「+ 新建」开始写作</div></div>'
+            : userPosts.map((p, idx) => fanficRenderCard(p, idx, 'user')).join('')
+          }
+        </div>
+      </div>
+    `;
+
+    // 新建按钮
+    document.getElementById('sp-fanfic-new-post-btn').onclick = () => {
+      fanficShowWriteEditor(null);
+    };
+
+    // 卡片点击
+    container.querySelectorAll('.sp-fanfic-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const idx = parseInt(card.dataset.idx);
+        const post = (settings.fanficUserPosts || [])[idx];
+        if (post) openFanficReader(post);
+      });
+    });
+  }
+
+  // ===== 写作编辑器弹窗 =====
+  function fanficShowWriteEditor(existingPost) {
+    document.getElementById('sp-fanfic-editor-overlay')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-fanfic-editor-overlay';
+    overlay.className = 'sp-confirm-overlay';
+    overlay.innerHTML = `
+      <div class="sp-confirm-box" style="max-width:320px;text-align:left;max-height:80vh;overflow-y:auto;">
+        <div class="sp-confirm-title">✏️ ${existingPost ? '编辑' : '新建'}同人文</div>
+        <label style="font-size:11px;color:var(--sp-text-secondary);margin-bottom:3px;display:block;">标题</label>
+        <input type="text" id="sp-fanfic-edit-title" value="${existingPost?.title || ''}" placeholder="给你的同人文起个标题" style="width:100%;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-light);color:var(--sp-text-primary);font-size:13px;margin-bottom:10px;box-sizing:border-box;" />
+        <label style="font-size:11px;color:var(--sp-text-secondary);margin-bottom:3px;display:block;">正文</label>
+        <textarea id="sp-fanfic-edit-content" placeholder="开始你的创作…" style="width:100%;min-height:150px;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-light);color:var(--sp-text-primary);font-size:13px;resize:vertical;box-sizing:border-box;margin-bottom:10px;">${existingPost?.content || ''}</textarea>
+        <label style="font-size:11px;color:var(--sp-text-secondary);margin-bottom:3px;display:block;">标签（逗号分隔）</label>
+        <input type="text" id="sp-fanfic-edit-tags" value="${(existingPost?.tags || []).join(', ')}" placeholder="甜文, 日常" style="width:100%;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-light);color:var(--sp-text-primary);font-size:12px;margin-bottom:14px;box-sizing:border-box;" />
+        <div class="sp-confirm-actions">
+          ${existingPost ? '<button class="sp-confirm-btn" style="color:#f66;border-color:rgba(239,83,80,0.4);margin-right:auto;" id="sp-fanfic-edit-delete">🗑️</button>' : ''}
+          <button class="sp-confirm-btn sp-confirm-btn-cancel" id="sp-fanfic-edit-cancel">取消</button>
+          <button class="sp-confirm-btn sp-confirm-btn-primary" id="sp-fanfic-edit-save">💾 保存</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    document.getElementById('sp-fanfic-edit-cancel').onclick = () => overlay.remove();
+
+    // 保存
+    document.getElementById('sp-fanfic-edit-save').onclick = () => {
+      const title = document.getElementById('sp-fanfic-edit-title').value.trim();
+      const content = document.getElementById('sp-fanfic-edit-content').value.trim();
+      const tags = document.getElementById('sp-fanfic-edit-tags').value.split(/[,，]/).map(t => t.trim()).filter(Boolean);
+
+      if (!title && !content) { showBubble('标题和正文不能都为空', 2000); return; }
+
+      if (!settings.fanficUserPosts) settings.fanficUserPosts = [];
+
+      if (existingPost) {
+        // 编辑已有
+        existingPost.title = title || '无题';
+        existingPost.content = content;
+        existingPost.tags = tags;
+        existingPost.wordCount = content.length;
+      } else {
+        // 新建
+        const coverGradients = [
+          'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+          'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+          'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+          'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)',
+        ];
+        settings.fanficUserPosts.push({
+          id: 'ff_user_' + Date.now(),
+          title: title || '无题',
+          content: content,
+          coverGradient: coverGradients[Math.floor(Math.random() * coverGradients.length)],
+          coverEmoji: '✏️',
+          authorName: settings.petName || '我',
+          authorAvatar: '🧑',
+          likes: 0,
+          views: 0,
+          tags: tags,
+          wordCount: content.length,
+          timestamp: Date.now(),
+          isUserPost: true,
+          continuations: [],
+        });
+      }
+
+      saveData();
+      overlay.remove();
+      renderFanficWritePage();
+      showBubble('💾 已保存', 2000);
+    };
+
+    // 删除
+    document.getElementById('sp-fanfic-edit-delete')?.addEventListener('click', () => {
+      overlay.remove();
+      showConfirmDialog({
+        title: '🗑️ 删除这篇创作？',
+        desc: '删除后不可恢复',
+        confirmText: '删除',
+        cancelText: '取消',
+        onConfirm: () => {
+          settings.fanficUserPosts = (settings.fanficUserPosts || []).filter(p => p.id !== existingPost.id);
+          settings.fanficFavorites = (settings.fanficFavorites || []).filter(id => id !== existingPost.id);
+          saveData();
+          renderFanficWritePage();
+          showBubble('已删除', 1500);
+        }
+      });
+    });
+  }
+
+  // ===== 「我」标签页渲染 =====
+  function renderFanficMePage() {
+    const container = document.getElementById('sp-fanfic-me-view');
+    if (!container) return;
+
+    const favIds = settings.fanficFavorites || [];
+    const allPosts = [...(settings.fanficPosts || []), ...(settings.fanficUserPosts || [])];
+    const favPosts = favIds.map(id => allPosts.find(p => p.id === id)).filter(Boolean);
+
+    const myName = settings.fanficMyName || '我的主页';
+    const myBio = settings.fanficMyBio || '点击编辑个性签名…';
+    const myAvatar = settings.fanficMyAvatar || '';
+    const avatarDisplay = myAvatar
+      ? `<img src="${myAvatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`
+      : '🧑';
+
+    container.innerHTML = `
+      <div class="sp-fanfic-me-page">
+        <div class="sp-fanfic-me-header">
+          <div class="sp-fanfic-me-avatar" id="sp-fanfic-me-avatar-btn" title="点击更换头像" style="cursor:pointer;">${avatarDisplay}</div>
+          <div class="sp-fanfic-me-info">
+            <div id="sp-fanfic-me-name-btn" style="font-size:14px;font-weight:600;color:var(--sp-text-primary);cursor:pointer;" title="点击修改名字">${myName}</div>
+            <div id="sp-fanfic-me-bio-btn" style="font-size:11px;color:var(--sp-text-muted);cursor:pointer;margin-top:2px;" title="点击编辑签名">${myBio}</div><div style="font-size:10px;color:var(--sp-text-muted);margin-top:4px;">收藏 ${favPosts.length} 篇 · 创作${(settings.fanficUserPosts || []).length} 篇</div>
+          </div>
+        </div>
+        <div style="font-size:13px;font-weight:600;color:var(--sp-text-primary);padding:12px 12px 6px;">⭐ 我的收藏</div>
+        <div class="sp-fanfic-feed" style="padding:0 8px 16px;">
+          ${favPosts.length === 0
+            ? '<div class="sp-fanfic-empty" style="padding:20px 0;"><div style="font-size:24px;margin-bottom:6px;">⭐</div><div style="font-size:12px;">还没有收藏</div><div style="font-size:11px;color:var(--sp-text-muted);margin-top:4px;">在阅读同人文时点击「☆ 收藏」</div></div>'
+            : favPosts.map((p, idx) => {
+                const source = p.isUserPost ? 'user' : 'generated';
+                const realIdx = source === 'user'
+                  ? (settings.fanficUserPosts || []).findIndex(up => up.id === p.id)
+                  : (settings.fanficPosts || []).findIndex(gp => gp.id === p.id);
+                return fanficRenderCard(p, realIdx >= 0 ? realIdx : idx, source);
+              }).join('')
+          }
+        </div>
+      </div>
+    `;
+
+    // ===== 点击头像更换 =====
+    document.getElementById('sp-fanfic-me-avatar-btn')?.addEventListener('click', () => {
+      showConfirmDialog({
+        title: '🖼️ 更换头像',
+        desc: '选择头像来源',
+        confirmText: '📁 本地上传',
+        cancelText: '🔗 输入链接',
+        onConfirm: () => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+          input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (file.size > 2 * 1024 * 1024) { showBubble('图片不能超过2MB', 3000); return; }
+            const reader = new FileReader();
+            reader.onload = async (ev) => {
+              const compressed = await compressImage(ev.target.result, 120, 0.8);
+              settings.fanficMyAvatar = compressed;
+              saveData();
+              renderFanficMePage();
+              showBubble('头像已更新✨', 2000);
+            };
+            reader.readAsDataURL(file);
+          };
+          input.click();
+        },onCancel: () => {
+          showPromptDialog({
+            title: '🔗 头像链接',
+            placeholder: 'https://...',
+            defaultValue: (settings.fanficMyAvatar || '').startsWith('http') ? settings.fanficMyAvatar : '',
+            confirmText: '确认',
+            cancelText: '清除头像',
+            onConfirm: (url) => {
+              if (url && url.trim().startsWith('http')) {
+                settings.fanficMyAvatar = url.trim();
+                saveData();
+                renderFanficMePage();
+                showBubble('头像已更新 ✨', 2000);
+              }
+            },
+            onCancel: () => {
+              settings.fanficMyAvatar = '';
+              saveData();
+              renderFanficMePage();
+              showBubble('头像已清除', 1500);
+            }
+          });
+        }
+      });
+    });
+
+    // ===== 点击名字修改 =====
+    document.getElementById('sp-fanfic-me-name-btn')?.addEventListener('click', () => {
+      showPromptDialog({
+        title: '✏️ 修改名字',
+        desc: '给自己起一个笔名吧',
+        placeholder: '我的笔名',
+        defaultValue: settings.fanficMyName || '',
+        confirmText: '保存',
+        cancelText: '取消',
+        onConfirm: (name) => {
+          if (name !== null) {
+            settings.fanficMyName = name.trim();
+            saveData();
+            renderFanficMePage();
+            showBubble('名字已更新', 1500);
+          }
+        }
+      });
+    });
+
+    // ===== 点击签名编辑 =====
+    document.getElementById('sp-fanfic-me-bio-btn')?.addEventListener('click', () => {
+      showPromptDialog({
+        title: '✏️ 编辑个性签名',
+        desc: '展示你的态度',
+        placeholder: '写点什么来介绍自己…',
+        defaultValue: settings.fanficMyBio || '',
+        confirmText: '保存',
+        cancelText: '取消',
+        onConfirm: (bio) => {
+          if (bio !== null) {
+            settings.fanficMyBio = bio.trim();
+            saveData();
+            renderFanficMePage();
+            showBubble('签名已更新', 1500);
+          }
+        }
+      });
+    });
+
+    // ===== 收藏卡片点击 =====
+    container.querySelectorAll('.sp-fanfic-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const source = card.dataset.source;
+        const idx = parseInt(card.dataset.idx);
+        let post;
+        if (source === 'generated') {
+          post = (settings.fanficPosts || [])[idx];
+        } else if (source === 'user') {
+          post = (settings.fanficUserPosts || [])[idx];
+        }
+        if (post) openFanficReader(post);
+      });
+    });
+  }
+
+  // ============================================================
   // 📚 书架模块 — 漫画 + 小说阅读器
   // ============================================================
 
@@ -26395,8 +28571,499 @@ window.addEventListener('beforeunload', () => {
   let _bsActiveBookId = null;
   let _bsActivePageIdx = 0;
 
+  // ===== 判断颜色是否偏深 =====
+  function bsIsColorDark(hex) {
+    if (!hex || !hex.startsWith('#')) return true;
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance < 0.5;
+  }
+
+  // ===== 注册自定义字体 @font-face =====
+  function bsRegisterCustomFont(fontName, url) {
+    const styleId = 'sp-bs-font-' + fontName.replace(/\s+/g, '_');
+    let styleEl = document.getElementById(styleId);
+    if (!styleEl) {
+      styleEl = document.createElement('style');
+      styleEl.id = styleId;
+      document.head.appendChild(styleEl);
+    }
+    styleEl.textContent = `@font-face { font-family: "${fontName}"; src: url("${url}"); font-display: swap; }`;
+  }
+
+  // ===== 注册 CSS @import 格式的字体（用 <link> 标签加载外部 CSS）=====
+  function bsRegisterCSSImportFont(fontName, cssUrl) {
+    const linkId = 'sp-bs-cssfont-' + fontName.replace(/\s+/g, '_');
+    let linkEl = document.getElementById(linkId);
+    if (!linkEl) {
+      linkEl = document.createElement('link');
+      linkEl.id = linkId;
+      linkEl.rel = 'stylesheet';
+      linkEl.type = 'text/css';
+      document.head.appendChild(linkEl);
+    }
+    linkEl.href = cssUrl;
+  }
+
+  // ===== 导入 CSS @import 字体的统一入口 =====
+  function bsImportCSSFont(fontName, cssUrl) {
+    bsRegisterCSSImportFont(fontName, cssUrl);
+    if (!settings.bookshelfCustomFonts) settings.bookshelfCustomFonts = [];
+    settings.bookshelfCustomFonts = settings.bookshelfCustomFonts.filter(f => f.name !== fontName);
+    settings.bookshelfCustomFonts.push({ name: fontName, url: cssUrl, type: 'css' });
+    saveData();
+    showBubble('字体「' + fontName + '」已通过 CSS 导入！', 2500);
+  }
+
+
+  // ===== 应用阅读样式到阅读器 =====
+  function bsApplyReaderStyle() {
+    const body = document.getElementById('sp-br-body');
+    const bgLayer = document.getElementById('sp-br-bg-layer');
+    if (!body) return;
+
+    // 背景图层（优先于纯色）
+    if (bgLayer) {
+      if (settings.bookshelfReaderBgImage) {
+        bgLayer.style.backgroundImage = `url(${settings.bookshelfReaderBgImage})`;
+        bgLayer.style.opacity = settings.bookshelfReaderBgOpacity ?? 0.3;
+        bgLayer.style.filter = `brightness(${settings.bookshelfReaderBrightness ?? 1.0})`;
+        // 有背景图时，body 背景色设为半透明，保证文字可读
+        body.style.backgroundColor = 'rgba(0,0,0,0.15)';
+        body.style.color = '#e0e0e0';
+      } else {
+        bgLayer.style.backgroundImage = 'none';
+        bgLayer.style.opacity = '0';
+        bgLayer.style.filter = '';
+        // 无背景图时，用纯色
+        const bgColor = settings.bookshelfReaderBgColor || '';
+        if (bgColor) {
+          body.style.backgroundColor = bgColor;
+          const isDark = bsIsColorDark(bgColor);
+          body.style.color = isDark ? '#e0e0e0' : '#222222';
+        } else {
+          body.style.backgroundColor = '';
+          body.style.color = '';
+        }
+      }
+    } else {
+      // 降级：没有 bgLayer（不应该出现）
+      const bgColor = settings.bookshelfReaderBgColor || '';
+      if (bgColor) {
+        body.style.backgroundColor = bgColor;
+        const isDark = bsIsColorDark(bgColor);
+        body.style.color = isDark ? '#e0e0e0' : '#222222';
+      } else {
+        body.style.backgroundColor = '';
+        body.style.color = '';
+      }
+    }
+
+    // 字体
+    const fontFamily = settings.bookshelfReaderFontFamily || '';
+    body.style.fontFamily = fontFamily || '';
+  }
+
+
+  // ===== 阅读设置弹窗 =====
+  function bsShowReaderSettings() {
+    document.getElementById('sp-bs-reader-settings-overlay')?.remove();
+
+    const presetBgs = [
+      { name: '默认', color: '' },
+      { name: '纸黄', color: '#f5f0e1' },
+      { name: '淡绿', color: '#e8f5e9' },
+      { name: '浅灰', color: '#f0f0f0' },
+      { name: '深色', color: '#1a1a2e' },
+      { name: '暖棕', color: '#f3e9dc' },
+      { name: '淡蓝', color: '#e3f2fd' },
+      { name: '夜间', color: '#2d2d2d' },
+    ];
+
+    const presetFonts = [
+      { name: '默认', value: '' },
+      { name: '宋体', value: 'SimSun, "Song Ti SC", serif' },
+      { name: '黑体', value: 'SimHei, "Hei Ti SC", sans-serif' },
+      { name: '楷体', value: 'KaiTi, "Kai Ti SC", serif' },
+      { name: '仿宋', value: 'FangSong, "Fang Song SC", serif' },
+      { name: '微软雅黑', value: '"Microsoft YaHei", sans-serif' },
+      { name: 'Arial', value: 'Arial, sans-serif' },
+      { name: 'Georgia', value: 'Georgia, serif' },
+      { name: 'Consolas', value: 'Consolas, monospace' },
+    ];
+
+    // 把已导入的自定义字体加入选项
+    (settings.bookshelfCustomFonts || []).forEach(cf => {
+      presetFonts.push({ name: '✨ ' + cf.name, value: "'" + cf.name + "', sans-serif", isCustom: true });
+    });
+
+    const currentBgColor = settings.bookshelfReaderBgColor || '';
+    const currentFont = settings.bookshelfReaderFontFamily || '';
+    const currentSize = settings.bookshelfReaderFont || 16;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-bs-reader-settings-overlay';
+    overlay.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,0.6);z-index:20;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
+
+    overlay.innerHTML = `
+      <div id="sp-bs-reader-settings-box" style="background:var(--sp-bg-secondary);border:1px solid var(--sp-border);border-radius:14px;width:100%;max-height:100%;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+        <div style="padding:10px 14px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--sp-border-light);flex-shrink:0;">
+          <span style="font-size:13px;font-weight:600;color:var(--sp-text-primary);">📖 阅读设置</span>
+          <button id="sp-bs-rs-close" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--sp-text-muted);padding:0 4px;">✕</button>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:14px;">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">🎨 阅读背景</div>
+            <div id="sp-bs-rs-bg-presets" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+              ${presetBgs.map(bg => {
+                const isActive = currentBgColor === bg.color;
+                const textColor = bg.color && (bg.color.startsWith('#1') || bg.color.startsWith('#2') || bg.color.startsWith('#3')) ? '#aaa' : '#555';
+                return '<div class="sp-bs-rs-bg-item" data-bg-color="' + bg.color + '" style="width:36px;height:36px;border-radius:8px;cursor:pointer;border:2px solid ' + (isActive ? 'rgba(100,180,255,0.7)' : 'var(--sp-border)') + ';background:' + (bg.color || 'var(--sp-bg-light)') + ';display:flex;align-items:center;justify-content:center;font-size:9px;color:' + textColor + ';transition:border-color 0.2s;" title="' + bg.name + '">' + bg.name + '</div>';
+              }).join('')}
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <label style="font-size:11px;color:var(--sp-text-secondary);margin:0;white-space:nowrap;">自定义颜色:</label>
+              <input type="color" id="sp-bs-rs-bg-picker" value="${currentBgColor || '#ffffff'}" style="width:32px;height:28px;border:1px solid var(--sp-border);border-radius:6px;cursor:pointer;padding:0;" />
+              <button id="sp-bs-rs-bg-clear" style="padding:3px 8px;font-size:10px;border-radius:5px;border:1px solid var(--sp-border);background:var(--sp-bg-light);color:var(--sp-text-secondary);cursor:pointer;">清除</button>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">🖼️ 阅读背景图</div>
+            <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;">
+              <div id="sp-bs-rs-bgimg-preview" style="width:48px;height:48px;border-radius:8px;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--sp-bg-light);border:1px solid var(--sp-border);font-size:10px;color:var(--sp-text-muted);">${settings.bookshelfReaderBgImage ? '<img src="' + settings.bookshelfReaderBgImage + '" style="width:100%;height:100%;object-fit:cover;" />' : '无'}</div>
+              <button id="sp-bs-rs-bgimg-upload" class="sp-phone-btn" style="font-size:11px;">📁 上传</button>
+              <button id="sp-bs-rs-bgimg-url" class="sp-phone-btn" style="font-size:11px;">🔗 链接</button>
+              <button id="sp-bs-rs-bgimg-clear" class="sp-phone-btn" style="font-size:11px;">清除</button>
+            </div>
+            <label style="font-size:11px;color:var(--sp-text-secondary);margin-bottom:2px;">背景透明度: <span id="sp-bs-rs-bgimg-opacity-val">${((settings.bookshelfReaderBgOpacity ?? 0.3) * 100).toFixed(0)}%</span></label>
+            <input type="range" id="sp-bs-rs-bgimg-opacity" min="5" max="100" step="5" value="${((settings.bookshelfReaderBgOpacity ?? 0.3) * 100).toFixed(0)}" style="width:100%;margin-bottom:8px;" />
+            <label style="font-size:11px;color:var(--sp-text-secondary);margin-bottom:2px;">背景明暗: <span id="sp-bs-rs-bgimg-brightness-val">${((settings.bookshelfReaderBrightness ?? 1.0) * 100).toFixed(0)}%</span></label>
+            <input type="range" id="sp-bs-rs-bgimg-brightness" min="20" max="180" step="10" value="${((settings.bookshelfReaderBrightness ?? 1.0) * 100).toFixed(0)}" style="width:100%;" />
+            <p style="font-size:9px;color:var(--sp-text-muted);margin:6px 0 0;">上传背景图后会覆盖纯色背景。透明度越低越若隐若现，明暗可调深色护眼或浅色明亮。</p>
+          </div>
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">🔤 阅读字体</div>
+            <select id="sp-bs-rs-font-select" style="width:100%;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-light);color:var(--sp-text-primary);font-size:12px;margin-bottom:8px;box-sizing:border-box;">
+              ${presetFonts.map(f => '<option value="' + f.value.replace(/"/g, '&quot;') + '" ' + (currentFont === f.value ? 'selected' : '') + '>' + f.name + '</option>').join('')}
+            </select>
+            <div id="sp-bs-rs-font-preview" style="padding:10px 12px;background:var(--sp-bg-light);border:1px solid var(--sp-border-light);border-radius:8px;font-size:${currentSize}px;line-height:1.6;color:var(--sp-text-primary);font-family:${currentFont || 'inherit'};margin-bottom:8px;">字体预览：天地玄黄，宇宙洪荒。The quick brown fox. 1234567890</div>
+          </div>
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">📐 字体大小</div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:11px;color:var(--sp-text-secondary);">A-</span>
+              <input type="range" id="sp-bs-rs-font-size" min="12" max="36" step="1" value="${currentSize}" style="flex:1;" />
+              <span style="font-size:15px;color:var(--sp-text-secondary);">A+</span>
+              <span id="sp-bs-rs-font-size-val" style="font-size:12px;color:var(--sp-text-primary);font-weight:600;min-width:30px;text-align:right;">${currentSize}px</span>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">📥 导入字体</div>
+            <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
+              <button id="sp-bs-rs-font-local" class="sp-phone-btn" style="flex:1;font-size:11px;min-width:80px;">📁 本地文件</button>
+              <button id="sp-bs-rs-font-url" class="sp-phone-btn" style="flex:1;font-size:11px;min-width:80px;">🔗 直链URL</button>
+              <button id="sp-bs-rs-font-css" class="sp-phone-btn" style="flex:1;font-size:11px;min-width:80px;">📝 CSS导入</button>
+            </div>
+            <input type="file" id="sp-bs-rs-font-file" accept=".ttf,.otf,.woff,.woff2" style="display:none;" />
+            <div id="sp-bs-rs-custom-fonts-list" style="display:flex;flex-direction:column;gap:4px;">
+              ${(settings.bookshelfCustomFonts || []).map((cf, idx) => '<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;background:rgba(255,255,255,0.04);border:1px solid var(--sp-border-light);border-radius:6px;"><span style="font-size:11px;color:var(--sp-text-primary);flex:1;">✨ ' + cf.name + ' <span style="font-size:9px;color:var(--sp-text-muted);">(' + (cf.type === 'url' ? '网络' : '本地') + ')</span></span><button class="sp-bs-rs-font-remove" data-idx="' + idx + '" style="background:none;border:none;font-size:12px;cursor:pointer;color:#f66;padding:2px 4px;">✕</button></div>').join('')}
+            </div>
+            <p style="font-size:9px;color:var(--sp-text-muted);margin:6px 0 0;">支持 TTF/OTF/WOFF/WOFF2 格式。本地字体会以 base64 存储，较大的字体文件建议使用网络链接。</p>
+          </div>
+        </div>
+        <div style="padding:10px 14px;border-top:1px solid var(--sp-border-light);flex-shrink:0;">
+          <button id="sp-bs-rs-save" class="sp-phone-btn sp-phone-btn-primary" style="width:100%;">💾 保存设置</button>
+        </div>
+      </div>
+    `;
+
+    // 挂在书架页面内部
+    const bookshelfPage = document.getElementById('sp-phone-bookshelf');
+    if (bookshelfPage) {
+      bookshelfPage.style.position = 'relative';
+      bookshelfPage.appendChild(overlay);
+    } else {
+      return;
+    }
+
+    // 关闭
+    document.getElementById('sp-bs-rs-close').onclick = () => overlay.remove();
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+    // 背景预设点击
+    overlay.querySelectorAll('.sp-bs-rs-bg-item').forEach(item => {
+      item.onclick = () => {
+        const color = item.dataset.bgColor;
+        settings.bookshelfReaderBgColor = color;
+        overlay.querySelectorAll('.sp-bs-rs-bg-item').forEach(i => {
+          i.style.borderColor = i.dataset.bgColor === color ? 'rgba(100,180,255,0.7)' : 'var(--sp-border)';
+        });
+        const picker = document.getElementById('sp-bs-rs-bg-picker');
+        if (picker && color) picker.value = color;
+        bsApplyReaderStyle();
+      };
+    });
+
+    // 自定义颜色选择器
+    document.getElementById('sp-bs-rs-bg-picker').onchange = (e) => {
+      settings.bookshelfReaderBgColor = e.target.value;
+      overlay.querySelectorAll('.sp-bs-rs-bg-item').forEach(i => {
+        i.style.borderColor = 'var(--sp-border)';
+      });
+      bsApplyReaderStyle();
+    };
+
+    // 清除背景
+    document.getElementById('sp-bs-rs-bg-clear').onclick = () => {
+      settings.bookshelfReaderBgColor = '';
+      settings.bookshelfReaderBg = '';
+      overlay.querySelectorAll('.sp-bs-rs-bg-item').forEach(i => {
+        i.style.borderColor = i.dataset.bgColor === '' ? 'rgba(100,180,255,0.7)' : 'var(--sp-border)';
+      });
+      bsApplyReaderStyle();
+    };
+
+    // 字体选择
+    document.getElementById('sp-bs-rs-font-select').onchange = (e) => {
+      settings.bookshelfReaderFontFamily = e.target.value;
+      const preview = document.getElementById('sp-bs-rs-font-preview');
+      if (preview) preview.style.fontFamily = e.target.value || 'inherit';
+      bsApplyReaderStyle();
+    };
+
+    // 字体大小滑轨
+    document.getElementById('sp-bs-rs-font-size').oninput = (e) => {
+      const size = parseInt(e.target.value);
+      settings.bookshelfReaderFont = size;
+      const valEl = document.getElementById('sp-bs-rs-font-size-val');
+      if (valEl) valEl.textContent = size + 'px';
+      const preview = document.getElementById('sp-bs-rs-font-preview');
+      if (preview) preview.style.fontSize = size + 'px';
+      bsApplyReaderStyle();
+    };
+
+    // 本地字体导入
+    document.getElementById('sp-bs-rs-font-local').onclick = () => {
+      document.getElementById('sp-bs-rs-font-file').click();
+    };
+
+    document.getElementById('sp-bs-rs-font-file').onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      e.target.value = '';
+      if (file.size > 10 * 1024 * 1024) {
+        showBubble('字体文件不能超过10MB，建议使用网络链接', 3000);
+        return;
+      }
+      const fontName = file.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9\u4e00-\u9fa5_\-\s]/g, '').trim();
+      if (!fontName) { showBubble('字体文件名无效', 2000); return; }
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target.result;
+        // 注册 @font-face
+        bsRegisterCustomFont(fontName, dataUrl);
+        // 保存到设置
+        if (!settings.bookshelfCustomFonts) settings.bookshelfCustomFonts = [];
+        settings.bookshelfCustomFonts = settings.bookshelfCustomFonts.filter(f => f.name !== fontName);
+        settings.bookshelfCustomFonts.push({ name: fontName, url: dataUrl, type: 'local' });
+        saveData();
+        showBubble('字体「' + fontName + '」已导入！', 2000);
+        overlay.remove();
+        bsShowReaderSettings(); // 重新打开刷新列表
+      };
+      reader.readAsDataURL(file);
+    };
+
+    // 网络字体导入
+    document.getElementById('sp-bs-rs-font-url').onclick = () => {
+      showPromptDialog({
+        title: '🔗 导入网络字体',
+        desc: '输入字体文件的 URL（支持 TTF/OTF/WOFF/WOFF2）',
+        placeholder: 'https://example.com/font.woff2',
+        defaultValue: '',
+        confirmText: '下一步',
+        cancelText: '取消',
+        onConfirm: (url) => {
+          if (!url || !url.trim()) return;
+          const trimmed = url.trim();
+          if (!trimmed.startsWith('http')) { showBubble('链接需要以 http 开头', 3000); return; }
+          showPromptDialog({
+            title: '✏️ 给字体起个名字',
+            desc: '这个名字会出现在字体选择列表中',
+            placeholder: '我的字体',
+            defaultValue: '',
+            confirmText: '导入',
+            cancelText: '取消',
+            onConfirm: (name) => {
+              if (!name || !name.trim()) return;
+              const fontName = name.trim();
+              bsRegisterCustomFont(fontName, trimmed);
+              if (!settings.bookshelfCustomFonts) settings.bookshelfCustomFonts = [];
+              settings.bookshelfCustomFonts = settings.bookshelfCustomFonts.filter(f => f.name !== fontName);
+              settings.bookshelfCustomFonts.push({ name: fontName, url: trimmed, type: 'url' });
+              saveData();
+              showBubble('字体「' + fontName + '」已导入！', 2000);
+              overlay.remove();
+              bsShowReaderSettings();
+            }
+          });
+        }
+      });
+    };
+
+    // CSS @import 格式导入（如 @import url("..."); font-family: "...";）
+    document.getElementById('sp-bs-rs-font-css').onclick = () => {
+      showPromptDialog({
+        title: '📝 CSS @import 导入',
+        desc: '粘贴完整的 CSS 代码，例如：<br/><code style="font-size:10px;color:#a9dc76;">@import url("https://..../result.css");<br/>font-family: "字体名";</code>',
+        placeholder: '@import url("https://..."); font-family: "字体名";',
+        defaultValue: '',
+        confirmText: '解析并导入',
+        cancelText: '取消',
+        onConfirm: (cssText) => {
+          if (!cssText || !cssText.trim()) return;
+          const text = cssText.trim();
+          // 提取 @import url(...)
+          const importMatch = text.match(/@import\s+(?:url\s*\(\s*["']?([^"')]+)["']?\s*\)|["']([^"']+)["'])/);
+          const cssUrl = (importMatch && (importMatch[1] || importMatch[2]) || '').trim();
+          // 提取 font-family
+          const familyMatch = text.match(/font-family\s*:\s*["']?([^"';]+)["']?\s*;?/);
+          if (!importMatch || !cssUrl) {
+            showBubble('未找到 @import url(...)，请检查格式', 3000);
+            return;
+          }
+          let fontName = familyMatch ? familyMatch[1].trim() : '';
+          if (!fontName) {
+            // 如果没有 font-family，让用户手动输入
+            showPromptDialog({
+              title: '✏️ 请输入字体名称',
+              desc: '检测到 CSS URL 但未找到 font-family，请手动输入字体名',
+              placeholder: 'IBM Plex Sans SC',
+              confirmText: '确认',
+              cancelText: '取消',
+              onConfirm: (name) => {
+                if (!name || !name.trim()) return;
+                bsImportCSSFont(name.trim(), cssUrl);
+                overlay.remove();
+                bsShowReaderSettings();
+              }
+            });
+            return;
+          }
+          bsImportCSSFont(fontName, cssUrl);
+          overlay.remove();
+          bsShowReaderSettings();
+        }
+      });
+    };
+
+
+    // 删除自定义字体
+    overlay.querySelectorAll('.sp-bs-rs-font-remove').forEach(btn => {
+      btn.onclick = () => {
+        const idx = parseInt(btn.dataset.idx);
+        if (!settings.bookshelfCustomFonts) return;
+        const removed = settings.bookshelfCustomFonts.splice(idx, 1);
+        if (removed.length > 0) {
+          const removedFont = removed[0];
+          // 如果当前正在使用这个字体，重置
+          if (settings.bookshelfReaderFontFamily && settings.bookshelfReaderFontFamily.includes(removedFont.name)) {
+            settings.bookshelfReaderFontFamily = '';
+            bsApplyReaderStyle();
+          }
+          // 移除对应的 DOM 元素（@font-face style 或 <link> 标签）
+          const safeName = removedFont.name.replace(/\s+/g, '_');
+          document.getElementById('sp-bs-font-' + safeName)?.remove();
+          document.getElementById('sp-bs-cssfont-' + safeName)?.remove();
+        }
+        saveData();
+        overlay.remove();
+        bsShowReaderSettings(); // 重新打开
+      };
+    });
+
+    // 阅读背景图上传
+    document.getElementById('sp-bs-rs-bgimg-upload').onclick = () => {
+      const input = document.createElement('input');
+      input.type = 'file'; input.accept = 'image/*';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 3 * 1024 * 1024) { showBubble('图片不能超过3MB', 3000); return; }
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          settings.bookshelfReaderBgImage = await compressImage(ev.target.result, 800, 0.7);
+          saveData(); bsApplyReaderStyle();
+          const prev = document.getElementById('sp-bs-rs-bgimg-preview');
+          if (prev) prev.innerHTML = '<img src="' + settings.bookshelfReaderBgImage + '" style="width:100%;height:100%;object-fit:cover;" />';
+          showBubble('阅读背景已设置 ✨', 2000);
+        };
+        reader.readAsDataURL(file);
+      };
+      input.click();
+    };
+
+    document.getElementById('sp-bs-rs-bgimg-url').onclick = () => {
+      showPromptDialog({
+        title: '🔗 背景图链接',
+        placeholder: 'https://...',
+        defaultValue: (settings.bookshelfReaderBgImage || '').startsWith('http') ? settings.bookshelfReaderBgImage : '',
+        onConfirm: (url) => {
+          if (url && url.trim().startsWith('http')) {
+            settings.bookshelfReaderBgImage = url.trim();
+            saveData(); bsApplyReaderStyle();
+            const prev = document.getElementById('sp-bs-rs-bgimg-preview');
+            if (prev) prev.innerHTML = '<img src="' + settings.bookshelfReaderBgImage + '" style="width:100%;height:100%;object-fit:cover;" />';
+            showBubble('阅读背景已设置 ✨', 2000);
+          }
+        }
+      });
+    };
+
+    document.getElementById('sp-bs-rs-bgimg-clear').onclick = () => {
+      settings.bookshelfReaderBgImage = '';
+      saveData(); bsApplyReaderStyle();
+      const prev = document.getElementById('sp-bs-rs-bgimg-preview');
+      if (prev) prev.innerHTML = '无';
+    };
+
+    // 阅读背景透明度
+    document.getElementById('sp-bs-rs-bgimg-opacity').oninput = (e) => {
+      const val = parseInt(e.target.value) / 100;
+      settings.bookshelfReaderBgOpacity = val;
+      const valEl = document.getElementById('sp-bs-rs-bgimg-opacity-val');
+      if (valEl) valEl.textContent = e.target.value + '%';
+      bsApplyReaderStyle();
+    };
+
+    // 阅读背景明暗
+    document.getElementById('sp-bs-rs-bgimg-brightness').oninput = (e) => {
+      const val = parseInt(e.target.value) / 100;
+      settings.bookshelfReaderBrightness = val;
+      const valEl = document.getElementById('sp-bs-rs-bgimg-brightness-val');
+      if (valEl) valEl.textContent = e.target.value + '%';
+      bsApplyReaderStyle();
+    };
+
+    // 保存按钮
+    document.getElementById('sp-bs-rs-save').onclick = () => {
+      saveData();
+      bsApplyReaderStyle();
+      overlay.remove();
+      showBubble('阅读设置已保存 ✨', 2000);
+    };
+  }
+
+
   // ===== 事件绑定 =====
   function bsBindEvents() {
+    // 防止重复绑定（toggleChat 每次打开都调用 bindPhoneEvents → bsBindEvents）
+    if (bsBindEvents._bound) return;
+    bsBindEvents._bound = true;
+
     const fileInput = document.getElementById('sp-bs-file-input');
     const restoreInput = document.getElementById('sp-bs-restore-input');
 
@@ -26437,6 +29104,8 @@ window.addEventListener('beforeunload', () => {
       settings.bookshelfLayout = settings.bookshelfLayout === 'grid' ? 'list' : 'grid';
       saveDataDebounced('书架布局');
       bsRenderShelf();
+      const toggleBtn = document.getElementById('sp-bs-layout-toggle');
+      if (toggleBtn) toggleBtn.textContent = settings.bookshelfLayout === 'grid' ? '⚃' : '☰';
     });
 
     document.getElementById('sp-bs-backup-btn')?.addEventListener('click', bsExportBackup);
@@ -26512,14 +29181,46 @@ window.addEventListener('beforeunload', () => {
       }
     }
 
-    // 点击阅读区域切换工具栏
+    // 点击阅读区域：左右区域翻页 + 中间区域切换工具栏
     document.getElementById('sp-br-body')?.addEventListener('click', (e) => {
       // 点击图片或链接不触发
       if (e.target.tagName === 'IMG' || e.target.tagName === 'A') return;
       // 点击书签段落不触发
       if (e.target.closest('[data-bs-pidx]') && e.target !== e.target.closest('[data-bs-pidx]')) return;
+      // 左右区域点击翻页
+      const bodyRect = document.getElementById('sp-br-body')?.getBoundingClientRect();
+      if (bodyRect) {
+        const clickX = e.clientX - bodyRect.left;
+        const bodyWidth = bodyRect.width;
+        if (clickX < bodyWidth * 0.25) {
+          bsReaderNav(-1); // 点击左侧25%区域 → 上一页
+          return;
+        } else if (clickX > bodyWidth * 0.75) {
+          bsReaderNav(1);  // 点击右侧25%区域 → 下一页
+          return;
+        }
+      }
       bsToggleBars();
     });
+
+    // 阅读器触摸左右滑动翻页
+    const _brBodyEl = document.getElementById('sp-br-body');
+    if (_brBodyEl) {
+      let _brSwipeStartX = 0, _brSwipeStartY = 0;
+      _brBodyEl.addEventListener('touchstart', (evt) => {
+        _brSwipeStartX = evt.touches[0].clientX;
+        _brSwipeStartY = evt.touches[0].clientY;
+      }, { passive: true });
+      _brBodyEl.addEventListener('touchend', (evt) => {
+        const dx = evt.changedTouches[0].clientX - _brSwipeStartX;
+        const dy = evt.changedTouches[0].clientY - _brSwipeStartY;
+        // 水平滑动 > 60px 且水平幅度 > 垂直幅度 × 1.5 才算翻页
+        if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+          if (dx < -60) bsReaderNav(1);      // 左滑 → 下一页
+          else if (dx > 60) bsReaderNav(-1); // 右滑 → 上一页
+        }
+      });
+    }
 
     // 滚动时自动隐藏工具栏
     document.getElementById('sp-br-body')?.addEventListener('scroll', () => {
@@ -26661,6 +29362,11 @@ window.addEventListener('beforeunload', () => {
   function bsRenderShelf() {
     const container = document.getElementById('sp-bs-shelf-list');
     if (!container) return;
+
+    // 同步布局切换按钮图标
+    const layoutBtn = document.getElementById('sp-bs-layout-toggle');
+    if (layoutBtn) layoutBtn.textContent = (settings.bookshelfLayout || 'grid') === 'grid' ? '⚃' : '☰';
+
     let books = [...(settings.bookshelfBooks || [])];
     if (_bsSearchQuery) books = books.filter(b => b.title.toLowerCase().includes(_bsSearchQuery));
     if (_bsFilterTag) books = books.filter(b => (settings.bookshelfTags?.[b.id] || []).includes(_bsFilterTag));
@@ -26671,16 +29377,31 @@ window.addEventListener('beforeunload', () => {
     else if (sort === 'recent') books.sort((a, b) => (b.lastReadTime || 0) - (a.lastReadTime || 0));
     else books.sort((a, b) => (b.addedTime || 0) - (a.addedTime || 0));
 
+    // 同步布局切换按钮图标
+    const layoutToggleBtn = document.getElementById('sp-bs-layout-toggle');
+    if (layoutToggleBtn) layoutToggleBtn.textContent = (settings.bookshelfLayout || 'grid') === 'grid' ? '⚃' : '☰';
+
     const isGrid = settings.bookshelfLayout === 'grid';
     if (books.length === 0) {
       container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--sp-text-muted);font-size:12px;">书架空空的～导入书籍或漫画吧</div>';
       return;
     }
 
-    container.style.display = isGrid ? 'grid' : 'flex';
-    container.style.gridTemplateColumns = isGrid ? 'repeat(3, 1fr)' : '';
-    container.style.gap = isGrid ? '8px' : '6px';
-    container.style.flexDirection = isGrid ? '' : 'column';
+    if (isGrid) {
+      container.style.display = 'grid';
+      container.style.gridTemplateColumns = 'repeat(3, 1fr)';
+      container.style.gridAutoRows = 'auto';
+      container.style.alignItems = 'start';
+      container.style.gap = '8px';
+      container.style.flexDirection = '';
+    } else {
+      container.style.display = 'flex';
+      container.style.gridTemplateColumns = '';
+      container.style.gridAutoRows = '';
+      container.style.alignItems = '';
+      container.style.gap = '6px';
+      container.style.flexDirection = 'column';
+    }
 
     container.innerHTML = books.map(book => {
       const cover = settings.bookshelfCovers?.[book.id];
@@ -26715,7 +29436,7 @@ window.addEventListener('beforeunload', () => {
           </div>
         `;
       }
-      return `<div>${coverHtml}</div>`;
+      return `<div style="width:100%;min-width:0;overflow:hidden;">${coverHtml}</div>`;
     }).join('');
 
     // 打开阅读
@@ -27082,11 +29803,11 @@ window.addEventListener('beforeunload', () => {
       if (titleEl) titleEl.textContent = `${book.title}`;
       const fontSize = settings.bookshelfReaderFont || 16;
       const paras = (pageData.content || '').split(/\r?\n/).filter(p => p.trim());
-      bodyEl.innerHTML = `<div style="font-size:14px;font-weight:600;color:var(--sp-text-primary);margin-bottom:10px;text-align:center;border-bottom:1px dashed var(--sp-border-light);padding-bottom:8px;">${chTitle} <span style="font-size:10px;color:var(--sp-text-muted);font-weight:400;">${_bsActivePageIdx + 1}/${book.pagesCount}</span></div>` +
+      bodyEl.innerHTML = `<div style="font-size:14px;font-weight:600;color:inherit;margin-bottom:10px;text-align:center;border-bottom:1px dashed var(--sp-border-light);padding-bottom:8px;">${chTitle} <span style="font-size:10px;color:var(--sp-text-muted);font-weight:400;">${_bsActivePageIdx + 1}/${book.pagesCount}</span></div>` +
         paras.map((p, idx) => {
           const bm = bsGetBookmark(book.id, _bsActivePageIdx, idx);
           const bmStyle = bm ? (bm.type === 'highlight' ? 'background:rgba(255,255,100,0.15);border-left:3px solid #ffb347;padding-left:8px;' : 'border-left:3px solid var(--sp-primary);padding-left:8px;') : '';
-          return `<p data-bs-pidx="${idx}" style="text-indent:2em;line-height:1.8;font-size:${fontSize}px;color:var(--sp-text-primary);margin-bottom:10px;${bmStyle}">${renderMarkdown(p)}${bm ? '<span style="font-size:10px;color:#ffb347;margin-left:4px;">🔖</span>' : ''}${bm?.note ? '<span style="display:block;font-size:10px;color:var(--sp-text-muted);margin-top:2px;">📝 ' + bm.note + '</span>' : ''}</p>`;
+          return `<p data-bs-pidx="${idx}" style="text-indent:2em;line-height:1.8;font-size:${fontSize}px;color:inherit;margin-bottom:10px;${bmStyle}">${renderMarkdown(p)}${bm ? '<span style="font-size:10px;color:#ffb347;margin-left:4px;">🔖</span>' : ''}${bm?.note ? '<span style="display:block;font-size:10px;color:var(--sp-text-muted);margin-top:2px;">📝 ' + bm.note + '</span>' : ''}</p>`;
         }).join('');
       // 段落长按书签
       bodyEl.querySelectorAll('[data-bs-pidx]').forEach(p => {
@@ -27103,6 +29824,7 @@ window.addEventListener('beforeunload', () => {
     book.currentPage = _bsActivePageIdx;
     saveDataDebounced('阅读进度');
     bodyEl.scrollTop = 0;
+    bsApplyReaderStyle();
   }
 
   async function bsReaderNav(direction) {
