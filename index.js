@@ -1481,12 +1481,12 @@ function saveData() {
       notif.classList.add('sp-lock-notif-visible');
     });
 
-    // 5秒后自动消失
+    // 15秒后自动消失
     setTimeout(() => {
       notif.classList.remove('sp-lock-notif-visible');
       notif.classList.add('sp-lock-notif-hiding');
       setTimeout(() => notif.remove(), 400);
-    }, 5000);
+    }, 15000);
 
     // 最多显示3条，多了移除最早的
     while (container.children.length > 3) {
@@ -7944,11 +7944,12 @@ function toggleChat() {
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
       const now = Date.now();
-      state.petChatHistory.push({ role: 'assistant', content: part, timestamp: now });
+      const msgObj = { role: 'assistant', content: part, timestamp: now };
+      state.petChatHistory.push(msgObj);
 
       // 直接创建消息行并附加到容器，带渐出动画
       if (container) {
-        const row = _createChatRow({ role: 'assistant', content: part, timestamp: now });
+        const row = _createChatRow(msgObj);
         row.classList.add('sp-chat-row-fadein');
         container.appendChild(row);
         container.scrollTop = container.scrollHeight;
@@ -12962,6 +12963,11 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
     panel.id = 'silly-pet-settings';
     panel.className = '';  // 清空自动生成的 class
     document.body.appendChild(panel);
+    // 追加保存按钮到面板底部
+    const footer = document.createElement('div');
+    footer.className = 'sp-settings-footer';
+    footer.innerHTML = '<button class="sp-btn sp-btn-primary" id="sp-save-settings">💾 保存所有设置</button>';
+    panel.appendChild(footer);
 
     // 只渲染默认激活的 API 标签页需要的内容，其他懒加载
     // renderUploadAreas();    // 延迟到切换到 display 标签页

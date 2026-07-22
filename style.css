@@ -8465,10 +8465,15 @@
 
 /* 锁屏提示 */
 #sp-lock-hint {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
   font-size: 12px;
   color: var(--sp-text-muted);
   animation: sp-lock-pulse 2s ease-in-out infinite;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 @keyframes sp-lock-pulse {
@@ -9554,24 +9559,24 @@
 
 #sp-lock-notifications {
   position: absolute;
-  top: 40px;
+  top: 55%;
   left: 12px;
   right: 12px;
   z-index: 35;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   pointer-events: none;
 }
 
 .sp-lock-notification {
-  background: rgba(40, 40, 55, 0.82);
-  backdrop-filter: blur(20px) saturate(1.4);
-  -webkit-backdrop-filter: blur(20px) saturate(1.4);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--sp-bg-secondary);
+  backdrop-filter: blur(24px) saturate(1.3);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  border: 1px solid var(--sp-border);
   border-radius: 16px;
   padding: 10px 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
   pointer-events: auto;
   opacity: 0;
   transform: translateY(-20px) scale(0.95);
@@ -9588,6 +9593,25 @@
   opacity: 0;
   transform: translateY(-10px) scale(0.97);
   transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* 楼梯式错落排列 */
+.sp-lock-notification:nth-child(2) {
+  margin-left: 20px;
+}
+
+.sp-lock-notification.sp-lock-notif-visible:nth-child(2) {
+  opacity: 0.92;
+  transform: translateY(0) scale(0.97);
+}
+
+.sp-lock-notification:nth-child(3) {
+  margin-left: 40px;
+}
+
+.sp-lock-notification.sp-lock-notif-visible:nth-child(3) {
+  opacity: 0.85;
+  transform: translateY(0) scale(0.94);
 }
 
 .sp-lock-notif-header {
@@ -9688,7 +9712,7 @@
 
 @media (max-width: 480px) {
   #sp-lock-notifications {
-    top: 30px;
+    top: 55%;
     left: 8px;
     right: 8px;
   }
