@@ -446,6 +446,9 @@
     phoneWallpaper: '',            // 手机主屏壁纸
     phoneWallpaperOpacity: 1.0,    // 主屏壁纸透明度
     chatBackground: '',            // 聊天背景
+    chatBackgroundOpacity: 1.0,    // 聊天背景透明度
+    chatBackgroundBrightness: 1.0, // 聊天背景明暗
+    chatBackgroundBlur: 0,         // 聊天背景模糊度
     appIcons: {                    // app 图标
       chat: '',
       settings: '',
@@ -1751,6 +1754,12 @@ function saveData() {
                 <button class="sp-phone-btn" id="sp-chat-bg-upload">📁 上传</button>
                 <button class="sp-phone-btn" id="sp-chat-bg-clear">清除</button>
               </div>
+              <label style="margin-top:8px;">背景透明度: <span id="sp-chat-bg-opacity-val">${((settings.chatBackgroundOpacity ?? 1.0) * 100).toFixed(0)}%</span></label>
+              <input type="range" id="sp-chat-bg-opacity" min="5" max="100" step="5" value="${((settings.chatBackgroundOpacity ?? 1.0) * 100).toFixed(0)}" style="width:100%;" />
+              <label style="margin-top:8px;">背景明暗: <span id="sp-chat-bg-brightness-val">${((settings.chatBackgroundBrightness ?? 1.0) * 100).toFixed(0)}%</span></label>
+              <input type="range" id="sp-chat-bg-brightness" min="20" max="180" step="10" value="${((settings.chatBackgroundBrightness ?? 1.0) * 100).toFixed(0)}" style="width:100%;" />
+              <label style="margin-top:8px;">背景模糊: <span id="sp-chat-bg-blur-val">${settings.chatBackgroundBlur ?? 0}px</span></label>
+              <input type="range" id="sp-chat-bg-blur" min="0" max="20" step="1" value="${settings.chatBackgroundBlur ?? 0}" style="width:100%;" /><p style="font-size:9px;color:var(--sp-text-muted);margin:6px 0 0;">上传聊天背景后可调节透明度、明暗和模糊程度</p>
             </div>
             <button class="sp-phone-btn sp-phone-btn-primary" id="sp-chat-settings-save">💾 保存</button>
           </div>
@@ -4914,9 +4923,22 @@ if (hasEmoji) {
     if (home) {
       home.style.backgroundImage = 'none';
     }
-    // 聊天页背景保持独立
+    // 聊天页背景保持独立（使用 CSS 变量 + 伪元素，支持透明度/明暗/模糊）
     const chatPage = document.getElementById('sp-phone-chat');
-    if (chatPage) chatPage.style.backgroundImage = settings.chatBackground ? `url(${settings.chatBackground})` : 'none';
+    if (chatPage) {
+      if (settings.chatBackground) {
+        chatPage.style.setProperty('--sp-chat-bg-image', `url(${settings.chatBackground})`);
+        chatPage.style.setProperty('--sp-chat-bg-opacity', String(settings.chatBackgroundOpacity ?? 1.0));
+        chatPage.style.setProperty('--sp-chat-bg-brightness', String(settings.chatBackgroundBrightness ?? 1.0));
+        chatPage.style.setProperty('--sp-chat-bg-blur', `${settings.chatBackgroundBlur ?? 0}px`);
+      } else {
+        chatPage.style.setProperty('--sp-chat-bg-image', 'none');
+        chatPage.style.setProperty('--sp-chat-bg-opacity', '0');
+        chatPage.style.setProperty('--sp-chat-bg-brightness', '1');
+        chatPage.style.setProperty('--sp-chat-bg-blur', '0px');
+      }
+      chatPage.style.backgroundImage = 'none';
+    }
   }
 
 
@@ -6358,6 +6380,45 @@ if (hasEmoji) {
       applyPhoneWallpaper();
     };
 
+    // 聊天背景透明度滑轨
+    const chatBgOpacitySlider = document.getElementById('sp-chat-bg-opacity');
+    if (chatBgOpacitySlider) {
+      chatBgOpacitySlider.oninput = () => {
+        const val = parseInt(chatBgOpacitySlider.value) / 100;
+        settings.chatBackgroundOpacity = val;
+        const valEl = document.getElementById('sp-chat-bg-opacity-val');
+        if (valEl) valEl.textContent = chatBgOpacitySlider.value + '%';
+        applyPhoneWallpaper();
+        saveDataDebounced('聊天背景透明度');
+      };
+    }
+
+    // 聊天背景明暗滑轨
+    const chatBgBrightnessSlider = document.getElementById('sp-chat-bg-brightness');
+    if (chatBgBrightnessSlider) {
+      chatBgBrightnessSlider.oninput = () => {
+        const val = parseInt(chatBgBrightnessSlider.value) / 100;
+        settings.chatBackgroundBrightness = val;
+        const valEl = document.getElementById('sp-chat-bg-brightness-val');
+        if (valEl) valEl.textContent = chatBgBrightnessSlider.value + '%';
+        applyPhoneWallpaper();
+        saveDataDebounced('聊天背景明暗');
+      };
+    }
+
+    // 聊天背景模糊度滑轨
+    const chatBgBlurSlider = document.getElementById('sp-chat-bg-blur');
+    if (chatBgBlurSlider) {
+      chatBgBlurSlider.oninput = () => {
+        const val = parseInt(chatBgBlurSlider.value);
+        settings.chatBackgroundBlur = val;
+        const valEl = document.getElementById('sp-chat-bg-blur-val');
+        if (valEl) valEl.textContent = val + 'px';
+        applyPhoneWallpaper();
+        saveDataDebounced('聊天背景模糊');
+      };
+    }
+
     // 聊天设置保存
     const chatSaveBtn = document.getElementById('sp-chat-settings-save');
     if (chatSaveBtn) chatSaveBtn.onclick = () => {
@@ -6506,6 +6567,20 @@ if (hasEmoji) {
     if (charPreview) charPreview.innerHTML = settings.chatCharAvatar ? `<img src="${settings.chatCharAvatar}" />` : '🐾';
     if (userPreview) userPreview.innerHTML = settings.chatUserAvatar ? `<img src="${settings.chatUserAvatar}" />` : '🧑';
     if (bgPreview) bgPreview.innerHTML = settings.chatBackground ? `<img src="${settings.chatBackground}" />` : '无';
+
+    // 聊天背景调节滑轨同步
+    const chatBgOpacity = document.getElementById('sp-chat-bg-opacity');
+    if (chatBgOpacity) chatBgOpacity.value = ((settings.chatBackgroundOpacity ?? 1.0) * 100).toFixed(0);
+    const chatBgOpacityVal = document.getElementById('sp-chat-bg-opacity-val');
+    if (chatBgOpacityVal) chatBgOpacityVal.textContent = ((settings.chatBackgroundOpacity ?? 1.0) * 100).toFixed(0) + '%';
+    const chatBgBrightness = document.getElementById('sp-chat-bg-brightness');
+    if (chatBgBrightness) chatBgBrightness.value = ((settings.chatBackgroundBrightness ?? 1.0) * 100).toFixed(0);
+    const chatBgBrightnessVal = document.getElementById('sp-chat-bg-brightness-val');
+    if (chatBgBrightnessVal) chatBgBrightnessVal.textContent = ((settings.chatBackgroundBrightness ?? 1.0) * 100).toFixed(0) + '%';
+    const chatBgBlur = document.getElementById('sp-chat-bg-blur');
+    if (chatBgBlur) chatBgBlur.value = settings.chatBackgroundBlur ?? 0;
+    const chatBgBlurVal = document.getElementById('sp-chat-bg-blur-val');
+    if (chatBgBlurVal) chatBgBlurVal.textContent = (settings.chatBackgroundBlur ?? 0) + 'px';
   }
 
     // 头像框预览同步
@@ -11099,7 +11174,7 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
                 ${(settings.petProfiles || []).map(p => `<option value="${p.name}" ${settings.currentProfile === p.name ? 'selected' : ''}>${p.name}</option>`).join('')}
               </select>
               <div class="sp-row" style="flex-wrap:wrap;">
-                <button class="sp-btn" id="sp-profile-save" type="button">💾 保存当前</button>
+                <button class="sp-btn" id="sp-archive-save-btn" type="button">💾 保存当前</button>
                 <button class="sp-btn sp-btn-primary" id="sp-profile-load" type="button">📂 加载存档</button>
                 <button class="sp-btn sp-btn-danger" id="sp-profile-delete" type="button">🗑️ 删除</button>
               </div>
@@ -13802,7 +13877,7 @@ document.getElementById('sp-export')?.addEventListener('click', async () => {
       });
     });
     // 多桌宠存档
-    document.getElementById('sp-profile-save')?.addEventListener('click', () => {
+    document.getElementById('sp-archive-save-btn')?.addEventListener('click', () => {
       showPromptDialog({
         title: '💾 保存桌宠存档',
         desc: '给当前桌宠配置起个名字',
@@ -15796,7 +15871,7 @@ window.addEventListener('beforeunload', () => {
       const isEmpty = count <= 0;
       return `
         <div class="sp-inv-item ${isEmpty ? '' : ''}" style="${isEmpty ? 'opacity:0.4;' : ''}">
-          <span class="sp-inv-item-emoji">${item.emoji}</span>
+          <span class="sp-inv-item-emoji">${getItemDisplayHtml('stamina_item_' + item.key, item.emoji, 22)}</span>
           <div class="sp-inv-item-info">
             <span class="sp-inv-item-name">${item.name}</span>
             <span class="sp-inv-item-detail">+${item.restore} 体力 | 库存: ${count}</span>

@@ -8928,14 +8928,29 @@
 #sp-phone-home {
   position: relative;
 }
+
+/* 聊天页背景伪元素（支持透明度/明暗/模糊） */
 #sp-phone-chat {
+  position: relative;
+}
+
+#sp-phone-chat::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--sp-chat-bg-image, none);
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+  opacity: var(--sp-chat-bg-opacity, 0);
+  filter: brightness(var(--sp-chat-bg-brightness, 1)) blur(var(--sp-chat-bg-blur, 0px));
+  z-index: 0;
+  pointer-events: none;
 }
-/* 有背景时消息区半透明，保证可读 */
-#sp-phone-chat[style*="background-image: url"] #silly-pet-chat-messages {
-  background: rgba(0,0,0,0.15);
+
+#sp-phone-chat > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* 壁纸预览小方块 */
