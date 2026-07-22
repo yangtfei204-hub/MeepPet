@@ -453,6 +453,8 @@
       bookshelf: '',
       contacts: '',
       profile: '',
+      forum: '',
+      fanfic: '',
     },
     // 书架
     bookshelfBooks: [],
@@ -1800,6 +1802,18 @@ function saveData() {
                 <div class="sp-chat-avatar-preview" id="sp-app-icon-profile-preview">👤</div>
                 <button class="sp-phone-btn" id="sp-app-icon-profile-upload">📁 上传</button>
                 <button class="sp-phone-btn" id="sp-app-icon-profile-clear">清除</button>
+              </div>
+              <label>论坛 app</label>
+              <div class="sp-chat-avatar-row">
+                <div class="sp-chat-avatar-preview" id="sp-app-icon-forum-preview">📰</div>
+                <button class="sp-phone-btn" id="sp-app-icon-forum-upload">📁 上传</button>
+                <button class="sp-phone-btn" id="sp-app-icon-forum-clear">清除</button>
+              </div>
+              <label>同人文 app</label>
+              <div class="sp-chat-avatar-row">
+                <div class="sp-chat-avatar-preview" id="sp-app-icon-fanfic-preview">📝</div>
+                <button class="sp-phone-btn" id="sp-app-icon-fanfic-upload">📁 上传</button>
+                <button class="sp-phone-btn" id="sp-app-icon-fanfic-clear">清除</button>
               </div>
 
             </div>
@@ -6373,7 +6387,7 @@ if (hasEmoji) {
     }
 
     // app 图标上传
-    ['chat', 'settings', 'theme', 'bookshelf', 'contacts', 'profile'].forEach(app => {
+    ['chat', 'settings', 'theme', 'bookshelf', 'contacts', 'profile', 'forum', 'fanfic'].forEach(app => {
       const upload = document.getElementById(`sp-app-icon-${app}-upload`);
       const clear = document.getElementById(`sp-app-icon-${app}-clear`);
       if (upload) upload.onclick = () => phoneUploadImage(`appIcons.${app}`, (url) => {
@@ -6387,7 +6401,7 @@ if (hasEmoji) {
         settings.appIcons[app] = '';
         saveData();
         const prev = document.getElementById(`sp-app-icon-${app}-preview`);
-        const fallback = {chat:'💬', settings:'⚙️', theme:'🎨', bookshelf:'📚'}[app];
+        const fallback = {chat:'💬', settings:'⚙️', theme:'🎨', bookshelf:'📚', contacts:'📇', profile:'👤', forum:'📰', fanfic:'📝'}[app];
         if (prev) prev.innerHTML = fallback;
         applyAppIcons();
       };
@@ -6517,7 +6531,14 @@ if (hasEmoji) {
     const profilePrev = document.getElementById('sp-app-icon-profile-preview');
     if (profilePrev) profilePrev.innerHTML = settings.appIcons.profile ? `<img src="${settings.appIcons.profile}" />` : '👤';
 
+    const forumPrev = document.getElementById('sp-app-icon-forum-preview');
+    if (forumPrev) forumPrev.innerHTML = settings.appIcons.forum ? `<img src="${settings.appIcons.forum}" />` : '📰';
+
+    const fanficPrev = document.getElementById('sp-app-icon-fanfic-preview');
+    if (fanficPrev) fanficPrev.innerHTML = settings.appIcons.fanfic ? `<img src="${settings.appIcons.fanfic}" />` : '📝';
+
     const wpOpacity = document.getElementById('sp-phone-wp-opacity');
+
     if (wpOpacity) wpOpacity.value = ((settings.phoneWallpaperOpacity ?? 1.0) * 100).toFixed(0);
     const wpOpacityVal = document.getElementById('sp-phone-wp-opacity-val');
     if (wpOpacityVal) wpOpacityVal.textContent = ((settings.phoneWallpaperOpacity ?? 1.0) * 100).toFixed(0) + '%';
