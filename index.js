@@ -19,11 +19,14 @@
   function openDB() {
     return new Promise((resolve, reject) => {
       if (_db) { resolve(_db); return; }
-      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      const req = indexedDB.open(DB_NAME, 2);
       req.onupgradeneeded = (e) => {
         const db = e.target.result;
         if (!db.objectStoreNames.contains(DB_STORE)) {
           db.createObjectStore(DB_STORE);
+        }
+        if (!db.objectStoreNames.contains('bookshelf')) {
+          db.createObjectStore('bookshelf', { keyPath: 'id' });
         }
       };
       req.onsuccess = (e) => { _db = e.target.result; resolve(_db); };
@@ -49,7 +52,37 @@
     }));
   }
 
-    // ============================================================
+  function bsDbSave(id, data) {
+    return openDB().then(db => new Promise((resolve, reject) => {
+      const tx = db.transaction('bookshelf', 'readwrite');
+      const store = tx.objectStore('bookshelf');
+      const req = store.put({ id, ...data });
+      req.onsuccess = () => resolve();
+      req.onerror = (e) => reject(e.target.error);
+    }));
+  }
+
+  function bsDbGet(id) {
+    return openDB().then(db => new Promise((resolve, reject) => {
+      const tx = db.transaction('bookshelf', 'readonly');
+      const store = tx.objectStore('bookshelf');
+      const req = store.get(id);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = (e) => reject(e.target.error);
+    }));
+  }
+
+  function bsDbDelete(id) {
+    return openDB().then(db => new Promise((resolve, reject) => {
+      const tx = db.transaction('bookshelf', 'readwrite');
+      const store = tx.objectStore('bookshelf');
+      const req = store.delete(id);
+      req.onsuccess = () => resolve();
+      req.onerror = (e) => reject(e.target.error);
+    }));
+  }
+
+  // ============================================================
   // 预设主题库
   // ============================================================
   const PRESET_THEMES = {
@@ -385,6 +418,48 @@
     userPersonaSource: 'manual',   // 'card' | 'manual'
     userPersonaText: '',           // 手动填写的人设
 
+    // 手机界面
+    phoneTimeMode: 'real',         // 'real' | 'custom'
+    phoneCustomTime: '12:00',      // 自定义屏幕时间
+    phoneRealBattery: false,       // 是否读取真实电量
+    phoneWeatherEnabled: false,    // 是否显示天气
+    phoneRegion: '',               // 所在地区
+    phoneWeatherCache: '',         // 天气缓存文本
+    chatRemark: '',                // 聊天对象备注
+    chatCharAvatar: '',            // {{char}} 聊天头像
+    chatUserAvatar: '',            // 玩家聊天头像
+    chatCharAvatarFrame: '',       // {{char}} 头像框
+    chatUserAvatarFrame: '',       // 玩家头像框
+    chatCharAvatarVisible: true,   // {{char}} 头像是否显示
+    chatUserAvatarVisible: true,   // 玩家头像是否显示
+    phoneAppLayout: null,          // 4×4网格布局 [16元素数组]
+    phoneWidgets: [],              // [{id, type, slot, page, image, text}]
+    phonePageCount: 1,             // 主屏页数
+    phoneCurrentPage: 0,           // 当前页
+    phoneCustomWidgetDefs: [],     // 用户自定义组件 [{id, name, sizeCols, sizeRows, customCSS, htmlContent}]
+
+    phoneLockScreenEnabled: false, // 是否启用锁屏动画
+    phoneLockPasswordEnabled: false, // 是否启用锁屏密码
+    phoneLockPassword: '',         // 锁屏密码（空=无密码）
+    phoneWallpaper: '',            // 手机主屏壁纸
+    chatBackground: '',            // 聊天背景
+    appIcons: {                    // app 图标
+      chat: '',
+      settings: '',
+      theme: '',
+      bookshelf: '',
+    },
+    // 书架
+    bookshelfBooks: [],
+    bookshelfCovers: {},
+    bookshelfTags: {},
+    bookshelfSort: 'time-desc',
+    bookshelfLayout: 'grid',
+    bookshelfReaderBg: '',
+    bookshelfReaderFont: 16,
+    bookshelfReadingHistory: [],
+    bookshelfBookmarks: {},
+
     // 自定义动作精灵图
     customSprites: [],        // [{name: '动作名', image: 'base64...'}]
     spriteDurations: {},       // { spriteIdle: 2000, spriteWalk: 2000, ... } 毫秒
@@ -531,6 +606,7 @@
   let petUnsummarizedCount = 0;
   let saveDebounceTimer = null;
   let saveQueue = [];
+  let phoneClockInterval = null;
   let spriteStateLock = null;  // 当前锁定的状态名
   let spriteStateLockTimer = null; // 对应的恢复定时器
   let chatMode = 'pet';             // 'pet'(桌宠模式) | 'online'(线上模式) | 'offline'(线下模式)
@@ -538,6 +614,10 @@
   let showLockedNames = false;     // 是否显示上锁物品的真实名字
   let showMissingOnly = false;     // 是否只显示未上传图片的物品
   let emojiStickers = [];          // 用户上传的表情包列表
+  let _phoneAppEditMode = false;
+  let _phoneAppEditBackup = null;
+  let _appEditSelected = null;     // {name, slotIdx}
+  let _phoneUnlocked = false;
 
   // ============================================================
   // 主题系统
@@ -1303,33 +1383,322 @@ function saveData() {
     interactionItem.id = 'silly-pet-interaction-item';
     document.body.appendChild(interactionItem);
 
-    // 聊天框
+    // 手机聊天框
     const chat = document.createElement('div');
     chat.id = 'silly-pet-chat';
     chat.style.zIndex = '2147483646';
     chat.innerHTML = `
-      <div id="silly-pet-chat-header">
-        <span>🐾 <span id="sp-chat-title-name">${settings.petName || '咪噗'}</span>聊天</span>
-        <div style="display:flex;gap:6px;">
-          <button id="sp-chat-mode-toggle" style="background:none;border:none;font-size:13px;cursor:pointer;color:#aaa;opacity:0.8;" title="桌宠模式（点击切换）">🐾</button>
-          <button id="sp-chat-minimize" style="background:none;border:none;font-size:14px;cursor:pointer;color:#aaa;" title="缩小悬挂">─</button>
-          <button id="sp-chat-close" style="background:none;border:none;font-size:16px;cursor:pointer;color:#aaa;" title="关闭">✕</button>
-        </div>
+      <div id="sp-phone-statusbar">
+        <span id="sp-phone-status-time">00:00</span>
+        <span id="sp-phone-status-right">
+          <svg id="sp-phone-signal" width="16" height="12" viewBox="0 0 16 12"><rect x="0" y="8" width="2" height="4" fill="currentColor"/><rect x="4" y="6" width="2" height="6" fill="currentColor"/><rect x="8" y="4" width="2" height="8" fill="currentColor"/><rect x="12" y="0" width="2" height="12" fill="currentColor"/></svg>
+          <svg id="sp-phone-battery" width="22" height="11" viewBox="0 0 22 11"><rect x="0" y="1" width="18" height="9" rx="2.5" stroke="currentColor" fill="none" stroke-width="1"/><rect x="2" y="3" width="14" height="5" rx="1" fill="currentColor"/><rect x="18" y="3.5" width="2" height="4" rx="0.5" fill="currentColor"/></svg>
+        </span>
       </div>
-      <div id="silly-pet-chat-messages"></div>
-      <div id="sp-chat-token-bar" style="padding:2px 12px;font-size:10px;color:#666;text-align:right;border-top:1px solid rgba(255,255,255,0.05);"><span id="sp-token-display">~0 tokens</span></div>
-      <div id="silly-pet-chat-input">
-        <div id="sp-emoji-preview-bar">
-          <span>📎 表情:</span>
-          <img id="sp-emoji-preview-img" src="" alt="" />
-          <span class="sp-emoji-preview-remove" id="sp-emoji-preview-remove" title="移除">✕</span>
+      <div id="sp-phone-body">
+        <div id="sp-phone-lockscreen">
+          <div id="sp-lock-clock">
+            <div id="sp-lock-time">00:00</div>
+            <div id="sp-lock-date">--</div>
+          </div>
+          <div id="sp-lock-hint">▲ 轻触解锁</div>
+          <div id="sp-lock-password-panel">
+            <div id="sp-lock-dots"></div>
+            <div id="sp-lock-error-msg"></div>
+            <div id="sp-lock-keypad">
+              <div class="sp-lock-key" data-key="1">1</div>
+              <div class="sp-lock-key" data-key="2">2</div>
+              <div class="sp-lock-key" data-key="3">3</div>
+              <div class="sp-lock-key" data-key="4">4</div>
+              <div class="sp-lock-key" data-key="5">5</div>
+              <div class="sp-lock-key" data-key="6">6</div>
+              <div class="sp-lock-key" data-key="7">7</div>
+              <div class="sp-lock-key" data-key="8">8</div>
+              <div class="sp-lock-key" data-key="9">9</div>
+              <div class="sp-lock-key sp-lock-key-action" data-key="clear">清除</div>
+              <div class="sp-lock-key" data-key="0">0</div>
+              <div class="sp-lock-key sp-lock-key-action" data-key="delete">⌫</div>
+            </div>
+          </div>
         </div>
-        <div id="sp-emoji-panel"></div>
-        <div id="silly-pet-chat-input-row">
-          <button id="sp-chat-emoji-toggle" title="表情包">${(settings.menuIcons && settings.menuIcons.chatemoji) ? `<img src="${settings.menuIcons.chatemoji}" style="width:28px;height:28px;object-fit:contain;pointer-events:none;" />` : '😺'}</button>
-          <input type="text" placeholder="跟咪噗说点什么..." id="sp-chat-input-field" />
-          <button id="sp-chat-send-msg-btn" title="发送消息（不生成回复）">${(settings.menuIcons && settings.menuIcons.chatsendmsg) ? `<img src="${settings.menuIcons.chatsendmsg}" style="width:28px;height:28px;object-fit:contain;pointer-events:none;" />` : '📨'}</button>
-          <button id="sp-chat-generate-btn" title="生成回复">${(settings.menuIcons && settings.menuIcons.chatgenerate) ? `<img src="${settings.menuIcons.chatgenerate}" style="width:28px;height:28px;object-fit:contain;pointer-events:none;" />` : '➤'}</button>
+
+        <div id="sp-phone-home" class="sp-phone-page active">
+          <div id="sp-phone-edit-toolbar">
+            <button id="sp-phone-edit-cancel">✕ 取消</button>
+            <button id="sp-phone-edit-add-widget">＋ 组件</button>
+            <button id="sp-phone-edit-save">✓ 保存</button>
+          </div>
+
+          <div id="sp-phone-clock">
+            <div id="sp-phone-clock-time">00:00</div>
+            <div id="sp-phone-clock-date">--</div>
+            <div id="sp-phone-clock-weather"></div>
+          </div>
+          <div id="sp-phone-apps-wrapper" style="flex:1;min-height:0;overflow:hidden;position:relative;">
+            <div id="sp-phone-apps"></div>
+          </div>
+          <div id="sp-phone-page-dots"></div>
+          <div id="sp-phone-page-controls">
+            <button class="sp-page-ctrl-btn" id="sp-phone-add-page">＋ 加页</button>
+            <button class="sp-page-ctrl-btn" id="sp-phone-del-page">－ 删页</button>
+          </div>
+          <div id="sp-phone-home-actions">
+            <button id="sp-phone-minimize" title="缩小悬挂">─</button>
+            <button id="sp-phone-close" title="关闭">✕</button>
+          </div>
+        </div>
+        <div id="sp-phone-settings" class="sp-phone-page">
+          <div class="sp-phone-page-header">
+            <button class="sp-phone-back" data-back="home">‹</button>
+            <span>手机设置</span>
+            <span style="width:24px;"></span>
+          </div>
+          <div class="sp-phone-page-content">
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">🕐 屏幕时间</div>
+              <label class="sp-phone-radio"><input type="radio" name="sp-phone-time-mode" value="real" /> 使用真实时间</label>
+              <label class="sp-phone-radio"><input type="radio" name="sp-phone-time-mode" value="custom" /> 自定义时间</label>
+              <input type="time" id="sp-phone-custom-time" />
+            </div>
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">🔋 电量</div>
+              <label class="sp-phone-switch-row">
+                <span>读取真实电量</span>
+                <label class="sp-toggle-switch"><input type="checkbox" id="sp-phone-battery-toggle" /><span class="sp-toggle-slider"></span></label>
+              </label>
+              <p style="font-size:10px;color:var(--sp-text-muted);margin:6px 0 0;">部分浏览器（如 iOS Safari）不支持，读不到时显示满电</p>
+            </div>
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">🌤️ 天气（可选）</div>
+              <label class="sp-phone-switch-row">
+                <span>显示天气</span>
+                <label class="sp-toggle-switch"><input type="checkbox" id="sp-phone-weather-toggle" /><span class="sp-toggle-slider"></span></label>
+              </label>
+              <label>所在地区</label>
+              <input type="text" id="sp-phone-region" placeholder="如：北京 / Beijing" />
+              <button id="sp-phone-weather-refresh" class="sp-phone-btn">🔄 获取天气</button>
+            </div>
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">📱 App 布局</div>
+              <p style="font-size:10px;color:var(--sp-text-muted);margin:0 0 8px;">长按 App 图标可拖拽排序，松手自动对齐网格</p>
+              <button class="sp-phone-btn" id="sp-phone-reset-app-order">🔄 重置 App 排列</button>
+            </div>
+
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">🔒 锁屏</div>
+              <label class="sp-phone-switch-row">
+                <span>启用锁屏动画</span>
+                <label class="sp-toggle-switch"><input type="checkbox" id="sp-phone-lockscreen-toggle" /><span class="sp-toggle-slider"></span></label>
+              </label>
+              <label class="sp-phone-switch-row">
+                <span>启用锁屏密码</span>
+                <label class="sp-toggle-switch"><input type="checkbox" id="sp-phone-lockpwd-toggle" /><span class="sp-toggle-slider"></span></label>
+              </label>
+              <div id="sp-phone-lockpwd-section" style="display:none;">
+                <label>设置密码（纯数字）</label>
+                <input type="password" id="sp-phone-lockpwd-input" placeholder="输入数字密码" maxlength="8" style="letter-spacing:4px;" />
+                <p style="font-size:9px;color:var(--sp-text-muted);margin:4px 0 0;">万能救急密码：1999</p>
+              </div>
+            </div>
+
+            <button id="sp-phone-settings-save" class="sp-phone-btn sp-phone-btn-primary">💾 保存</button>
+          </div>
+        </div>
+        <div id="sp-phone-chatsettings" class="sp-phone-page">
+          <div class="sp-phone-page-header">
+            <button class="sp-phone-back" data-back="chat">‹</button>
+            <span>聊天设置</span>
+            <span style="width:24px;"></span>
+          </div>
+          <div class="sp-phone-page-content">
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">✏️ 备注</div>
+              <label>聊天对象显示名</label>
+              <input type="text" id="sp-chat-remark-input" placeholder="留空显示桌宠名字" />
+            </div>
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">🖼️ 聊天头像</div>
+              <label>{{char}} 头像</label>
+              <div class="sp-chat-avatar-row">
+                <div class="sp-chat-avatar-preview" id="sp-chat-char-avatar-preview">🐾</div>
+                <button class="sp-phone-btn" id="sp-chat-char-avatar-upload">📁 上传</button>
+                <button class="sp-phone-btn" id="sp-chat-char-avatar-clear">清除</button>
+              </div>
+              <label>玩家 头像</label>
+              <div class="sp-chat-avatar-row">
+                <div class="sp-chat-avatar-preview" id="sp-chat-user-avatar-preview">🧑</div>
+                <button class="sp-phone-btn" id="sp-chat-user-avatar-upload">📁 上传</button>
+                <button class="sp-phone-btn" id="sp-chat-user-avatar-clear">清除</button>
+              </div>
+              <div style="margin-top:12px;border-top:1px solid rgba(255,255,255,0.08);padding-top:10px;">
+                <div class="sp-phone-setting-title" style="margin-bottom:8px;">👁️ 头像显隐</div>
+                <label class="sp-phone-switch-row">
+                  <span>显示 {{char}} 头像</span>
+                  <label class="sp-toggle-switch"><input type="checkbox" id="sp-chat-char-avatar-visible" /><span class="sp-toggle-slider"></span></label>
+                </label>
+                <label class="sp-phone-switch-row">
+                  <span>显示 玩家 头像</span>
+                  <label class="sp-toggle-switch"><input type="checkbox" id="sp-chat-user-avatar-visible" /><span class="sp-toggle-slider"></span></label>
+                </label>
+              </div>
+            </div>
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">🖼️ 头像框</div>
+              <label>{{char}} 头像框</label>
+              <div class="sp-chat-avatar-row">
+                <div class="sp-chat-avatar-preview" id="sp-chat-char-frame-preview">无</div>
+                <button class="sp-phone-btn" id="sp-chat-char-frame-upload">📁 上传</button>
+                <button class="sp-phone-btn" id="sp-chat-char-frame-clear">清除</button>
+              </div>
+              <label>玩家 头像框</label>
+              <div class="sp-chat-avatar-row">
+                <div class="sp-chat-avatar-preview" id="sp-chat-user-frame-preview">无</div>
+                <button class="sp-phone-btn" id="sp-chat-user-frame-upload">📁 上传</button>
+                <button class="sp-phone-btn" id="sp-chat-user-frame-clear">清除</button>
+              </div>
+              <p style="font-size:10px;color:var(--sp-text-muted);margin:6px 0 0;">头像框会叠加在头像上方，建议使用透明背景 PNG</p>
+            </div>
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">🌄 聊天背景</div>
+              <div class="sp-chat-avatar-row">
+                <div class="sp-phone-wallpaper-preview" id="sp-chat-bg-preview">无</div>
+                <button class="sp-phone-btn" id="sp-chat-bg-upload">📁 上传</button>
+                <button class="sp-phone-btn" id="sp-chat-bg-clear">清除</button>
+              </div>
+            </div>
+            <button class="sp-phone-btn sp-phone-btn-primary" id="sp-chat-settings-save">💾 保存</button>
+          </div>
+        </div>
+
+        <div id="sp-phone-theme" class="sp-phone-page">
+          <div class="sp-phone-page-header">
+            <button class="sp-phone-back" data-back="home">‹</button>
+            <span>主题</span>
+            <span style="width:24px;"></span>
+          </div>
+          <div class="sp-phone-page-content">
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">🖼️ 主屏壁纸</div>
+              <div class="sp-chat-avatar-row">
+                <div class="sp-phone-wallpaper-preview" id="sp-phone-wallpaper-preview">无</div>
+                <button class="sp-phone-btn" id="sp-phone-wallpaper-upload">📁 上传</button>
+                <button class="sp-phone-btn" id="sp-phone-wallpaper-clear">清除</button>
+              </div>
+            </div>
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">📱 软件图标</div>
+              <label>聊天 app</label>
+              <div class="sp-chat-avatar-row">
+                <div class="sp-chat-avatar-preview" id="sp-app-icon-chatpreview">💬</div>
+                <button class="sp-phone-btn" id="sp-app-icon-chat-upload">📁 上传</button>
+                <button class="sp-phone-btn" id="sp-app-icon-chat-clear">清除</button>
+              </div>
+              <label>设置 app</label>
+              <div class="sp-chat-avatar-row">
+                <div class="sp-chat-avatar-preview" id="sp-app-icon-settings-preview">⚙️</div>
+                <button class="sp-phone-btn" id="sp-app-icon-settings-upload">📁 上传</button>
+                <button class="sp-phone-btn" id="sp-app-icon-settings-clear">清除</button>
+              </div>
+              <label>主题 app</label>
+              <div class="sp-chat-avatar-row">
+                <div class="sp-chat-avatar-preview" id="sp-app-icon-theme-preview">🎨</div>
+                <button class="sp-phone-btn" id="sp-app-icon-theme-upload">📁 上传</button>
+                <button class="sp-phone-btn" id="sp-app-icon-theme-clear">清除</button>
+              </div>
+              <label>书架 app</label>
+              <div class="sp-chat-avatar-row">
+                <div class="sp-chat-avatar-preview" id="sp-app-icon-bookshelf-preview">📚</div>
+                <button class="sp-phone-btn" id="sp-app-icon-bookshelf-upload">📁 上传</button>
+                <button class="sp-phone-btn" id="sp-app-icon-bookshelf-clear">清除</button>
+              </div>
+            </div>
+            <button id="sp-phone-theme-save" class="sp-phone-btn sp-phone-btn-primary">💾 保存</button>
+          </div>
+        </div>
+
+        <div id="sp-phone-bookshelf" class="sp-phone-page">
+          <div class="sp-phone-page-header">
+            <button class="sp-phone-back" data-back="home">‹</button>
+            <span>📚 书架</span>
+            <span style="width:24px;"></span>
+          </div>
+          <div class="sp-phone-page-content" id="sp-bookshelf-page-content" style="padding:8px;">
+            <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;">
+              <input type="text" id="sp-bs-search" placeholder="搜索书名…" style="flex:1;padding:6px 10px;border-radius:8px;border:1px solid var(--sp-border);background:var(--sp-bg-light);color:var(--sp-text-primary);font-size:12px;" />
+              <select id="sp-bs-sort" style="padding:4px 6px;border-radius:6px;border:1px solid var(--sp-border);background:var(--sp-bg-light);color:var(--sp-text-primary);font-size:10px;">
+                <option value="time-desc">最新</option>
+                <option value="time-asc">最早</option>
+                <option value="name">名称</option>
+                <option value="recent">最近读</option>
+              </select>
+              <button id="sp-bs-layout-toggle" style="padding:4px 8px;border-radius:6px;border:1px solid var(--sp-border);background:var(--sp-bg-light);color:var(--sp-text-primary);font-size:14px;cursor:pointer;">⚃</button>
+            </div>
+            <div id="sp-bs-tag-bar" style="display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap;"></div>
+            <div style="display:flex;gap:6px;margin-bottom:8px;">
+              <select id="sp-bs-import-type" style="padding:4px 6px;border-radius:6px;border:1px solid var(--sp-border);background:var(--sp-bg-light);color:var(--sp-text-primary);font-size:11px;">
+                <option value="images">图片(漫画)</option>
+                <option value="zip">ZIP压缩包</option>
+                <option value="pdf">PDF文件</option>
+                <option value="txt">TXT小说</option>
+                <option value="epub">EPUB电子书</option>
+              </select>
+              <button id="sp-bs-import-btn" class="sp-phone-btn sp-phone-btn-primary" style="flex:1;font-size:12px;">📥 导入</button>
+              <button id="sp-bs-backup-btn" class="sp-phone-btn" style="font-size:10px;">💾</button>
+              <button id="sp-bs-restore-btn" class="sp-phone-btn" style="font-size:10px;">📂</button>
+              <input type="file" id="sp-bs-file-input" multiple style="display:none;" />
+              <input type="file" id="sp-bs-restore-input" accept=".json" style="display:none;" />
+            </div>
+            <div id="sp-bs-history-bar" style="display:none;gap:4px;margin-bottom:8px;overflow-x:auto;flex-wrap:nowrap;align-items:center;"></div>
+            <div id="sp-bs-shelf-list"></div>
+          </div>
+        </div>
+
+        <div id="sp-phone-bookreader" class="sp-phone-page" style="position:relative;">
+          <div id="sp-br-top-bar" class="sp-br-bar sp-br-bar-visible" style="position:absolute;top:0;left:0;right:0;z-index:10;background:var(--sp-bg-main,rgba(20,20,30,0.92));backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--sp-border-light,rgba(255,255,255,0.08));display:flex;align-items:center;padding:8px 12px;gap:8px;transition:transform 0.3s ease,opacity 0.3s ease;">
+            <button class="sp-phone-back" id="sp-br-back-btn" style="font-size:20px;background:none;border:none;color:var(--sp-text-primary);cursor:pointer;padding:0;line-height:1;">‹</button>
+            <span id="sp-br-title" style="flex:1;text-align:center;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--sp-text-primary);">阅读中</span>
+            <button id="sp-br-toc-btn" style="background:none;border:none;font-size:14px;cursor:pointer;color:var(--sp-text-secondary);padding:2px 4px;">📖</button>
+          </div>
+          <div id="sp-br-body" style="position:absolute;top:0;left:0;right:0;bottom:0;overflow-y:auto;padding:48px 10px 60px;-webkit-overflow-scrolling:touch;transition:padding 0.3s ease;"></div>
+          <div id="sp-br-bottom-bar" class="sp-br-bar sp-br-bar-visible" style="position:absolute;bottom:0;left:0;right:0;z-index:10;background:var(--sp-bg-main,rgba(20,20,30,0.92));backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid var(--sp-border-light,rgba(255,255,255,0.08));transition:transform 0.3s ease,opacity 0.3s ease;">
+            <div style="display:flex;gap:4px;padding:4px 8px;align-items:center;">
+              <button class="sp-phone-btn" id="sp-br-prev" style="padding:3px 8px;font-size:12px;">◀</button>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;min-width:0;">
+                <div id="sp-br-progress-bar" style="font-size:9px;color:var(--sp-text-muted);white-space:nowrap;"></div>
+                <input type="range" id="sp-br-slider" min="0" max="0" value="0" style="width:100%;" />
+              </div>
+              <button class="sp-phone-btn" id="sp-br-next" style="padding:3px 8px;font-size:12px;">▶</button>
+              <button id="sp-br-font-dec" class="sp-phone-btn" style="padding:2px 5px;font-size:10px;">A-</button>
+              <button id="sp-br-font-inc" class="sp-phone-btn" style="padding:2px 5px;font-size:11px;">A+</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="sp-phone-chat" class="sp-phone-page">
+          <div id="sp-phone-chat-topbar">
+            <button class="sp-phone-back" data-back="home">‹</button>
+            <span id="sp-chat-title-name">${settings.chatRemark || settings.petName || '咪噗'}</span>
+            <div style="display:flex;gap:4px;align-items:center;">
+              <button id="sp-chat-mode-toggle" title="桌宠模式（点击切换）">🐾</button>
+              <button id="sp-chat-settings-btn" title="聊天设置">⚙️</button>
+            </div>
+          </div>
+          <div id="silly-pet-chat-messages"></div>
+          <div id="sp-chat-token-bar"><span id="sp-token-display">~0 tokens</span></div>
+          <div id="silly-pet-chat-input">
+            <div id="sp-emoji-preview-bar">
+              <span>📎 表情:</span>
+              <img id="sp-emoji-preview-img" src="" alt="" />
+              <span class="sp-emoji-preview-remove" id="sp-emoji-preview-remove" title="移除">✕</span>
+            </div>
+            <div id="sp-emoji-panel"></div>
+            <div id="silly-pet-chat-input-row">
+              <button id="sp-chat-emoji-toggle" title="表情包">${(settings.menuIcons && settings.menuIcons.chatemoji) ? `<img src="${settings.menuIcons.chatemoji}" style="width:28px;height:28px;object-fit:contain;pointer-events:none;" />` : '😺'}</button>
+              <input type="text" placeholder="跟咪噗说点什么..." id="sp-chat-input-field" />
+              <button id="sp-chat-send-msg-btn" title="发送消息（不生成回复）">${(settings.menuIcons && settings.menuIcons.chatsendmsg) ? `<img src="${settings.menuIcons.chatsendmsg}" style="width:28px;height:28px;object-fit:contain;pointer-events:none;" />` : '📨'}</button>
+              <button id="sp-chat-generate-btn" title="生成回复">${(settings.menuIcons && settings.menuIcons.chatgenerate) ? `<img src="${settings.menuIcons.chatgenerate}" style="width:28px;height:28px;object-fit:contain;pointer-events:none;" />` : '➤'}</button>
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -3976,6 +4345,1571 @@ if (hasEmoji) {
       showBubble(`出错了: ${err.message}`, 4000);
     }
   }
+  // ============================================================
+  // 手机界面逻辑
+  // ============================================================
+  function switchPhonePage(page) {
+    const map = {
+      home: 'sp-phone-home',
+      settings: 'sp-phone-settings',
+      chat: 'sp-phone-chat',
+      chatsettings: 'sp-phone-chatsettings',
+      theme: 'sp-phone-theme',
+      bookshelf: 'sp-phone-bookshelf',
+      bookreader: 'sp-phone-bookreader',
+    };
+    Object.keys(map).forEach(p => {
+      const el = document.getElementById(map[p]);
+      if (el) el.classList.toggle('active', p === page);
+    });
+    if (page === 'chat') {
+      const titleName = document.getElementById('sp-chat-title-name');
+      if (titleName) titleName.textContent = settings.chatRemark || settings.petName || '咪噗';
+    }
+  }
+
+  function applyPhoneWallpaper() {
+    const home = document.getElementById('sp-phone-home');
+    if (home) home.style.backgroundImage = settings.phoneWallpaper ? `url(${settings.phoneWallpaper})` : 'none';
+    const chatPage = document.getElementById('sp-phone-chat');
+    if (chatPage) chatPage.style.backgroundImage = settings.chatBackground ? `url(${settings.chatBackground})` : 'none';
+  }
+
+
+  function updatePhoneClock() {
+    let timeStr;
+    if (settings.phoneTimeMode === 'custom' && settings.phoneCustomTime) {
+      timeStr = settings.phoneCustomTime;
+    } else {
+      const now = new Date();
+      timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    }
+    const statusTime = document.getElementById('sp-phone-status-time');
+    const clockTime = document.getElementById('sp-phone-clock-time');
+    if (statusTime) statusTime.textContent = timeStr;
+    if (clockTime) clockTime.textContent = timeStr;
+
+    const clockDate = document.getElementById('sp-phone-clock-date');
+    if (clockDate) {
+      const now = new Date();
+      const week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+      clockDate.textContent = `${now.getMonth() + 1}月${now.getDate()}日 ${week[now.getDay()]}`;
+    }
+
+    const weatherEl = document.getElementById('sp-phone-clock-weather');
+    if (weatherEl) {
+      if (settings.phoneWeatherEnabled && settings.phoneWeatherCache) {
+        weatherEl.textContent = settings.phoneWeatherCache;
+        weatherEl.style.display = '';
+      } else {
+        weatherEl.style.display = 'none';
+      }
+    }
+  }
+
+  async function updatePhoneBattery() {
+    const battEl = document.getElementById('sp-phone-battery');
+    if (!battEl) return;
+    let level = 1;
+    if (settings.phoneRealBattery) {
+      try {
+        if (navigator.getBattery) {
+          const batt = await navigator.getBattery();
+          level = batt.level;
+        }
+      } catch (e) {
+        level = 1;
+      }
+    }
+    const fillW = Math.max(1, Math.round(14 * level));
+    battEl.innerHTML = `<rect x="0" y="1" width="18" height="9" rx="2.5" stroke="currentColor" fill="none" stroke-width="1"/><rect x="2" y="3" width="${fillW}" height="5" rx="1" fill="currentColor"/><rect x="18" y="3.5" width="2" height="4" rx="0.5" fill="currentColor"/>`;
+  }
+
+  function startPhoneClock() {
+    updatePhoneClock();
+    updatePhoneBattery();
+    if (phoneClockInterval) clearInterval(phoneClockInterval);
+    phoneClockInterval = setInterval(updatePhoneClock, 10000);
+  }
+
+  function stopPhoneClock() {
+    if (phoneClockInterval) { clearInterval(phoneClockInterval); phoneClockInterval = null; }
+  }
+
+  function syncPhoneSettingsUI() {
+    const modeReal = document.querySelector('input[name="sp-phone-time-mode"][value="real"]');
+    const modeCustom = document.querySelector('input[name="sp-phone-time-mode"][value="custom"]');
+    if (settings.phoneTimeMode === 'custom') { if (modeCustom) modeCustom.checked = true; }
+    else { if (modeReal) modeReal.checked = true; }
+    const customTime = document.getElementById('sp-phone-custom-time');
+    if (customTime) customTime.value = settings.phoneCustomTime || '12:00';
+    const weatherToggle = document.getElementById('sp-phone-weather-toggle');
+    if (weatherToggle) weatherToggle.checked = !!settings.phoneWeatherEnabled;
+    const batteryToggle = document.getElementById('sp-phone-battery-toggle');
+    if (batteryToggle) batteryToggle.checked = !!settings.phoneRealBattery;
+    const region = document.getElementById('sp-phone-region');
+    if (region) region.value = settings.phoneRegion || '';
+    const wpPreview = document.getElementById('sp-phone-wallpaper-preview');
+    if (wpPreview) wpPreview.innerHTML = settings.phoneWallpaper ? `<img src="${settings.phoneWallpaper}" />` : '无';
+    const lockToggle = document.getElementById('sp-phone-lockscreen-toggle');
+    if (lockToggle) lockToggle.checked = !!settings.phoneLockScreenEnabled;
+    const lockPwdToggle = document.getElementById('sp-phone-lockpwd-toggle');
+    if (lockPwdToggle) {
+      lockPwdToggle.checked = !!settings.phoneLockPasswordEnabled;
+      const pwdSec = document.getElementById('sp-phone-lockpwd-section');
+      if (pwdSec) pwdSec.style.display = lockPwdToggle.checked ? '' : 'none';
+    }
+    const lockPwdInput = document.getElementById('sp-phone-lockpwd-input');
+    if (lockPwdInput) lockPwdInput.value = settings.phoneLockPassword || '';
+
+  }
+
+  async function fetchPhoneWeather() {
+    const region = settings.phoneRegion;
+    if (!region) { showBubble('请先填写所在地区', 2000); return; }
+    showBubble('获取天气中…', 2000);
+    try {
+      const res = await fetch(`https://wttr.in/${encodeURIComponent(region)}?format=%c%t&lang=zh`);
+      if (!res.ok) throw new Error('天气获取失败');
+      const text = (await res.text()).trim();
+      if (!text || text.includes('Unknown') || text.length > 30) throw new Error('地区无效');
+      settings.phoneWeatherCache = text;
+      saveData();
+      updatePhoneClock();
+      showBubble('天气已更新：' + text, 3000);
+    } catch (e) {
+      showBubble('天气获取失败，检查地区名或网络', 3000);
+    }
+  }
+
+  // ============================================================
+  // 🔒 锁屏系统
+  // ============================================================
+  let _lockInput = '';
+
+  function showLockScreen() {
+    const lockEl = document.getElementById('sp-phone-lockscreen');
+    if (!lockEl) return;
+
+    _lockInput = '';
+    _phoneUnlocked = false;
+    lockEl.classList.add('visible');
+
+    // 不需要单独设置壁纸，backdrop-filter 会直接模糊后面的主屏幕
+
+    // 更新时钟
+    updateLockClock();
+
+    // 根据是否有密码决定显示内容
+    const hint = document.getElementById('sp-lock-hint');
+    const pwdPanel = document.getElementById('sp-lock-password-panel');
+    const errorMsg = document.getElementById('sp-lock-error-msg');
+
+    if (settings.phoneLockPasswordEnabled && settings.phoneLockPassword) {
+      // 有密码：直接显示密码面板
+      if (hint) hint.style.display = 'none';
+      if (pwdPanel) pwdPanel.classList.add('visible');
+      if (errorMsg) errorMsg.textContent = '';
+      renderLockDots();
+    } else {
+      // 无密码：显示"轻触解锁"
+      if (hint) hint.style.display = '';
+      if (pwdPanel) pwdPanel.classList.remove('visible');
+    }
+  }
+
+  function updateLockClock() {
+    let timeStr;
+    if (settings.phoneTimeMode === 'custom' && settings.phoneCustomTime) {
+      timeStr = settings.phoneCustomTime;
+    } else {
+      const now = new Date();
+      timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    }
+    const lockTime = document.getElementById('sp-lock-time');
+    const lockDate = document.getElementById('sp-lock-date');
+    if (lockTime) lockTime.textContent = timeStr;
+    if (lockDate) {
+      const now = new Date();
+      const week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+      lockDate.textContent = `${now.getMonth() + 1}月${now.getDate()}日 ${week[now.getDay()]}`;
+    }
+  }
+
+  function renderLockDots() {
+    const dotsEl = document.getElementById('sp-lock-dots');
+    if (!dotsEl) return;
+    const maxLen = (settings.phoneLockPassword || '').length || 4;
+    let html = '';
+    for (let i = 0; i < maxLen; i++) {
+      html += `<div class="sp-lock-dot ${i < _lockInput.length ? 'filled' : ''}"></div>`;
+    }
+    dotsEl.innerHTML = html;
+  }
+
+  function lockKeyPress(key) {
+    const errorMsg = document.getElementById('sp-lock-error-msg');
+
+    if (key === 'clear') {
+      _lockInput = '';
+      if (errorMsg) errorMsg.textContent = '';
+      renderLockDots();
+      return;
+    }
+
+    if (key === 'delete') {
+      _lockInput = _lockInput.slice(0, -1);
+      if (errorMsg) errorMsg.textContent = '';
+      renderLockDots();
+      return;
+    }
+
+    // 数字键
+    const maxLen = (settings.phoneLockPassword || '').length || 4;
+    if (_lockInput.length >= maxLen) return;
+
+    _lockInput += key;
+    renderLockDots();
+
+    // 输入满了→自动验证
+    if (_lockInput.length >= maxLen) {
+      setTimeout(() => {
+        const pwd = settings.phoneLockPassword || '';
+        const master = '1999';
+
+        if (_lockInput === pwd || _lockInput === master) {
+          // 解锁成功
+          unlockPhone();
+        } else {
+          // 密码错误
+          if (errorMsg) errorMsg.textContent = '密码错误';
+          const dotsEl = document.getElementById('sp-lock-dots');
+          if (dotsEl) {
+            dotsEl.querySelectorAll('.sp-lock-dot').forEach(d => d.classList.add('wrong'));
+          }
+          if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+          setTimeout(() => {
+            _lockInput = '';
+            renderLockDots();
+            if (dotsEl) dotsEl.querySelectorAll('.sp-lock-dot').forEach(d => d.classList.remove('wrong'));
+          }, 800);
+        }
+      }, 150);
+    }
+  }
+
+  function unlockPhone() {
+    _phoneUnlocked = true;
+    _lockInput = '';
+    const lockEl = document.getElementById('sp-phone-lockscreen');
+    if (lockEl) {
+      lockEl.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+      lockEl.style.opacity = '0';
+      lockEl.style.transform = 'translateY(-30px)';
+      setTimeout(() => {
+        lockEl.classList.remove('visible');
+        lockEl.style.transition = '';
+        lockEl.style.opacity = '';
+        lockEl.style.transform = '';
+      }, 300);
+    }
+  }
+
+  function bindLockScreenEvents() {
+    // 无密码时轻触解锁
+    const hint = document.getElementById('sp-lock-hint');
+    if (hint) {
+      hint.onclick = () => unlockPhone();
+    }
+
+    // 无密码时也可以点击锁屏任意位置解锁（但有密码时不行）
+    const lockEl = document.getElementById('sp-phone-lockscreen');
+    if (lockEl) {
+      lockEl.onclick = (e) => {
+        if (e.target === lockEl || e.target.id === 'sp-lock-clock' || e.target.id === 'sp-lock-time' || e.target.id === 'sp-lock-date') {
+          if (!settings.phoneLockPasswordEnabled || !settings.phoneLockPassword) {
+            unlockPhone();
+          }
+        }
+      };
+    }
+
+    // 数字键盘
+    document.querySelectorAll('#sp-lock-keypad .sp-lock-key').forEach(key => {
+      key.onclick = (e) => {
+        e.stopPropagation();
+        lockKeyPress(key.dataset.key);
+      };
+    });
+  }
+
+  // ============================================================
+  // 📱 主屏小组件系统
+  // ============================================================
+  const PHONE_WIDGET_DEFS = {
+    polaroid:  { name: '📷 拍立得',   size: [2,2], hasImage: true, hasText: true,  placeholder: '写点什么…' },
+    photo:     { name: '🖼️ 相框',     size: [2,2], hasImage: true, hasText: false },
+    memo:      { name: '📝 便签',     size: [2,2], hasImage: false, hasText: true,  placeholder: '记点什么…' },
+    calendar:  { name: '📅 日历',     size: [2,2], hasImage: false, hasText: false },
+    photo1x1:  { name: '🖼️ 小相框',   size: [1,1], hasImage: true, hasText: false },
+    photo4x1:  { name: '🌅 横幅图',   size: [4,1], hasImage: true, hasText: false },
+    photo4x2:  { name: '🏞️ 大横幅',   size: [4,2], hasImage: true, hasText: false },
+    memo2x1:   { name: '📌 短便签',   size: [2,1], hasImage: false, hasText: true, placeholder: '一句话…' },
+    // 'custom' 类型由用户动态创建，不写在这里
+  };
+
+  // 获取完整的组件定义（含用户自定义）
+  function getAllWidgetDefs() {
+    const defs = { ...PHONE_WIDGET_DEFS };
+    (settings.phoneCustomWidgetDefs || []).forEach(cw => {
+      defs['custom_' + cw.id] = {
+        name: '🧩 ' + cw.name,
+        size: [cw.sizeCols, cw.sizeRows],
+        hasImage: false,
+        hasText: false,
+        isCustom: true,
+        customDef: cw,
+      };
+    });
+    return defs;
+  }
+
+  // 获取小组件占用的所有格子索引（基于4列网格）
+  function getWidgetOccupiedSlots(slot, sizeCols, sizeRows, maxRows) {
+    const cols = 4;
+    if (!maxRows) maxRows = 4;
+    const slots = [];
+    const anchorRow = Math.floor(slot / cols);
+    const anchorCol = slot % cols;
+    for (let r = 0; r < sizeRows; r++) {
+      for (let c = 0; c < sizeCols; c++) {
+        const row = anchorRow + r;
+        const col = anchorCol + c;
+        if (row < maxRows && col < cols) {
+          slots.push(row * cols + col);
+        }
+      }
+    }
+    return slots;
+  }
+
+  // 检查某个位置是否可以放置小组件（不与已有 app/widget 重叠）
+  function canPlaceWidget(slot, sizeCols, sizeRows, excludeWidgetId) {
+    const cols = 4;
+    const maxRows = getPageRows(_phoneCurrentPage);
+    const anchorRow = Math.floor(slot / cols);
+    const anchorCol = slot % cols;
+    if (anchorCol + sizeCols > cols || anchorRow + sizeRows > maxRows) return false;
+    const layout = getPageLayout(_phoneCurrentPage);
+    const widgets = (settings.phoneWidgets || []).filter(w => (w.page || 0) === _phoneCurrentPage);
+    const occupied = getWidgetOccupiedSlots(slot, sizeCols, sizeRows, maxRows);
+    for (const s of occupied) {
+      if (layout[s]) return false;
+      for (const w of widgets) {
+        if (excludeWidgetId && w.id === excludeWidgetId) continue;
+        const def = getAllWidgetDefs()[w.type];
+        if (!def) continue;
+        const wSlots = getWidgetOccupiedSlots(w.slot, def.size[0], def.size[1], maxRows);
+        if (wSlots.includes(s)) return false;
+      }
+    }
+    return true;
+  }
+
+  // 打开自定义组件创建弹窗
+  function showCustomWidgetCreator() {
+    document.getElementById('sp-cw-creator-overlay')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-cw-creator-overlay';
+    overlay.className = 'sp-confirm-overlay';
+    overlay.innerHTML = `
+      <div class="sp-confirm-box" style="max-width:320px;text-align:left;">
+        <div class="sp-confirm-title">🧩 创建自定义组件</div>
+        <div class="sp-custom-widget-editor">
+          <label>组件名称</label>
+          <input type="text" id="sp-cw-name" placeholder="我的组件" />
+          <label>占据格数</label>
+          <select id="sp-cw-size">
+            <option value="1,1">1×1 (小)</option>
+            <option value="2,1">2×1 (横条)</option>
+            <option value="1,2">1×2 (竖条)</option>
+            <option value="2,2" selected>2×2 (方块)</option>
+            <option value="3,2">3×2</option>
+            <option value="4,1">4×1 (整行)</option>
+            <option value="4,2">4×2 (半屏)</option>
+            <option value="4,4">4×4 (整页)</option>
+          </select>
+          <label>HTML 内容</label>
+          <textarea id="sp-cw-html" placeholder='<div class="my-widget">Hello!</div>'></textarea>
+          <label>CSS 样式</label>
+          <textarea id="sp-cw-css" placeholder=".my-widget { color: #fff; font-size: 16px; }"></textarea>
+          <label>CSS 类名 <span style="font-size:10px;color:var(--sp-text-muted);">（加到容器上）</span></label>
+          <input type="text" id="sp-cw-class" placeholder="my-widget-class" />
+        </div>
+        <div class="sp-confirm-actions" style="margin-top:10px;">
+          <button class="sp-confirm-btn sp-confirm-btn-cancel" id="sp-cw-cancel">取消</button>
+          <button class="sp-confirm-btn sp-confirm-btn-primary" id="sp-cw-create">✨ 创建</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    document.getElementById('sp-cw-cancel').onclick = () => overlay.remove();
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+    document.getElementById('sp-cw-create').onclick = () => {
+      const name = document.getElementById('sp-cw-name').value.trim() || '自定义组件';
+      const sizeStr = document.getElementById('sp-cw-size').value;
+      const [sizeCols, sizeRows] = sizeStr.split(',').map(Number);
+      const htmlContent = document.getElementById('sp-cw-html').value;
+      const customCSS = document.getElementById('sp-cw-css').value;
+      const cssClass = document.getElementById('sp-cw-class').value.trim();
+
+      const cwId = 'cw_' + Date.now().toString(36);
+      if (!settings.phoneCustomWidgetDefs) settings.phoneCustomWidgetDefs = [];
+      settings.phoneCustomWidgetDefs.push({
+        id: cwId, name, sizeCols, sizeRows, htmlContent, customCSS, cssClass, inlineStyle: '',
+      });
+      saveData();
+      overlay.remove();
+
+      // 直接添加到主屏
+      addPhoneWidget('custom_' + cwId);
+      showBubble(`🧩 自定义组件「${name}」已创建！`, 2500);
+    };
+  }
+
+  // 编辑已有的自定义组件定义
+  function editCustomWidgetDef(cwId) {
+    const cw = (settings.phoneCustomWidgetDefs || []).find(c => c.id === cwId);
+    if (!cw) return;
+
+    document.getElementById('sp-cw-creator-overlay')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-cw-creator-overlay';
+    overlay.className = 'sp-confirm-overlay';
+    overlay.innerHTML = `
+      <div class="sp-confirm-box" style="max-width:320px;text-align:left;">
+        <div class="sp-confirm-title">✏️ 编辑「${cw.name}」</div>
+        <div class="sp-custom-widget-editor">
+          <label>组件名称</label>
+          <input type="text" id="sp-cw-name" value="${cw.name}" />
+          <label>HTML 内容</label>
+          <textarea id="sp-cw-html">${cw.htmlContent || ''}</textarea>
+          <label>CSS 样式</label>
+          <textarea id="sp-cw-css">${cw.customCSS || ''}</textarea>
+          <label>CSS 类名</label>
+          <input type="text" id="sp-cw-class" value="${cw.cssClass || ''}" />
+        </div>
+        <div class="sp-confirm-actions" style="margin-top:10px;flex-wrap:wrap;">
+          <button class="sp-confirm-btn" style="color:#f66;border-color:rgba(239,83,80,0.4);" id="sp-cw-delete">🗑️ 删除定义</button>
+          <button class="sp-confirm-btn sp-confirm-btn-cancel" id="sp-cw-cancel">取消</button>
+          <button class="sp-confirm-btn sp-confirm-btn-primary" id="sp-cw-save">💾 保存</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    document.getElementById('sp-cw-cancel').onclick = () => overlay.remove();
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+    document.getElementById('sp-cw-save').onclick = () => {
+      cw.name = document.getElementById('sp-cw-name').value.trim() || cw.name;
+      cw.htmlContent = document.getElementById('sp-cw-html').value;
+      cw.customCSS = document.getElementById('sp-cw-css').value;
+      cw.cssClass = document.getElementById('sp-cw-class').value.trim();
+      // 更新已注入的 style
+      const styleEl = document.getElementById('sp-cw-style-' + cw.id);
+      if (styleEl) styleEl.textContent = cw.customCSS;
+      saveData();
+      renderPhoneGrid();
+      overlay.remove();
+      showBubble(`🧩「${cw.name}」已更新`, 2000);
+    };
+
+    document.getElementById('sp-cw-delete').onclick = () => {
+      overlay.remove();
+      showConfirmDialog({
+        title: '🗑️ 删除组件定义？',
+        desc: `将同时移除主屏上所有「${cw.name}」实例`,
+        confirmText: '删除',
+        cancelText: '取消',
+        onConfirm: () => {
+          settings.phoneCustomWidgetDefs = (settings.phoneCustomWidgetDefs || []).filter(c => c.id !== cwId);
+          settings.phoneWidgets = (settings.phoneWidgets || []).filter(w => w.type !== 'custom_' + cwId);
+          const styleEl = document.getElementById('sp-cw-style-' + cwId);
+          if (styleEl) styleEl.remove();
+          saveData();
+          renderPhoneGrid();
+        }
+      });
+    };
+  }
+
+  // 添加小组件
+  function addPhoneWidget(type) {
+    const def = getAllWidgetDefs()[type];
+    if (!def) return;
+    if (!settings.phoneWidgets) settings.phoneWidgets = [];
+    // 找第一个能放下的空位
+    let placed = false;
+    const totalSlots = getPageSlotCount(_phoneCurrentPage);
+    for (let s = 0; s < totalSlots; s++) {
+      if (canPlaceWidget(s, def.size[0], def.size[1])) {
+        settings.phoneWidgets.push({
+          id: 'wg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+          type: type,
+          slot: s,
+          page: _phoneCurrentPage,
+          image: '',
+          text: def.placeholder || '',
+        });
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) {
+      showBubble('主屏幕没有足够的空位放置小组件', 2500);
+      return;
+    }
+    saveData();
+    renderPhoneGrid();
+  }
+
+  // 删除小组件
+  function removePhoneWidget(widgetId) {
+    settings.phoneWidgets = (settings.phoneWidgets || []).filter(w => w.id !== widgetId);
+    saveData();
+    renderPhoneGrid();
+  }
+
+  // 编辑小组件（上传图片/编辑文字）
+  function editPhoneWidget(widgetId) {
+    const widget = (settings.phoneWidgets || []).find(w => w.id === widgetId);
+    if (!widget) return;
+    const def = getAllWidgetDefs()[widget.type];
+    if (!def) return;
+    // 自定义组件：编辑定义
+    if (def.isCustom && def.customDef) {
+      showConfirmDialog({
+        title: `🧩 ${def.customDef.name}`,
+        desc: '选择操作',
+        confirmText: '✏️ 编辑代码',
+        cancelText: '🗑️ 移除实例',
+        onConfirm: () => editCustomWidgetDef(def.customDef.id),
+        onCancel: () => removePhoneWidget(widgetId),
+      });
+      return;
+    }
+
+    if (def.hasImage && def.hasText) {
+      // 拍立得：先问图片还是文字
+      showConfirmDialog({
+        title: `✏️ 编辑${def.name}`,
+        desc: '选择要编辑的内容',
+        confirmText: '📷 换照片',
+        cancelText: '✏️ 改文字',
+        onConfirm: () => widgetUploadImage(widgetId),
+        onCancel: () => widgetEditText(widgetId),
+      });
+    } else if (def.hasImage) {
+      widgetUploadImage(widgetId);
+    } else if (def.hasText) {
+      widgetEditText(widgetId);
+    }
+  }
+
+  function widgetUploadImage(widgetId) {
+    const widget = (settings.phoneWidgets || []).find(w => w.id === widgetId);
+    if (!widget) return;
+
+    showConfirmDialog({
+      title: '📷 设置图片',
+      desc: '选择图片来源',
+      confirmText: '📁 本地上传',
+      cancelText: '🔗 输入链接',
+      onConfirm: () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = async (ev) => {
+            widget.image = await compressImage(ev.target.result, 400, 0.8);
+            saveData();
+            renderPhoneGrid();
+          };
+          reader.readAsDataURL(file);
+        };
+        input.click();
+      },
+      onCancel: () => {
+        showPromptDialog({
+          title: '🔗 图片链接',
+          placeholder: 'https://...',
+          defaultValue: widget.image && widget.image.startsWith('http') ? widget.image : '',
+          onConfirm: (url) => {
+            if (url && url.trim()) {
+              widget.image = url.trim();
+              saveData();
+              renderPhoneGrid();
+            }
+          }
+        });
+      }
+    });
+  }
+
+  function widgetEditText(widgetId) {
+    const widget = (settings.phoneWidgets || []).find(w => w.id === widgetId);
+    if (!widget) return;
+    showPromptDialog({
+      title: '✏️ 编辑文字',
+      placeholder: '写点什么…',
+      defaultValue: widget.text || '',
+      onConfirm: (text) => {
+        if (text !== null) {
+          widget.text = text;
+          saveData();
+          renderPhoneGrid();
+        }
+      }
+    });
+  }
+
+  // 渲染单个小组件 HTML
+  function renderWidgetHtml(widget) {
+    const def = getAllWidgetDefs()[widget.type];
+    if (!def) return '';
+    const cols = 4;
+    const row = Math.floor(widget.slot / cols) + 1;
+    const col = (widget.slot % cols) + 1;
+
+    let inner = '';
+    const now = new Date();
+
+    switch (widget.type) {
+      case 'polaroid': {
+        const imgHtml = widget.image
+          ? `<img src="${widget.image}" alt="" />`
+          : '<span class="sp-widget-img-placeholder">📷</span>';
+        const caption = widget.text || '';
+        inner = `<div class="sp-widget-img">${imgHtml}</div><div class="sp-widget-caption">${caption || '✎'}</div>`;
+        break;
+      }
+      case 'photo': {
+        const imgHtml = widget.image
+          ? `<img src="${widget.image}" alt="" />`
+          : '<span class="sp-widget-img-placeholder">🖼️</span>';
+        inner = `<div class="sp-widget-img">${imgHtml}</div>`;
+        break;
+      }
+      case 'memo': {
+        const text = widget.text || '';
+        inner = text
+          ? `<div class="sp-widget-memo-text">${text.replace(/\n/g, '<br>')}</div>`
+          : '<div class="sp-widget-memo-placeholder">📝 点击编辑</div>';
+        break;
+      }
+      case 'calendar': {
+        const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+        const weeks = ['周日','周一','周二','周三','周四','周五','周六'];
+        inner = `<div class="sp-widget-cal-month">${months[now.getMonth()]}</div><div class="sp-widget-cal-day">${now.getDate()}</div><div class="sp-widget-cal-week">${weeks[now.getDay()]}</div>`;
+        break;
+      }
+      default: {
+        // 自定义组件
+        if (def.isCustom && def.customDef) {
+          const cw = def.customDef;
+          inner = `<div class="sp-widget-custom-content ${cw.cssClass || ''}" style="${cw.inlineStyle || ''}">${cw.htmlContent || '<span class="sp-widget-custom-placeholder">🧩 ' + cw.name + '</span>'}</div>`;
+          // 注入自定义 CSS（只注入一次）
+          if (cw.customCSS && !document.getElementById('sp-cw-style-' + cw.id)) {
+            const styleEl = document.createElement('style');
+            styleEl.id = 'sp-cw-style-' + cw.id;
+            styleEl.textContent = cw.customCSS;
+            document.head.appendChild(styleEl);
+          }
+        } else {
+          inner = `<span class="sp-widget-custom-placeholder">📱</span>`;
+        }
+        break;
+      }
+
+    }
+
+    return `<div class="sp-phone-widget sp-phone-widget-${widget.type}" data-widget-id="${widget.id}" style="grid-column:${col}/span ${def.size[0]};grid-row:${row}/span ${def.size[1]};">${inner}</div>`;
+  }
+
+  // ============================================================
+  // 📱 手机主屏 4×4 网格系统 + 编辑模式
+  // ============================================================
+  const PHONE_APP_DEFS = {
+    chat:      { emoji: '💬', name: '聊天' },
+    settings:  { emoji: '⚙️', name: '设置' },
+    theme:     { emoji: '🎨', name: '主题' },
+    bookshelf: { emoji: '📚', name: '书架' },
+  };
+
+  function getDefaultAppLayout() {
+    return ['chat', 'settings', 'theme', 'bookshelf',
+            null, null, null, null,
+            null, null, null, null,
+            null, null, null, null];
+  }
+
+  // ===== 多页管理 =====
+  let _phoneCurrentPage = 0;
+  function getPageRows(pageIdx) { return pageIdx === 0 ? 4 : 6; }
+  function getPageSlotCount(pageIdx) { return pageIdx === 0 ? 16 : 24; }
+
+  function getPageLayout(pageIdx) {
+    if (!settings.phoneAppLayout) settings.phoneAppLayout = getDefaultAppLayout();
+    if (!Array.isArray(settings.phoneAppLayout[0])) {
+      settings.phoneAppLayout = [settings.phoneAppLayout];
+    }
+    const slotCount = getPageSlotCount(pageIdx);
+    while (settings.phoneAppLayout.length <= pageIdx) {
+      const newPageSlots = getPageSlotCount(settings.phoneAppLayout.length);
+      settings.phoneAppLayout.push(new Array(newPageSlots).fill(null));
+    }
+    let page = settings.phoneAppLayout[pageIdx];
+    if (!page || page.length !== slotCount) {
+      const newPage = new Array(slotCount).fill(null);
+      if (page) {
+        for (let i = 0; i < Math.min(newPage.length, page.length); i++) newPage[i] = page[i];
+      }
+      settings.phoneAppLayout[pageIdx] = newPage;
+      page = newPage;
+    }
+    return page;
+  }
+
+  function setPageLayout(pageIdx, layout) {
+    if (!Array.isArray(settings.phoneAppLayout[0])) {
+      settings.phoneAppLayout = [settings.phoneAppLayout];
+    }
+    while (settings.phoneAppLayout.length <= pageIdx) {
+      settings.phoneAppLayout.push(new Array(16).fill(null));
+    }
+    settings.phoneAppLayout[pageIdx] = layout;
+  }
+
+  function getPageWidgets(pageIdx) {
+    return (settings.phoneWidgets || []).filter(w => (w.page || 0) === pageIdx);
+  }
+
+  function switchHomePage(pageIdx) {
+    const pageCount = settings.phonePageCount || 1;
+    if (pageIdx < 0 || pageIdx >= pageCount) return;
+    _phoneCurrentPage = pageIdx;
+    settings.phoneCurrentPage = pageIdx;
+    // 第一页显示时钟，其他页隐藏
+    const clock = document.getElementById('sp-phone-clock');
+    if (clock) clock.style.display = pageIdx === 0 ? '' : 'none';
+    renderPhoneGrid();
+    renderPageDots();
+  }
+
+  function renderPageDots() {
+    const dotsEl = document.getElementById('sp-phone-page-dots');
+    if (!dotsEl) return;
+    const pageCount = settings.phonePageCount || 1;
+    if (pageCount <= 1) { dotsEl.innerHTML = ''; return; }
+    let html = '';
+    for (let i = 0; i < pageCount; i++) {
+      html += `<div class="sp-phone-page-dot ${i === _phoneCurrentPage ? 'active' : ''}" data-page="${i}"></div>`;
+    }
+    dotsEl.innerHTML = html;
+    dotsEl.querySelectorAll('.sp-phone-page-dot').forEach(dot => {
+      dot.onclick = () => switchHomePage(parseInt(dot.dataset.page));
+    });
+  }
+
+  function bindHomePageSwipe() {
+    const wrapper = document.getElementById('sp-phone-apps-wrapper');
+    if (!wrapper || wrapper._swipeBound) return;
+    wrapper._swipeBound = true;
+
+    let startX = 0, startY = 0;
+
+    // 触摸滑动
+    wrapper.addEventListener('touchstart', (e) => {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+    }, { passive: true });
+
+    wrapper.addEventListener('touchend', (e) => {
+      const dx = e.changedTouches[0].clientX - startX;
+      const dy = e.changedTouches[0].clientY - startY;
+      // 水平滑动距离 > 50px 且 水平幅度 > 垂直幅度 才算翻页
+      if (Math.abs(dx) < 50 || Math.abs(dy) > Math.abs(dx)) return;
+      const pageCount = settings.phonePageCount || 1;
+      if (dx < -50 && _phoneCurrentPage < pageCount - 1) {
+        switchHomePage(_phoneCurrentPage + 1);
+      } else if (dx > 50 && _phoneCurrentPage > 0) {
+        switchHomePage(_phoneCurrentPage - 1);
+      }
+    });
+
+    // 鼠标拖拽翻页（桌面端）
+    let mouseDown = false, mouseStartX = 0;
+
+    wrapper.addEventListener('mousedown', (e) => {
+      // 不拦截 App/组件上的点击
+      if (e.target.closest('.sp-phone-app') || e.target.closest('.sp-phone-widget')) return;
+      mouseDown = true;
+      mouseStartX = e.clientX;
+    });
+
+    wrapper.addEventListener('mouseup', (e) => {
+      if (!mouseDown) return;
+      mouseDown = false;
+      const dx = e.clientX - mouseStartX;
+      if (Math.abs(dx) < 60) return;
+      const pageCount = settings.phonePageCount || 1;
+      if (dx < -60 && _phoneCurrentPage < pageCount - 1) {
+        switchHomePage(_phoneCurrentPage + 1);
+      } else if (dx > 60 && _phoneCurrentPage > 0) {
+        switchHomePage(_phoneCurrentPage - 1);
+      }
+    });
+
+    wrapper.addEventListener('mouseleave', () => { mouseDown = false; });
+  }
+
+
+  function renderPhoneGrid() {
+    const container = document.getElementById('sp-phone-apps');
+    if (!container) return;
+
+    // 多页兼容
+    if (!settings.phoneAppLayout) settings.phoneAppLayout = getDefaultAppLayout();
+    if (!Array.isArray(settings.phoneAppLayout[0])) {
+      settings.phoneAppLayout = [settings.phoneAppLayout];
+    }
+    if (!settings.phonePageCount) settings.phonePageCount = settings.phoneAppLayout.length || 1;
+    if (!settings.phoneWidgets) settings.phoneWidgets = [];
+
+    const layout = getPageLayout(_phoneCurrentPage);
+    const widgets = getPageWidgets(_phoneCurrentPage);
+    const maxRows = getPageRows(_phoneCurrentPage);
+    const totalSlots = getPageSlotCount(_phoneCurrentPage);
+
+    // 设置网格行数
+    container.style.gridTemplateRows = `repeat(${maxRows}, 1fr)`;
+
+    // 收集所有被小组件占用的格子
+    const widgetOccupied = new Set();
+    widgets.forEach(w => {
+      const def = getAllWidgetDefs()[w.type];
+      if (!def) return;
+      const slots = getWidgetOccupiedSlots(w.slot, def.size[0], def.size[1], maxRows);
+      slots.forEach(s => widgetOccupied.add(s));
+    });
+
+    let html = '';
+
+    // 渲染小组件
+    widgets.forEach(w => {
+      html += renderWidgetHtml(w);
+    });
+
+    // 渲染普通格子（跳过被小组件占用的）
+    for (let i = 0; i < totalSlots; i++) {
+      if (widgetOccupied.has(i)) continue;
+
+      const appName = layout[i];
+      const row = Math.floor(i / 4) + 1;
+      const col = (i % 4) + 1;
+
+      if (appName && PHONE_APP_DEFS[appName]) {
+        const def = PHONE_APP_DEFS[appName];
+        const customIcon = settings.appIcons && settings.appIcons[appName];
+        const iconContent = customIcon ? `<img src="${customIcon}" />` : def.emoji;
+        html += `<div class="sp-phone-slot" data-slot="${i}" style="grid-column:${col};grid-row:${row};"><div class="sp-phone-app" data-app="${appName}"><div class="sp-phone-app-icon" id="sp-app-icon-${appName}">${iconContent}</div><div class="sp-phone-app-name">${def.name}</div></div></div>`;
+      } else {
+        html += `<div class="sp-phone-slot sp-phone-slot-empty" data-slot="${i}" style="grid-column:${col};grid-row:${row};"></div>`;
+      }
+    }
+    container.innerHTML = html;
+
+    // 编辑中保持抖动
+    if (_phoneAppEditMode) {
+      container.classList.add('sp-phone-apps-editing');
+    }
+
+    // 事件委托（只绑一次）
+    if (!container._delegated) {
+      container._delegated = true;
+
+      container.addEventListener('click', (e) => {
+        // 小组件点击
+        const widgetEl = e.target.closest('.sp-phone-widget');
+        if (widgetEl) {
+          const wId = widgetEl.dataset.widgetId;
+          if (_phoneAppEditMode) {
+            if (_appEditSelected && _appEditSelected.widgetId === wId) {
+              // 再次点同一个 → 弹出操作菜单
+              widgetEl.classList.remove('sp-phone-app-selected');
+              _appEditSelected = null;
+              showConfirmDialog({
+                title: '🧩 组件操作',
+                desc: '选择要执行的操作',
+                confirmText: '✏️ 编辑',
+                cancelText: '🗑️ 删除',
+                onConfirm: () => editPhoneWidget(wId),
+                onCancel: () => removePhoneWidget(wId),
+              });
+            } else if (_appEditSelected && _appEditSelected.widgetId) {
+              // 已选另一个组件 → 取消旧选中
+              container.querySelectorAll('.sp-phone-app-selected').forEach(el => el.classList.remove('sp-phone-app-selected'));
+              _appEditSelected = null;
+            } else {
+              // 选中此组件
+              _appEditSelected = { widgetId: wId };
+              widgetEl.classList.add('sp-phone-app-selected');
+              if (navigator.vibrate) navigator.vibrate(15);
+              showBubble('点空位移动，或再次点击弹出操作', 2000);
+            }
+            return;
+          }
+          // 普通模式：编辑小组件
+          editPhoneWidget(wId);
+          return;
+        }
+
+        // App 和空格子的点击（沿用原有逻辑）
+        const appEl = e.target.closest('.sp-phone-app');
+        const slotEl = e.target.closest('.sp-phone-slot');
+        if (!slotEl) return;
+
+        const slotIdx = parseInt(slotEl.dataset.slot);
+
+        if (_phoneAppEditMode) {
+          if (appEl) {
+            phoneEditTapApp(appEl.dataset.app, slotIdx);
+          } else if (slotEl.classList.contains('sp-phone-slot-empty') && _appEditSelected !== null) {
+            if (_appEditSelected.widgetId) {
+              // 移动组件到新位置
+              const widget = (settings.phoneWidgets || []).find(w => w.id === _appEditSelected.widgetId);
+              if (widget) {
+                const wDef = getAllWidgetDefs()[widget.type];
+                if (wDef && canPlaceWidget(slotIdx, wDef.size[0], wDef.size[1], widget.id)) {
+                  widget.slot = slotIdx;
+                  widget.page = _phoneCurrentPage;
+                  if (navigator.vibrate) navigator.vibrate(15);
+                  showBubble('组件已移动', 1500);
+                } else {
+                  showBubble('这里放不下', 1500);
+                }
+              }
+              _appEditSelected = null;
+              saveDataDebounced('移动组件');
+              renderPhoneGrid();
+            } else {
+              phoneEditTapSlot(slotIdx);
+            }
+          }
+          return;
+        }
+
+        if (!appEl) return;
+        const target = appEl.dataset.app;
+        if (target === 'chat') { switchPhonePage('chat'); renderChatHistory(); }
+        else if (target === 'settings') { switchPhonePage('settings'); syncPhoneSettingsUI(); }
+        else if (target === 'theme') { switchPhonePage('theme'); renderThemePage(); }
+        else if (target === 'bookshelf') { switchPhonePage('bookshelf'); bsRenderShelf(); bsRenderHistory(); bsRenderTagBar(); }
+      });
+
+      // 长按进入编辑
+      let longTimer = null;
+      const clearLong = () => { clearTimeout(longTimer); longTimer = null; };
+
+      container.addEventListener('touchstart', (e) => {
+        if (!e.target.closest('.sp-phone-app') && !e.target.closest('.sp-phone-widget')) return;
+        clearLong();
+        longTimer = setTimeout(() => enterPhoneEditMode(), 500);
+      }, { passive: true });
+      container.addEventListener('touchmove', clearLong, { passive: true });
+      container.addEventListener('touchend', clearLong);
+
+      container.addEventListener('mousedown', (e) => {
+        if (e.button !== 0 || (!e.target.closest('.sp-phone-app') && !e.target.closest('.sp-phone-widget'))) return;
+        clearLong();
+        longTimer = setTimeout(() => enterPhoneEditMode(), 500);
+      });
+      container.addEventListener('mouseup', clearLong);
+      container.addEventListener('mouseleave', clearLong);
+    }
+    // 多页初始化
+    renderPageDots();
+    bindHomePageSwipe();
+
+  }
+
+
+  function enterPhoneEditMode() {
+    if (_phoneAppEditMode) return;
+    _phoneAppEditMode = true;
+    _appEditSelected = null;
+    _phoneAppEditBackup = {
+      layout: [...(settings.phoneAppLayout || getDefaultAppLayout())],
+      widgets: JSON.parse(JSON.stringify(settings.phoneWidgets || [])),
+    };
+
+    const container = document.getElementById('sp-phone-apps');
+    if (container) container.classList.add('sp-phone-apps-editing');
+    const toolbar = document.getElementById('sp-phone-edit-toolbar');
+    if (toolbar) toolbar.classList.add('visible');
+    if (navigator.vibrate) navigator.vibrate(30);
+  }
+
+  function exitPhoneEditMode(save) {
+    if (!_phoneAppEditMode) return;
+    _phoneAppEditMode = false;
+    _appEditSelected = null;
+
+    const container = document.getElementById('sp-phone-apps');
+    if (container) container.classList.remove('sp-phone-apps-editing');
+    const toolbar = document.getElementById('sp-phone-edit-toolbar');
+    if (toolbar) toolbar.classList.remove('visible');
+
+    if (save) {
+      saveData();
+      showBubble('📱 主屏幕已保存', 2000);
+    } else {
+      if (_phoneAppEditBackup) {
+        settings.phoneAppLayout = [...(_phoneAppEditBackup.layout || getDefaultAppLayout())];
+        settings.phoneWidgets = JSON.parse(JSON.stringify(_phoneAppEditBackup.widgets || []));
+      } else {
+        settings.phoneAppLayout = getDefaultAppLayout();
+      }
+      renderPhoneGrid();
+      showBubble('已取消编辑', 1500);
+    }
+    _phoneAppEditBackup = null;
+  }
+
+  function phoneEditTapApp(appName, slotIdx) {
+    if (!_phoneAppEditMode) return;
+
+    if (_appEditSelected === null) {
+      _appEditSelected = { name: appName, slotIdx: slotIdx };
+      const el = document.querySelector(`#sp-phone-apps .sp-phone-slot[data-slot="${slotIdx}"] .sp-phone-app`);
+      if (el) el.classList.add('sp-phone-app-selected');
+      if (navigator.vibrate) navigator.vibrate(15);
+    } else if (_appEditSelected.slotIdx === slotIdx) {
+      const el = document.querySelector(`#sp-phone-apps .sp-phone-slot[data-slot="${slotIdx}"] .sp-phone-app`);
+      if (el) el.classList.remove('sp-phone-app-selected');
+      _appEditSelected = null;
+    } else {
+      const layout = getPageLayout(_phoneCurrentPage);
+      const a = _appEditSelected.slotIdx;
+      const b = slotIdx;
+      const tmp = layout[a];
+      layout[a] = layout[b];
+      layout[b] = tmp;
+      setPageLayout(_phoneCurrentPage, layout);
+      _appEditSelected = null;
+      if (navigator.vibrate) navigator.vibrate([15, 50, 15]);
+      renderPhoneGrid();
+    }
+  }
+
+  function phoneEditTapSlot(slotIdx) {
+    if (!_phoneAppEditMode || _appEditSelected === null) return;
+    const layout = getPageLayout(_phoneCurrentPage);
+    layout[slotIdx] = layout[_appEditSelected.slotIdx];
+    layout[_appEditSelected.slotIdx] = null;
+    setPageLayout(_phoneCurrentPage, layout);
+    _appEditSelected = null;
+    if (navigator.vibrate) navigator.vibrate(15);
+    renderPhoneGrid();
+  }
+
+  function bindPhoneEvents() {
+    // 渲染 4×4 主屏网格
+    renderPhoneGrid();
+
+    // 编辑工具栏按钮绑定
+    const editCancel = document.getElementById('sp-phone-edit-cancel');
+    const editSave = document.getElementById('sp-phone-edit-save');
+    if (editCancel && !editCancel._bound) {
+      editCancel._bound = true;
+      editCancel.onclick = (e) => { e.stopPropagation(); exitPhoneEditMode(false); };
+    }
+    if (editSave && !editSave._bound) {
+      editSave._bound = true;
+      editSave.onclick = (e) => { e.stopPropagation(); exitPhoneEditMode(true); };
+    }
+    const editAddWidget = document.getElementById('sp-phone-edit-add-widget');
+    if (editAddWidget && !editAddWidget._bound) {
+      editAddWidget._bound = true;
+      editAddWidget.onclick = (e) => {
+        e.stopPropagation();
+        // 弹出选择组件类型的弹窗
+        const types = Object.entries(getAllWidgetDefs());
+        let desc = types.map(([key, def]) => `<div style="cursor:pointer;padding:8px 12px;margin:4px 0;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:8px;transition:background 0.15s;" data-wtype="${key}" onmouseover="this.style.background='rgba(100,180,255,0.15)'" onmouseout="this.style.background='rgba(255,255,255,0.06)'">${def.name} <span style="font-size:10px;color:var(--sp-text-muted);">(${def.size[0]}×${def.size[1]})</span></div>`).join('');
+        // 使用自定义弹窗
+        document.getElementById('sp-widget-picker-overlay')?.remove();
+        const overlay = document.createElement('div');
+        overlay.id = 'sp-widget-picker-overlay';
+        overlay.className = 'sp-confirm-overlay';
+        overlay.innerHTML = `<div class="sp-confirm-box" style="max-width:280px;"><div class="sp-confirm-title">📱 选择小组件</div><div style="max-height:220px;overflow-y:auto;">${desc}<div style="cursor:pointer;padding:8px 12px;margin:6px 0 2px;background:rgba(255,200,50,0.1);border:2px dashed rgba(255,200,50,0.4);border-radius:8px;text-align:center;color:#ffb347;font-size:12px;font-weight:600;transition:background 0.15s;" id="sp-widget-create-custom" onmouseover="this.style.background='rgba(255,200,50,0.2)'" onmouseout="this.style.background='rgba(255,200,50,0.1)'">＋ 新建自定义组件</div></div><div class="sp-confirm-actions" style="margin-top:10px;"><button class="sp-confirm-btn sp-confirm-btn-cancel" id="sp-widget-picker-close">取消</button></div></div>`;
+        document.body.appendChild(overlay);
+        overlay.querySelector('#sp-widget-picker-close').onclick = () => overlay.remove();
+        overlay.onclick = (ev) => { if (ev.target === overlay) overlay.remove(); };
+        overlay.querySelectorAll('[data-wtype]').forEach(el => {
+          el.onclick = () => {
+            overlay.remove();
+            addPhoneWidget(el.dataset.wtype);
+          };
+        });
+        overlay.querySelector('#sp-widget-create-custom').onclick = () => {
+          overlay.remove();
+          showCustomWidgetCreator();
+        };
+      };
+    }
+
+    // 加页/删页按钮
+    const addPageBtn = document.getElementById('sp-phone-add-page');
+    const delPageBtn = document.getElementById('sp-phone-del-page');
+    if (addPageBtn && !addPageBtn._bound) {
+      addPageBtn._bound = true;
+      addPageBtn.onclick = (e) => {
+        e.stopPropagation();
+        if (!settings.phonePageCount) settings.phonePageCount = 1;
+        if (settings.phonePageCount >= 5) { showBubble('最多5页', 1500); return; }
+        settings.phonePageCount++;
+        saveData();
+        switchHomePage(settings.phonePageCount - 1);
+        showBubble(`已添加第 ${settings.phonePageCount} 页`, 1500);
+      };
+    }
+    if (delPageBtn && !delPageBtn._bound) {
+      delPageBtn._bound = true;
+      delPageBtn.onclick = (e) => {
+        e.stopPropagation();
+        if (!settings.phonePageCount || settings.phonePageCount <= 1) { showBubble('至少保留1页', 1500); return; }
+        showConfirmDialog({
+          title: '删除最后一页？',
+          desc: '该页上的 App 和小组件将被清除',
+          confirmText: '删除',
+          cancelText: '取消',
+          onConfirm: () => {
+            const lastPage = settings.phonePageCount - 1;
+            if (Array.isArray(settings.phoneAppLayout) && settings.phoneAppLayout.length > lastPage) {
+              settings.phoneAppLayout.splice(lastPage, 1);
+            }
+            settings.phoneWidgets = (settings.phoneWidgets || []).filter(w => (w.page || 0) !== lastPage);
+            settings.phonePageCount--;
+            if (_phoneCurrentPage >= settings.phonePageCount) _phoneCurrentPage = settings.phonePageCount - 1;
+            saveData();
+            renderPhoneGrid();
+            showBubble('已删除最后一页', 1500);
+          }
+        });
+      };
+    }
+
+    // 编辑模式时显示页面增减按钮
+    const pageControls = document.getElementById('sp-phone-page-controls');
+    if (pageControls) {
+      // 用 MutationObserver 监听编辑模式 class
+      const appsEl = document.getElementById('sp-phone-apps');
+      if (appsEl && !appsEl._pageObserver) {
+        appsEl._pageObserver = true;
+        const observer = new MutationObserver(() => {
+          pageControls.classList.toggle('sp-editing-visible', appsEl.classList.contains('sp-phone-apps-editing'));
+        });
+        observer.observe(appsEl, { attributes: true, attributeFilter: ['class'] });
+      }
+    }
+
+    // 折叠状态下双击状态栏恢复
+    const statusbar = document.getElementById('sp-phone-statusbar');
+    if (statusbar) {
+      statusbar.ondblclick = () => {
+        const chatEl = document.getElementById('silly-pet-chat');
+        if (chatEl && chatEl.classList.contains('sp-chat-minimized')) {
+          chatEl.classList.remove('sp-chat-minimized');
+        }
+      };
+    }
+
+    document.querySelectorAll('#silly-pet-chat .sp-phone-back').forEach(btn => {
+      btn.onclick = () => switchPhonePage(btn.dataset.back || 'home');
+    });
+
+    const closeBtn = document.getElementById('sp-phone-close');
+    if (closeBtn) closeBtn.onclick = () => toggleChat();
+
+    const minBtn = document.getElementById('sp-phone-minimize');
+    if (minBtn) {
+      minBtn.onclick = () => {
+        const chatEl = document.getElementById('silly-pet-chat');
+        if (chatEl) chatEl.classList.toggle('sp-chat-minimized');
+      };
+    }
+
+    const saveBtn = document.getElementById('sp-phone-settings-save');
+    if (saveBtn) {
+      saveBtn.onclick = () => {
+        const modeCustom = document.querySelector('input[name="sp-phone-time-mode"][value="custom"]');
+        settings.phoneTimeMode = (modeCustom && modeCustom.checked) ? 'custom' : 'real';
+        const customTime = document.getElementById('sp-phone-custom-time');
+        if (customTime) settings.phoneCustomTime = customTime.value || '12:00';
+        const weatherToggle = document.getElementById('sp-phone-weather-toggle');
+        settings.phoneWeatherEnabled = weatherToggle ? weatherToggle.checked : false;
+        const batteryToggle = document.getElementById('sp-phone-battery-toggle');
+        settings.phoneRealBattery = batteryToggle ? batteryToggle.checked : false;
+        const region = document.getElementById('sp-phone-region');
+        if (region) settings.phoneRegion = region.value.trim();
+        // 锁屏设置
+        const lockToggle = document.getElementById('sp-phone-lockscreen-toggle');
+        settings.phoneLockScreenEnabled = lockToggle ? lockToggle.checked : false;
+        const lockPwdToggle = document.getElementById('sp-phone-lockpwd-toggle');
+        settings.phoneLockPasswordEnabled = lockPwdToggle ? lockPwdToggle.checked : false;
+        const lockPwdInput = document.getElementById('sp-phone-lockpwd-input');
+        if (lockPwdInput && lockPwdInput.value.trim()) {
+          settings.phoneLockPassword = lockPwdInput.value.trim();
+        }
+        saveData();
+        updatePhoneClock();
+        updatePhoneBattery();
+        showBubble('手机设置已保存', 2000);
+        switchPhonePage('home');
+      };
+    }
+
+    const resetAppOrderBtn = document.getElementById('sp-phone-reset-app-order');
+    if (resetAppOrderBtn) {
+      resetAppOrderBtn.onclick = () => {
+        settings.phoneAppLayout = getDefaultAppLayout();
+        saveData();
+        renderPhoneGrid();
+        showBubble('App 排列已重置', 2000);
+      };
+    }
+
+    // 锁屏设置 UI 同步
+    const lockScreenToggle = document.getElementById('sp-phone-lockscreen-toggle');
+    if (lockScreenToggle) lockScreenToggle.checked = !!settings.phoneLockScreenEnabled;
+    const lockPwdToggleInit = document.getElementById('sp-phone-lockpwd-toggle');
+    if (lockPwdToggleInit) {
+      lockPwdToggleInit.checked = !!settings.phoneLockPasswordEnabled;
+      const pwdSection = document.getElementById('sp-phone-lockpwd-section');
+      if (pwdSection) pwdSection.style.display = lockPwdToggleInit.checked ? '' : 'none';
+      lockPwdToggleInit.onchange = () => {
+        const s = document.getElementById('sp-phone-lockpwd-section');
+        if (s) s.style.display = lockPwdToggleInit.checked ? '' : 'none';
+      };
+    }
+    const lockPwdInputInit = document.getElementById('sp-phone-lockpwd-input');
+    if (lockPwdInputInit) lockPwdInputInit.value = settings.phoneLockPassword || '';
+
+
+
+    const weatherRefresh = document.getElementById('sp-phone-weather-refresh');
+    if (weatherRefresh) {
+      weatherRefresh.onclick = () => {
+        const region = document.getElementById('sp-phone-region');
+        if (region) settings.phoneRegion = region.value.trim();
+        const weatherToggle = document.getElementById('sp-phone-weather-toggle');
+        settings.phoneWeatherEnabled = weatherToggle ? weatherToggle.checked : false;
+        saveData();
+        fetchPhoneWeather();
+      };
+    }
+
+    const chatSettingsBtn = document.getElementById('sp-chat-settings-btn');
+    if (chatSettingsBtn) chatSettingsBtn.onclick = () => {
+      switchPhonePage('chatsettings');
+      renderChatSettingsPage();
+    };
+
+    // 聊天 char 头像
+    const charUpload = document.getElementById('sp-chat-char-avatar-upload');
+    if (charUpload) charUpload.onclick = () => phoneUploadImage('chatCharAvatar', (url) => {
+      const p = document.getElementById('sp-chat-char-avatar-preview');
+      if (p) p.innerHTML = `<img src="${url}" />`;
+      renderChatHistory();
+    }, 120);
+    const charClear = document.getElementById('sp-chat-char-avatar-clear');
+    if (charClear) charClear.onclick = () => {
+      settings.chatCharAvatar = '';
+      saveData();
+      const p = document.getElementById('sp-chat-char-avatar-preview');
+      if (p) p.innerHTML = '🐾';
+      renderChatHistory();
+    };
+
+    // 聊天 user 头像
+    const userUpload = document.getElementById('sp-chat-user-avatar-upload');
+    if (userUpload) userUpload.onclick = () => phoneUploadImage('chatUserAvatar', (url) => {
+      const p = document.getElementById('sp-chat-user-avatar-preview');
+      if (p) p.innerHTML = `<img src="${url}" />`;
+      renderChatHistory();
+    }, 120);
+    const userClear = document.getElementById('sp-chat-user-avatar-clear');
+    if (userClear) userClear.onclick = () => {
+      settings.chatUserAvatar = '';
+      saveData();
+      const p = document.getElementById('sp-chat-user-avatar-preview');
+      if (p) p.innerHTML = '🧑';
+      renderChatHistory();
+    };
+
+    // 头像显隐开关
+    const charVisToggle = document.getElementById('sp-chat-char-avatar-visible');
+    if (charVisToggle) {
+      charVisToggle.checked = settings.chatCharAvatarVisible !== false;
+      charVisToggle.onchange = () => {
+        settings.chatCharAvatarVisible = charVisToggle.checked;
+        saveData();
+        renderChatHistory();
+      };
+    }
+    const userVisToggle = document.getElementById('sp-chat-user-avatar-visible');
+    if (userVisToggle) {
+      userVisToggle.checked = settings.chatUserAvatarVisible !== false;
+      userVisToggle.onchange = () => {
+        settings.chatUserAvatarVisible = userVisToggle.checked;
+        saveData();
+        renderChatHistory();
+      };
+    }
+
+    // {{char}} 头像框
+    const charFrameUpload = document.getElementById('sp-chat-char-frame-upload');
+    if (charFrameUpload) charFrameUpload.onclick = () => phoneUploadImage('chatCharAvatarFrame', (url) => {
+      const p = document.getElementById('sp-chat-char-frame-preview');
+      if (p) p.innerHTML = `<img src="${url}" />`;
+      renderChatHistory();
+    }, 120);
+    const charFrameClear = document.getElementById('sp-chat-char-frame-clear');
+    if (charFrameClear) charFrameClear.onclick = () => {
+      settings.chatCharAvatarFrame = '';
+      saveData();
+      const p = document.getElementById('sp-chat-char-frame-preview');
+      if (p) p.innerHTML = '无';
+      renderChatHistory();
+    };
+
+    // 玩家 头像框
+    const userFrameUpload = document.getElementById('sp-chat-user-frame-upload');
+    if (userFrameUpload) userFrameUpload.onclick = () => phoneUploadImage('chatUserAvatarFrame', (url) => {
+      const p = document.getElementById('sp-chat-user-frame-preview');
+      if (p) p.innerHTML = `<img src="${url}" />`;
+      renderChatHistory();
+    }, 120);
+    const userFrameClear = document.getElementById('sp-chat-user-frame-clear');
+    if (userFrameClear) userFrameClear.onclick = () => {
+      settings.chatUserAvatarFrame = '';
+      saveData();
+      const p = document.getElementById('sp-chat-user-frame-preview');
+      if (p) p.innerHTML = '无';
+      renderChatHistory();
+    };
+
+
+    // 聊天背景
+    const bgUpload = document.getElementById('sp-chat-bg-upload');
+    if (bgUpload) bgUpload.onclick = () => phoneUploadImage('chatBackground', (url) => {
+      const p = document.getElementById('sp-chat-bg-preview');
+      if (p) p.innerHTML = `<img src="${url}" />`;
+      applyPhoneWallpaper();
+    }, 600);
+    const bgClear = document.getElementById('sp-chat-bg-clear');
+    if (bgClear) bgClear.onclick = () => {
+      settings.chatBackground = '';
+      saveData();
+      const p = document.getElementById('sp-chat-bg-preview');
+      if (p) p.innerHTML = '无';
+      applyPhoneWallpaper();
+    };
+
+    // 聊天设置保存
+    const chatSaveBtn = document.getElementById('sp-chat-settings-save');
+    if (chatSaveBtn) chatSaveBtn.onclick = () => {
+      const remarkInput = document.getElementById('sp-chat-remark-input');
+      if (remarkInput) settings.chatRemark = remarkInput.value.trim();
+      saveData();
+      const titleName = document.getElementById('sp-chat-title-name');
+      if (titleName) titleName.textContent = settings.chatRemark || settings.petName || '咪噗';
+      showBubble('聊天设置已保存', 2000);
+      switchPhonePage('chat');
+    };
+
+    // 主题页绑定
+    const themeApp = document.querySelector('.sp-phone-app[data-app="theme"]');
+    if (themeApp) themeApp.onclick = () => {
+      switchPhonePage('theme');
+      renderThemePage();
+    };
+
+    // 主题页壁纸
+    const wpUpload = document.getElementById('sp-phone-wallpaper-upload');
+    if (wpUpload) wpUpload.onclick = () => phoneUploadImage('phoneWallpaper', (url) => {
+      const p = document.getElementById('sp-phone-wallpaper-preview');
+      if (p) p.innerHTML = `<img src="${url}" />`;
+      applyPhoneWallpaper();
+    }, 600);
+    const wpClear = document.getElementById('sp-phone-wallpaper-clear');
+    if (wpClear) wpClear.onclick = () => {
+      settings.phoneWallpaper = '';
+      saveData();
+      const p = document.getElementById('sp-phone-wallpaper-preview');
+      if (p) p.innerHTML = '无';
+      applyPhoneWallpaper();
+    };
+
+    // app 图标上传
+    ['chat', 'settings', 'theme', 'bookshelf'].forEach(app => {
+      const upload = document.getElementById(`sp-app-icon-${app}-upload`);
+      const clear = document.getElementById(`sp-app-icon-${app}-clear`);
+      if (upload) upload.onclick = () => phoneUploadImage(`appIcons.${app}`, (url) => {
+        settings.appIcons[app] = url;
+        saveData();
+        const prev = document.getElementById(`sp-app-icon-${app}-preview`);
+        if (prev) prev.innerHTML = `<img src="${url}" />`;
+        applyAppIcons();
+      }, 120);
+      if (clear) clear.onclick = () => {
+        settings.appIcons[app] = '';
+        saveData();
+        const prev = document.getElementById(`sp-app-icon-${app}-preview`);
+        const fallback = {chat:'💬', settings:'⚙️', theme:'🎨', bookshelf:'📚'}[app];
+        if (prev) prev.innerHTML = fallback;
+        applyAppIcons();
+      };
+    });
+
+    // 主题保存
+    const themeSave = document.getElementById('sp-phone-theme-save');
+    if (themeSave) themeSave.onclick = () => {
+      showBubble('主题已保存', 2000);
+      switchPhonePage('home');
+    };
+
+    // ===== 书架功能 =====
+    const bsImportBtn = document.getElementById('sp-bookshelf-import-btn');
+    const bsFileInput = document.getElementById('sp-bookshelf-file-input');
+    if (bsImportBtn && bsFileInput) {
+      bsImportBtn.onclick = () => {
+        const importType = document.getElementById('sp-bookshelf-import-type')?.value || 'images';
+        if (importType === 'txt') {
+          bsFileInput.accept = '.txt';
+          bsFileInput.multiple = false;
+        } else {
+          bsFileInput.accept = 'image/*,.zip,.pdf';
+          bsFileInput.multiple = true;
+        }
+        bsFileInput.click();
+      };
+      bsFileInput.onchange = async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+        bsFileInput.value = '';
+        const importType = document.getElementById('sp-bookshelf-import-type')?.value || 'images';
+        if (importType === 'txt') {
+          await bookshelfImportTxt(files[0]);
+        } else {
+          await bookshelfImportImages(files);
+        }
+      };
+    }
+
+    // 阅读器返回
+    const brBack = document.getElementById('sp-bookreader-back');
+    if (brBack) {
+      brBack.onclick = () => {
+        state.activeBookId = null;
+        switchPhonePage('bookshelf');
+        renderBookshelfList();
+      };
+    }
+
+    // 阅读器翻页
+    document.getElementById('sp-bookreader-prev')?.addEventListener('click', () => bookReaderNav(-1));
+    document.getElementById('sp-bookreader-next')?.addEventListener('click', () => bookReaderNav(1));
+    
+    // ===== 书架事件 =====
+    bsBindEvents();
+    // 绑定锁屏事件
+    bindLockScreenEvents();
+
+  }
+
+  function renderChatSettingsPage() {
+    const remarkInput = document.getElementById('sp-chat-remark-input');
+    if (remarkInput) remarkInput.value = settings.chatRemark || '';
+
+    const charPreview = document.getElementById('sp-chat-char-avatar-preview');
+    const userPreview = document.getElementById('sp-chat-user-avatar-preview');
+    const bgPreview = document.getElementById('sp-chat-bg-preview');
+    if (charPreview) charPreview.innerHTML = settings.chatCharAvatar ? `<img src="${settings.chatCharAvatar}" />` : '🐾';
+    if (userPreview) userPreview.innerHTML = settings.chatUserAvatar ? `<img src="${settings.chatUserAvatar}" />` : '🧑';
+    if (bgPreview) bgPreview.innerHTML = settings.chatBackground ? `<img src="${settings.chatBackground}" />` : '无';
+  }
+
+    // 头像框预览同步
+    const charFramePreview = document.getElementById('sp-chat-char-frame-preview');
+    const userFramePreview = document.getElementById('sp-chat-user-frame-preview');
+    if (charFramePreview) charFramePreview.innerHTML = settings.chatCharAvatarFrame ? `<img src="${settings.chatCharAvatarFrame}" />` : '无';
+    if (userFramePreview) userFramePreview.innerHTML = settings.chatUserAvatarFrame ? `<img src="${settings.chatUserAvatarFrame}" />` : '无';
+
+    // 头像显隐开关同步
+    const charVisToggle = document.getElementById('sp-chat-char-avatar-visible');
+    const userVisToggle = document.getElementById('sp-chat-user-avatar-visible');
+    if (charVisToggle) charVisToggle.checked = settings.chatCharAvatarVisible !== false;
+    if (userVisToggle) userVisToggle.checked = settings.chatUserAvatarVisible !== false;
+
+  function renderThemePage() {
+    const wpPreview = document.getElementById('sp-phone-wallpaper-preview');
+    if (wpPreview) wpPreview.innerHTML = settings.phoneWallpaper ? `<img src="${settings.phoneWallpaper}" />` : '无';
+
+    const chatPrev = document.getElementById('sp-app-icon-chat-preview');
+    const setPrev = document.getElementById('sp-app-icon-settings-preview');
+    const themePrev = document.getElementById('sp-app-icon-theme-preview');
+    if (chatPrev) chatPrev.innerHTML = settings.appIcons.chat ? `<img src="${settings.appIcons.chat}" />` : '💬';
+    if (setPrev) setPrev.innerHTML = settings.appIcons.settings ? `<img src="${settings.appIcons.settings}" />` : '⚙️';
+    if (themePrev) themePrev.innerHTML = settings.appIcons.theme ? `<img src="${settings.appIcons.theme}" />` : '🎨';
+
+    const bookPrev = document.getElementById('sp-app-icon-bookshelf-preview');
+    if (bookPrev) bookPrev.innerHTML = settings.appIcons.bookshelf ? `<img src="${settings.appIcons.bookshelf}" />` : '📚';
+
+  }
+
+  function applyAppIcons() {
+    renderPhoneGrid();
+  }
+
+  // 通用图片上传（存入 settings，压缩后回调）
+  function phoneUploadImage(key, onDone, maxWidth = 400) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+    input.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (file.size > 3 * 1024 * 1024) { showBubble('图片不能超过3MB', 3000); return; }
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const compressed = await compressImage(ev.target.result, maxWidth, 0.8);
+        settings[key] = compressed;
+        saveData();
+        if (onDone) onDone(compressed);
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  }
 
   // ============================================================
   // 桌宠聊天
@@ -3986,28 +5920,35 @@ function toggleChat() {
   isChatOpen = !isChatOpen;
   chatEl.classList.toggle('visible', isChatOpen);
   if (isChatOpen) {
-    const chatW = Math.min(320, window.innerWidth - 20);
-    
-    // 先显示元素，让浏览器计算出实际高度
-    chatEl.style.width = chatW + 'px';
-    
-    // 使用 requestAnimationFrame 确保获取到渲染后的高度
+    // 手机默认回到主页并启动时钟
+    switchPhonePage('home');
+    startPhoneClock();
+    bindPhoneEvents();
+    applyPhoneWallpaper();
+    renderPhoneGrid();
+
+    // 锁屏检查
+    if (settings.phoneLockScreenEnabled) {
+      _phoneUnlocked = false;
+      showLockScreen();
+    } else {
+      _phoneUnlocked = true;
+    }
+
+    // 使用 requestAnimationFrame 确保获取到渲染后的尺寸
     requestAnimationFrame(() => {
       const chatH = chatEl.offsetHeight;
-      const maxTop = window.innerHeight - chatH - 20; // 留20px边距
+      const chatW = chatEl.offsetWidth;
+      const maxTop = window.innerHeight - chatH - 20;
       const centerTop = Math.floor((window.innerHeight - chatH) / 2);
-      
-      // 确保不会超出屏幕底部
       const finalTop = Math.max(10, Math.min(centerTop, maxTop));
-      
       chatEl.style.left = Math.floor((window.innerWidth - chatW) / 2) + 'px';
       chatEl.style.top = finalTop + 'px';
       chatEl.style.right = 'auto';
       chatEl.style.bottom = 'auto';
     });
-    
-    renderChatHistory();
 
+    renderChatHistory();
     // 预估当前 token
     buildPromptMessages('chat', '').then(messages => {
       const tokens = estimateMessagesTokens(messages);
@@ -4087,6 +6028,8 @@ function toggleChat() {
         inputField?.focus({ preventScroll: true });
       }, 100);
     }
+  } else {
+    stopPhoneClock();
   }
 }
 
@@ -4237,8 +6180,47 @@ function toggleChat() {
     if (!container) return;
     container.innerHTML = '';
     state.petChatHistory.slice(-30).forEach(msg => {
+      const isPet = msg.role === 'assistant';
+
+      // 消息行（含头像）
+      const row = document.createElement('div');
+      row.className = `sp-chat-row ${isPet ? 'pet' : 'user'}`;
+
+      // 头像（含显隐 + 头像框）
+      const avatarVisible = isPet
+        ? (settings.chatCharAvatarVisible !== false)
+        : (settings.chatUserAvatarVisible !== false);
+
+      const avatar = document.createElement('div');
+      avatar.className = 'sp-chat-avatar';
+
+      if (!avatarVisible) {
+        avatar.style.visibility = 'hidden';
+        avatar.style.width = '0';
+        avatar.style.minWidth = '0';
+        avatar.style.margin = '0';
+        avatar.style.padding = '0';
+        avatar.style.overflow = 'hidden';
+      } else {
+        const avatarUrl = isPet ? settings.chatCharAvatar : settings.chatUserAvatar;
+        const frameUrl = isPet ? settings.chatCharAvatarFrame : settings.chatUserAvatarFrame;
+        if (avatarUrl) {
+          let avatarHtml = `<img src="${avatarUrl}" alt="" />`;
+          if (frameUrl) {
+            avatarHtml += `<img src="${frameUrl}" class="sp-chat-avatar-frame" alt="" />`;
+          }
+          avatar.innerHTML = avatarHtml;
+        } else {
+          avatar.classList.add('sp-chat-avatar-default');
+          avatar.textContent = isPet ? '🐾' : '🧑';
+          if (frameUrl) {
+            avatar.innerHTML = `<span style="font-size:18px;">${isPet ? '🐾' : '🧑'}</span><img src="${frameUrl}" class="sp-chat-avatar-frame" alt="" />`;
+          }
+        }
+      }
+
       const div = document.createElement('div');
-      div.className = `sp-chat-msg ${msg.role === 'assistant' ? 'pet' : 'user'}`;
+      div.className = `sp-chat-msg ${isPet ? 'pet' : 'user'}`;
 
       // 时间戳
       let timeStr = '';
@@ -4256,6 +6238,7 @@ function toggleChat() {
       } else {
         div.innerHTML = `${timeStr}${renderMarkdown(msg.content)}`;
       }
+
       // 桌宠的回复支持右键/长按重新生成
       if (msg.role === 'assistant') {
         div.style.cursor = 'context-menu';
@@ -4266,11 +6249,9 @@ function toggleChat() {
         };
         div.addEventListener('contextmenu', (e) => {
           e.preventDefault();
-          // 如果弹窗已存在（长按已触发），跳过
           if (document.getElementById('sp-regen-confirm')) return;
           doRegenerate();
         });
-        // 移动端长按兼容
         let longPressTimer = null;
         div.addEventListener('touchstart', () => {
           longPressTimer = setTimeout(() => { doRegenerate(); }, 600);
@@ -4278,10 +6259,14 @@ function toggleChat() {
         div.addEventListener('touchend', () => { clearTimeout(longPressTimer); });
         div.addEventListener('touchmove', () => { clearTimeout(longPressTimer); });
       }
-      container.appendChild(div);
+
+      row.appendChild(avatar);
+      row.appendChild(div);
+      container.appendChild(row);
     });
     container.scrollTop = container.scrollHeight;
   }
+
 
   async function sendChatMessage(text) {
     if (!text.trim()) return;
@@ -7813,9 +9798,7 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 
 /* ===== 气泡（桌宠说话的对话气泡）===== */
 #silly-pet-bubble { }
-/* 气泡显示时*/
 #silly-pet-bubble.visible { }
-/* 气泡底部三角箭头 */
 #silly-pet-bubble::after { }
 
 /* ===== 心情图标（右上角emoji）===== */
@@ -7823,39 +9806,29 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 
 /* ===== 状态条（底部饱食/清洁/精力三条）===== */
 #silly-pet-status-bar { }
-/* 状态条显示时 */
 #silly-pet-status-bar.visible { }
-/* 单条状态行 */
 .sp-stat { }
-/* 状态图标（🍖💧⚡） */
 .sp-stat-icon { }
-/* 状态进度条容器 */
 .sp-stat-bar { }
-/* 状态进度条填充（通过 width 控制百分比）*/
 .sp-stat-fill { }
-.sp-stat-fill.hunger { }  /* 饱食 */
-.sp-stat-fill.clean { }   /* 清洁 */
-.sp-stat-fill.energy { }  /* 精力 */
-/* 状态百分比文字 */
+.sp-stat-fill.hunger { }
+.sp-stat-fill.clean { }
+.sp-stat-fill.energy { }
 .sp-stat-pct { }
 
 /* ===== 菜单按钮（圆形发散的8个按钮）===== */
 #silly-pet-menu { }
-/* 菜单展开时 */
 #silly-pet-menu.visible { }
-/* 单个菜单按钮 */
 .sp-menu-btn { }
-/* 有自定义图标的菜单按钮 */
 .sp-menu-btn.has-custom-icon { }
-/* 按功能区分*/
-.sp-menu-btn[data-action="feed"] { }     /* 投喂 */
-.sp-menu-btn[data-action="bath"] { }     /* 洗澡 */
-.sp-menu-btn[data-action="sleep"] { }    /* 睡觉 */
-.sp-menu-btn[data-action="chat"] { }     /* 聊天 */
-.sp-menu-btn[data-action="diary"] { }    /* 日记 */
-.sp-menu-btn[data-action="game"] { }     /* 游戏 */
-.sp-menu-btn[data-action="house"] { }    /* 小屋 */
-.sp-menu-btn[data-action="settings"] { } /* 设置 */
+.sp-menu-btn[data-action="feed"] { }
+.sp-menu-btn[data-action="bath"] { }
+.sp-menu-btn[data-action="sleep"] { }
+.sp-menu-btn[data-action="chat"] { }
+.sp-menu-btn[data-action="diary"] { }
+.sp-menu-btn[data-action="game"] { }
+.sp-menu-btn[data-action="house"] { }
+.sp-menu-btn[data-action="settings"] { }
 
 /* ===== 互动贴图（投喂/洗澡/睡觉时飘出的物品）===== */
 #silly-pet-interaction-item { }
@@ -7865,33 +9838,79 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">💬聊天框</summary>
+                <summary class="sp-guide-summary">💬 聊天框（手机界面）</summary>
                 <div class="sp-guide-details-content">
-                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 聊天面板容器 ===== */
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 聊天面板容器（手机外壳）===== */
 #silly-pet-chat { }
-/* 聊天面板显示时 */
 #silly-pet-chat.visible { }
-/* 聊天面板最小化时 */
 #silly-pet-chat.sp-chat-minimized { }
 
-/* ===== 聊天头部（可拖拽的标题栏）===== */
-#silly-pet-chat-header { }
+/* ===== 手机状态栏（可拖拽）===== */
+#sp-phone-statusbar { }
+#sp-phone-status-time { }
+#sp-phone-status-right { }
+#sp-phone-signal { }
+#sp-phone-battery { }
+
+/* ===== 手机主页 ===== */
+#sp-phone-home { }
+#sp-phone-clock { }
+#sp-phone-clock-time { }
+#sp-phone-clock-date { }
+#sp-phone-clock-weather { }
+#sp-phone-apps { }
+.sp-phone-app { }
+.sp-phone-app-icon { }
+.sp-phone-app-name { }
+#sp-phone-home-actions { }
+#sp-phone-minimize { }
+#sp-phone-close { }
+
+/* ===== 手机页面通用 ===== */
+.sp-phone-page { }
+.sp-phone-page.active { }
+.sp-phone-page-header { }
+.sp-phone-back { }
+.sp-phone-page-content { }
+.sp-phone-setting-block { }
+.sp-phone-setting-title { }
+.sp-phone-radio { }
+.sp-phone-switch-row { }
+.sp-phone-btn { }
+.sp-phone-btn-primary { }
+.sp-phone-wallpaper-preview { }
+
+/* ===== 聊天页头部 ===== */
+#sp-phone-chat-topbar { }
+#sp-chat-title-name { }
+#sp-chat-mode-toggle { }
+#sp-chat-settings-btn { }
 
 /* ===== 聊天消息区 ===== */
 #silly-pet-chat-messages { }
-/* 聊天消息滚动条 */
 #silly-pet-chat-messages::-webkit-scrollbar { }
 #silly-pet-chat-messages::-webkit-scrollbar-thumb { }
 
+/* ===== 聊天消息行（含头像）===== */
+.sp-chat-row { }
+.sp-chat-row.pet { }
+.sp-chat-row.user { }
+
+/* ===== 聊天头像 ===== */
+.sp-chat-avatar { }
+.sp-chat-avatar img { }
+.sp-chat-avatar-default { }
+
+/* ===== 头像框叠加层 ===== */
+.sp-chat-avatar-frame { }
+
 /* ===== 聊天消息气泡 ===== */
-.sp-chat-msg { }           /* 所有消息 */
-.sp-chat-msg.pet { }       /* 桌宠的回复 */
-.sp-chat-msg.user { }      /* 用户的消息 */
-/* 消息内的Markdown 元素 */
-.sp-chat-msg em { }        /* 斜体 */
-.sp-chat-msg strong { }    /* 加粗 */
-.sp-chat-msg code { }      /* 代码 */
-/* 思考中动画（桌宠正在生成回复）*/
+.sp-chat-msg { }
+.sp-chat-msg.pet { }
+.sp-chat-msg.user { }
+.sp-chat-msg em { }
+.sp-chat-msg strong { }
+.sp-chat-msg code { }
 .sp-chat-msg.sp-thinking { }
 .sp-thinking-dots { }
 
@@ -7901,32 +9920,36 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 
 /* ===== 聊天输入区 ===== */
 #silly-pet-chat-input { }
-/* 输入行容器 */
 #silly-pet-chat-input-row { }
-/* 输入框 */
 #sp-chat-input-field { }
-/* 表情包按钮 */
 #sp-chat-emoji-toggle { }
-/* 发送消息按钮（不生成回复）*/
 #sp-chat-send-msg-btn { }
-/* 生成回复按钮 */
 #sp-chat-generate-btn { }
 
 /* ===== 表情包面板 ===== */
 #sp-emoji-panel { }
 #sp-emoji-panel.visible { }
-/* 单个表情格子 */
 .sp-emoji-item { }
 .sp-emoji-item.selected { }
 .sp-emoji-item img { }
-/* 添加表情按钮 */
 .sp-emoji-add-btn { }
-
-/* ===== 已选表情预览条 ===== */
 #sp-emoji-preview-bar { }
 #sp-emoji-preview-bar.visible { }
-#sp-emoji-preview-bar img { }
-#sp-emoji-preview-bar .sp-emoji-preview-remove { }</pre>
+
+/* ===== 聊天设置页 ===== */
+#sp-phone-chatsettings { }
+.sp-chat-avatar-row { }
+.sp-chat-avatar-preview { }
+.sp-chat-avatar-preview img { }
+
+/* ===== 手机主题页 ===== */
+#sp-phone-theme { }
+
+/* ===== 手机设置页 ===== */
+#sp-phone-settings { }
+.sp-toggle-switch { }
+.sp-toggle-slider { }
+.sp-toggle-switch input:checked + .sp-toggle-slider { }</pre>
                 </div>
               </details>
 
@@ -7939,24 +9962,21 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 
 /* ===== 设置头部 ===== */
 .sp-settings-header { }
-.sp-settings-header-icon { }   /* 🐾 图标 */
-.sp-settings-header-title { }  /* 标题文字 */
-.sp-settings-header-ver { }    /* 版本号标签 */
-.sp-settings-close { }         /* 关闭按钮✕ */
+.sp-settings-header-icon { }
+.sp-settings-header-title { }
+.sp-settings-header-ver { }
+.sp-settings-close { }
 
 /* ===== 标签栏 ===== */
 .sp-tabs { }
-/* 单个标签 */
 .sp-tab { }
 .sp-tab:hover { }
 .sp-tab.active { }
 
 /* ===== 标签页面板容器 ===== */
 .sp-tab-panels { }
-/* 单个面板 */
 .sp-tab-panel { }
 .sp-tab-panel.active { }
-/* 按面板名区分 */
 .sp-tab-panel[data-panel="api"] { }
 .sp-tab-panel[data-panel="persona"] { }
 .sp-tab-panel[data-panel="prompt"] { }
@@ -7967,7 +9987,7 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 .sp-tab-panel[data-panel="guide"] { }
 .sp-tab-panel[data-panel="customcss"] { }
 
-/* ===== 区块===== */
+/* ===== 区块 ===== */
 #silly-pet-settings .sp-section { }
 #silly-pet-settings .sp-section-title { }
 
@@ -7986,13 +10006,6 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 
 /* ===== 底部保存栏 ===== */
 .sp-settings-footer { }
-.sp-settings-footer .sp-btn-primary { }
-
-/* ===== 开关 ===== */
-.sp-toggle-switch { }
-.sp-toggle-slider { }
-.sp-toggle-slider::before { }
-.sp-toggle-switch input:checked + .sp-toggle-slider { }
 
 /* ===== 搜索下拉 ===== */
 .sp-search-select { }
@@ -8027,30 +10040,53 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 .sp-theme-preview { }
 .sp-theme-dot { }
 .sp-theme-name { }
-/* 自定义主题编辑器 */
 #sp-custom-theme-editor { }
 .sp-theme-color-input { }
-.sp-theme-color-picker { }</pre>
+.sp-theme-color-picker { }
+
+/* ===== 自定义CSS编辑器 ===== */
+#sp-custom-css-editor { }
+
+/* ===== 预览区 ===== */
+.sp-preview-box { }
+.sp-preview-header { }
+.sp-preview-content { }
+.sp-preview-content.expanded { }
+
+/* ===== 世界书条目 ===== */
+.sp-wi-entry { }
+.sp-wi-entry.sp-wi-expanded { }
+.sp-wi-entry.sp-wi-excluded { }
+.sp-wi-entry-header { }
+.sp-wi-name { }
+.sp-wi-keys { }
+.sp-wi-entry-body { }
+
+/* ===== 自定义动作条目 ===== */
+.sp-custom-sprite-item { }
+.sp-custom-sprite-preview { }
+.sp-custom-sprite-info { }
+.sp-custom-sprite-actions { }
+
+/* ===== 时间滑轨 ===== */
+.sp-duration-row { }
+.sp-duration-label { }
+.sp-duration-row input[type="range"] { }</pre>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🏠 桌宠小屋</summary>
+                <summary class="sp-guide-summary">🏠 桌宠小屋 + 👗 更衣系统</summary>
                 <div class="sp-guide-details-content">
                   <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 小屋面板 ===== */
 #silly-pet-house { }
 #silly-pet-house.visible { }
-/* 最小化状态 */
 #silly-pet-house.sp-house-minimized { }
-
-/* ===== 小屋头部 ===== */
 #sp-house-header { }
 
 /* ===== 场景区域（2:3竖屏）===== */
 #sp-house-scene { }
-/* 背景层 */
 #sp-house-bg-layer { }
-/* 角色立绘层 */
 #sp-house-char-layer { }
 #sp-house-char-layer img { }
 
@@ -8063,38 +10099,38 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 
 /* ===== 对话覆盖层（底部毛玻璃）===== */
 #sp-house-dialogue-overlay { }
-/* 对话框折叠时 */
 #sp-house-dialogue-overlay.sp-house-dialogue-collapsed { }
 
 /* ===== 对话框 ===== */
 #sp-house-dialogue-box { }
-/* 展开对话框时 */
 #sp-house-dialogue-box.sp-house-dialogue-expanded { }
-
-/*角色名字行 */
 #sp-house-char-name { }
-/* 头像圆形容器 */
 #sp-house-avatar { }
 #sp-house-avatar img { }
-/* 名字文字 */
 #sp-house-name-text { }
 
-/* 对话文字 */
+/* ===== 对话文字 ===== */
 #sp-house-dialogue-text { }
-/* 打字完成后（隐藏光标）*/
 #sp-house-dialogue-text.sp-house-typing-done { }
-/* 打字光标 */
 #sp-house-dialogue-text::after { }
-/* 对话文字的 Markdown */
 #sp-house-dialogue-text em { }
 #sp-house-dialogue-text strong { }
-#sp-house-dialogue-text code { }
 
-/* ===== 输入区===== */
+/* ===== 输入区 ===== */
 #sp-house-input-area { }
 #sp-house-input-field { }
 #sp-house-send-btn { }
-#sp-house-regen-btn { }</pre>
+#sp-house-regen-btn { }
+
+/* ===== 更衣快捷面板（小屋右侧圆形按钮列）===== */
+#sp-wardrobe-quick { }
+#sp-wardrobe-quick-settings { }
+
+/* ===== 更衣系统弹窗 ===== */
+#sp-wardrobe-modal-overlay { }
+#sp-wardrobe-modal { }
+#sp-wardrobe-header { }
+#sp-wardrobe-body { }</pre>
                 </div>
               </details>
 
@@ -8109,15 +10145,13 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 /* ===== 日历网格 ===== */
 .sp-diary-calendar { }
 .sp-diary-calendar-header { }
-.sp-diary-calendar-header button { } /* 上/下月箭头 */
 .sp-diary-weekdays { }
 .sp-diary-weekday { }
-/* 日期格子 */
 .sp-diary-day { }
-.sp-diary-day.today { }       /* 今天 */
-.sp-diary-day.has-diary { }   /* 有日记的日期 */
-.sp-diary-day.selected { }    /* 选中的日期 */
-.sp-diary-day.has-diary::after { } /* 日记小圆点 */
+.sp-diary-day.today { }
+.sp-diary-day.has-diary { }
+.sp-diary-day.selected { }
+.sp-diary-day.has-diary::after { }
 
 /* ===== 日记内容 ===== */
 .sp-diary-entry { }
@@ -8130,27 +10164,27 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 #sp-diary-generate-section { }
 .sp-diary-range-row { }
 .sp-diary-range-hint { }
-#sp-diary-generate-btn {}</pre>
+#sp-diary-generate-btn { }</pre>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🗨️ 弹窗（确认/输入/提示/总结）</summary>
+                <summary class="sp-guide-summary">🗨️ 弹窗（确认/输入/提示/总结/表情编辑）</summary>
                 <div class="sp-guide-details-content">
                   <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 确认弹窗 ===== */
-.sp-confirm-overlay { }    /* 遮罩层 */
-.sp-confirm-box { }        /* 弹窗主体 */
-.sp-confirm-title { }      /* 标题 */
-.sp-confirm-desc { }       /* 描述文字 */
-.sp-confirm-actions { }    /* 按钮行 */
-.sp-confirm-btn { }        /* 按钮通用 */
-.sp-confirm-btn-primary { } /* 主按钮 */
-.sp-confirm-btn-cancel { }/* 取消按钮 */
+.sp-confirm-overlay { }
+.sp-confirm-box { }
+.sp-confirm-title { }
+.sp-confirm-desc { }
+.sp-confirm-actions { }
+.sp-confirm-btn { }
+.sp-confirm-btn-primary { }
+.sp-confirm-btn-cancel { }
 
 /* ===== 输入弹窗（替代prompt）===== */
 #sp-prompt-dialog-overlay { }
 #sp-prompt-dialog-box { }
-.sp-prompt-input { }        /* 输入框 */
+.sp-prompt-input { }
 
 /* ===== 提示弹窗（替代alert）===== */
 #sp-alert-dialog-overlay { }
@@ -8182,10 +10216,7 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
                   <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 合成工坊面板 ===== */
 #sp-game-panel { }
 #sp-game-panel.visible { }
-/* 最小化 */
 #sp-game-panel.sp-game-minimized { }
-
-/* ===== 头部 / 状态 / 通知===== */
 #sp-game-header { }
 #sp-game-status-bar { }
 .sp-game-stat { }
@@ -8198,17 +10229,15 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 .sp-game-tab-content { }
 .sp-game-tab-content.active { }
 
-/* =====棋盘 ===== */
+/* ===== 棋盘 ===== */
 #sp-game-board { }
-/* 单个格子 */
 .sp-game-cell { }
 .sp-game-cell.sp-game-has-item { }
 .sp-game-cell.sp-game-selected { }
-.sp-game-cell.sp-game-generator { }  /* 生成器 */
-.sp-game-cell.sp-game-sell { }       /* 售卖区 */
-.sp-game-cell.sp-game-dragging { }   /* 拖拽中 */
-.sp-game-cell.sp-game-dragover { }   /* 拖入悬停 */
-/* 按合成链着色 */
+.sp-game-cell.sp-game-generator { }
+.sp-game-cell.sp-game-sell { }
+.sp-game-cell.sp-game-dragging { }
+.sp-game-cell.sp-game-dragover { }
 .sp-game-cell.sp-game-chain-toy { }
 .sp-game-cell.sp-game-chain-food { }
 .sp-game-cell.sp-game-chain-gem { }
@@ -8218,10 +10247,8 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 .sp-game-cell.sp-game-chain-star { }
 .sp-game-cell.sp-game-chain-seasoning { }
 .sp-game-cell.sp-game-chain-stamina { }
-/* 格子内图标 */
 .sp-game-cell-emoji { }
 .sp-game-cell-img { }
-/* 等级标签 */
 .sp-game-level-badge { }
 
 /* ===== 订单 ===== */
@@ -8232,7 +10259,6 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 .sp-game-order-name { }
 .sp-game-order-reward { }
 .sp-game-order-btn { }
-/* 刷新按钮 */
 .sp-game-order-refresh-btn { }
 
 /* ===== 商店 ===== */
@@ -8266,65 +10292,43 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🃏 消消看</summary>
+                <summary class="sp-guide-summary">🃏 消消看 + 🔗 连连看</summary>
                 <div class="sp-guide-details-content">
-                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 面板 ===== */
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 消消看面板 ===== */
 #sp-match3-panel { }
 #sp-match3-panel.visible { }
 #sp-match3-panel.sp-match3-minimized { }
 #sp-match3-header { }
 #sp-match3-notice { }
-
-/* ===== 棋盘 ===== */
 #sp-match3-board { }
-/* 牌 */
 .sp-match3-card { }
 .sp-match3-clickable { }
-.sp-match3-clickable:hover { }
 .sp-match3-blocked { }
-
-/* ===== 暂存栏 ===== */
 #sp-match3-slots-wrapper { }
 #sp-match3-slots { }
 .sp-match3-slot { }
 .sp-match3-slot-empty { }
 .sp-match3-slot-filled { }
-
-/* ===== 道具 ===== */
 #sp-match3-props { }
 .sp-match3-prop-btn { }
 .sp-match3-prop-icon { }
 .sp-match3-prop-count { }
-
-/* ===== 控制按钮 ===== */
 #sp-match3-controls { }
 .sp-match3-ctrl-btn { }
 .sp-match3-ctrl-quit { }
-
-/* ===== 结算 ===== */
 .sp-match3-result-box { }
 .sp-match3-result-title { }
-.sp-match3-result-info { }
 .sp-match3-result-btn { }
-
-/* ===== 背包/商店 ===== */
 .sp-match3-bag-item { }
 .sp-match3-shop-item { }
-.sp-match3-shop-buy { }</pre>
-                </div>
-              </details>
+.sp-match3-shop-buy { }
 
-              <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🔗 连连看</summary>
-                <div class="sp-guide-details-content">
-                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 面板 ===== */
+/* ===== 连连看面板 ===== */
 #sp-link-panel { }
 #sp-link-panel.visible { }
 #sp-link-panel.sp-link-minimized { }
 #sp-link-header { }
 #sp-link-notice { }
-
-/* =====棋盘 ===== */
 #sp-link-board { }
 .sp-link-cell { }
 .sp-link-cell-empty { }
@@ -8334,12 +10338,8 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 .sp-link-cell-tile.sp-link-hint { }
 .sp-link-cell-tile.sp-link-compass-highlight { }
 .sp-link-cell-img { }
-
-/* 连线 SVG */
 #sp-link-path-svg { }
 #sp-link-path-svg line { }
-
-/* ===== 道具/控制/结算 ===== */
 .sp-link-prop-btn { }
 .sp-link-prop-icon { }
 .sp-link-prop-count { }
@@ -8348,13 +10348,11 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 .sp-link-result-box { }
 .sp-link-result-title { }
 .sp-link-result-btn { }
-
-/* ===== 背包/商店 ===== */
 .sp-link-bag-item { }
 .sp-link-shop-item { }
 .sp-link-shop-buy { }
 
-/* ===== 大棋盘字号适配 ===== */
+/* 大棋盘字号适配 */
 #sp-link-board[style*="repeat(12"] .sp-link-cell { }
 #sp-link-board[style*="repeat(14"] .sp-link-cell { }
 #sp-link-board[style*="repeat(16"] .sp-link-cell { }
@@ -8363,33 +10361,24 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🧊 冰箱整理</summary>
+                <summary class="sp-guide-summary">🧊 冰箱整理 + 🍢 糖葫芦工坊</summary>
                 <div class="sp-guide-details-content">
-                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 面板 ===== */
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 冰箱面板 ===== */
 #sp-fridge-panel { }
 #sp-fridge-panel.visible { }
 #sp-fridge-panel.sp-fridge-minimized { }
 #sp-fridge-header { }
 #sp-fridge-notice { }
-
-/* =====冰箱网格 ===== */
 .sp-fridge-grid { }
-/* 空格子 */
 .sp-fridge-cell { }
 .sp-fridge-cell-occupied { }
-/* 放置预览高亮 */
 .sp-fridge-cell.sp-fridge-preview-ok { }
 .sp-fridge-cell.sp-fridge-preview-bad { }
-
-/* ===== 已放置物品 ===== */
 .sp-fridge-placed-item { }
 .sp-fridge-placed-item:hover { }
 .sp-fridge-placed-emoji { }
 .sp-fridge-placed-name { }
-/* 异形物品的单格 */
 .sp-fridge-placed-cell { }
-
-/* ===== 购物筐 ===== */
 .sp-fridge-basket { }
 .sp-fridge-basket-item { }
 .sp-fridge-basket-item.sp-fridge-basket-selected { }
@@ -8397,98 +10386,65 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 .sp-fridge-basket-name { }
 .sp-fridge-basket-size { }
 .sp-fridge-basket-empty { }
-
-/* ===== 道具/控制/结算 ===== */
 .sp-fridge-prop-btn { }
 .sp-fridge-ctrl-btn { }
 .sp-fridge-ctrl-quit { }
 .sp-fridge-result-box { }
 .sp-fridge-result-title { }
+.sp-fridge-bag-item { }
 
-/* ===== 背包/商店 ===== */
-.sp-fridge-bag-item { }</pre>
-                </div>
-              </details>
-
-              <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🍢糖葫芦工坊</summary>
-                <div class="sp-guide-details-content">
-                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 面板 ===== */
+/* ===== 糖葫芦面板 ===== */
 #sp-tanghulu-panel { }
 #sp-tanghulu-panel.visible { }
 #sp-tanghulu-panel.sp-tanghulu-minimized { }
 #sp-tanghulu-header { }
 #sp-tanghulu-notice { }
-
-/* ===== 竹签棋盘 ===== */
 .sp-tanghulu-board { }
-/* 单根竹签 */
 .sp-tanghulu-stick { }
 .sp-tanghulu-stick:hover { }
 .sp-tanghulu-stick.sp-tanghulu-stick-selected { }
-/* 竹签上的水果容器 */
 .sp-tanghulu-stick-fruits { }
-/* 水果球 */
 .sp-tanghulu-fruit { }
 .sp-tanghulu-fruit-top { }
-/* 空位 */
 .sp-tanghulu-slot-empty { }
-/* 竹签底座 */
 .sp-tanghulu-stick-base { }
-/* 竹签标签 */
 .sp-tanghulu-stick-label { }</pre>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🛒 货架整理</summary>
+                <summary class="sp-guide-summary">🛒 货架整理 + 🐱 小猫餐厅</summary>
                 <div class="sp-guide-details-content">
-                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 面板 ===== */
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 货架面板 ===== */
 #sp-shelf-panel { }
 #sp-shelf-panel.visible { }
 #sp-shelf-panel.sp-shelf-minimized { }
 #sp-shelf-header { }
 #sp-shelf-notice { }
-
-/* ===== 货架区域 ===== */
 #sp-shelf-area { }
-/* 单个隔间（3格一组）*/
 .sp-shelf-bay { }
 .sp-shelf-bay:hover { }
-/*拖拽落点反馈 */
 .sp-shelf-bay.sp-shelf-bay-drop-ok { }
 .sp-shelf-bay.sp-shelf-bay-drop-bad { }
-
-/* ===== 隔间内格子 ===== */
 .sp-shelf-slot { }
 .sp-shelf-slot:hover { }
 .sp-shelf-slot.sp-shelf-slot-filled { }
 .sp-shelf-slot.sp-shelf-slot-selected { }
 .sp-shelf-slot.sp-shelf-slot-dragging { }
-
-/* ===== 底部背包区===== */
 #sp-shelf-bag-area { }
 .sp-shelf-bag-slot { }
 .sp-shelf-bag-slot.sp-shelf-bag-filled { }
 .sp-shelf-bag-slot.sp-shelf-bag-locked { }
-.sp-shelf-bag-slot.sp-shelf-slot-selected { }
-
-/* ===== 道具/结算 ===== */
 .sp-shelf-prop-btn { }
 .sp-shelf-result-box { }
-.sp-shelf-result-title { }</pre>
-                </div>
-              </details>
+.sp-shelf-result-title { }
 
-              <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🐱 小猫餐厅</summary>
-                <div class="sp-guide-details-content">
-                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 面板 ===== */
+/* ===== 小猫餐厅面板 ===== */
 #sp-restaurant-panel { }
 #sp-restaurant-header { }
 #sp-restaurant-notice { }
 
-/* =====桌子网格 ===== */
+/* 桌子网格 */
 .sp-restaurant-tables { }
 .sp-restaurant-table { }
 .sp-restaurant-table-empty { }
@@ -8501,28 +10457,27 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 .sp-restaurant-table-timer.urgent { }
 .sp-restaurant-table-wants { }
 .sp-restaurant-table-number { }
-/* 上菜/甜品按钮 */
 .sp-restaurant-table-serve-btn { }
 .sp-restaurant-table-dessert-btn { }
 
-/* ===== 厨房 ===== */
+/* 厨房 */
 .sp-r-kitchen-section { }
 .sp-r-kitchen-title { }
-.sp-r-shop-toggle { }         /* 开店/关店按钮 */
-.sp-r-cooking-active { }      /* 烹饪中 */
-.sp-r-cooking-idle { }        /* 空闲 */
+.sp-r-shop-toggle { }
+.sp-r-cooking-active { }
+.sp-r-cooking-idle { }
 .sp-r-cooking-name { }
 .sp-r-cooking-timer { }
-.sp-r-cook-btn { }            /* 选食谱烹饪按钮 */
+.sp-r-cook-btn { }
 
-/* ===== 出餐台 ===== */
+/* 出餐台 */
 .sp-r-dishes-row { }
 .sp-r-dish-tag { }
 .sp-r-dish-name { }
 .sp-r-dish-count { }
-.sp-restaurant-feed-btn { }   /* 喂桌宠按钮 */
+.sp-restaurant-feed-btn { }
 
-/* ===== 菜单 ===== */
+/* 菜单 */
 .sp-r-menu-group { }
 .sp-r-menu-group-summary { }
 .sp-r-menu-recipe { }
@@ -8531,7 +10486,7 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 .sp-r-menu-recipe-name { }
 .sp-r-menu-recipe-price { }
 
-/* ===== 补货 ===== */
+/* 补货 */
 .sp-r-supply-title { }
 .sp-r-supply-row { }
 .sp-r-supply-locked { }
@@ -8539,7 +10494,7 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 .sp-r-supply-name { }
 .sp-r-convert-area { }
 
-/* ===== 库存 ===== */
+/* 库存 */
 .sp-r-stock-card { }
 .sp-r-stock-card-earnings { }
 .sp-r-stock-section { }
@@ -8548,7 +10503,7 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 .sp-r-stock-empty { }
 .sp-r-stock-gold { }
 
-/* ===== 食谱选择弹窗 ===== */
+/* 食谱选择弹窗 */
 #sp-restaurant-recipe-modal-overlay { }
 #sp-restaurant-recipe-modal { }
 #sp-restaurant-recipe-modal-header { }
@@ -8562,7 +10517,7 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🎰 抽奖 /🎮 游戏选择 / 🎒 背包</summary>
+                <summary class="sp-guide-summary">🎰 抽奖 / 🎮 游戏选择 / 🎒 背包 / 🏆 成就 / 📖 图鉴</summary>
                 <div class="sp-guide-details-content">
                   <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 抽奖面板 ===== */
 #sp-lottery-panel { }
@@ -8579,8 +10534,6 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 .sp-lottery-preview-tag { }
 .sp-lottery-draw-btn { }
 .sp-lottery-limit-badge { }
-
-/* 抽奖结果弹层 */
 .sp-lottery-result-overlay { }
 .sp-lottery-rarity-common { }
 .sp-lottery-rarity-rare { }
@@ -8604,7 +10557,6 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 .sp-game-selector-icon { }
 .sp-game-selector-name { }
 .sp-game-selector-desc { }
-/*帮助按钮 */
 .sp-game-selector-help { }
 
 /* ===== 游戏帮助弹窗 ===== */
@@ -8640,21 +10592,15 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 .sp-total-inv-empty { }
 
 /* ===== 体力背包弹窗 ===== */
-#sp-stamina-inv-popup .sp-inv-popup-box { }</pre>
-                </div>
-              </details>
+#sp-stamina-inv-popup .sp-inv-popup-box { }
 
-              <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🏆 成就 / 📖 图鉴合集/ 👗 更衣</summary>
-                <div class="sp-guide-details-content">
-                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 成就弹窗 ===== */
+/* ===== 成就弹窗 ===== */
 #sp-achievements-overlay { }
 #sp-achievements-overlay .sp-total-inv-box { }
 #sp-achievements-overlay .sp-total-inv-body { }
 #sp-achievements-overlay details { }
 #sp-achievements-overlay details[open] { }
 #sp-achievements-overlay details summary { }
-/* 领取按钮 */
 .sp-achievement-claim-btn { }
 #sp-achievements-claim-all { }
 
@@ -8662,70 +10608,94 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 #sp-unified-collection-overlay { }
 #sp-unified-collection-overlay .sp-total-inv-box { }
 #sp-unified-collection-overlay .sp-total-inv-body { }
-/* 折叠栏 */
 #sp-unified-collection-overlay .sp-guide-details { }
 #sp-unified-collection-overlay .sp-guide-details-content { }
-/* 图鉴网格 */
 .sp-unified-coll-grid { }
 .sp-unified-coll-item { }
 .sp-unified-coll-item:hover { }
 .sp-unified-coll-item.sp-unified-locked { }
 .sp-unified-coll-item.sp-unified-has-custom { }
 .sp-unified-coll-name { }
-.sp-unified-coll-link { }    /* 🔗联动标记 */
-.sp-unified-coll-upload { }  /* 📷上传按钮 */
-/* 游戏图标网格 */
+.sp-unified-coll-link { }
+.sp-unified-coll-upload { }
 .sp-unified-game-icon-grid { }
 .sp-unified-game-icon-item { }
 .sp-unified-game-icon-preview { }
 .sp-unified-game-icon-name { }
 .sp-unified-game-icon-upload { }
-/* 显示上锁名字按钮 */
 .sp-unified-show-locked-names-btn { }
 .sp-unified-show-locked-names-btn.active { }
+#sp-unified-search-input { }</pre>
+                </div>
+              </details>
 
-/* ===== 更衣系统弹窗 ===== */
-#sp-wardrobe-modal-overlay { }
-#sp-wardrobe-modal { }
-#sp-wardrobe-header { }
-#sp-wardrobe-body { }
-/* 更衣快捷面板（小屋右侧浮出的圆形按钮列）*/
-#sp-wardrobe-quick { }
-#sp-wardrobe-quick-settings { }</pre>
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">📚 书架 + 阅读器</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 书架页面 ===== */
+#sp-phone-bookshelf { }
+#sp-bookshelf-page-content { }
+#sp-bs-shelf-list { }
+#sp-bs-search { }
+#sp-bs-sort { }
+#sp-bs-layout-toggle { }
+#sp-bs-tag-bar { }
+#sp-bs-history-bar { }
+#sp-bs-import-btn { }
+
+/* ===== 阅读器页面 ===== */
+#sp-phone-bookreader { }
+
+/* 顶部/底部工具栏 */
+.sp-br-bar { }
+.sp-br-bar-visible { }
+.sp-br-bar-hidden { }
+#sp-br-top-bar { }
+#sp-br-bottom-bar { }
+#sp-br-top-bar.sp-br-bar-hidden { }
+#sp-br-bottom-bar.sp-br-bar-hidden { }
+#sp-br-title { }
+#sp-br-toc-btn { }
+#sp-br-back-btn { }
+
+/* 阅读区域 */
+#sp-br-body { }
+#sp-br-body.sp-br-immersive { }
+
+/* 进度条/翻页 */
+#sp-br-progress-bar { }
+#sp-br-slider { }
+#sp-br-slider::-webkit-slider-thumb { }
+#sp-br-slider::-moz-range-thumb { }
+#sp-br-prev { }
+#sp-br-next { }
+#sp-br-font-dec { }
+#sp-br-font-inc { }
+
+/* 目录弹窗 */
+#sp-bs-toc-overlay { }</pre>
                 </div>
               </details>
 
               <details class="sp-guide-details">
                 <summary class="sp-guide-summary">🎨 CSS 变量（主题色）</summary>
                 <div class="sp-guide-details-content">
-                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* 覆盖这些变量可以改变整体颜色。在「🎨 外观 → 主题配色」中选预设会自动设置，
-   但你也可以在这里手动覆盖。 */
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* 覆盖这些变量可以改变整体颜色 */
 :root {
-  /* 主色调（按钮、高亮等）*/
   --sp-primary: rgba(100,180,255,0.4);
   --sp-primary-hover: rgba(100,180,255,0.6);
   --sp-primary-border: rgba(100,180,255,0.5);
-
-  /* 背景色 */
-  --sp-bg-main: rgba(20,20,30,0.85);       /* 面板主背景 */
-  --sp-bg-secondary: rgba(30,30,40,0.9);   /* 弹窗/次级背景 */
-  --sp-bg-light: rgba(255,255,255,0.06);   /* 内嵌区块浅底 */
-
-  /* 边框 */
+  --sp-bg-main: rgba(20,20,30,0.85);
+  --sp-bg-secondary: rgba(30,30,40,0.9);
+  --sp-bg-light: rgba(255,255,255,0.06);
   --sp-border: rgba(255,255,255,0.12);
   --sp-border-light: rgba(255,255,255,0.08);
-
-  /* 文字 */
-  --sp-text-primary: #eee;    /* 主文字 */
-  --sp-text-secondary: #bbb;  /* 副文字 */
-  --sp-text-muted: #888;      /* 灰色提示文字 */
-
-  /* 状态条颜色 */
-  --sp-status-hunger: #ffb347;  /* 饱食 */
-  --sp-status-clean: #87ceeb;   /* 清洁 */
-  --sp-status-energy: #90ee90;  /* 精力 */
-
-  /* 气泡 */
+  --sp-text-primary: #eee;
+  --sp-text-secondary: #bbb;
+  --sp-text-muted: #888;
+  --sp-status-hunger: #ffb347;
+  --sp-status-clean: #87ceeb;
+  --sp-status-energy: #90ee90;
   --sp-bubble-bg: rgba(20,20,30,0.85);
   --sp-bubble-border: rgba(255,255,255,0.15);
 }</pre>
@@ -8733,13 +10703,13 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">📐 使用说明折叠栏 / 通知条 / 滚动条 / 杂项</summary>
+                <summary class="sp-guide-summary">📐 杂项 / 滚动条 / 动画 / 迁移进度条</summary>
                 <div class="sp-guide-details-content">
                   <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 使用说明折叠栏 ===== */
 .sp-guide-details { }
 .sp-guide-details[open] { }
 .sp-guide-summary { }
-.sp-guide-summary::before { }   /* ▶ 箭头 */
+.sp-guide-summary::before { }
 .sp-guide-details-content { }
 
 /* ===== 所有游戏的通知条（统一覆盖）===== */
@@ -8762,51 +10732,16 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 #sp-migrate-progress-box { }
 #sp-migrate-bar { }
 
-/* ===== 自定义动作条目 ===== */
-.sp-custom-sprite-item { }
-.sp-custom-sprite-preview { }
-.sp-custom-sprite-info { }
-.sp-custom-sprite-actions { }
-
-/* ===== 时间滑轨 ===== */
-.sp-duration-row { }
-.sp-duration-label { }
-.sp-duration-row input[type="range"] { }
-
-/* ===== 记忆/聊天管理 ===== */
-.sp-memory-item { }
-.sp-chat-history-item { }
-.sp-chat-history-header { }
-
-/* ===== 世界书条目 ===== */
-.sp-wi-entry { }
-.sp-wi-entry.sp-wi-expanded { }
-.sp-wi-entry.sp-wi-excluded { }
-.sp-wi-entry-header { }
-.sp-wi-name { }
-.sp-wi-keys { }
-.sp-wi-entry-body { }
-
-/* ===== 预览区===== */
-.sp-preview-box { }
-.sp-preview-header { }
-.sp-preview-content { }
-.sp-preview-content.expanded { }
-
 /* ===== 动画关键帧（可覆盖）===== */
-/*菜单浮动*/
 @keyframes sp-menu-float { }
-/*闲置摆动 */
 @keyframes sp-idle-bob { }
-/* 心情跳动 */
 @keyframes sp-mood-bounce { }
-/* 渐入*/
 @keyframes sp-fade-in { }</pre>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">✨ 示例：圆角加大 + 气泡渐变</summary>
+                <summary class="sp-guide-summary">✨ 示例：圆角加大 + 气泡渐变 + 头像框美化</summary>
                 <div class="sp-guide-details-content">
                   <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* 所有面板圆角加大 */
 #silly-pet-chat,
@@ -8836,6 +10771,16 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
   border-radius: 8px;
 }
 
+/* 头像框加发光效果 */
+.sp-chat-avatar-frame {
+  filter: drop-shadow(0 0 4px rgba(255,200,50,0.5));
+}
+
+/* 隐藏头像时聊天气泡占满整行 */
+.sp-chat-row .sp-chat-msg {
+  max-width: 90%;
+}
+
 /* 给面板加背景图 */
 #silly-pet-chat {
   background-image: url("https://example.com/bg.jpg");
@@ -8846,13 +10791,8 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
               </details>
             </div>
           </div>
-        </div>
-        <div class="sp-settings-footer">
-          <button class="sp-btn sp-btn-primary" id="sp-save-settings">💾 保存所有设置</button>
-        </div>
-      </div>
-    </div>
-    `;
+
+          `;
 
     const wrapper = document.createElement('div');
     wrapper.innerHTML = html;
@@ -9263,28 +11203,7 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
       btn.addEventListener('touchend', (e) => { e.stopPropagation(); e.preventDefault(); if (!isMenuOpen) return; if (Date.now() - menuOpenTime < 300) return; handleMenuAction(btn.dataset.action); });
     });
 
-    // 聊天（初始化绑定，toggleChat 内会重新绑定最新逻辑）
-    const closeBtn = document.getElementById('sp-chat-close');
-
-    if (closeBtn) closeBtn.onclick = () => toggleChat();
-    const minimizeBtn = document.getElementById('sp-chat-minimize');
-    if (minimizeBtn) {
-      minimizeBtn.onclick = () => {
-        const chatEl = document.getElementById('silly-pet-chat');
-        if (!chatEl) return;
-        if (chatEl.classList.contains('sp-chat-minimized')) {
-          // 恢复
-          chatEl.classList.remove('sp-chat-minimized');
-          minimizeBtn.textContent = '─';
-          minimizeBtn.title = '缩小悬挂';
-        } else {
-          // 最小化
-          chatEl.classList.add('sp-chat-minimized');
-          minimizeBtn.textContent = '□';
-          minimizeBtn.title = '恢复窗口';
-        }
-      };
-    }
+    // 手机模式切换按钮
     const modeToggle = document.getElementById('sp-chat-mode-toggle');
     if (modeToggle) {
       updateChatModeButton(modeToggle);
@@ -9304,42 +11223,42 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
       };
     }
 
-    const chatHeader = document.getElementById('silly-pet-chat-header');
-   if (chatHeader) {
-    let chatDragging = false, chatOffX = 0, chatOffY = 0;
-    const chatDown = (e) => {
-     if (e.target.closest('#sp-chat-close') || e.target.closest('#sp-chat-minimize')) return;
-     chatDragging = true;
-     const chatEl = document.getElementById('silly-pet-chat');
-     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-     const rect = chatEl.getBoundingClientRect();
-     chatOffX = clientX - rect.left;
-     chatOffY = clientY - rect.top;
-    };
-    const chatMove = (e) => {
-      if (!chatDragging) return;
-      if (e.cancelable) e.preventDefault();
-      const chatEl = document.getElementById('silly-pet-chat');
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-      let x = clientX - chatOffX;
-      let y = clientY - chatOffY;
-      x = Math.max(0, Math.min(window.innerWidth - chatEl.offsetWidth, x));
-      y = Math.max(0, Math.min(window.innerHeight - chatEl.offsetHeight, y));
-      chatEl.style.left = x + 'px';
-      chatEl.style.top = y + 'px';
-      chatEl.style.right = 'auto';
-      chatEl.style.bottom = 'auto';
-    };
-  const chatUp = () => { chatDragging = false; };
-  chatHeader.addEventListener('mousedown', chatDown);
-  chatHeader.addEventListener('touchstart', chatDown, { passive: true });
-  document.addEventListener('mousemove', chatMove);
-  document.addEventListener('touchmove', chatMove, { passive: false });
-  document.addEventListener('mouseup', chatUp);
-  document.addEventListener('touchend', chatUp);
-}
+    // 手机拖拽（用状态栏作为手柄）
+    const phoneStatusbar = document.getElementById('sp-phone-statusbar');
+    if (phoneStatusbar) {
+      let chatDragging = false, chatOffX = 0, chatOffY = 0;
+      const chatDown = (e) => {
+        chatDragging = true;
+        const chatEl = document.getElementById('silly-pet-chat');
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const rect = chatEl.getBoundingClientRect();
+        chatOffX = clientX - rect.left;
+        chatOffY = clientY - rect.top;
+      };
+      const chatMove = (e) => {
+        if (!chatDragging) return;
+        if (e.cancelable) e.preventDefault();
+        const chatEl = document.getElementById('silly-pet-chat');
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        let x = clientX - chatOffX;
+        let y = clientY - chatOffY;
+        x = Math.max(0, Math.min(window.innerWidth - chatEl.offsetWidth, x));
+        y = Math.max(0, Math.min(window.innerHeight - chatEl.offsetHeight, y));
+        chatEl.style.left = x + 'px';
+        chatEl.style.top = y + 'px';
+        chatEl.style.right = 'auto';
+        chatEl.style.bottom = 'auto';
+      };
+      const chatUp = () => { chatDragging = false; };
+      phoneStatusbar.addEventListener('mousedown', chatDown);
+      phoneStatusbar.addEventListener('touchstart', chatDown, { passive: true });
+      document.addEventListener('mousemove', chatMove);
+      document.addEventListener('touchmove', chatMove, { passive: false });
+      document.addEventListener('mouseup', chatUp);
+      document.addEventListener('touchend', chatUp);
+    }
 
     // 总结弹窗
     document.getElementById('sp-summary-confirm')?.addEventListener('click', confirmSummary);
@@ -24467,6 +26386,892 @@ window.addEventListener('beforeunload', () => {
     });
   }
 
+  // ============================================================
+  // 📚 书架模块 — 漫画 + 小说阅读器
+  // ============================================================
+
+  let _bsFilterTag = '';
+  let _bsSearchQuery = '';
+  let _bsActiveBookId = null;
+  let _bsActivePageIdx = 0;
+
+  // ===== 事件绑定 =====
+  function bsBindEvents() {
+    const fileInput = document.getElementById('sp-bs-file-input');
+    const restoreInput = document.getElementById('sp-bs-restore-input');
+
+    document.getElementById('sp-bs-import-btn')?.addEventListener('click', () => {
+      const t = document.getElementById('sp-bs-import-type')?.value || 'images';
+      if (t === 'images') { fileInput.accept = 'image/*'; fileInput.multiple = true; }
+      else if (t === 'zip') { fileInput.accept = '.zip'; fileInput.multiple = false; }
+      else if (t === 'pdf') { fileInput.accept = '.pdf'; fileInput.multiple = false; }
+      else if (t === 'txt') { fileInput.accept = '.txt'; fileInput.multiple = false; }
+      else if (t === 'epub') { fileInput.accept = '.epub'; fileInput.multiple = false; }
+      fileInput.click();
+    });
+
+    fileInput?.addEventListener('change', async (e) => {
+      const files = Array.from(e.target.files);
+      if (files.length === 0) return;
+      fileInput.value = '';
+      const t = document.getElementById('sp-bs-import-type')?.value || 'images';
+      if (t === 'images') await bsImportImages(files);
+      else if (t === 'zip') await bsImportZip(files[0]);
+      else if (t === 'pdf') await bsImportPdf(files[0]);
+      else if (t === 'txt') await bsImportTxt(files[0]);
+      else if (t === 'epub') await bsImportEpub(files[0]);
+    });
+
+    document.getElementById('sp-bs-search')?.addEventListener('input', (e) => {
+      _bsSearchQuery = e.target.value.trim().toLowerCase();
+      bsRenderShelf();
+    });
+
+    document.getElementById('sp-bs-sort')?.addEventListener('change', (e) => {
+      settings.bookshelfSort = e.target.value;
+      saveDataDebounced('书架排序');
+      bsRenderShelf();
+    });
+
+    document.getElementById('sp-bs-layout-toggle')?.addEventListener('click', () => {
+      settings.bookshelfLayout = settings.bookshelfLayout === 'grid' ? 'list' : 'grid';
+      saveDataDebounced('书架布局');
+      bsRenderShelf();
+    });
+
+    document.getElementById('sp-bs-backup-btn')?.addEventListener('click', bsExportBackup);
+    document.getElementById('sp-bs-restore-btn')?.addEventListener('click', () => restoreInput?.click());
+    restoreInput?.addEventListener('change', (e) => {
+      if (e.target.files[0]) { bsImportBackup(e.target.files[0]); e.target.value = ''; }
+    });
+
+    // 阅读器
+    document.getElementById('sp-br-back-btn')?.addEventListener('click', () => {
+      _bsActiveBookId = null;
+      switchPhonePage('bookshelf');
+      bsRenderShelf();
+      bsRenderHistory();
+    });
+    document.getElementById('sp-br-prev')?.addEventListener('click', () => bsReaderNav(-1));
+    document.getElementById('sp-br-next')?.addEventListener('click', () => bsReaderNav(1));
+    document.getElementById('sp-br-toc-btn')?.addEventListener('click', bsOpenToc);
+    document.getElementById('sp-br-font-dec')?.addEventListener('click', () => {
+      settings.bookshelfReaderFont = Math.max(12, (settings.bookshelfReaderFont || 16) - 2);
+      saveDataDebounced('字号'); bsRenderPage();
+    });
+    document.getElementById('sp-br-font-inc')?.addEventListener('click', () => {
+      settings.bookshelfReaderFont = Math.min(36, (settings.bookshelfReaderFont || 16) + 2);
+      saveDataDebounced('字号'); bsRenderPage();
+    });
+
+    const slider = document.getElementById('sp-br-slider');
+    if (slider) {
+      slider.addEventListener('input', () => {
+        const book = bsGetBook(_bsActiveBookId);
+        if (book) {
+          const bar = document.getElementById('sp-br-progress-bar');
+          if (bar) bar.textContent = `${parseInt(slider.value) + 1} / ${book.pagesCount}`;
+        }
+      });
+      slider.addEventListener('change', async () => {
+        _bsActivePageIdx = parseInt(slider.value);
+        await bsRenderPage();
+      });
+    }
+
+    // ===== 沉浸模式 =====
+    let _bsBarsVisible = true;
+    let _bsHideTimer = null;
+    let _bsLastScrollTop = 0;
+
+    function bsToggleBars(show) {
+      const topBar = document.getElementById('sp-br-top-bar');
+      const bottomBar = document.getElementById('sp-br-bottom-bar');
+      const body = document.getElementById('sp-br-body');
+      if (!topBar || !bottomBar || !body) return;
+
+      if (show === undefined) show = !_bsBarsVisible;
+      _bsBarsVisible = show;
+
+      if (show) {
+        topBar.classList.remove('sp-br-bar-hidden');
+        topBar.classList.add('sp-br-bar-visible');
+        bottomBar.classList.remove('sp-br-bar-hidden');
+        bottomBar.classList.add('sp-br-bar-visible');
+        body.classList.remove('sp-br-immersive');
+        // 3 秒后自动隐藏
+        clearTimeout(_bsHideTimer);
+        _bsHideTimer = setTimeout(() => bsToggleBars(false), 3000);
+      } else {
+        topBar.classList.remove('sp-br-bar-visible');
+        topBar.classList.add('sp-br-bar-hidden');
+        bottomBar.classList.remove('sp-br-bar-visible');
+        bottomBar.classList.add('sp-br-bar-hidden');
+        body.classList.add('sp-br-immersive');
+        clearTimeout(_bsHideTimer);
+      }
+    }
+
+    // 点击阅读区域切换工具栏
+    document.getElementById('sp-br-body')?.addEventListener('click', (e) => {
+      // 点击图片或链接不触发
+      if (e.target.tagName === 'IMG' || e.target.tagName === 'A') return;
+      // 点击书签段落不触发
+      if (e.target.closest('[data-bs-pidx]') && e.target !== e.target.closest('[data-bs-pidx]')) return;
+      bsToggleBars();
+    });
+
+    // 滚动时自动隐藏工具栏
+    document.getElementById('sp-br-body')?.addEventListener('scroll', () => {
+      const body = document.getElementById('sp-br-body');
+      if (!body) return;
+      const currentScroll = body.scrollTop;
+      const diff = currentScroll - _bsLastScrollTop;
+
+      // 向下滚动超过 30px 自动隐藏
+      if (diff > 30 && _bsBarsVisible) {
+        bsToggleBars(false);
+      }
+      // 向上快速滚动超过 50px 自动显示
+      else if (diff < -50 && !_bsBarsVisible) {
+        bsToggleBars(true);
+      }
+
+      _bsLastScrollTop = currentScroll;
+    });
+
+    // 工具栏自身不冒泡到 body 的 click
+    document.getElementById('sp-br-top-bar')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      clearTimeout(_bsHideTimer);
+      _bsHideTimer = setTimeout(() => bsToggleBars(false), 3000);
+    });
+    document.getElementById('sp-br-bottom-bar')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      clearTimeout(_bsHideTimer);
+      _bsHideTimer = setTimeout(() => bsToggleBars(false), 3000);
+    });
+
+    // 打开阅读器时重置状态
+    const origBsOpenReader = bsOpenReader;
+    bsOpenReader = async function(bookId) {
+      await origBsOpenReader(bookId);
+      _bsBarsVisible = true;
+      _bsLastScrollTop = 0;
+      clearTimeout(_bsHideTimer);
+      // 进入后 3 秒自动隐藏
+      _bsHideTimer = setTimeout(() => bsToggleBars(false), 3000);
+    };
+
+  }
+
+  // ===== 工具函数 =====
+  function bsGetBook(id) {
+    return (settings.bookshelfBooks || []).find(b => b.id === id);
+  }
+
+  function bsGenThumbnail(base64, maxSize) {
+    maxSize = maxSize || 120;
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        let w = img.width, h = img.height;
+        const ratio = Math.min(maxSize / w, maxSize / h);
+        if (ratio < 1) { w = Math.floor(w * ratio); h = Math.floor(h * ratio); }
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        let r = c.toDataURL('image/webp', 0.4);
+        if (!r || r.length < 50) r = c.toDataURL('image/jpeg', 0.5);
+        c.width = 0; c.height = 0;
+        resolve(r);
+      };
+      img.onerror = () => resolve(base64);
+      img.src = base64;
+    });
+  }
+
+  function bsProcessImage(file, maxW, maxH) {
+    maxW = maxW || 1600; maxH = maxH || 2400;
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          let w = img.width, h = img.height;
+          if (w <= maxW && h <= maxH && file.size < 300 * 1024) { resolve(e.target.result); return; }
+          if (w > maxW || h > maxH) { const r = Math.min(maxW / w, maxH / h); w = Math.floor(w * r); h = Math.floor(h * r); }
+          const c = document.createElement('canvas');
+          c.width = w; c.height = h;
+          const ctx = c.getContext('2d');
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, w, h);
+          let result = c.toDataURL('image/webp', 0.78);
+          if (!result || result.length < 50) result = c.toDataURL('image/jpeg', 0.8);
+          c.width = 0; c.height = 0;
+          resolve(result);
+        };
+        img.onerror = () => reject(new Error('图片加载失败'));
+        img.src = e.target.result;
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function bsDetectEncoding(file) {
+    return new Promise((resolve, reject) => {
+      const sampleBlob = file.slice(0, 8192);
+      const sr = new FileReader();
+      sr.onload = (e) => {
+        const bytes = new Uint8Array(e.target.result);
+        if (bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) { resolve('UTF-8'); return; }
+        if (bytes[0] === 0xFF && bytes[1] === 0xFE) { resolve('UTF-16LE'); return; }
+        let i = 0, errors = 0, multi = 0;
+        while (i < bytes.length) {
+          if (bytes[i] <= 0x7F) { i++; }
+          else if ((bytes[i] & 0xE0) === 0xC0) { multi++; if (i + 1 >= bytes.length || (bytes[i + 1] & 0xC0) !== 0x80) errors++; i += 2; }
+          else if ((bytes[i] & 0xF0) === 0xE0) { multi++; if (i + 2 >= bytes.length || (bytes[i + 1] & 0xC0) !== 0x80 || (bytes[i + 2] & 0xC0) !== 0x80) errors++; i += 3; }
+          else if ((bytes[i] & 0xF8) === 0xF0) { multi++; if (i + 3 >= bytes.length || (bytes[i + 1] & 0xC0) !== 0x80 || (bytes[i + 2] & 0xC0) !== 0x80 || (bytes[i + 3] & 0xC0) !== 0x80) errors++; i += 4; }
+          else { errors++; i++; }
+        }
+        resolve(multi > 0 && (errors / multi) >= 0.05 ? 'GBK' : 'UTF-8');
+      };
+      sr.onerror = () => resolve('UTF-8');
+      sr.readAsArrayBuffer(sampleBlob);
+    });
+  }
+
+  function bsReadFileAs(file, encoding) {
+    return new Promise((resolve, reject) => {
+      if (encoding === 'GBK') {
+        const r = new FileReader();
+        r.onload = (e) => { try { resolve(new TextDecoder('GBK').decode(new Uint8Array(e.target.result))); } catch { const r2 = new FileReader(); r2.onload = (e2) => resolve(e2.target.result); r2.readAsText(file, 'UTF-8'); } };
+        r.readAsArrayBuffer(file);
+      } else {
+        const r = new FileReader();
+        r.onload = (e) => resolve(e.target.result);
+        r.onerror = () => reject(r.error);
+        r.readAsText(file, encoding);
+      }
+    });
+  }
+
+  // ===== 书架渲染 =====
+  function bsRenderShelf() {
+    const container = document.getElementById('sp-bs-shelf-list');
+    if (!container) return;
+    let books = [...(settings.bookshelfBooks || [])];
+    if (_bsSearchQuery) books = books.filter(b => b.title.toLowerCase().includes(_bsSearchQuery));
+    if (_bsFilterTag) books = books.filter(b => (settings.bookshelfTags?.[b.id] || []).includes(_bsFilterTag));
+
+    const sort = settings.bookshelfSort || 'time-desc';
+    if (sort === 'name') books.sort((a, b) => a.title.localeCompare(b.title, undefined, { numeric: true }));
+    else if (sort === 'time-asc') books.sort((a, b) => (a.addedTime || 0) - (b.addedTime || 0));
+    else if (sort === 'recent') books.sort((a, b) => (b.lastReadTime || 0) - (a.lastReadTime || 0));
+    else books.sort((a, b) => (b.addedTime || 0) - (a.addedTime || 0));
+
+    const isGrid = settings.bookshelfLayout === 'grid';
+    if (books.length === 0) {
+      container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--sp-text-muted);font-size:12px;">书架空空的～导入书籍或漫画吧</div>';
+      return;
+    }
+
+    container.style.display = isGrid ? 'grid' : 'flex';
+    container.style.gridTemplateColumns = isGrid ? 'repeat(3, 1fr)' : '';
+    container.style.gap = isGrid ? '8px' : '6px';
+    container.style.flexDirection = isGrid ? '' : 'column';
+
+    container.innerHTML = books.map(book => {
+      const cover = settings.bookshelfCovers?.[book.id];
+      const emoji = book.type === 'comic' ? '🖼️' : '📖';
+      let coverHtml = '';
+      if (isGrid) {
+        let coverStyle = 'aspect-ratio:3/4;border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:32px;cursor:pointer;position:relative;';
+        if (cover?.type === 'image' && cover.value) {
+          coverStyle += `background-image:url('${cover.value}');background-size:cover;background-position:center;`;
+        } else {
+          const colors = ['linear-gradient(135deg,#fbc2eb,#a6c1ee)', 'linear-gradient(135deg,#ff9a9e,#fecfef)', 'linear-gradient(135deg,#a1c4fd,#c2e9fb)', 'linear-gradient(135deg,#d4fc79,#96e6a1)', 'linear-gradient(135deg,#84fab0,#8fd3f4)'];
+          let h = 0; for (let i = 0; i < book.id.length; i++) h = book.id.charCodeAt(i) + ((h << 5) - h);
+          coverStyle += `background:${colors[Math.abs(h) % colors.length]};`;
+        }
+        coverHtml = `
+          <div data-bs-open="${book.id}" style="${coverStyle}">${(!cover?.type || cover?.type === 'text') ? (cover?.value || emoji) : ''}</div>
+          <div style="font-size:10px;color:var(--sp-text-primary);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;">${book.title}</div>
+          <div style="font-size:8px;color:var(--sp-text-muted);text-align:center;">${book.currentPage + 1}/${book.pagesCount}</div>
+        `;
+      } else {
+        coverHtml = `
+          <div style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--sp-bg-light);border:1px solid var(--sp-border-light);border-radius:8px;cursor:pointer;" data-bs-open="${book.id}">
+            <span style="font-size:24px;flex-shrink:0;">${emoji}</span>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${book.title}</div>
+              <div style="font-size:10px;color:var(--sp-text-muted);">${book.type === 'comic' ? '漫画' : '小说'} · ${book.currentPage + 1}/${book.pagesCount}</div>
+            </div>
+            <button class="sp-phone-btn" data-bs-rename="${book.id}" style="padding:2px 6px;font-size:10px;">✏️</button>
+            <button class="sp-phone-btn" data-bs-tags="${book.id}" style="padding:2px 6px;font-size:10px;">🏷️</button>
+            <button class="sp-phone-btn" data-bs-cover="${book.id}" style="padding:2px 6px;font-size:10px;">🖼️</button>
+            <button class="sp-phone-btn" data-bs-del="${book.id}" style="padding:2px 6px;font-size:10px;color:#f66;">✕</button>
+          </div>
+        `;
+      }
+      return `<div>${coverHtml}</div>`;
+    }).join('');
+
+    // 打开阅读
+    container.querySelectorAll('[data-bs-open]').forEach(el => {
+      el.addEventListener('click', () => bsOpenReader(el.dataset.bsOpen));
+      // 长按编辑（移动端）
+      let lpt = null, lp = false;
+      el.addEventListener('touchstart', () => { lp = false; lpt = setTimeout(() => { lp = true; if (navigator.vibrate) navigator.vibrate(50); bsShowBookMenu(el.dataset.bsOpen); }, 500); });
+      el.addEventListener('touchend', (e) => { clearTimeout(lpt); if (lp) { e.preventDefault(); e.stopPropagation(); } });
+      el.addEventListener('touchmove', () => clearTimeout(lpt));
+    });
+    // 按钮事件（列表模式）
+    container.querySelectorAll('[data-bs-rename]').forEach(el => { el.onclick = (e) => { e.stopPropagation(); bsRenameBook(el.dataset.bsRename); }; });
+    container.querySelectorAll('[data-bs-tags]').forEach(el => { el.onclick = (e) => { e.stopPropagation(); bsEditTags(el.dataset.bsTags); }; });
+    container.querySelectorAll('[data-bs-cover]').forEach(el => { el.onclick = (e) => { e.stopPropagation(); bsEditCover(el.dataset.bsCover); }; });
+    container.querySelectorAll('[data-bs-del]').forEach(el => { el.onclick = (e) => { e.stopPropagation(); bsDeleteBook(el.dataset.bsDel); }; });
+  }
+
+  function bsShowBookMenu(bookId) {
+    showConfirmDialog({
+      title: '📚 管理书籍',
+      desc: '选择操作：',
+      confirmText: '✏️ 改名',
+      cancelText: '🗑️ 删除',
+      onConfirm: () => bsRenameBook(bookId),
+      onCancel: () => bsDeleteBook(bookId),
+    });
+  }
+
+  function bsRenderHistory() {
+    const bar = document.getElementById('sp-bs-history-bar');
+    if (!bar) return;
+    const history = (settings.bookshelfReadingHistory || []).filter(h => (settings.bookshelfBooks || []).some(b => b.id === h.bookId));
+    if (history.length === 0) { bar.style.display = 'none'; return; }
+    bar.style.display = 'flex';
+    bar.innerHTML = '<span style="font-size:10px;color:var(--sp-text-muted);flex-shrink:0;">📖最近</span>' +
+      history.slice(0, 5).map(h => `<span data-bs-hist="${h.bookId}" style="font-size:10px;padding:2px 8px;border-radius:8px;background:var(--sp-bg-light);border:1px solid var(--sp-border-light);color:var(--sp-text-secondary);cursor:pointer;white-space:nowrap;flex-shrink:0;">${h.title.slice(0, 6)}</span>`).join('');
+    bar.querySelectorAll('[data-bs-hist]').forEach(el => { el.onclick = () => bsOpenReader(el.dataset.bsHist); });
+  }
+
+  function bsRenderTagBar() {
+    const bar = document.getElementById('sp-bs-tag-bar');
+    if (!bar) return;
+    const allTags = new Set();
+    Object.values(settings.bookshelfTags || {}).forEach(tags => tags.forEach(t => allTags.add(t)));
+    if (allTags.size === 0) { bar.innerHTML = ''; return; }
+    let html = `<button data-bs-tag="" style="font-size:9px;padding:2px 8px;border-radius:8px;border:1px solid var(--sp-border);background:${_bsFilterTag === '' ? 'var(--sp-primary)' : 'var(--sp-bg-light)'};color:${_bsFilterTag === '' ? '#fff' : 'var(--sp-text-secondary)'};cursor:pointer;">全部</button>`;
+    allTags.forEach(tag => {
+      html += `<button data-bs-tag="${tag}" style="font-size:9px;padding:2px 8px;border-radius:8px;border:1px solid var(--sp-border);background:${_bsFilterTag === tag ? 'var(--sp-primary)' : 'var(--sp-bg-light)'};color:${_bsFilterTag === tag ? '#fff' : 'var(--sp-text-secondary)'};cursor:pointer;">${tag}</button>`;
+    });
+    bar.innerHTML = html;
+    bar.querySelectorAll('[data-bs-tag]').forEach(btn => { btn.onclick = () => { _bsFilterTag = btn.dataset.bsTag; bsRenderTagBar(); bsRenderShelf(); }; });
+  }
+
+  // ===== 书籍管理 =====
+  function bsRenameBook(id) {
+    const book = bsGetBook(id);
+    if (!book) return;
+    showPromptDialog({ title: '✏️ 重命名', placeholder: '新名称', defaultValue: book.title, onConfirm: (name) => { if (name) { book.title = name.trim(); saveData(); bsRenderShelf(); } } });
+  }
+
+  function bsEditTags(id) {
+    const current = (settings.bookshelfTags?.[id] || []).join(', ');
+    showPromptDialog({ title: '🏷️ 管理标签', desc: '用逗号分隔多个标签', placeholder: '日漫, 已读完, 收藏', defaultValue: current, onConfirm: (input) => {
+      if (input !== null) {
+        const tags = input.split(/[,，]/).map(t => t.trim()).filter(Boolean);
+        if (!settings.bookshelfTags) settings.bookshelfTags = {};
+        settings.bookshelfTags[id] = tags;
+        saveData(); bsRenderTagBar(); bsRenderShelf();
+      }
+    }});
+  }
+
+  function bsEditCover(id) {
+    showConfirmDialog({
+      title: '🖼️ 封面设置',
+      desc: '选择封面类型',
+      confirmText: '📁 上传图片',
+      cancelText: '🎨 恢复默认',
+      onConfirm: () => {
+        const input = document.createElement('input');
+        input.type = 'file'; input.accept = 'image/*';
+        input.onchange = (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = async (ev) => {
+            const thumb = await bsGenThumbnail(ev.target.result, 200);
+            if (!settings.bookshelfCovers) settings.bookshelfCovers = {};
+            settings.bookshelfCovers[id] = { type: 'image', value: thumb };
+            saveData(); bsRenderShelf();
+          };
+          reader.readAsDataURL(file);
+        };
+        input.click();
+      },
+      onCancel: () => {
+        if (settings.bookshelfCovers?.[id]) delete settings.bookshelfCovers[id];
+        saveData(); bsRenderShelf();
+      }
+    });
+  }
+
+  function bsDeleteBook(id) {
+    const book = bsGetBook(id);
+    if (!book) return;
+    showConfirmDialog({
+      title: `🗑️ 删除「${book.title}」？`,
+      desc: '所有数据将永久删除',
+      confirmText: '删除',
+      cancelText: '取消',
+      onConfirm: async () => {
+        for (let i = 0; i < book.pagesCount; i++) await bsDbDelete(`${id}_p_${i}`).catch(() => {});
+        settings.bookshelfBooks = (settings.bookshelfBooks || []).filter(b => b.id !== id);
+        if (settings.bookshelfCovers?.[id]) delete settings.bookshelfCovers[id];
+        if (settings.bookshelfTags?.[id]) delete settings.bookshelfTags[id];
+        if (settings.bookshelfBookmarks?.[id]) delete settings.bookshelfBookmarks[id];
+        settings.bookshelfReadingHistory = (settings.bookshelfReadingHistory || []).filter(h => h.bookId !== id);
+        saveData(); bsRenderShelf(); bsRenderHistory(); bsRenderTagBar();
+      }
+    });
+  }
+
+  // ===== 导入：图片 =====
+  async function bsImportImages(files) {
+    const imgs = files.filter(f => f.type.startsWith('image/'));
+    if (imgs.length === 0) { showBubble('没有找到图片', 2000); return; }
+    imgs.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    showPromptDialog({
+      title: `📚 导入漫画 (${imgs.length}张)`,
+      placeholder: '漫画名称',
+      defaultValue: imgs[0].name.replace(/\.[^.]+$/, '').replace(/[\d_\-]+$/, '') || '漫画',
+      onConfirm: async (name) => {
+        if (!name) return;
+        showBubble(`正在导入「${name}」…0/${imgs.length}`, 30000);
+        const bookId = 'bk_' + Date.now();
+        for (let i = 0; i < imgs.length; i++) {
+          const data = await bsProcessImage(imgs[i]);
+          const thumb = await bsGenThumbnail(data);
+          await bsDbSave(`${bookId}_p_${i}`, { content: data, thumbnail: thumb, type: 'image' });
+          if (i % 5 === 4) { showBubble(`导入中…${i + 1}/${imgs.length}`, 30000); await new Promise(r => setTimeout(r, 0)); }
+        }
+        const firstPage = await bsDbGet(`${bookId}_p_0`);
+        if (!settings.bookshelfBooks) settings.bookshelfBooks = [];
+        settings.bookshelfBooks.push({ id: bookId, title: name.trim(), type: 'comic', pagesCount: imgs.length, currentPage: 0, addedTime: Date.now() });
+        if (firstPage?.thumbnail) { if (!settings.bookshelfCovers) settings.bookshelfCovers = {}; settings.bookshelfCovers[bookId] = { type: 'image', value: firstPage.thumbnail }; }
+        saveData(); bsRenderShelf(); showBubble(`📚「${name}」导入完成！共${imgs.length}页`, 3000);
+      }
+    });
+  }
+
+  // ===== 导入：TXT =====
+  async function bsImportTxt(file) {
+    showBubble('正在解析文件编码…', 5000);
+    const encoding = await bsDetectEncoding(file);
+    const text = await bsReadFileAs(file, encoding);
+    const regex = /第[一二三四五六七八九十百千万零0-9a-zA-Z\s]+[章节卷回集折篇幕]/g;
+    const matches = [];
+    let m;
+    while ((m = regex.exec(text)) !== null) matches.push({ index: m.index, title: m[0].trim() });
+    const chapters = [];
+    if (matches.length === 0) {
+      for (let i = 0; i < text.length; i += 5000) chapters.push({ title: `第${chapters.length + 1}部分`, content: text.substring(i, i + 5000) });
+    } else {
+      if (matches[0].index > 0) chapters.push({ title: '前言', content: text.substring(0, matches[0].index).trim() });
+      for (let i = 0; i < matches.length; i++) {
+        const start = matches[i].index + matches[i].title.length;
+        const end = i + 1 < matches.length ? matches[i + 1].index : text.length;
+        chapters.push({ title: matches[i].title, content: text.substring(start, end).trim() });
+      }
+    }
+    const bookId = 'bk_' + Date.now();
+    const bookName = file.name.replace(/\.txt$/i, '');
+    showBubble(`正在导入「${bookName}」…${chapters.length}章`, 10000);
+    for (let i = 0; i < chapters.length; i++) {
+      await bsDbSave(`${bookId}_p_${i}`, { content: chapters[i].content, title: chapters[i].title, type: 'text' });
+      if (i % 50 === 49) await new Promise(r => setTimeout(r, 0));
+    }
+    if (!settings.bookshelfBooks) settings.bookshelfBooks = [];
+    settings.bookshelfBooks.push({ id: bookId, title: bookName, type: 'novel', pagesCount: chapters.length, currentPage: 0, addedTime: Date.now() });
+    saveData(); bsRenderShelf(); showBubble(`📖「${bookName}」导入完成！共${chapters.length}章`, 3000);
+  }
+
+  // ===== 导入：ZIP =====
+  async function bsImportZip(file) {
+    if (typeof JSZip === 'undefined') {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/jszip@3/dist/jszip.min.js';
+      document.head.appendChild(s);
+      await new Promise((resolve, reject) => { s.onload = resolve; s.onerror = () => reject(new Error('JSZip加载失败')); });
+    }
+    showPromptDialog({
+      title: '📦 导入ZIP漫画',
+      placeholder: '漫画名称',
+      defaultValue: file.name.replace(/\.zip$/i, ''),
+      onConfirm: async (name) => {
+        if (!name) return;
+        showBubble(`正在解压「${name}」…`, 30000);
+        const zip = await JSZip.loadAsync(file);
+        const imgFiles = [];
+        for (const [fn, f] of Object.entries(zip.files)) {
+          if (!f.dir && /\.(jpg|jpeg|png|webp|gif|bmp)$/i.test(fn)) {
+            const blob = await f.async('blob');
+            imgFiles.push({ name: fn, file: new File([blob], fn, { type: 'image/' + fn.split('.').pop() }) });
+          }
+        }
+        if (imgFiles.length === 0) { showBubble('ZIP中没有找到图片', 3000); return; }
+        imgFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+        const bookId = 'bk_' + Date.now();
+        for (let i = 0; i < imgFiles.length; i++) {
+          const data = await bsProcessImage(imgFiles[i].file);
+          const thumb = await bsGenThumbnail(data);
+          await bsDbSave(`${bookId}_p_${i}`, { content: data, thumbnail: thumb, type: 'image' });
+          if (i % 5 === 4) { showBubble(`导入中…${i + 1}/${imgFiles.length}`, 30000); await new Promise(r => setTimeout(r, 0)); }
+        }
+        if (!settings.bookshelfBooks) settings.bookshelfBooks = [];
+        settings.bookshelfBooks.push({ id: bookId, title: name.trim(), type: 'comic', pagesCount: imgFiles.length, currentPage: 0, addedTime: Date.now() });
+        const fp = await bsDbGet(`${bookId}_p_0`);
+        if (fp?.thumbnail) { if (!settings.bookshelfCovers) settings.bookshelfCovers = {}; settings.bookshelfCovers[bookId] = { type: 'image', value: fp.thumbnail }; }
+        saveData(); bsRenderShelf(); showBubble(`📦「${name}」导入完成！共${imgFiles.length}页`, 3000);
+      }
+    });
+  }
+
+  // ===== 导入：PDF =====
+  async function bsImportPdf(file) {
+    if (typeof pdfjsLib === 'undefined') {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
+      document.head.appendChild(s);
+      await new Promise((resolve, reject) => { s.onload = resolve; s.onerror = () => reject(new Error('pdf.js加载失败')); });
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+    }
+    showPromptDialog({
+      title: '📄 导入PDF',
+      placeholder: '名称',
+      defaultValue: file.name.replace(/\.pdf$/i, ''),
+      onConfirm: async (name) => {
+        if (!name) return;
+        showBubble(`正在解析PDF…`, 30000);
+        const buf = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+        const total = pdf.numPages;
+        const bookId = 'bk_' + Date.now();
+        for (let i = 0; i < total; i++) {
+          const page = await pdf.getPage(i + 1);
+          const vp0 = page.getViewport({ scale: 1 });
+          const scale = Math.min(1200 / vp0.width, 1.5);
+          const vp = page.getViewport({ scale });
+          const c = document.createElement('canvas');
+          c.width = vp.width; c.height = vp.height;
+          await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+          let data = c.toDataURL('image/webp', 0.78);
+          if (!data || data.length < 50) data = c.toDataURL('image/jpeg', 0.8);
+          const tr = Math.min(120 / vp.width, 120 / vp.height);
+          const tc = document.createElement('canvas');
+          tc.width = Math.floor(vp.width * tr); tc.height = Math.floor(vp.height * tr);
+          tc.getContext('2d').drawImage(c, 0, 0, tc.width, tc.height);
+          let thumb = tc.toDataURL('image/webp', 0.4);
+          if (!thumb || thumb.length < 50) thumb = tc.toDataURL('image/jpeg', 0.5);
+          await bsDbSave(`${bookId}_p_${i}`, { content: data, thumbnail: thumb, type: 'image' });
+          c.width = 0; c.height = 0; tc.width = 0; tc.height = 0;
+          if (i % 3 === 2) { showBubble(`PDF导入中…${i + 1}/${total}`, 30000); await new Promise(r => setTimeout(r, 0)); }
+        }
+        if (!settings.bookshelfBooks) settings.bookshelfBooks = [];
+        settings.bookshelfBooks.push({ id: bookId, title: name.trim(), type: 'comic', pagesCount: total, currentPage: 0, addedTime: Date.now() });
+        const fp = await bsDbGet(`${bookId}_p_0`);
+        if (fp?.thumbnail) { if (!settings.bookshelfCovers) settings.bookshelfCovers = {}; settings.bookshelfCovers[bookId] = { type: 'image', value: fp.thumbnail }; }
+        saveData(); bsRenderShelf(); showBubble(`📄「${name}」导入完成！共${total}页`, 3000);
+      }
+    });
+  }
+
+  // ===== 导入：EPUB =====
+  async function bsImportEpub(file) {
+    if (typeof JSZip === 'undefined') {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/jszip@3/dist/jszip.min.js';
+      document.head.appendChild(s);
+      await new Promise((resolve, reject) => { s.onload = resolve; s.onerror = () => reject(new Error('JSZip加载失败')); });
+    }
+    showBubble('正在解析EPUB…', 30000);
+    const buf = await file.arrayBuffer();
+    const zip = await JSZip.loadAsync(buf);
+    const containerXml = await zip.file('META-INF/container.xml')?.async('text');
+    let opfPath = '';
+    if (containerXml) { const m = containerXml.match(/full-path="([^"]+)"/); if (m) opfPath = m[1]; }
+    if (!opfPath) { const f = Object.keys(zip.files).find(f => f.endsWith('.opf')); if (f) opfPath = f; }
+    if (!opfPath) { showBubble('无法解析EPUB结构', 3000); return; }
+    const opfContent = await zip.file(opfPath)?.async('text');
+    if (!opfContent) { showBubble('无法读取EPUB内容', 3000); return; }
+    const opfDir = opfPath.includes('/') ? opfPath.substring(0, opfPath.lastIndexOf('/') + 1) : '';
+    const parser = new DOMParser();
+    const opfDoc = parser.parseFromString(opfContent, 'application/xml');
+    const titleEl = opfDoc.querySelector('metadata title');
+    const bookTitle = titleEl ? titleEl.textContent.trim() : file.name.replace(/\.[^.]+$/, '');
+    const manifest = {};
+    opfDoc.querySelectorAll('manifest item').forEach(item => { manifest[item.getAttribute('id')] = item.getAttribute('href'); });
+    const spineItems = [];
+    opfDoc.querySelectorAll('spine itemref').forEach(ref => { const id = ref.getAttribute('idref'); if (manifest[id]) spineItems.push(manifest[id]); });
+    if (spineItems.length === 0) { showBubble('EPUB没有可读内容', 3000); return; }
+    const chapters = [];
+    for (let i = 0; i < spineItems.length; i++) {
+      const href = opfDir + spineItems[i];
+      const htmlFile = zip.file(href);
+      if (!htmlFile) continue;
+      const html = await htmlFile.async('text');
+      const doc = parser.parseFromString(html, 'text/html');
+      let title = doc.querySelector('title')?.textContent?.trim() || doc.querySelector('h1,h2,h3')?.textContent?.trim() || `第${i + 1}章`;
+      const body = doc.body;
+      if (!body) continue;
+      body.querySelectorAll('script,style').forEach(el => el.remove());
+      const blocks = body.querySelectorAll('p,div,h1,h2,h3,h4,h5,h6');
+      const paragraphs = [];
+      if (blocks.length > 0) blocks.forEach(b => { const t = b.textContent.trim(); if (t) paragraphs.push(t); });
+      else { const t = body.textContent.trim(); if (t) paragraphs.push(t); }
+      const text = paragraphs.join('\n');
+      if (text.length > 0) chapters.push({ title, content: text });
+    }
+    if (chapters.length === 0) { showBubble('EPUB中没有可读文本', 3000); return; }
+    const bookId = 'bk_' + Date.now();
+    for (let i = 0; i < chapters.length; i++) {
+      await bsDbSave(`${bookId}_p_${i}`, { content: chapters[i].content, title: chapters[i].title, type: 'text' });
+      if (i % 50 === 49) await new Promise(r => setTimeout(r, 0));
+    }
+    if (!settings.bookshelfBooks) settings.bookshelfBooks = [];
+    settings.bookshelfBooks.push({ id: bookId, title: bookTitle, type: 'novel', pagesCount: chapters.length, currentPage: 0, addedTime: Date.now() });
+    saveData(); bsRenderShelf(); showBubble(`📖「${bookTitle}」导入完成！共${chapters.length}章`, 3000);
+  }
+
+  // ===== 阅读器 =====
+  async function bsOpenReader(bookId) {
+    const book = bsGetBook(bookId);
+    if (!book) return;
+    _bsActiveBookId = bookId;
+    _bsActivePageIdx = book.currentPage || 0;
+    book.lastReadTime = Date.now();
+    // 阅读历史
+    if (!settings.bookshelfReadingHistory) settings.bookshelfReadingHistory = [];
+    settings.bookshelfReadingHistory = settings.bookshelfReadingHistory.filter(h => h.bookId !== bookId);
+    settings.bookshelfReadingHistory.unshift({ bookId, title: book.title, timestamp: Date.now() });
+    if (settings.bookshelfReadingHistory.length > 5) settings.bookshelfReadingHistory = settings.bookshelfReadingHistory.slice(0, 5);
+    saveDataDebounced('书架阅读');
+    switchPhonePage('bookreader');
+    await bsRenderPage();
+  }
+
+  async function bsRenderPage() {
+    const book = bsGetBook(_bsActiveBookId);
+    if (!book) return;
+    const titleEl = document.getElementById('sp-br-title');
+    const bodyEl = document.getElementById('sp-br-body');
+    const progressEl = document.getElementById('sp-br-progress-bar');
+    const slider = document.getElementById('sp-br-slider');
+    if (!bodyEl) return;
+    const pageData = await bsDbGet(`${book.id}_p_${_bsActivePageIdx}`);
+    if (!pageData) { bodyEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--sp-text-muted);">页面加载失败</div>'; return; }
+
+    if (book.type === 'comic') {
+      if (titleEl) titleEl.textContent = book.title;
+      bodyEl.innerHTML = `<img src="${pageData.content}" style="width:100%;height:auto;border-radius:6px;display:block;" alt="第${_bsActivePageIdx + 1}页" />`;
+    } else {
+      const chTitle = pageData.title || `第${_bsActivePageIdx + 1}章`;
+      if (titleEl) titleEl.textContent = `${book.title}`;
+      const fontSize = settings.bookshelfReaderFont || 16;
+      const paras = (pageData.content || '').split(/\r?\n/).filter(p => p.trim());
+      bodyEl.innerHTML = `<div style="font-size:14px;font-weight:600;color:var(--sp-text-primary);margin-bottom:10px;text-align:center;border-bottom:1px dashed var(--sp-border-light);padding-bottom:8px;">${chTitle} <span style="font-size:10px;color:var(--sp-text-muted);font-weight:400;">${_bsActivePageIdx + 1}/${book.pagesCount}</span></div>` +
+        paras.map((p, idx) => {
+          const bm = bsGetBookmark(book.id, _bsActivePageIdx, idx);
+          const bmStyle = bm ? (bm.type === 'highlight' ? 'background:rgba(255,255,100,0.15);border-left:3px solid #ffb347;padding-left:8px;' : 'border-left:3px solid var(--sp-primary);padding-left:8px;') : '';
+          return `<p data-bs-pidx="${idx}" style="text-indent:2em;line-height:1.8;font-size:${fontSize}px;color:var(--sp-text-primary);margin-bottom:10px;${bmStyle}">${renderMarkdown(p)}${bm ? '<span style="font-size:10px;color:#ffb347;margin-left:4px;">🔖</span>' : ''}${bm?.note ? '<span style="display:block;font-size:10px;color:var(--sp-text-muted);margin-top:2px;">📝 ' + bm.note + '</span>' : ''}</p>`;
+        }).join('');
+      // 段落长按书签
+      bodyEl.querySelectorAll('[data-bs-pidx]').forEach(p => {
+        p.addEventListener('contextmenu', (e) => { e.preventDefault(); bsBookmarkMenu(book.id, _bsActivePageIdx, parseInt(p.dataset.bsPidx)); });
+        let lpt = null;
+        p.addEventListener('touchstart', () => { lpt = setTimeout(() => { if (navigator.vibrate) navigator.vibrate(30); bsBookmarkMenu(book.id, _bsActivePageIdx, parseInt(p.dataset.bsPidx)); }, 600); });
+        p.addEventListener('touchend', () => clearTimeout(lpt));
+        p.addEventListener('touchmove', () => clearTimeout(lpt));
+      });
+    }
+
+    if (progressEl) progressEl.textContent = `${_bsActivePageIdx + 1} / ${book.pagesCount}`;
+    if (slider) { slider.max = book.pagesCount - 1; slider.value = _bsActivePageIdx; }
+    book.currentPage = _bsActivePageIdx;
+    saveDataDebounced('阅读进度');
+    bodyEl.scrollTop = 0;
+  }
+
+  async function bsReaderNav(direction) {
+    const book = bsGetBook(_bsActiveBookId);
+    if (!book) return;
+    const newPage = _bsActivePageIdx + direction;
+    if (newPage < 0 || newPage >= book.pagesCount) {
+      showBubble(direction < 0 ? '已经是第一页了' : '已经是最后一页了', 1500);
+      return;
+    }
+    _bsActivePageIdx = newPage;
+    await bsRenderPage();
+  }
+
+  async function bsOpenToc() {
+    const book = bsGetBook(_bsActiveBookId);
+    if (!book) return;
+    document.getElementById('sp-bs-toc-overlay')?.remove();
+
+    // 关键：挂在阅读器页面内部，不挂 body
+    const readerPage = document.getElementById('sp-phone-bookreader');
+    if (!readerPage) return;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-bs-toc-overlay';
+    overlay.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:20;display:flex;align-items:center;justify-content:center;padding:20px 12px;box-sizing:border-box;';
+
+    const isComic = book.type === 'comic';
+
+    const box = document.createElement('div');
+    box.style.cssText = 'background:var(--sp-bg-secondary,rgba(30,30,40,0.95));border:1px solid var(--sp-border,rgba(255,255,255,0.12));border-radius:14px;width:100%;max-height:100%;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.5);';
+
+    const header = document.createElement('div');
+    header.style.cssText = 'padding:10px 14px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--sp-border-light,rgba(255,255,255,0.08));flex-shrink:0;';
+    header.innerHTML = '<span style="font-size:13px;font-weight:600;color:var(--sp-text-primary,#eee);">\uD83D\uDCD6 ' + (isComic ? '缩略图目录' : '章节目录') + ' (' + book.pagesCount + ')</span><button id="sp-bs-toc-close" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--sp-text-muted,#888);padding:0 4px;">\u2715</button>';
+
+    const tocBody = document.createElement('div');
+    tocBody.style.cssText = 'flex:1;overflow-y:auto;padding:8px;min-height:0;-webkit-overflow-scrolling:touch;' + (isComic ? 'display:grid;grid-template-columns:repeat(3,1fr);gap:6px;' : '');
+
+    box.appendChild(header);
+    box.appendChild(tocBody);
+    overlay.appendChild(box);
+    readerPage.appendChild(overlay);
+
+    header.querySelector('#sp-bs-toc-close').onclick = () => overlay.remove();
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+    for (let i = 0; i < book.pagesCount; i++) {
+      const item = document.createElement('div');
+      if (isComic) {
+        item.style.cssText = 'aspect-ratio:3/4;border-radius:6px;overflow:hidden;cursor:pointer;border:2px solid ' + (i === _bsActivePageIdx ? 'var(--sp-primary,rgba(100,180,255,0.7))' : 'var(--sp-border-light,rgba(255,255,255,0.08))') + ';position:relative;background:var(--sp-bg-light,rgba(255,255,255,0.06));display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--sp-text-muted,#888);';
+        item.textContent = '' + (i + 1);
+        const idx = i;
+        bsDbGet(book.id + '_p_' + idx).then(function(data) {
+          if (data && data.thumbnail) {
+            item.innerHTML = '<img src="' + data.thumbnail + '" style="width:100%;height:100%;object-fit:cover;" /><div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.6);color:#fff;text-align:center;font-size:9px;padding:1px;">' + (idx + 1) + '</div>';
+          }
+        });
+      } else {
+        item.style.cssText = 'padding:8px 10px;cursor:pointer;border-radius:6px;font-size:12px;color:' + (i === _bsActivePageIdx ? 'var(--sp-text-primary,#eee)' : 'var(--sp-text-secondary,#bbb)') + ';background:' + (i === _bsActivePageIdx ? 'var(--sp-bg-light,rgba(255,255,255,0.06))' : 'transparent') + ';border:1px solid ' + (i === _bsActivePageIdx ? 'var(--sp-primary,rgba(100,180,255,0.5))' : 'transparent') + ';margin-bottom:2px;';
+        item.textContent = '加载中…';
+        const idx = i;
+        bsDbGet(book.id + '_p_' + idx).then(function(data) {
+          if (data) item.textContent = data.title || ('第' + (idx + 1) + '章');
+        });
+      }
+      const pageIdx = i;
+      item.onclick = async () => {
+        _bsActivePageIdx = pageIdx;
+        await bsRenderPage();
+        overlay.remove();
+      };
+      tocBody.appendChild(item);
+      if (i % 30 === 29) await new Promise(r => setTimeout(r, 0));
+    }
+
+    requestAnimationFrame(() => {
+      if (tocBody.children[_bsActivePageIdx]) {
+        tocBody.children[_bsActivePageIdx].scrollIntoView({ block: 'center', behavior: 'instant' });
+      }
+    });
+  }
+
+
+  // ===== 书签 =====
+  function bsGetBookmark(bookId, pageIdx, paragraphIdx) {
+    const bms = settings.bookshelfBookmarks?.[bookId] || [];
+    return bms.find(b => b.pageIndex === pageIdx && b.paragraphIndex === paragraphIdx);
+  }
+
+  function bsBookmarkMenu(bookId, pageIdx, paragraphIdx) {
+    const existing = bsGetBookmark(bookId, pageIdx, paragraphIdx);
+    if (existing) {
+      showConfirmDialog({
+        title: '🔖 书签管理',
+        desc: existing.note ? `📝 ${existing.note}` : '已有书签',
+        confirmText: '📝 编辑笔记',
+        cancelText: '🗑️ 移除书签',
+        onConfirm: () => {
+          showPromptDialog({ title: '📝 编辑笔记', defaultValue: existing.note || '', onConfirm: (note) => {
+            if (note !== null) { existing.note = note.trim(); saveData(); bsRenderPage(); }
+          }});
+        },
+        onCancel: () => {
+          if (!settings.bookshelfBookmarks) settings.bookshelfBookmarks = {};
+          settings.bookshelfBookmarks[bookId] = (settings.bookshelfBookmarks[bookId] || []).filter(b => b.timestamp !== existing.timestamp);
+          saveData(); bsRenderPage();
+        }
+      });
+    } else {
+      showConfirmDialog({
+        title: '🔖 添加书签',
+        desc: '选择书签类型',
+        confirmText: '🔖 书签',
+        cancelText: '🖍️ 高亮',
+        onConfirm: () => bsAddBookmark(bookId, pageIdx, paragraphIdx, 'bookmark'),
+        onCancel: () => bsAddBookmark(bookId, pageIdx, paragraphIdx, 'highlight'),
+      });
+    }
+  }
+
+  function bsAddBookmark(bookId, pageIdx, paragraphIdx, type) {
+    if (!settings.bookshelfBookmarks) settings.bookshelfBookmarks = {};
+    if (!settings.bookshelfBookmarks[bookId]) settings.bookshelfBookmarks[bookId] = [];
+    showPromptDialog({ title: '📝 添加笔记（可留空）', placeholder: '笔记内容…', defaultValue: '', onConfirm: (note) => {
+      settings.bookshelfBookmarks[bookId].push({ pageIndex: pageIdx, paragraphIndex: paragraphIdx, type, note: (note || '').trim(), timestamp: Date.now() });
+      saveData(); bsRenderPage(); showBubble('🔖 书签已添加', 1500);
+    }});
+  }
+
+  // ===== 备份/还原 =====
+  async function bsExportBackup() {
+    showBubble('正在导出备份…', 10000);
+    const books = settings.bookshelfBooks || [];
+    const backup = { version: '1.0', books: books, covers: settings.bookshelfCovers || {}, tags: settings.bookshelfTags || {}, bookmarks: settings.bookshelfBookmarks || {}, pages: [] };
+    for (const book of books) {
+      for (let i = 0; i < book.pagesCount; i++) {
+        const p = await bsDbGet(`${book.id}_p_${i}`);
+        if (p) backup.pages.push({ id: `${book.id}_p_${i}`, ...p });
+      }
+    }
+    const blob = new Blob([JSON.stringify(backup)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `bookshelf_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showBubble(`📦 备份完成！共${books.length}本`, 3000);
+  }
+
+  async function bsImportBackup(file) {
+    showBubble('正在还原备份…', 30000);
+    const text = await new Promise((resolve) => { const r = new FileReader(); r.onload = (e) => resolve(e.target.result); r.readAsText(file); });
+    const data = JSON.parse(text);
+    if (!data.books || !data.pages) { showBubble('无效的备份文件', 3000); return; }
+    for (const book of data.books) {
+      if (!(settings.bookshelfBooks || []).some(b => b.id === book.id)) {
+        if (!settings.bookshelfBooks) settings.bookshelfBooks = [];
+        settings.bookshelfBooks.push(book);
+      }
+    }
+    for (const p of data.pages) await bsDbSave(p.id, p).catch(() => {});
+    if (data.covers) settings.bookshelfCovers = { ...(settings.bookshelfCovers || {}), ...data.covers };
+    if (data.tags) settings.bookshelfTags = { ...(settings.bookshelfTags || {}), ...data.tags };
+    if (data.bookmarks) settings.bookshelfBookmarks = { ...(settings.bookshelfBookmarks || {}), ...data.bookmarks };
+    saveData(); bsRenderShelf(); bsRenderTagBar();
+    showBubble(`📂 还原完成！共${data.books.length}本`, 3000);
+  }
 
 })();
 
