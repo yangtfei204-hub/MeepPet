@@ -10560,3 +10560,19 @@
   color: var(--sp-text-secondary) !important;
   text-decoration: underline;
 }
+
+/* ===== 线上模式消息逐条渐出动画 ===== */
+.sp-chat-row-fadein {
+  animation: sp-chat-row-appear 0.5s ease-out forwards;
+}
+
+@keyframes sp-chat-row-appear {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

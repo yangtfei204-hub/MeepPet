@@ -1421,10 +1421,7 @@ function saveData() {
         // 处理线上模式的 ||| 分隔
         if (reply.includes('|||')) {
           const parts = reply.split('|||').map(s => s.trim()).filter(Boolean);
-          const now = Date.now();
-          parts.forEach((part, i) => {
-            state.petChatHistory.push({ role: 'assistant', content: part, timestamp: now + i });
-          });
+          await showOnlineMessagesSequentially(parts);
         } else {
           state.petChatHistory.push({ role: 'assistant', content: reply, timestamp: Date.now() });
         }
@@ -4851,10 +4848,7 @@ if (hasEmoji) {
       if (reply) {
         if (chatMode === 'online' && reply.includes('|||')) {
           const parts = reply.split('|||').map(s => s.trim()).filter(Boolean);
-          const now = Date.now();
-          parts.forEach((part, i) => {
-            state.petChatHistory.push({ role: 'assistant', content: part, timestamp: now + i });
-          });
+          await showOnlineMessagesSequentially(parts);
         } else {
           state.petChatHistory.push({ role: 'assistant', content: reply, timestamp: Date.now() });
         }
@@ -7945,6 +7939,27 @@ function toggleChat() {
     container.scrollTop = container.scrollHeight;
   }
 
+  async function showOnlineMessagesSequentially(parts) {
+    const container = document.getElementById('silly-pet-chat-messages');
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const now = Date.now();
+      state.petChatHistory.push({ role: 'assistant', content: part, timestamp: now });
+
+      // 直接创建消息行并附加到容器，带渐出动画
+      if (container) {
+        const row = _createChatRow({ role: 'assistant', content: part, timestamp: now });
+        row.classList.add('sp-chat-row-fadein');
+        container.appendChild(row);
+        container.scrollTop = container.scrollHeight;
+      }
+
+      // 每条消息之间等待一段时间（模拟真实发消息的节奏）
+      if (i < parts.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 600 + Math.random() * 600));
+      }
+    }
+  }
 
   async function sendChatMessage(text) {
     if (!text.trim()) return;
@@ -7983,10 +7998,7 @@ function toggleChat() {
       if (reply) {
         if (chatMode === 'online' && reply.includes('|||')) {
           const parts = reply.split('|||').map(s => s.trim()).filter(Boolean);
-          const now = Date.now();
-          parts.forEach((part, i) => {
-            state.petChatHistory.push({ role: 'assistant', content: part, timestamp: now + i });
-          });
+          await showOnlineMessagesSequentially(parts);
         } else {
           state.petChatHistory.push({ role: 'assistant', content: reply, timestamp: Date.now() });
         }
