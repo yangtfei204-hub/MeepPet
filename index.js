@@ -495,6 +495,7 @@
     fanficMyAvatar: '',                // 同人文「我」标签页自定义头像
     fanficGeneratePrompt: '你是一个同人文生成器。请根据提供的世界观设定，生成若干篇同人文。\n\n请严格按以下JSON数组格式输出（不要输出任何其他内容，只输出JSON）：\n[\n  {\n    "title": "同人文标题(5-20字)",\n    "content": "同人文正文(800-2000字，包含场景描写、人物对话、心理活动，文笔细腻，感情丰富)",\n    "authorName": "作者笔名(2-6字)",\n    "authorAvatar": "一个emoji表情作为头像",\n    "coverEmoji": "一个能代表文章氛围的emoji",\n    "likes": 随机数100-9999,\n    "views": 随机数500-99999,\n    "tags": ["标签1","标签2"]\n  }\n]\n\n要求：\n- 生成5到10篇同人文\n- 每篇要有不同的作者和写作风格\n- 内容必须贴合世界观设定\n- 包含不同类型：甜文、虐文、日常、冒险等\n- 标签1-3个\n- 数字字段请直接写数字，不要加引号\n- content字段内容要丰富，至少800字',
     fanficContinuePrompt: '请根据以下同人文内容进行续写。续写要求：\n1. 保持原文的文风和人物性格\n2. 情节自然衔接\n3. 续写内容800-1500字\n4. 直接输出续写的正文内容，不要输出JSON或其他格式标记\n5. 不要重复原文内容',
+    fanficCommentPrompt: '你是一个同人文评论生成器。请根据提供的同人文内容和世界观设定，生成若干条风格各异的读者评论。\n\n请严格按以下JSON数组格式输出（不要输出任何其他内容，只输出JSON）：\n[\n  {\n    "author": "评论者昵称(2-6个字，符合世界观的名字风格)",\n    "avatarEmoji": "一个emoji表情作为头像",\n    "content": "评论内容(10-150字，语言风格像文学社区/同人论坛评论，可以包含表情符号)",\n    "likes": 随机数0-999\n  }\n]\n\n要求：\n- 生成10到15条评论\n- 每条评论的作者和写作风格都不同\n- 评论类型要多样化：有表白的、有分析剧情的、有催更的、有讨论CP的、有吐槽的、有写长评的、有纯尖叫的\n- 评论内容必须贴合同人文的剧情和人物\n- 有的评论可以很短（如"啊啊啊好甜""呜呜呜刀了""前排""催更！"等粉丝风格）\n- 有的评论可以比较长（认真分析剧情、讨论人物心理）\n- 评论要有真实感，像真人在同人社区里互动\n- 数字字段请直接写数字，不要加引号',
 
     // 自定义动作精灵图
     customSprites: [],        // [{name: '动作名', image: 'base64...'}]
@@ -1995,6 +1996,10 @@ function saveData() {
               <textarea id="sp-fanfic-generate-prompt" style="width:100%;min-height:80px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${settings.fanficGeneratePrompt || ''}</textarea>
               <div class="sp-phone-setting-title" style="margin-top:10px;">📝 同人文续写提示词</div>
               <textarea id="sp-fanfic-continue-prompt" style="width:100%;min-height:60px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${settings.fanficContinuePrompt || ''}</textarea>
+              <div class="sp-phone-setting-title" style="margin-top:10px;">💬 同人文评论提示词</div>
+              <textarea id="sp-fanfic-comment-prompt" style="width:100%;min-height:80px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${settings.fanficCommentPrompt || ''}</textarea>
+              <p style="font-size:10px;color:var(--sp-text-muted);margin:4px 0 0;line-height:1.6;">生成同人文评论时发送：${'{'}<span style="color:rgba(100,180,255,0.8);">世界书</span>${'}'}<span style="font-size:9px;">（由下方开关控制）</span> + <span style="color:rgba(200,150,255,0.8);">同人文标题和正文</span> + <span style="color:rgba(255,180,100,0.8);">破限</span> + <span style="color:rgba(100,220,100,0.8);">此提示词</span><br/>每次生成10~15条风格各异的评论，生成后追加到同人文阅读页的评论区</p>
+
               <label class="sp-phone-switch-row" style="margin-top:8px;">
                 <span>生成同人文时发送世界书</span>
                 <label class="sp-toggle-switch"><input type="checkbox" id="sp-fanfic-send-worldbook" ${settings.fanficSendWorldBook !== false ? 'checked' : ''} /><span class="sp-toggle-slider"></span></label>
@@ -7521,6 +7526,8 @@ if (hasEmoji) {
     if (fanficGenPrompt) fanficGenPrompt.value = settings.fanficGeneratePrompt || '';
     const fanficContPrompt = document.getElementById('sp-fanfic-continue-prompt');
     if (fanficContPrompt) fanficContPrompt.value = settings.fanficContinuePrompt || '';
+    const fanficCommentPrompt = document.getElementById('sp-fanfic-comment-prompt');
+    if (fanficCommentPrompt) fanficCommentPrompt.value = settings.fanficCommentPrompt || '';
     const fanficWbToggle = document.getElementById('sp-fanfic-send-worldbook');
     if (fanficWbToggle) fanficWbToggle.checked = settings.fanficSendWorldBook !== false;
     // 预设下拉同步
@@ -14048,6 +14055,8 @@ document.getElementById('sp-export')?.addEventListener('click', async () => {
     settings.forumSendWorldBook = document.getElementById('sp-forum-send-worldbook')?.checked !== false;
     settings.fanficSendWorldBook = document.getElementById('sp-fanfic-send-worldbook')?.checked !== false;settings.fanficGeneratePrompt = v('sp-fanfic-generate-prompt') || DEFAULT_SETTINGS.fanficGeneratePrompt;
     settings.fanficContinuePrompt = v('sp-fanfic-continue-prompt') || DEFAULT_SETTINGS.fanficContinuePrompt;
+    settings.fanficCommentPrompt = v('sp-fanfic-comment-prompt') || DEFAULT_SETTINGS.fanficCommentPrompt;
+
     settings.summaryMode = v('sp-summary-mode') || 'incremental';
     settings.summaryTrigger = document.getElementById('sp-summary-auto')?.checked ? 'auto' : 'manual';
     settings.summaryKeepRecent = n('sp-summary-keep', 10);
@@ -28897,6 +28906,7 @@ window.addEventListener('beforeunload', () => {
         wordCount: (p.content || '').length,
         timestamp: Date.now(),
         continuations: [],
+        generatedComments: [],
       }));
 
       settings.fanficPosts = posts;
@@ -28924,6 +28934,26 @@ window.addEventListener('beforeunload', () => {
     const isFav = (settings.fanficFavorites || []).includes(post.id);
     const fullContent = post.content + (post.continuations || []).map(c => '\n\n---\n\n' + c).join('');
 
+    //渲染已有评论
+    let fanficCommentsHtml = '';
+    if (post.generatedComments && post.generatedComments.length > 0) {
+      fanficCommentsHtml = `<div style="margin-top:16px;border-top:1px solid var(--sp-border-light);padding-top:12px;">
+        <div style="font-size:13px;font-weight:600;color:var(--sp-text-primary);margin-bottom:10px;">💬 评论区 (${post.generatedComments.length})</div>
+        ${post.generatedComments.map(c => `
+          <div style="display:flex;gap:8px;margin-bottom:10px;padding:8px 10px;background:rgba(255,255,255,0.04);border-radius:10px;">
+            <span style="font-size:18px;flex-shrink:0;">${c.avatarEmoji || '😺'}</span>
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
+                <span style="font-size:12px;font-weight:600;color:var(--sp-text-primary);">${c.author || '匿名'}</span>
+                <span style="font-size:10px;color:var(--sp-text-muted);">❤️ ${c.likes || 0}</span>
+              </div>
+              <div style="font-size:13px;color:var(--sp-text-secondary);line-height:1.6;">${c.content || ''}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>`;
+    }
+
     readerView.innerHTML = `
       <div class="sp-fanfic-reader">
         <div class="sp-fanfic-reader-header">
@@ -28941,8 +28971,10 @@ window.addEventListener('beforeunload', () => {
         <div class="sp-fanfic-reader-title">${post.title || '无题'}</div>
         <div class="sp-fanfic-reader-tags">${(post.tags || []).map(t => '<span class="sp-fanfic-tag">#' + t + '</span>').join('')}</div>
         <div class="sp-fanfic-reader-body">${renderMarkdown(fullContent)}</div>
+        ${fanficCommentsHtml}
         <div class="sp-fanfic-reader-actions">
           <button id="sp-fanfic-continue-btn" class="sp-fanfic-continue-btn">✏️ 续写</button>
+          <button id="sp-fanfic-gen-comment-btn" class="sp-fanfic-continue-btn" style="background:rgba(255,180,50,0.3);border-color:rgba(255,180,50,0.5);">💬 生成评论</button>
         </div>
       </div>
     `;
@@ -28974,6 +29006,11 @@ window.addEventListener('beforeunload', () => {
         showBubble('已收藏！可在「我」标签页查看', 2000);
       }
       saveData();
+    };
+
+    // 生成评论按钮
+    document.getElementById('sp-fanfic-gen-comment-btn').onclick = () => {
+      generateFanficComments(post);
     };
 
     // 续写按钮
@@ -29041,6 +29078,77 @@ window.addEventListener('beforeunload', () => {
 
       await fanficContinuePost(post, mode, guideText);
     };
+  }
+
+  //===== 同人文评论生成 =====
+  async function generateFanficComments(post) {
+    showBubble('💬 正在生成同人文评论', 3000);
+
+    try {
+      const messages = [];
+      const commentPrompt = settings.fanficCommentPrompt || DEFAULT_SETTINGS.fanficCommentPrompt;
+
+      // 拼接同人文内容到系统提示词
+      const fullContent = post.content + (post.continuations || []).map(c => '\n\n' + c).join('');
+      let sysContent = commentPrompt + '\n\n[同人文标题]\n' + (post.title || '无题') + '\n\n[同人文正文]\n' + fullContent;
+
+      // 根据开关决定是否发送世界书（与同人文生成共用同一个开关）
+      if (settings.fanficSendWorldBook !== false) {
+        let worldInfo = '';
+        try { worldInfo = await getWorldBookContent(); } catch(e) { console.warn('[meep-pet] 同人文评论：世界书加载失败'); }
+        if (worldInfo) {
+          sysContent += '\n\n[世界观设定]\n' + worldInfo;
+        }
+      }
+
+      messages.push({ role: 'system', content: sysContent });
+      messages.push({ role: 'user', content: '请根据以上同人文内容和世界观设定，生成10到15条评论。严格输出JSON数组格式，不要输出任何其他文字。' });
+
+      // 破限
+      if (settings.jailbreak) {
+        messages.push({ role: 'system', content: settings.jailbreak });
+      }
+
+      let result = null;
+      if (settings.apiSource === 'tavern') {
+        result = await callViaTavern(messages);
+      } else {
+        result = await callViaCustom(messages);
+      }
+
+      if (!result) {
+        showBubble('评论生成失败，检查API连接', 3000);
+        return;
+      }
+
+      let comments = [];
+      try {
+        const jsonMatch = result.match(/\[[\s\S]*\]/);
+        if (jsonMatch) comments = JSON.parse(jsonMatch[0]);
+        else comments = JSON.parse(result);
+      } catch (e) {
+        console.error('[meep-pet] 同人文评论 JSON 解析失败:', e);
+        showBubble('评论格式有误，请重试', 3000);
+        return;
+      }
+
+      if (!Array.isArray(comments) || comments.length === 0) {
+        showBubble('生成结果为空', 2000);
+        return;
+      }
+
+      if (!post.generatedComments) post.generatedComments = [];
+      post.generatedComments = post.generatedComments.concat(comments);
+      saveData();
+
+      // 重新打开阅读页以显示新评论
+      openFanficReader(post);
+      showBubble(`💬 生成了 ${comments.length} 条评论！`, 2500);
+
+    } catch (err) {
+      console.error('[meep-pet] 同人文评论生成异常:', err);
+      showBubble(`生成出错: ${err.message}`, 3000);
+    }
   }
 
   // ===== 续写API调用 =====
@@ -29206,6 +29314,7 @@ window.addEventListener('beforeunload', () => {
           timestamp: Date.now(),
           isUserPost: true,
           continuations: [],
+          generatedComments: [],
         });
       }
 
