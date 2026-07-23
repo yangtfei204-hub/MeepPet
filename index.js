@@ -553,6 +553,12 @@
     safetyThreshold: 10,
   };
 
+  // 获取本地日期字符串（YYYY-MM-DD），修复 UTC 偏移导致的跨天问题
+  function getLocalDateStr() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  }
+
   const DEFAULT_STATE = {
     hunger: 80,
     cleanliness: 80,
