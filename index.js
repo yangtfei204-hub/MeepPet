@@ -7390,12 +7390,8 @@ if (hasEmoji) {
       return;
     }
 
-    const loadingEl = document.getElementById('sp-forum-loading');
-    const emptyEl = document.getElementById('sp-forum-empty');
-
     state.forumGenerating = true;
-    if (loadingEl) loadingEl.style.display = '';
-    if (emptyEl) emptyEl.style.display = 'none';
+    renderForumHomePage();
 
     try {
       // 构建消息：只包含世界书 + 破限 + 论坛提示词
@@ -7437,7 +7433,6 @@ if (hasEmoji) {
       state.forumGenerating = false;
 
       if (!result) {
-        if (loadingEl) loadingEl.style.display = 'none';
         showBubble('生成失败了…检查 API 连接？', 3000);
         renderForumPage();
         return;
@@ -7456,14 +7451,12 @@ if (hasEmoji) {
       } catch (parseErr) {
         console.error('[meep-pet] 论坛 JSON 解析失败:', parseErr, result);
         showBubble('AI 返回格式有误，请重试', 3000);
-        if (loadingEl) loadingEl.style.display = 'none';
         renderForumPage();
         return;
       }
 
       if (!Array.isArray(posts) || posts.length === 0) {
         showBubble('生成结果为空，请重试', 2000);
-        if (loadingEl) loadingEl.style.display = 'none';
         renderForumPage();
         return;
       }
@@ -7480,7 +7473,6 @@ if (hasEmoji) {
     } catch (err) {
       state.forumGenerating = false;
       console.error('[meep-pet] 论坛生成异常:', err);
-      if (loadingEl) loadingEl.style.display = 'none';
       showBubble(`生成出错: ${err.message}`, 3000);
       renderForumPage();
     }
