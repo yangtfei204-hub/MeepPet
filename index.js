@@ -7052,9 +7052,9 @@ if (hasEmoji) {
       messages.push({ role: 'system', content: sysContent });
       messages.push({ role: 'user', content: '请根据以上帖子内容和世界观设定，生成10到15条评论。严格输出JSON数组格式，不要输出任何其他文字。' });
 
-      // 破限
+      // 破限 — 放到最前面
       if (settings.jailbreak) {
-        messages.push({ role: 'system', content: settings.jailbreak });
+        messages.unshift({ role: 'system', content: settings.jailbreak });
       }
 
       let result = null;
@@ -7417,9 +7417,9 @@ if (hasEmoji) {
       // 3. 用户消息：触发生成
       messages.push({ role: 'user', content: '请根据以上世界观设定，生成5到10篇论坛帖子。严格输出JSON数组格式，不要输出任何其他文字。' });
 
-      // 4. 破限（如果有）
+      // 4. 破限（如果有）— 放到最前面
       if (settings.jailbreak) {
-        messages.push({ role: 'system', content: settings.jailbreak });
+        messages.unshift({ role: 'system', content: settings.jailbreak });
       }
 
       // 调用 API
@@ -8443,7 +8443,7 @@ function toggleChat() {
     }
 
     if (settings.jailbreak) {
-      messages.push({ role: 'system', content: settings.jailbreak });
+      messages.unshift({ role: 'system', content: settings.jailbreak });
     }
 
     return messages;
@@ -10597,9 +10597,9 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
     userContent += '请根据以上内容，写一篇今天的日记。';
     messages.push({ role: 'user', content: userContent });
 
-    // 破限
+    // 破限 — 放到最前面
     if (settings.jailbreak) {
-      messages.push({ role: 'system', content: settings.jailbreak });
+      messages.unshift({ role: 'system', content: settings.jailbreak });
     }
 
     // 开始生成
@@ -28831,9 +28831,9 @@ window.addEventListener('beforeunload', () => {
       messages.push({ role: 'system', content: sysContent });
       messages.push({ role: 'user', content: '请根据以上世界观和角色设定，生成5到10篇同人文。严格输出JSON数组格式，不要输出任何其他文字。' });
 
-      // 4. 破限
+      // 4. 破限 — 放到最前面
       if (settings.jailbreak) {
-        messages.push({ role: 'system', content: settings.jailbreak });
+        messages.unshift({ role: 'system', content: settings.jailbreak });
       }
 
       let result = null;
@@ -29096,9 +29096,9 @@ window.addEventListener('beforeunload', () => {
       messages.push({ role: 'system', content: sysContent });
       messages.push({ role: 'user', content: '请根据以上同人文内容和世界观设定，生成10到15条评论。严格输出JSON数组格式，不要输出任何其他文字。' });
 
-      // 破限
+      // 破限 — 放到最前面
       if (settings.jailbreak) {
-        messages.push({ role: 'system', content: settings.jailbreak });
+        messages.unshift({ role: 'system', content: settings.jailbreak });
       }
 
       let result = null;
@@ -29168,9 +29168,9 @@ window.addEventListener('beforeunload', () => {
 
       messages.push({ role: 'user', content: userContent });
 
-      // 破限
+      // 破限 — 放到最前面
       if (settings.jailbreak) {
-        messages.push({ role: 'system', content: settings.jailbreak });
+        messages.unshift({ role: 'system', content: settings.jailbreak });
       }
 
       let result = null;
