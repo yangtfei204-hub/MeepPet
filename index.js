@@ -407,7 +407,11 @@
     houseButtonSend: '',           // 小屋发送按钮图标
     houseButtonWardrobeSettings: '', // 更衣系统设置入口按钮图标
     houseOutfits: [],              // 服装列表 [{name, character, actionFeed, actionBath, actionSleep, expressions: []}]
-    houseCurrentOutfit: '',        // 当前穿着的服装名
+    houseCurrentOutfit: '',        // 当前穿着的服装名houseHouseCharacterId: '',     // 小屋专属角色卡名
+    houseHouseWorldBookId: '',     // 小屋专属世界书名
+    houseHouseWorldBookExcluded: [], // 小屋世界书排除条目索引
+    houseHouseCustomWorldBook: [], // 小屋自定义世界书条目 [{name, keys, content, excluded}]
+    houseHouseMemories: [],        // 小屋专属记忆池 [{content, tag, importance, timestamp}]
 
     spriteHangLeft: '',       // 挂在左边缘
     spriteHangRight: '',      // 挂在右边缘
@@ -693,7 +697,8 @@
   let spriteStateLock = null;  // 当前锁定的状态名
   let spriteStateLockTimer = null; // 对应的恢复定时器
   let chatMode = 'pet';             // 'pet'(桌宠模式) | 'online'(线上模式) | 'offline'(线下模式)
-  let selectedEmoji = null;        // 当前选中的表情包 (base64 或 URL)
+  let selectedEmoji = null;        // 当前选中的表情包(base64 或 URL)
+  let _isHouseChat = false;        // 是否正在小屋聊天（用于 buildPromptMessages 判断上下文）
   let autoMessageTimer = null;     // API自动发消息定时器
   let showLockedNames = false;     // 是否显示上锁物品的真实名字
   let showMissingOnly = false;     // 是否只显示未上传图片的物品
@@ -9711,6 +9716,8 @@ function toggleChat() {
       if (activeContact.customDescription) {
         charDesc = activeContact.customDescription;
       }
+    } else if (_isHouseChat && settings.houseHouseCharacterId) {
+      charDesc = getCharacterDescriptionById(settings.houseHouseCharacterId);
     } else {
       charDesc = getCharacterDescription();
     }
@@ -9740,6 +9747,25 @@ function toggleChat() {
             worldInfo = worldInfo ? (worldInfo + '\n' + customWbText) : customWbText;
           }
         }
+      } else if (_isHouseChat && settings.houseHouseWorldBookId) {
+        // 小屋专属酒馆世界书
+        const origWbId = settings.worldBookId;
+        const origExcluded = settings.worldBookExcluded;
+        settings.worldBookId = settings.houseHouseWorldBookId;
+        settings.worldBookExcluded = settings.houseHouseWorldBookExcluded || [];
+        worldInfo = await getWorldBookContent();
+        settings.worldBookId = origWbId;
+        settings.worldBookExcluded = origExcluded;
+        // 小屋自定义世界书条目
+        if (settings.houseHouseCustomWorldBook && settings.houseHouseCustomWorldBook.length > 0) {
+          const customWbText = settings.houseHouseCustomWorldBook
+            .filter(e => e.content && !e.excluded)
+            .map(e => e.content)
+            .join('\n');
+          if (customWbText) {
+            worldInfo = worldInfo ? (worldInfo + '\n' + customWbText) : customWbText;
+          }
+        }
       } else {
         worldInfo = await getWorldBookContent();
       }
@@ -9748,12 +9774,17 @@ function toggleChat() {
 
     // ===== 记忆和总结：用当前全局的（已由 openConversation 同步）=====
     if (state.summary) sys += `\n[记忆总结]\n${state.summary}\n`;
-    if (state.memories.length > 0) {
-      const mems = state.memories
+    // 合并全局记忆 + 小屋专属记忆
+    let allMemories = [...state.memories];
+    if (_isHouseChat && settings.houseHouseMemories && settings.houseHouseMemories.length > 0) {
+      allMemories = [...allMemories, ...settings.houseHouseMemories];
+    }
+    if (allMemories.length > 0) {
+      const mems = allMemories
         .map(m => typeof m === 'string' ? { content: m, importance: 3, tag: '' } : m)
         .filter(m => m.content)
         .sort((a, b) => (b.importance || 3) - (a.importance || 3))
-        .slice(0, 15);
+        .slice(0, 20);
       const memText = mems.map(m => {
         const tag = m.tag ? `[${m.tag}] ` : '';
         return `${tag}${m.content}`;
@@ -10457,6 +10488,41 @@ async function refreshWorldPreview() {
             <div id="sp-wardrobe-upload-house"></div>
           </div>
 
+          <!-- 酒馆角色读取 -->
+          <div class="sp-section" style="margin-bottom:14px;padding:12px;background:rgba(255,255,255,0.05);border-radius:10px;border:1px solid rgba(255,255,255,0.08);">
+            <div class="sp-section-title" style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--sp-text-primary);">🎭 酒馆角色读取（小屋专属）</div>
+            <p style="font-size:11px;color:#999;margin-bottom:8px;">为小屋单独关联一个酒馆角色卡，不影响手机聊天的全局角色卡设置</p>
+            <div class="sp-search-select">
+              <input type="text" id="sp-wardrobe-char-input" placeholder="搜索角色卡..." autocomplete="off" value="${settings.houseHouseCharacterId || ''}" />
+              <div class="sp-search-dropdown" id="sp-wardrobe-char-dropdown"></div>
+            </div><div id="sp-wardrobe-char-preview" style="margin-top:8px;"></div>
+          </div>
+
+          <!-- 世界书读取 -->
+          <div class="sp-section" style="margin-bottom:14px;padding:12px;background:rgba(255,255,255,0.05);border-radius:10px;border:1px solid rgba(255,255,255,0.08);">
+            <div class="sp-section-title" style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--sp-text-primary);">📖 世界书读取（小屋专属）</div>
+            <p style="font-size:11px;color:#999;margin-bottom:8px;">为小屋单独关联一本酒馆世界书</p>
+            <div class="sp-search-select">
+              <input type="text" id="sp-wardrobe-world-input" placeholder="搜索世界书..." autocomplete="off" value="${settings.houseHouseWorldBookId || ''}" />
+              <div class="sp-search-dropdown" id="sp-wardrobe-world-dropdown"></div>
+            </div>
+            <div id="sp-wardrobe-world-entries" style="margin-top:8px;max-height:200px;overflow-y:auto;"></div><div style="margin-top:10px;">
+              <div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:6px;">📖 自定义世界书条目 (<span id="sp-wardrobe-cwb-count">${(settings.houseHouseCustomWorldBook || []).length}</span>)</div>
+              <div id="sp-wardrobe-cwb-list"></div>
+              <button id="sp-wardrobe-add-cwb" class="sp-btn" type="button" style="margin-top:8px;padding:6px 14px;border-radius:8px;border:1px solid var(--sp-border);background:var(--sp-bg-light);color:var(--sp-text-secondary);cursor:pointer;font-size:12px;">＋ 添加世界书条目</button>
+            </div>
+          </div>
+
+          <!-- 小屋专属记忆池 -->
+          <div class="sp-section" style="margin-bottom:14px;padding:12px;background:rgba(255,255,255,0.05);border-radius:10px;border:1px solid rgba(255,255,255,0.08);">
+            <div class="sp-section-title" style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--sp-text-primary);">🧠 小屋专属记忆池</div>
+            <p style="font-size:11px;color:#999;margin-bottom:8px;">这些记忆仅在小屋对话时注入AI上下文，不影响手机聊天</p>
+            <div id="sp-wardrobe-memories-list"></div>
+            <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+              <button id="sp-wardrobe-add-memory" class="sp-btn" type="button" style="padding:6px 14px;border-radius:8px;border:1px solid var(--sp-border);background:var(--sp-bg-light);color:var(--sp-text-secondary);cursor:pointer;font-size:12px;">+ 新增记忆</button></div>
+          </div>
+
+
           <!-- 小屋动作立绘 -->
           <div class="sp-section" style="margin-bottom:14px;padding:12px;background:rgba(255,255,255,0.05);border-radius:10px;border:1px solid rgba(255,255,255,0.08);">
             <div class="sp-section-title" style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--sp-text-primary);">🎨 服装立绘 <span id="sp-wardrobe-outfit-badge" style="font-size:10px;color:#888;font-weight:400;">（全局默认）</span></div>
@@ -10573,6 +10639,9 @@ async function refreshWorldPreview() {
 
     // 渲染三个上传区
     wardrobeRenderUploads();
+
+    // 渲染小屋角色卡/世界书/记忆池
+    wardrobeRenderHouseContext();
 
     // 渲染表情立绘
     wardrobeRenderExpressions();
@@ -11108,6 +11177,285 @@ async function refreshWorldPreview() {
     });
   }
 
+  // 👗 更衣系统 — 小屋角色卡/世界书/记忆池 渲染
+  // ============================================================
+  function wardrobeRenderHouseContext() {
+    //===== 角色卡搜索下拉 =====
+    bindSearchInput('sp-wardrobe-char-input', 'sp-wardrobe-char-dropdown', getAvailableCharacters, (name) => {
+      document.getElementById('sp-wardrobe-char-input').value = name;
+      settings.houseHouseCharacterId = name;
+      saveDataDebounced('小屋角色卡');
+      //刷新预览
+      wardrobeRenderCharPreview();
+    });
+
+    // ===== 世界书搜索下拉 =====
+    bindSearchInput('sp-wardrobe-world-input', 'sp-wardrobe-world-dropdown', getAvailableWorldBooks, (name) => {
+      document.getElementById('sp-wardrobe-world-input').value = name;
+      settings.houseHouseWorldBookId = name;
+      saveDataDebounced('小屋世界书');
+      // 加载世界书条目
+      wardrobeLoadWorldEntries();
+    });
+
+    //初始加载
+    wardrobeRenderCharPreview();
+    if (settings.houseHouseWorldBookId) wardrobeLoadWorldEntries();wardrobeRenderCustomWB();
+    wardrobeRenderHouseMemories();
+
+    // ===== 添加自定义世界书条目按钮 =====
+    document.getElementById('sp-wardrobe-add-cwb')?.addEventListener('click', () => {
+      if (!settings.houseHouseCustomWorldBook) settings.houseHouseCustomWorldBook = [];
+      settings.houseHouseCustomWorldBook.push({ name: '', keys: '', content: '' });
+      wardrobeRenderCustomWB();
+    });
+
+    // ===== 添加记忆按钮 =====
+    document.getElementById('sp-wardrobe-add-memory')?.addEventListener('click', () => {
+      if (!settings.houseHouseMemories) settings.houseHouseMemories = [];
+      settings.houseHouseMemories.push({ content: '', tag: '小屋', importance: 3, timestamp: Date.now() });
+      wardrobeRenderHouseMemories();saveDataDebounced('小屋记忆');
+    });
+  }
+
+  // ===== 小屋角色卡预览 =====
+  function wardrobeRenderCharPreview() {
+    const container = document.getElementById('sp-wardrobe-char-preview');
+    if (!container) return;
+    if (!settings.houseHouseCharacterId) {
+      container.innerHTML = '<div style="font-size:11px;color:var(--sp-text-muted);padding:4px 0;">未选择角色卡（将使用全局设置）</div>';
+      return;
+    }
+    const desc = getCharacterDescriptionById(settings.houseHouseCharacterId);
+    if (desc) {
+      container.innerHTML = `
+        <div class="sp-preview-box">
+          <div class="sp-preview-header">
+            <span>🎭 ${settings.houseHouseCharacterId}</span>
+            <button class="sp-btn" id="sp-wardrobe-char-toggle" style="padding:2px 10px;font-size:11px;">展开</button>
+          </div>
+          <div class="sp-preview-content" id="sp-wardrobe-char-content">${desc.slice(0, 200)}${desc.length > 200 ? '' : ''}</div>
+        </div>
+      `;document.getElementById('sp-wardrobe-char-toggle')?.addEventListener('click', () => {
+        const content = document.getElementById('sp-wardrobe-char-content');
+        const btn = document.getElementById('sp-wardrobe-char-toggle');
+        if (content && btn) {
+          const expanded = content.classList.toggle('expanded');
+          btn.textContent = expanded ? '收起' : '展开';
+          if (expanded) content.textContent = desc;
+        }
+      });
+    } else {
+      container.innerHTML = '<div style="font-size:11px;color:var(--sp-text-muted);padding:4px 0;">未找到角色描述</div>';
+    }
+  }
+
+  // ===== 小屋酒馆世界书条目加载 =====
+  async function wardrobeLoadWorldEntries() {
+    const container = document.getElementById('sp-wardrobe-world-entries');
+    if (!container) return;
+    if (!settings.houseHouseWorldBookId) {
+      container.innerHTML = '';
+      return;
+    }
+
+    container.innerHTML = '<div style="font-size:11px;color:var(--sp-text-muted);padding:8px;text-align:center;">加载中…</div>';
+
+    const origWbId = settings.worldBookId;
+    const origExcluded = settings.worldBookExcluded;
+    settings.worldBookId = settings.houseHouseWorldBookId;
+    settings.worldBookExcluded = [];
+    const entries = await getWorldBookEntries();
+    settings.worldBookId = origWbId;
+    settings.worldBookExcluded = origExcluded;
+
+    if (!settings.houseHouseWorldBookExcluded) settings.houseHouseWorldBookExcluded = [];
+
+    if (entries.length === 0) {
+      container.innerHTML = '<div style="font-size:11px;color:var(--sp-text-muted);padding:8px;">暂无条目或加载失败</div>';
+      return;
+    }
+
+    container.innerHTML = '<div class="sp-world-entries-list">' + entries.map((entry, idx) => {
+      const excluded = settings.houseHouseWorldBookExcluded.includes(idx);
+      return `
+        <div class="sp-wi-entry ${excluded ? 'sp-wi-excluded' : ''}" data-wi-idx="${idx}">
+          <div class="sp-wi-entry-header">
+            <div class="sp-wi-header-left">
+              <span class="sp-wi-check" onclick="event.stopPropagation()">
+                <input type="checkbox" data-house-wi-idx="${idx}" ${excluded ? '' : 'checked'} />
+              </span>
+              <span class="sp-wi-index">#${idx + 1}</span>
+              ${entry.name ? `<span class="sp-wi-name" title="${entry.name}">${entry.name}</span>` : ''}
+              ${entry.keys ? `<span class="sp-wi-keys" title="${entry.keys}">[${entry.keys}]</span>` : ''}
+            </div>
+            <span class="sp-wi-expand-arrow">▶</span>
+          </div>
+          <div class="sp-wi-entry-body">${entry.content}</div>
+        </div>
+      `;
+    }).join('') + '</div>';
+
+    // 绑定勾选框
+    container.querySelectorAll('input[data-house-wi-idx]').forEach(cb => {
+      cb.onchange = (e) => {
+        e.stopPropagation();
+        const entryIdx = parseInt(cb.dataset.houseWiIdx);
+        if (cb.checked) {
+          settings.houseHouseWorldBookExcluded = settings.houseHouseWorldBookExcluded.filter(i => i !== entryIdx);
+        } else {
+          if (!settings.houseHouseWorldBookExcluded.includes(entryIdx)) {
+            settings.houseHouseWorldBookExcluded.push(entryIdx);
+          }
+        }
+        cb.closest('.sp-wi-entry').classList.toggle('sp-wi-excluded', !cb.checked);
+        saveDataDebounced('小屋世界书排除');
+      };
+    });
+
+    // 绑定展开
+    container.querySelectorAll('.sp-wi-entry-header').forEach(header => {
+      header.addEventListener('click', (e) => {
+        if (e.target.closest('.sp-wi-check')) return;
+        header.closest('.sp-wi-entry').classList.toggle('sp-wi-expanded');
+      });
+    });
+  }
+
+  // ===== 小屋自定义世界书条目渲染 =====
+  function wardrobeRenderCustomWB() {
+    const container = document.getElementById('sp-wardrobe-cwb-list');
+    if (!container) return;
+    if (!settings.houseHouseCustomWorldBook) settings.houseHouseCustomWorldBook = [];
+
+    const entries = settings.houseHouseCustomWorldBook;
+    const countEl = document.getElementById('sp-wardrobe-cwb-count');
+    if (countEl) countEl.textContent = entries.length;
+
+    container.innerHTML = entries.map((entry, idx) => `
+      <div style="margin-bottom:8px;padding:8px;background:rgba(255,255,255,0.04);border:1px solid var(--sp-border-light);border-radius:8px;${entry.excluded ? 'opacity:0.45;' : ''}">
+        <div style="display:flex;gap:6px;margin-bottom:4px;align-items:center;">
+          <label style="display:flex;align-items:center;cursor:pointer;flex-shrink:0;margin:0;" title="${entry.excluded ? '已排除' : '已启用'}">
+            <input type="checkbox" class="sp-wdcwb-enabled" data-idx="${idx}" ${entry.excluded ? '' : 'checked'} style="accent-color:#64b4ff;width:14px;height:14px;cursor:pointer;margin:0;" />
+          </label>
+          <input type="text" class="sp-wdcwb-name" data-idx="${idx}" value="${entry.name || ''}" placeholder="条目名" style="flex:1;padding:4px 8px;font-size:11px;border:1px solid var(--sp-border);border-radius:6px;background:var(--sp-bg-light);color:var(--sp-text-primary);box-sizing:border-box;" />
+          <input type="text" class="sp-wdcwb-keys" data-idx="${idx}" value="${entry.keys || ''}" placeholder="关键词(逗号分隔)" style="flex:1;padding:4px 8px;font-size:11px;border:1px solid var(--sp-border);border-radius:6px;background:var(--sp-bg-light);color:var(--sp-text-primary);box-sizing:border-box;" />
+          <button class="sp-wdcwb-delete" data-idx="${idx}" style="background:none;border:none;color:#f66;cursor:pointer;font-size:14px;padding:04px;">✕</button>
+        </div>
+        <textarea class="sp-wdcwb-content" data-idx="${idx}" placeholder="条目内容..." style="width:100%;min-height:50px;padding:6px 8px;font-size:12px;border:1px solid var(--sp-border);border-radius:6px;background:var(--sp-bg-light);color:var(--sp-text-primary);resize:vertical;box-sizing:border-box;">${entry.content || ''}</textarea>
+      </div>
+    `).join('') || '<div style="text-align:center;padding:12px;color:var(--sp-text-muted);font-size:12px;">暂无自定义条目</div>';
+
+    // 绑定启用/禁用
+    container.querySelectorAll('.sp-wdcwb-enabled').forEach(cb => {
+      cb.onchange = () => {
+        const idx = parseInt(cb.dataset.idx);
+        if (settings.houseHouseCustomWorldBook[idx]) {
+          settings.houseHouseCustomWorldBook[idx].excluded = !cb.checked;
+          saveDataDebounced('小屋自定义世界书排除');
+          wardrobeRenderCustomWB();
+        }
+      };
+    });
+
+    container.querySelectorAll('.sp-wdcwb-name').forEach(input => {
+      input.onchange = () => {
+        const idx = parseInt(input.dataset.idx);
+        if (settings.houseHouseCustomWorldBook[idx]) settings.houseHouseCustomWorldBook[idx].name = input.value.trim();
+      };
+    });
+
+    container.querySelectorAll('.sp-wdcwb-keys').forEach(input => {
+      input.onchange = () => {
+        const idx = parseInt(input.dataset.idx);
+        if (settings.houseHouseCustomWorldBook[idx]) settings.houseHouseCustomWorldBook[idx].keys = input.value.trim();
+      };
+    });
+
+    container.querySelectorAll('.sp-wdcwb-content').forEach(textarea => {
+      textarea.onchange = () => {
+        const idx = parseInt(textarea.dataset.idx);
+        if (settings.houseHouseCustomWorldBook[idx]) settings.houseHouseCustomWorldBook[idx].content = textarea.value;
+      };
+    });
+
+    container.querySelectorAll('.sp-wdcwb-delete').forEach(btn => {
+      btn.onclick = () => {
+        settings.houseHouseCustomWorldBook.splice(parseInt(btn.dataset.idx), 1);
+        wardrobeRenderCustomWB();};
+    });
+  }
+
+  // ===== 小屋记忆池渲染 =====
+  function wardrobeRenderHouseMemories() {
+    const container = document.getElementById('sp-wardrobe-memories-list');
+    if (!container) return;
+    if (!settings.houseHouseMemories) settings.houseHouseMemories = [];
+
+    container.innerHTML = '';
+
+    const sorted = [...settings.houseHouseMemories].sort((a, b) => (b.importance || 3) - (a.importance || 3));
+
+    sorted.forEach((mem) => {
+      const realIdx = settings.houseHouseMemories.indexOf(mem);
+      const item = document.createElement('div');
+      item.className = 'sp-memory-item';
+      const stars = '★'.repeat(mem.importance || 3) + '☆'.repeat(5 - (mem.importance || 3));
+      const timeStr = mem.timestamp ? new Date(mem.timestamp).toLocaleDateString() : '';
+      item.innerHTML = `
+        <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+            <input type="text" class="sp-wdmem-tag" data-idx="${realIdx}" value="${mem.tag || ''}" placeholder="标签" style="width:70px;padding:3px 6px;font-size:11px;margin:0;border:1px solid var(--sp-border);border-radius:6px;background:var(--sp-bg-light);color:var(--sp-text-primary);box-sizing:border-box;" />
+            <span class="sp-wdmem-stars" data-idx="${realIdx}" style="cursor:pointer;font-size:12px;color:#ffb347;" title="点击调整重要度">${stars}</span>
+            <span style="font-size:10px;color:#666;">${timeStr}</span>
+          </div>
+          <textarea class="sp-wdmem-text" data-idx="${realIdx}" style="width:100%;min-height:36px;padding:6px 8px;font-size:12px;border:1px solid var(--sp-border);border-radius:6px;background:var(--sp-bg-light);color:var(--sp-text-primary);resize:vertical;box-sizing:border-box;margin:0;">${mem.content}</textarea>
+        </div><button class="sp-btn sp-btn-danger sp-wdmem-delete" data-idx="${realIdx}" style="align-self:flex-start;padding:4px 8px;font-size:11px;border-radius:6px;background:rgba(239,83,80,0.4);color:#fff;border:1px solid rgba(239,83,80,0.5);cursor:pointer;">✕</button>
+      `;
+      container.appendChild(item);
+    });
+
+    // 绑定事件
+    container.querySelectorAll('.sp-wdmem-text').forEach(t => {
+      t.onchange = () => {
+        const idx = parseInt(t.dataset.idx);
+        if (settings.houseHouseMemories[idx]) {
+          settings.houseHouseMemories[idx].content = t.value;
+          saveDataDebounced('小屋记忆编辑');
+        }
+      };
+    });
+
+    container.querySelectorAll('.sp-wdmem-tag').forEach(t => {
+      t.onchange = () => {
+        const idx = parseInt(t.dataset.idx);
+        if (settings.houseHouseMemories[idx]) {
+          settings.houseHouseMemories[idx].tag = t.value.trim();
+          saveDataDebounced('小屋记忆标签');
+        }
+      };
+    });
+
+    container.querySelectorAll('.sp-wdmem-stars').forEach(el => {
+      el.onclick = () => {
+        const idx = parseInt(el.dataset.idx);
+        if (!settings.houseHouseMemories[idx]) return;
+        let imp = (settings.houseHouseMemories[idx].importance || 3) + 1;
+        if (imp > 5) imp = 1;
+        settings.houseHouseMemories[idx].importance = imp;
+        saveDataDebounced('小屋记忆重要度');
+        wardrobeRenderHouseMemories();
+      };
+    });
+
+    container.querySelectorAll('.sp-wdmem-delete').forEach(b => {
+      b.onclick = () => {
+        settings.houseHouseMemories.splice(parseInt(b.dataset.idx), 1);
+        saveDataImmediate('删除小屋记忆');
+        wardrobeRenderHouseMemories();
+      };
+    });
+  }
 
   function wardrobeBindDrag() {
     const header = document.getElementById('sp-wardrobe-header');
@@ -11378,9 +11726,10 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 
       const prevMode = chatMode;
       chatMode = 'offline';
+      _isHouseChat = true;
       const reply = await callPetAPI('chat', '');
+      _isHouseChat = false;
       chatMode = prevMode;
-
       if (spriteStateLock === 'think') clearSpriteLock();
 
       if (reply) {
@@ -11549,7 +11898,9 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
     // 临时开启线下模式让提示词注入 offlinePrompt
     const prevMode = chatMode;
     chatMode = 'offline';
+    _isHouseChat = true;
     const reply = await callPetAPI('chat', text);
+    _isHouseChat = false;
     chatMode = prevMode;
 
     if (spriteStateLock === 'think') clearSpriteLock();
