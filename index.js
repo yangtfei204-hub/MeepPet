@@ -7605,9 +7605,9 @@ if (hasEmoji) {
     overlay.id = 'sp-friend-picker-overlay';
     overlay.className = 'sp-confirm-overlay';
     overlay.innerHTML = `
-      <div class="sp-confirm-box" style="max-width:300px;text-align:left;max-height:70vh;overflow-y:auto;">
-        <div class="sp-confirm-title">💬 选择联系人开始聊天</div>
-        <div style="display:flex;flex-direction:column;gap:8px;">
+      <div class="sp-confirm-box" style="max-width:300px;max-height:65vh;text-align:left;display:flex;flex-direction:column;overflow:hidden;">
+        <div class="sp-confirm-title" style="flex-shrink:0;">💬 选择联系人开始聊天</div>
+        <div style="display:flex;flex-direction:column;gap:8px;flex:1;overflow-y:auto;padding-right:4px;">
           ${available.map(contact => `
             <div class="sp-friend-pick-item" data-contact-id="${contact.id}" style="display:flex;align-items:center;gap:10px;padding:10px;background:rgba(255,255,255,0.05);border:1px solid var(--sp-border-light);border-radius:10px;cursor:pointer;transition:all 0.15s;">
               <div style="width:36px;height:36px;border-radius:50%;background:var(--sp-bg-secondary);border:1px solid var(--sp-border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
@@ -7616,11 +7616,30 @@ if (hasEmoji) {
               <span style="font-size:13px;font-weight:600;color:var(--sp-text-primary);">${contact.name}</span></div>
           `).join('')}
         </div>
-        <div class="sp-confirm-actions" style="margin-top:12px;">
-          <button class="sp-confirm-btn sp-confirm-btn-cancel" id="sp-friend-picker-cancel">取消</button></div>
+        <div class="sp-confirm-actions" style="margin-top:12px;flex-shrink:0;padding-top:8px;border-top:1px solid var(--sp-border-light);">
+          <button class="sp-confirm-btn sp-confirm-btn-cancel" id="sp-friend-picker-cancel">取消</button>
+        </div>
       </div>
     `;
     document.body.appendChild(overlay);
+
+    // 居中定位（移动端安全）
+    requestAnimationFrame(() => {
+      const box = overlay.querySelector('.sp-confirm-box');
+      if (box) {
+        box.style.position = 'fixed';
+        box.style.margin = '0';
+        const boxH = box.offsetHeight || 300;
+        const boxW = box.offsetWidth || 300;
+        const safeTop = Math.max(10, Math.min(
+          Math.floor((window.innerHeight - boxH) / 2),
+          window.innerHeight - boxH - 10
+        ));
+        box.style.top = safeTop + 'px';
+        box.style.left = Math.floor((window.innerWidth - boxW) / 2) + 'px';
+      }
+    });
+
 
     document.getElementById('sp-friend-picker-cancel').onclick = () => overlay.remove();
     overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
