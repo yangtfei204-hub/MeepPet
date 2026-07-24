@@ -12898,33 +12898,55 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 
           <!-- 记忆 -->
           <div class="sp-tab-panel" data-panel="memory">
-            <div class="sp-section">
-              <div class="sp-section-title">记忆条目</div>
-              <div id="sp-memories-list"></div>
-              <button class="sp-btn" id="sp-add-memory">+ 新增记忆</button>
-              <button class="sp-btn" id="sp-auto-extract-memory">🤖 AI提取记忆</button>
-            </div>
-            <div class="sp-section">
-              <div class="sp-section-title">对话总结</div>
-              <textarea id="sp-current-summary" style="min-height:80px;">${state.summary}</textarea>
-              <div class="sp-row" style="margin-top:8px;">
-                <button class="sp-btn" id="sp-save-summary">保存总结</button>
-                <button class="sp-btn" id="sp-trigger-summary">手动总结</button>
+            <div class="sp-section" style="background:linear-gradient(135deg,rgba(100,180,255,0.06),rgba(200,100,255,0.06));border:1px solid rgba(100,180,255,0.15);">
+              <div class="sp-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+                <span>📊 记忆总览</span>
+                <span id="sp-memory-overview-badge" style="font-size:10px;color:var(--sp-text-muted);font-weight:400;"></span>
               </div>
-            </div>
-            <div class="sp-section">
-              <div class="sp-section-title">💬 聊天记录 (<span id="sp-chat-history-count">${state.petChatHistory.length}</span>条)</div>
-              <div id="sp-chat-history-list" style="max-height:300px;overflow-y:auto;"></div>
-              <div class="sp-row" style="margin-top:8px;">
-                <button class="sp-btn sp-btn-danger" id="sp-clear-chat-history">🗑️ 清空全部</button>
-              </div>
-            <div class="sp-section">
-              <div class="sp-section-title">📚 历史聊天归档 (<span id="sp-archive-count">0</span>批)</div>
-              <div id="sp-chat-archive-list" style="max-height:250px;overflow-y:auto;"></div>
-            </div>
+              <div id="sp-memory-overview-panel" style="font-size:11px;color:var(--sp-text-secondary);line-height:1.8;"></div>
             </div>
 
-          </div>
+            <div class="sp-section">
+              <div class="sp-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+                <span>🧠 记忆条目(<span id="sp-memory-count-badge">${state.memories.length}</span>条)</span>
+                <div style="display:flex;gap:4px;">
+                  <button class="sp-btn" id="sp-add-memory" style="padding:3px 10px;font-size:11px;">+ 新增</button>
+                  <button class="sp-btn" id="sp-auto-extract-memory" style="padding:3px 10px;font-size:11px;">🤖 AI提取</button>
+                </div>
+              </div>
+              <p style="font-size:10px;color:var(--sp-text-muted);margin:0 0 8px;">这些记忆会在发送 API 时自动注入上下文。⭐星级越高优先级越高。<br/>💡 手机聊天设置中每个会话也有独立记忆池，切换会话时自动同步到这里。</p>
+              <div id="sp-memories-list" style="max-height:350px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.2) transparent;"></div>
+            </div>
+
+            <div class="sp-section">
+              <div class="sp-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+                <span>📝 对话总结</span>
+                <span style="font-size:10px;color:var(--sp-text-muted);font-weight:400;">${state.summary ? (state.summary.length + '字') : '空'}</span>
+              </div>
+              <p style="font-size:10px;color:var(--sp-text-muted);margin:0 0 6px;">AI 将旧聊天压缩为摘要，节省 token 同时保留关键信息。手动总结可选范围后AI 生成。</p>
+              <textarea id="sp-current-summary" style="min-height:80px;">${state.summary}</textarea>
+              <div class="sp-row" style="margin-top:8px;">
+                <button class="sp-btn" id="sp-save-summary">💾 保存总结</button>
+                <button class="sp-btn" id="sp-trigger-summary">🔄 手动总结</button>
+              </div>
+            </div>
+
+            <details class="sp-guide-details" style="margin-bottom:14px;">
+              <summary class="sp-guide-summary">💬 聊天记录 (<span id="sp-chat-history-count">${state.petChatHistory.length}</span>条)</summary>
+              <div class="sp-guide-details-content" style="padding:8px;">
+                <div id="sp-chat-history-list" style="max-height:300px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.2) transparent;"></div>
+                <div class="sp-row" style="margin-top:8px;">
+                  <button class="sp-btn sp-btn-danger" id="sp-clear-chat-history">🗑️ 清空全部</button>
+                </div>
+              </div>
+            </details>
+
+            <details class="sp-guide-details">
+              <summary class="sp-guide-summary">📚 历史聊天归档 (<span id="sp-archive-count">0</span>批)</summary>
+              <div class="sp-guide-details-content" style="padding:8px;">
+                <div id="sp-chat-archive-list" style="max-height:250px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.2) transparent;"></div>
+              </div>
+            </details></div>
 
           <!-- 数据 -->
           <div class="sp-tab-panel" data-panel="data">
@@ -12984,22 +13006,23 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
             </div>
           </div>
 
-          <!-- 使用说明 -->
           <div class="sp-tab-panel" data-panel="guide">
             <div class="sp-section">
               <div class="sp-section-title">📖 使用说明</div>
               <p style="font-size:12px;color:#999;margin-bottom:12px;">点击各项展开查看详细说明</p>
 
               <details class="sp-guide-details" open>
-                <summary class="sp-guide-summary">🚀 快速上手</summary>
+                <summary class="sp-guide-summary">🚀 快速上手（三步开始）</summary>
                 <div class="sp-guide-details-content">
                   <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                    <strong style="color:var(--sp-text-primary);">1. 配置 API</strong><br/>
-                    在「🔑 API」标签页选择「使用酒馆当前 API」（零配置）或手动填写独立 API Key + Base URL。可选开启流式输出、视觉识别。<br/><br/>
-                    <strong style="color:var(--sp-text-primary);">2. 设定性格</strong><br/>
-                    打开手机界面 → 📇通讯录关联角色卡/世界书→ 👤个人主页选择提示词预设或手动编写。<br/><br/>
-                    <strong style="color:var(--sp-text-primary);">3. 开始互动</strong><br/>
-                    点击桌宠（手机端双击）打开菜单 → 💬聊天 → 输入消息按Enter 发送，点➤ 让AI 回复。
+                    <strong style="color:var(--sp-text-primary);">第一步：配置 API</strong><br/>
+                    在「🔑 API」标签页填写你的 API Key 和 Base URL（OpenAI 兼容格式），选择模型。点「📡 获取」可自动拉取可用模型列表。<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">第二步：设定桌宠性格</strong><br/>
+                    点击桌宠 → 💬聊天 → 打开手机界面 → 👤个人主页 → 填写桌宠名字和系统提示词，或直接选择一个内置预设（可爱猫咪/傲娇精灵等）。<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">第三步：开始聊天</strong><br/>
+                    手机界面 → 💬聊天App → 点右上角 ＋ 新建会话 → 输入消息按Enter 发送 → 点➤ 按钮让AI 回复。<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">进阶：导入角色卡</strong><br/>
+                    手机界面 → 📇通讯录 → ＋ → 「从角色卡文件导入」 → 选择 PNG 或 JSON 格式的角色卡文件，会自动提取角色描述和内嵌世界书。也可以单独导入世界书 JSON 文件。
                   </p>
                 </div>
               </details>
@@ -13008,36 +13031,51 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
                 <summary class="sp-guide-summary">🐾 基础操作</summary>
                 <div class="sp-guide-details-content">
                   <div class="sp-guide-table">
-                    <div class="sp-guide-row"><span class="sp-guide-key">点击桌宠</span><span class="sp-guide-val">打开圆形发散菜单（手机双击）</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">拖拽桌宠</span><span class="sp-guide-val">移动位置，拖到屏幕边缘自动吸附挂起</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">🍖 投喂</span><span class="sp-guide-val">恢复饱食度，从背包/冰箱/糖葫芦/餐厅出餐台选物品</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">🛁 洗澡</span><span class="sp-guide-val">恢复清洁度，从背包选洗护道具</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">🛏️ 睡觉</span><span class="sp-guide-val">恢复精力值，从背包选睡眠道具</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">💬 聊天</span><span class="sp-guide-val">打开手机界面，包含聊天、设置、书架等App</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">📔 日记</span><span class="sp-guide-val">选择记忆和聊天范围，AI 以桌宠视角写日记</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">🎮 游戏</span><span class="sp-guide-val">打开游戏选择器，8种小游戏 + 抽奖 + 成就</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">点击桌宠</span><span class="sp-guide-val">打开圆形发散菜单（手机端双击）</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">拖拽桌宠</span><span class="sp-guide-val">移动位置，拖到屏幕边缘会自动吸附挂起</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">🍖 投喂</span><span class="sp-guide-val">恢复饱食度（需要先在游戏商店购买道具）</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">🛁 洗澡</span><span class="sp-guide-val">恢复清洁度</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">🛏️ 睡觉</span><span class="sp-guide-val">恢复精力值</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">💬 聊天</span><span class="sp-guide-val">打开手机界面（所有功能的入口）</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">📔 日记</span><span class="sp-guide-val">AI 以桌宠视角撰写每日日记</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">🎮 游戏</span><span class="sp-guide-val">8 种小游戏 + 抽奖 + 成就系统</span></div>
                     <div class="sp-guide-row"><span class="sp-guide-key">🏠 小屋</span><span class="sp-guide-val">沉浸式立绘对话空间，含换装系统</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">⚙️ 设置</span><span class="sp-guide-val">打开悬浮设置面板</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">⚙️ 设置</span><span class="sp-guide-val">打开悬浮设置面板（API/外观/记忆/数据）</span></div>
                   </div>
-                  <p style="font-size:11px;color:#999;margin-top:8px;">三项状态随时间自然下降，低于 20% 时心情变差（困/饿/脏），影响对话语气。离线后回来会根据时间计算衰减。</p>
+                  <p style="font-size:11px;color:#999;margin-top:8px;">饱食/清洁/精力三项状态会随时间自然下降，低于 20% 时心情变差，影响对话语气。离线后回来时会根据离线时长计算衰减。</p>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">📱 手机界面</summary>
+                <summary class="sp-guide-summary">📱 手机界面 App一览</summary>
                 <div class="sp-guide-details-content">
                   <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                    点击菜单的「💬 聊天」打开手机界面，包含以下 App：<br/><br/>
-                    <strong style="color:var(--sp-text-primary);">💬 聊天</strong> — 与桌宠对话，支持三种模式切换<br/>
-                    <strong style="color:var(--sp-text-primary);">⚙️ 设置</strong> — 时间显示、电量、天气、锁屏密码、时间感知、自动消息<br/>
-                    <strong style="color:var(--sp-text-primary);">🎨 主题</strong> — 主屏壁纸、App 图标自定义<br/>
-                    <strong style="color:var(--sp-text-primary);">📚 书架</strong> — 导入漫画(图片/ZIP/PDF)、小说(TXT/EPUB)阅读<br/>
-                    <strong style="color:var(--sp-text-primary);">📇 通讯录</strong> — 关联酒馆角色卡和世界书<br/>
+                    <strong style="color:var(--sp-text-primary);">💬 聊天</strong> — 消息列表，点 ＋ 从通讯录添加好友开始新会话。每个联系人有独立的聊天记录和记忆<br/>
+                    <strong style="color:var(--sp-text-primary);">⚙️ 设置</strong> — 屏幕时间、电量、天气、锁屏密码、时间感知、API 自动消息<br/>
+                    <strong style="color:var(--sp-text-primary);">🎨 主题</strong> — 主屏壁纸和App 图标自定义<br/>
+                    <strong style="color:var(--sp-text-primary);">📚 书架</strong> — 导入漫画（图片/ZIP/PDF）和小说（TXT/EPUB）阅读<br/>
+                    <strong style="color:var(--sp-text-primary);">📇 通讯录</strong> — 导入角色卡文件（PNG/JSON）创建联系人，支持同时导入世界书<br/>
                     <strong style="color:var(--sp-text-primary);">👤 个人主页</strong> — 桌宠名字、系统提示词、预设管理、关系描述、各类提示词编辑<br/>
-                    <strong style="color:var(--sp-text-primary);">📰 论坛</strong> — 根据世界书生成论坛风格帖子<br/>
-                    <strong style="color:var(--sp-text-primary);">📝 同人文</strong> — AI 生成/续写同人文，支持自己创作<br/><br/>
-                    长按 App 图标进入编辑模式，可拖拽排序、添加小组件（拍立得/相框/便签/日历/自定义HTML）。支持多页（最多5页），左右滑动翻页。<br/>
-                    锁屏功能可在 ⚙️ 设置中开启，支持密码保护和消息通知悬浮。
+                    <strong style="color:var(--sp-text-primary);">📰 论坛</strong> — 根据世界书 AI 生成论坛风格帖子和评论<br/>
+                    <strong style="color:var(--sp-text-primary);">📝 同人文</strong> — AI 生成/续写同人文，也可自己创作<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">💡 小技巧：</strong>长按 App 图标进入编辑模式，可拖拽排序、添加小组件（拍立得/相框/便签/日历）。主屏支持最多 5 页，左右滑动翻页。
+                  </p>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
+                <summary class="sp-guide-summary">📇 角色卡与世界书</summary>
+                <div class="sp-guide-details-content">
+                  <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
+                    <strong style="color:var(--sp-text-primary);">通讯录导入角色卡：</strong><br/>
+                    📇通讯录 → ＋ →「从角色卡文件导入」→ 选择 PNG 或 JSON 文件。系统会自动提取角色名称、描述、性格设定，以及角色卡内嵌的世界书（character_book）。<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">单独导入世界书：</strong><br/>
+                    在角色卡导入页面下方，可以额外上传一个世界书 JSON 文件。上传的世界书会覆盖角色卡内嵌的世界书。<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">手动创建联系人：</strong><br/>📇通讯录 → ＋ →「手动新建人物」→ 填写角色名称和描述，可手动添加世界书条目。<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">数据隔离：</strong><br/>
+                    每个联系人拥有独立的角色描述、世界书、聊天记录和记忆池。切换会话时自动加载对应数据。<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">全局角色卡：</strong><br/>
+                    在悬浮设置面板的「🔑 API」标签页下方也可以导入全局角色卡和世界书，没有联系人时会使用这些全局设定。
                   </p>
                 </div>
               </details>
@@ -13049,29 +13087,29 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
                     <div class="sp-guide-row"><span class="sp-guide-key">📨 发送</span><span class="sp-guide-val">只发消息不触发 AI 回复，可连发多条</span></div>
                     <div class="sp-guide-row"><span class="sp-guide-key">➤ 生成</span><span class="sp-guide-val">发送当前输入 + 触发 AI 回复</span></div>
                     <div class="sp-guide-row"><span class="sp-guide-key">Enter</span><span class="sp-guide-val">等同于 📨 发送</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">😺 表情</span><span class="sp-guide-val">打开表情面板，可上传/发送/右键编辑/删除</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">模式切换</span><span class="sp-guide-val">🐾 桌宠 →💬 线上（多条||| 分隔）→🌙 线下</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">右键/长按回复</span><span class="sp-guide-val">重新生成该条及之后的桌宠回复</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">⚙️ 聊天设置</span><span class="sp-guide-val">备注名、头像、头像框、头像显隐、聊天背景</span></div>
-                  </div>
-                  <p style="font-size:11px;color:#999;margin-top:8px;">开启「视觉识别」后，发送的表情包图片会以多模态格式发给AI。开启「自动消息」后桌宠会按设定间隔主动发消息。</p>
+                    <div class="sp-guide-row"><span class="sp-guide-key">😺 表情</span><span class="sp-guide-val">打开表情面板，可上传/发送，右键编辑/删除</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">模式切换</span><span class="sp-guide-val">🐾桌宠 → 💬线上（多条|||分隔）→🌙线下</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">右键/长按回复</span><span class="sp-guide-val">重新生成该条及之后的回复</span></div>
+                    <div class="sp-guide-row"><span class="sp-guide-key">⚙️ 聊天设置</span><span class="sp-guide-val">备注名、头像/头像框、聊天背景、会话记忆管理</span></div>
+                </div>
+                  <p style="font-size:11px;color:#999;margin-top:8px;">开启「视觉识别」后发送的表情包图片会交给 AI 识别。开启「自动消息」后桌宠会按设定间隔主动发消息（使用线上模式提示词）。</p>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🏠 桌宠小屋 & 👗 换装</summary>
+                <summary class="sp-guide-summary">🏠 桌宠小屋 &👗 换装</summary>
                 <div class="sp-guide-details-content">
                   <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                    小屋是沉浸式立绘对话空间（2:3 竖屏），带打字机效果和关键词表情匹配。<br/><br/>
+                    沉浸式立绘对话空间（2:3 竖屏），带打字机效果和关键词表情匹配。<br/><br/>
                     <strong style="color:var(--sp-text-primary);">场景构成：</strong>房间背景 + 人物立绘 + 底部毛玻璃对话区<br/>
-                    <strong style="color:var(--sp-text-primary);">右侧按钮：</strong>🍖喂食🛁洗澡 🛏️睡觉 👗更衣（各按钮均可自定义图标）<br/>
-                    <strong style="color:var(--sp-text-primary);">对话框：</strong>支持输入对话、重新生成、展开/收起/折叠<br/><br/>
-                    <strong style="color:var(--sp-text-primary);">👗 更衣系统：</strong><br/>
-                    点击小屋右侧👗按钮弹出快捷面板，可快速切换服装。点击⚙️进入更衣设置弹窗：<br/>
-                    • 新建/编辑/删除服装套装<br/>
-                    • 每套服装含独立的：默认立绘、喂食/洗澡/睡觉动作立绘、表情立绘组<br/>
-                    • 全局设置：房间背景、对话框头像、各按钮图标<br/>
-                    • 表情立绘通过关键词匹配，对话中出现对应词自动切换立绘
+                    <strong style="color:var(--sp-text-primary);">右侧按钮：</strong>🍖喂食🛁洗澡 🛏️睡觉 👗更衣<br/>
+                    <strong style="color:var(--sp-text-primary);">对话框：</strong>支持输入、重新生成、展开/收起/折叠<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">👗 更衣系统（点👗旁的⚙️进入）：</strong><br/>
+                    • 新建/编辑/删除服装套装，每套含独立立绘和表情组<br/>
+                    • 全局设置：房间背景、对话框头像、按钮图标<br/>
+                    • 表情立绘通过关键词匹配，对话出现对应词自动切换<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">🎭 小屋专属角色卡/世界书：</strong><br/>
+                    在更衣设置⚙️中可为小屋单独导入角色卡（PNG/JSON）和世界书 JSON，不影响手机聊天的全局设置。还有小屋专属记忆池，仅在小屋对话时生效。
                   </p>
                 </div>
               </details>
@@ -13080,11 +13118,15 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
                 <summary class="sp-guide-summary">🧠 记忆系统</summary>
                 <div class="sp-guide-details-content">
                   <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                桌宠记忆分三层，发送API 时自动拼入上下文：<br/><br/>
-                    <strong style="color:var(--sp-text-primary);">对话记录</strong> — 最近 N轮聊天（可在行为设置中调整轮数）<br/>
-                    <strong style="color:var(--sp-text-primary);">记忆条目</strong> — 手动添加或🤖AI提取，支持标签和⭐1~5 星优先级排序<br/>
-                    <strong style="color:var(--sp-text-primary);">对话总结</strong> — 手动触发 AI 压缩旧对话，支持增量/覆盖/追加三种策略<br/><br/>
-                    在「🧠 记忆」标签页管理。点「手动总结」可选范围后AI 生成总结，确认后旧记录自动归档。归档记录可查看或导出。
+                    <strong style="color:var(--sp-text-primary);">三层记忆，发送 API 时自动拼入上下文：</strong><br/><br/>
+                    <strong style="color:var(--sp-text-primary);">① 对话记录</strong> — 最近 N轮聊天原文（可在行为设置中调整轮数）<br/>
+                    <strong style="color:var(--sp-text-primary);">② 记忆条目</strong> — 手动添加或🤖AI自动提取，支持标签和⭐1~5 星优先级<br/>
+                    <strong style="color:var(--sp-text-primary);">③ 对话总结</strong> — 手动触发 AI 压缩旧对话，支持增量/覆盖/追加三种策略<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">管理入口：</strong><br/>
+                    •悬浮设置 → 🧠记忆 标签页（全局记忆，所有聊天共享）<br/>
+                    • 手机聊天 → ⚙️聊天设置（当前会话专属记忆）<br/>
+                    • 桌宠小屋 → 👗更衣⚙️ → 小屋专属记忆池<br/><br/>
+                    点「手动总结」可选范围后AI 生成总结，确认后旧记录自动归档。
                   </p>
                 </div>
               </details>
@@ -13093,55 +13135,32 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
                 <summary class="sp-guide-summary">🎨 外观定制</summary>
                 <div class="sp-guide-details-content">
                   <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                    在「🎨 外观」标签页设置：<br/><br/>
-                    <strong style="color:var(--sp-text-primary);">主题配色</strong> — 8 种预设（深色/赛博/粉色/深海/森林/淡蓝/淡紫/淡黄）+ 自定义 RGB，可导出/导入主题文件<br/>
-                    <strong style="color:var(--sp-text-primary);">精灵图</strong> — 17 种状态图（闲置/四方向走路/睡觉/开心/难过/拖拽/晕乎/吃东西/洗澡/打招呼/思考/三方向挂墙），支持 GIF 动图和 URL 链接，每个可调播放时长<br/>
-                    <strong style="color:var(--sp-text-primary);">菜单图标</strong> — 替换 8 个圆形菜单按钮和 3 个聊天按钮的图标<br/>
-                    <strong style="color:var(--sp-text-primary);">自定义动作</strong> — 添加额外动作精灵图，桌宠闲逛时随机播放<br/>
+                    在悬浮设置「🎨 外观」标签页：<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">主题配色</strong> — 8 种预设 + 自定义 RGB，可导出/导入主题<br/>
+                    <strong style="color:var(--sp-text-primary);">精灵图</strong> — 17 种状态图（闲置/走路/睡觉/拖拽/吃东西等），支持 GIF 动图和 URL 链接<br/>
+                    <strong style="color:var(--sp-text-primary);">菜单图标</strong> — 替换 8 个菜单按钮和 3 个聊天按钮图标<br/>
+                    <strong style="color:var(--sp-text-primary);">自定义动作</strong> — 添加额外动作精灵图，闲逛时随机播放<br/>
                     <strong style="color:var(--sp-text-primary);">互动贴图</strong> — 投喂/洗澡/睡觉时飘出的物品图<br/>
-                    <strong style="color:var(--sp-text-primary);">心情图标</strong> — 替换右上角 6 种心情的emoji<br/>
-                    <strong style="color:var(--sp-text-primary);">桌宠大小</strong> — 0.5x~2.0x 自由缩放<br/>
-                    <strong style="color:var(--sp-text-primary);">状态条</strong> — 可显示/隐藏底部饱食/清洁/精力条
+                    <strong style="color:var(--sp-text-primary);">心情图标</strong> — 替换 6 种心情 emoji<br/>
+                    <strong style="color:var(--sp-text-primary);">缩放</strong> — 0.5x~2.0x 自由调整桌宠大小
                   </p>
                 </div>
               </details>
 
               <details class="sp-guide-details">
-                <summary class="sp-guide-summary">📚 书架 & 阅读器</summary>
+                <summary class="sp-guide-summary">🎮 游戏系统简介</summary>
                 <div class="sp-guide-details-content">
                   <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                    手机界面的📚书架 App，支持导入和阅读：<br/><br/>
-                    <strong style="color:var(--sp-text-primary);">支持格式：</strong>图片(漫画)、ZIP 压缩包、PDF、TXT 小说、EPUB 电子书<br/>
-                    <strong style="color:var(--sp-text-primary);">书架功能：</strong>搜索、排序（时间/名称/最近读）、标签分类、网格/列表布局切换、封面自定义、最近阅读历史<br/>
-                    <strong style="color:var(--sp-text-primary);">阅读器：</strong>触摸/点击翻页、进度滑轨、目录跳转、字号调节、沉浸模式（自动隐藏工具栏）<br/>
-                    <strong style="color:var(--sp-text-primary);">阅读设置：</strong>背景颜色/背景图（含透明度和明暗调节）、字体选择（内置+本地文件+网络URL+CSS @import 导入）<br/>
-                    <strong style="color:var(--sp-text-primary);">书签：</strong>长按段落添加书签/高亮，可附带笔记<br/>
-                    <strong style="color:var(--sp-text-primary);">数据：</strong>支持备份/还原整个书架（含所有页面数据）
-                  </p>
-                </div>
-              </details>
-
-              <details class="sp-guide-details">
-                <summary class="sp-guide-summary">🎮 游戏系统</summary>
-                <div class="sp-guide-details-content">
-                  <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                    所有游戏共享 <strong style="color:#ffb347;">🪙金币</strong> 和 <strong style="color:var(--sp-status-energy);">⚡体力</strong>（每 5 分钟恢复 1 点）。点游戏选择弹窗的<strong style="color:var(--sp-text-primary);">❓</strong> 按钮可查看详细规则。<br/><br/>
-                    <strong style="color:var(--sp-text-primary);">🐱 小猫餐厅</strong> — 经营猫咪餐厅，烹饪上菜赚金币。声望升级解锁新菜谱和客人（10级体系）。食材来自冰箱/货架/进货区<br/>
-                    <strong style="color:var(--sp-text-primary);">🧶 合成工坊</strong> — 9 条合成链（含调料链↔餐厅实时同步），猫爪生成→合成升级→完成订单→商店买道具<br/>
-                    <strong style="color:var(--sp-text-primary);">🃏 消消看</strong> — 多层堆叠图案牌，收集到暂存栏凑三消。消除产出食材/调料/道具联动<br/>
-                    <strong style="color:var(--sp-text-primary);">🔗 连连看</strong> — 相同图案两折连线消除。8×8~18×18 随机棋盘，同样有物品联动产出<br/>
-                    <strong style="color:var(--sp-text-primary);">🧊 冰箱整理</strong> — 把食材塞进随机大小冰箱，含异形食材和旋转。塞进去的存入冰箱库存<br/>
-                    <strong style="color:var(--sp-text-primary);">🍢糖葫芦工坊</strong> — 水果排序归类。通关产出糖葫芦可卖/投喂/餐厅甜品上菜<br/>
-                    <strong style="color:var(--sp-text-primary);">🛒 整理货架</strong> — 货架三消，消除的商品按类型进入对应库存（冰箱/道具/调料等）<br/>
-                    <strong style="color:var(--sp-text-primary);">🎰幸运抽奖</strong> — 三档奖池，产出金币/各类道具/棋盘物品/食材/糖葫芦等<br/><br/>
-                    <strong style="color:var(--sp-text-primary);">🎒 总背包</strong> — 查看所有道具和物资汇总<br/>
-                    <strong style="color:var(--sp-text-primary);">🏆 成就</strong> — 300+ 个成就，解锁后可领取金币/体力/道具奖励，支持一键领取<br/>
-                    <strong style="color:var(--sp-text-primary);">📖 图鉴合集</strong> — 所有游戏图鉴汇总，支持搜索、查漏补缺、联动物品共享图片。包含游戏图标自定义<br/><br/>
-                    <strong style="color:var(--sp-text-primary);">核心联动：</strong><br/>
-                    冰箱/货架 → 餐厅食材 → 烹饪出菜 → 投喂桌宠<br/>
-                    工坊调料链↔ 餐厅调料 |糖葫芦 → 卖/喂/上菜<br/>
-                    消消看+连连看消除 → 食材/调料/道具 |抽奖 → 各类物品<br/>
-                    金币 → 商店道具 → 投喂/洗澡/睡觉时消耗
+                    所有游戏共享🪙金币 和⚡体力（每5 分钟恢复 1 点）。点游戏选择弹窗的❓ 按钮查看完整规则。<br/><br/>
+                    <strong style="color:var(--sp-text-primary);">🐱 小猫餐厅</strong> — 经营餐厅，烹饪上菜赚金币，声望升级解锁新菜谱<br/>
+                    <strong style="color:var(--sp-text-primary);">🧶 合成工坊</strong> — 9 条合成链，猫爪生成→合成升级→完成订单<br/>
+                    <strong style="color:var(--sp-text-primary);">🃏 消消看</strong> — 多层图案牌三消，消除产出食材/道具<br/>
+                    <strong style="color:var(--sp-text-primary);">🔗 连连看</strong> — 相同图案两折连线消除<br/>
+                    <strong style="color:var(--sp-text-primary);">🧊 冰箱整理</strong> — 俄罗斯方块式塞食材，含异形和旋转<br/>
+                    <strong style="color:var(--sp-text-primary);">🍢糖葫芦工坊</strong> — 水果排序归类，通关产出糖葫芦<br/>
+                    <strong style="color:var(--sp-text-primary);">🛒 整理货架</strong> — 货架三消，消除的商品进入对应库存<br/>
+                    <strong style="color:var(--sp-text-primary);">🎰幸运抽奖</strong> — 三档奖池，产出各类道具和物品<br/><br/>
+                    还有 🎒总背包、🏆成就（300+个）、📖图鉴合集。所有游戏之间通过金币/食材/调料/道具互相联动。
                   </p>
                 </div>
               </details>
@@ -13149,43 +13168,12 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
               <details class="sp-guide-details">
                 <summary class="sp-guide-summary">💾 数据管理</summary>
                 <div class="sp-guide-details-content">
-                  <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;"><strong style="color:var(--sp-text-primary);">多桌宠存档</strong> — 保存/加载/删除不同桌宠配置（含聊天记录、图片、游戏进度全部状态）<br/>
-                    <strong style="color:var(--sp-text-primary);">导出/导入</strong> — 完整备份为 JSON 文件，也可单独导出/导入图片配置<br/>
-                    <strong style="color:var(--sp-text-primary);">☁️ GitHub 图片托管</strong> — 配置 Token 和仓库后，一键将所有 base64 图片上传到 GitHub 仓库并替换为 CDN 链接，大幅释放本地存储空间<br/>
-                    <strong style="color:var(--sp-text-primary);">危险操作</strong> — 清空所有聊天数据、重置全部数据（不可撤销）<br/>
-                    <strong style="color:var(--sp-text-primary);">状态总览</strong> — 查看当前状态、存储空间占用、Token 估算<br/><br/>
-                    <span style="color:#f66;">⚠️ 数据存储在浏览器 IndexedDB 中，换浏览器/清缓存 = 数据丢失！务必定期导出备份。</span>
-                  </p>
-                </div>
-              </details>
-
-              <details class="sp-guide-details">
-                <summary class="sp-guide-summary">⚙️ 行为设置</summary>
-                <div class="sp-guide-details-content">
                   <p style="font-size:12px;color:var(--sp-text-secondary);line-height:1.7;">
-                    在「⚙️ 行为」标签页可调节：<br/><br/>
-                    <strong style="color:var(--sp-text-primary);">活跃度</strong> — 0% 安静 ~ 100% 话痨，控制闲逛时碎碎念和自动评论频率<br/>
-                    <strong style="color:var(--sp-text-primary);">自动反应</strong> — 是否监听酒馆主聊天并自动发表旁观评论<br/>
-                    <strong style="color:var(--sp-text-primary);">冷却/窥探/聊天轮数</strong> — 控制反应间隔、读取酒馆聊天范围、桌宠聊天上下文长度<br/>
-                    <strong style="color:var(--sp-text-primary);">走动频率</strong> — 3s 频繁走动 ~ 30s 基本不动<br/>
-                    <strong style="color:var(--sp-text-primary);">总结策略</strong> — 手动/自动触发，增量合并/覆盖/追加，可设置总结后保留条数<br/>
-                    <strong style="color:var(--sp-text-primary);">离线衰减</strong> — 衰减率和安全阈值<br/>
-                    <strong style="color:var(--sp-text-primary);">反应语言</strong> — 自定义投喂/洗澡/睡觉/拖拽/闲逛/回归等场景的反应文案（用| 分隔多条随机）
+                    <strong style="color:var(--sp-text-primary);">多桌宠存档</strong> — 保存/加载不同桌宠配置（含全部数据）<br/>
+                    <strong style="color:var(--sp-text-primary);">导出/导入</strong> — 完整备份为 JSON，也可单独导出/导入图片<br/>
+                    <strong style="color:var(--sp-text-primary);">☁️ GitHub 图片托管</strong> — 配置 Token 后一键上传 base64 图片到 GitHub，释放本地空间<br/><br/>
+                    <span style="color:#f66;">⚠️ 数据存储在浏览器 IndexedDB 中，清除浏览器缓存 = 数据丢失！务必定期导出备份。</span>
                   </p>
-                </div>
-              </details>
-
-              <details class="sp-guide-details">
-                <summary class="sp-guide-summary">⚡ 斜杠指令</summary>
-                <div class="sp-guide-details-content">
-                  <div class="sp-guide-table">
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet status</span><span class="sp-guide-val">查看桌宠状态（饱食/清洁/精力/心情）</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet feed</span><span class="sp-guide-val">投喂</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet bath</span><span class="sp-guide-val">洗澡</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet sleep</span><span class="sp-guide-val">睡觉</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet summon</span><span class="sp-guide-val">强行召唤到屏幕正中心（桌宠跑飞了用这个）</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet toggle</span><span class="sp-guide-val">显示/隐藏桌宠</span></div>
-                    <div class="sp-guide-row"><span class="sp-guide-key">/pet chat &lt;内容&gt;</span><span class="sp-guide-val">在酒馆输入框隔空给桌宠发消息</span></div></div>
                 </div>
               </details>
 
@@ -13549,6 +13537,61 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
               </details>
 
               <details class="sp-guide-details">
+                <summary class="sp-guide-summary">📇 通讯录 & 💬 消息列表</summary>
+                <div class="sp-guide-details-content">
+                  <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 通讯录页===== */
+#sp-phone-contacts { }               /* 通讯录页面容器 */
+#sp-contacts-list-content { }        /* 联系人列表内容区 */
+.sp-contact-list-item { }            /* 单个联系人行 */
+.sp-contact-list-item:hover { }      /* 悬停高亮 */
+.sp-contact-list-item:active { }     /* 按下缩放 */
+
+/* ===== 新建联系人 ===== */
+#sp-phone-contact-new { }            /* 新建联系人选择页*/
+#sp-contact-from-tavern { }          /* 「从角色卡文件导入」按钮 */
+#sp-contact-from-custom { }          /* 「手动新建人物」按钮 */
+
+/* ===== 角色卡导入页 ===== */
+#sp-phone-contact-import { }         /* 导入页*/
+#sp-contact-import-char-btn { }      /* 📁 选择角色卡文件按钮 */
+#sp-contact-import-char-preview { }  /* 导入预览框（绿色边框） */
+#sp-contact-import-world-btn { }     /* 📁 选择世界书按钮 */
+#sp-contact-import-world-preview { } /* 世界书预览框（蓝色边框） */
+#sp-contact-import-save { }          /* ✅ 添加到通讯录按钮 */
+
+/* ===== 手动新建页 ===== */
+#sp-phone-contact-create { }         /* 手动新建页 */
+#sp-contact-create-name { }          /* 角色姓名输入框 */
+#sp-contact-create-desc { }          /* 角色描述文本框 */
+#sp-contact-create-worldbook-list { } /* 世界书条目列表 */
+.sp-cwb-create-entry { }             /* 单个世界书条目 */
+
+/* ===== 联系人详情页 ===== */
+#sp-phone-contact-detail { }         /* 详情页 */
+#sp-contact-detail-title { }         /* 详情页标题 */
+#sp-contact-detail-avatar { }        /* 详情页头像（可点击更换） */
+#sp-contact-detail-desc { }          /* 角色描述编辑框 */
+#sp-contact-detail-wb-list { }       /* 自定义世界书条目列表 */
+#sp-contact-detail-add-wb { }        /* ＋ 添加条目按钮 */
+#sp-contact-detail-save { }          /* 💾 保存修改按钮 */
+#sp-contact-detail-delete { }        /* 🗑️ 删除联系人按钮 */
+
+/* ===== 消息列表页 ===== */
+#sp-phone-msglist { }                /* 消息列表页 */
+#sp-msglist-content { }              /* 消息列表内容区 */
+#sp-msglist-add-btn { }              /* ＋ 添加好友按钮 */
+.sp-msglist-item { }                 /* 单个会话行 */
+.sp-msglist-item:hover { }           /* 悬停高亮 */
+.sp-msglist-item:active { }          /* 按下缩放 */
+
+/* ===== 添加好友选择弹窗 ===== */
+#sp-friend-picker-overlay { }        /* 弹窗遮罩 */
+.sp-friend-pick-item { }             /* 单个联系人选项 */
+.sp-friend-pick-item:hover { }       /* 悬停高亮 */</pre>
+                </div>
+              </details>
+
+              <details class="sp-guide-details">
                 <summary class="sp-guide-summary">📚 书架 & 阅读器</summary>
                 <div class="sp-guide-details-content">
                   <pre style="font-size:11px;color:var(--sp-text-secondary);line-height:1.6;white-space:pre-wrap;word-break:break-all;">/* ===== 书架页 ===== */
@@ -13908,7 +13951,30 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 #sp-wardrobe-editing-label { }       /* 当前编辑提示 */
 #sp-wardrobe-outfit-list { }         /* 服装列表区 */
 #sp-wardrobe-expressions-list { }    /* 表情立绘列表 */
-#sp-wardrobe-save { }                /* 💾 保存按钮 */</pre>
+#sp-wardrobe-save { }                /* 💾 保存按钮 */
+
+/* ===== 更衣弹窗 — 小屋专属角色卡/世界书/记忆 ===== */
+#sp-wardrobe-import-char-btn { }     /* 📁 导入角色卡按钮 */
+#sp-wardrobe-import-char-file { }    /* 角色卡文件input（隐藏） */
+#sp-wardrobe-char-preview { }        /* 角色卡预览区 */
+#sp-wardrobe-clear-char { }          /* ✕ 清除角色卡按钮 */
+#sp-wardrobe-import-wb-btn { }       /* 📁 导入世界书按钮 */
+#sp-wardrobe-import-wb-file { }      /* 世界书文件input（隐藏） */
+#sp-wardrobe-wb-list { }             /* 世界书条目列表 */
+#sp-wardrobe-add-wb-entry { }        /* ＋ 手动添加世界书条目 */
+#sp-wardrobe-clear-wb { }            /* ✕ 清除全部世界书 */
+.sp-hwb-enabled { }                  /* 世界书条目启用勾选框 */
+.sp-hwb-name { }                     /* 世界书条目名称输入 */
+.sp-hwb-keys { }                     /* 世界书条目关键词输入 */
+.sp-hwb-content { }                  /* 世界书条目内容文本框 */
+.sp-hwb-delete { }                   /* 世界书条目删除按钮 */
+#sp-wardrobe-memories-list { }       /* 小屋记忆池列表 */
+#sp-wardrobe-add-memory { }          /* + 新增记忆按钮 */
+.sp-hmem-tag { }                     /* 记忆标签输入 */
+.sp-hmem-stars { }                   /* 记忆重要度星星 */
+.sp-hmem-text { }                    /* 记忆内容文本框 */
+.sp-hmem-delete { }                  /* 记忆删除按钮 */
+</pre>
                 </div>
               </details>
 
@@ -14628,7 +14694,17 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
 #sp-migrate-bar { }                  /* 进度条 */
 
 /* ===== 扩展设置区顶部控制条 ===== */
-#meep-pet-top-control { }            /* 酒馆设置区的启用开关 */</pre>
+#meep-pet-top-control { }            /* 酒馆设置区的启用开关 */
+
+/* ===== 线上模式消息渐出===== */
+.sp-chat-row-fadein { }              /* 逐条淡入动画 */
+@keyframes sp-chat-row-appear { }    /* 消息出现关键帧 */
+
+/* ===== 通讯录/消息列表交互 ===== */
+.sp-contact-list-item { }            /* 联系人行 */
+.sp-msglist-item { }                 /* 消息列表行 */
+.sp-friend-pick-item { }             /* 添加好友选项 */
+</pre>
                 </div>
               </details>
 
@@ -14698,7 +14774,38 @@ document.getElementById('sp-house-sleep-btn').onclick = () => {
   --sp-text-muted: #999;
   --sp-bubble-bg: rgba(245,245,250,0.95);
   --sp-bubble-border: rgba(0,0,0,0.1);
-}</pre>
+}
+  
+
+/* ===== 通讯录列表加边框效果 ===== */
+.sp-contact-list-item {
+  border-left: 3px solid transparent;
+  transition: border-color 0.2s;
+}
+.sp-contact-list-item:hover {
+  border-left-color: var(--sp-primary);
+}
+
+/* ===== 消息列表未读指示器 ===== */
+.sp-msglist-item::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sp-primary);
+  flex-shrink: 0;
+  display: none; /* 需要时改为 block */
+}
+
+/* ===== 小屋对话框加渐变边框 ===== */
+#sp-house-dialogue-overlay {
+  border-image: linear-gradient(
+    to right,
+    rgba(100,180,255,0.5),
+    rgba(200,100,255,0.5)
+  ) 1;
+}
+</pre>
                 </div>
               </details>
             </div>
@@ -15883,6 +15990,7 @@ function bindTabSwitching() {
       tab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
       // 懒加载：切换到记忆标签才渲染记忆列表
       if (target === 'memory') {
+        renderMemoryOverview();
         renderMemoriesList();
         renderChatHistoryList();
         renderChatArchive();
@@ -16269,6 +16377,84 @@ function updateUploadPreview(key, dataUrl) {
 
 }
 
+  // 记忆总览面板
+  // ============================================================
+  function renderMemoryOverview() {
+    const panel = document.getElementById('sp-memory-overview-panel');
+    const badge = document.getElementById('sp-memory-overview-badge');
+    if (!panel) return;
+
+    const memCount = state.memories.length;
+    const chatCount = state.petChatHistory.length;
+    const archiveCount = (state.petChatArchive || []).length;
+    const summaryLen = (state.summary || '').length;
+    const diaryCount = (state.diaryEntries || []).length;
+
+    // 当前活跃会话信息
+    let activeInfo = '无活跃会话（全局模式）';
+    if (state.activeConversationId) {
+      const conv = (state.conversationsList || []).find(c => c.id === state.activeConversationId);
+      if (conv) {
+        const contact = (settings.contactsList || []).find(c => c.id === conv.contactId);
+        activeInfo = contact ? `当前会话: 🎭 ${contact.name}` : '当前会话: 未知联系人';
+      }
+    }
+
+    // 星级分布
+    const starDist = [0, 0, 0, 0, 0];
+    state.memories.forEach(m => {
+      const imp = (typeof m === 'object' ? m.importance : 3) || 3;
+      starDist[imp - 1]++;
+    });
+    const starDistHtml = starDist.map((count, i) => {
+      const stars = i + 1;
+      const barWidth = memCount > 0 ? Math.round((count / memCount) * 100) : 0;
+      return `<div style="display:flex;align-items:center;gap:4px;font-size:10px;">
+        <span style="min-width:30px;color:var(--sp-text-muted);">${'★'.repeat(stars)}</span>
+        <div style="flex:1;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden;">
+          <div style="width:${barWidth}%;height:100%;background:rgba(255,200,50,${0.3 + stars * 0.14});border-radius:2px;transition:width 0.3s;"></div>
+        </div>
+        <span style="min-width:18px;text-align:right;color:var(--sp-text-muted);">${count}</span>
+      </div>`;
+    }).join('');
+
+    // token 估算
+    let estimatedTokens = 0;
+    state.memories.forEach(m => {
+      const content = typeof m === 'string' ? m : (m.content || '');
+      estimatedTokens += estimateTokens(content);
+    });
+    estimatedTokens += estimateTokens(state.summary || '');
+
+    if (badge) badge.textContent = activeInfo;
+
+    panel.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px;">
+        <div style="text-align:center;padding:6px;background:rgba(255,255,255,0.04);border-radius:6px;">
+          <div style="font-size:16px;font-weight:700;color:var(--sp-text-primary);">${memCount}</div>
+          <div style="font-size:9px;color:var(--sp-text-muted);">记忆条目</div>
+        </div>
+        <div style="text-align:center;padding:6px;background:rgba(255,255,255,0.04);border-radius:6px;">
+          <div style="font-size:16px;font-weight:700;color:var(--sp-text-primary);">${chatCount}</div>
+          <div style="font-size:9px;color:var(--sp-text-muted);">聊天记录</div>
+        </div>
+        <div style="text-align:center;padding:6px;background:rgba(255,255,255,0.04);border-radius:6px;">
+          <div style="font-size:16px;font-weight:700;color:var(--sp-text-primary);">${archiveCount}</div>
+          <div style="font-size:9px;color:var(--sp-text-muted);">归档批次</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;margin-bottom:8px;">
+        <span>📝 总结: ${summaryLen > 0 ? summaryLen + '字' : '<span style="color:var(--sp-text-muted);">空</span>'}</span>
+        <span>📔 日记: ${diaryCount}篇</span>
+        <span>🔢 记忆≈${estimatedTokens} tokens</span>
+      </div>
+      <div style="margin-top:4px;">
+        <div style="font-size:10px;color:var(--sp-text-muted);margin-bottom:4px;">⭐ 重要度分布</div>
+        ${starDistHtml}
+      </div>
+    `;
+  }
+
 // ============================================================
 // 记忆管理
 // ============================================================
@@ -16276,6 +16462,10 @@ function renderMemoriesList() {
   const container = document.getElementById('sp-memories-list');
   if (!container) return;
   container.innerHTML = '';
+  // 同步记忆计数和总览
+  renderMemoryOverview();
+  const countBadge = document.getElementById('sp-memory-count-badge');
+  if (countBadge) countBadge.textContent = state.memories.length;
 
   state.memories = state.memories.map(mem => {
     if (typeof mem === 'string') return { content: mem, tag: '', importance: 3, timestamp: Date.now() };
