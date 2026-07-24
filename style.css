@@ -973,11 +973,11 @@
 .sp-world-entries-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
 
 .sp-wi-entry {
-  margin-bottom: 1px;
+  margin-bottom: 8px;
   background: rgba(255,255,255,0.04);
-  border-radius: 3px;
+  border-radius: 6px;
   border: 1px solid rgba(255,255,255,0.08);
-  border-left: 2px solid rgba(100,180,255,0.5);
+  border-left: 3px solid rgba(100,180,255,0.5);
   overflow: hidden; transition: all 0.2s ease;
 }
 .sp-wi-entry:last-child { margin-bottom: 0; }
@@ -985,7 +985,7 @@
 
 .sp-wi-entry-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 3px 6px; cursor: pointer; user-select: none; min-height: 20px; line-height: 1;
+  padding: 6px 8px; cursor: pointer; user-select: none; min-height: 28px; line-height: 1.2;
 }
 .sp-wi-header-left {
   display: flex; align-items: center; gap: 4px; flex: 1; overflow: hidden; min-width: 0; line-height: 1;
@@ -10599,4 +10599,44 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* ============================================================ */
+/* 📇 通讯录 &💬 消息列表样式                                    */
+/* ============================================================ */
+
+.sp-contact-list-item:hover {
+  background: rgba(100,180,255,0.08) !important;
+  border-color: rgba(100,180,255,0.3) !important;
+}
+
+.sp-contact-list-item:active {
+  transform: scale(0.98);
+}
+
+.sp-msglist-item:hover {
+  background: rgba(100,180,255,0.08) !important;
+  border-color: rgba(100,180,255,0.3) !important;
+}
+
+.sp-msglist-item:active {
+  transform: scale(0.98);
+}
+
+.sp-friend-pick-item:hover {
+  background: rgba(100,180,255,0.12) !important;
+  border-color: rgba(100,180,255,0.4) !important;
+}
+
+/* ===== 通讯录页面性能优化 ===== */
+#sp-contacts-list-content {
+  contain: layout style paint;
+  will-change: scroll-position;
+}
+
+#sp-contact-new-content,
+#sp-contact-import-content,
+#sp-contact-create-content,
+#sp-contact-detail-content {
+  contain: layout style;
 }

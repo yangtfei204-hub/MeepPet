@@ -416,6 +416,20 @@
 
     // 世界书排除的条目索引
     worldBookExcluded: [],    // 被排除的条目索引数组
+    contactsList: [],
+    // 每个联系人结构：
+    // {
+    //   id: 'contact_xxx',        // 唯一ID
+    //   name: '角色名',            // 显示名称
+    //   avatar: '',// 头像（base64或URL）
+    //   source: 'tavern' | 'custom', // 来源：酒馆角色卡 or 手动创建
+    //   characterId: '',// 关联的酒馆角色卡名（tavern来源时有效）
+    //   customDescription: '',      // 手动填写的角色描述
+    //   worldBookId: '',            // 关联的酒馆世界书名
+    //   customWorldBook: [],        // 手动填写的世界书条目 [{name, keys, content}]
+    //   worldBookExcluded: [],      // 被排除的世界书条目索引
+    //   createdTime: 0,
+    // }
 
     userPersonaSource: 'manual',   // 'card' | 'manual'
     userPersonaText: '',           // 手动填写的人设
@@ -496,6 +510,14 @@
     fanficGeneratePrompt: '你是一个同人文生成器。请根据提供的世界观设定，生成若干篇同人文。\n\n请严格按以下JSON数组格式输出（不要输出任何其他内容，只输出JSON）：\n[\n  {\n    "title": "同人文标题(5-20字)",\n    "content": "同人文正文(800-2000字，包含场景描写、人物对话、心理活动，文笔细腻，感情丰富)",\n    "authorName": "作者笔名(2-6字)",\n    "authorAvatar": "一个emoji表情作为头像",\n    "coverEmoji": "一个能代表文章氛围的emoji",\n    "likes": 随机数100-9999,\n    "views": 随机数500-99999,\n    "tags": ["标签1","标签2"]\n  }\n]\n\n要求：\n- 生成5到10篇同人文\n- 每篇要有不同的作者和写作风格\n- 内容必须贴合世界观设定\n- 包含不同类型：甜文、虐文、日常、冒险等\n- 标签1-3个\n- 数字字段请直接写数字，不要加引号\n- content字段内容要丰富，至少800字',
     fanficContinuePrompt: '请根据以下同人文内容进行续写。续写要求：\n1. 保持原文的文风和人物性格\n2. 情节自然衔接\n3. 续写内容800-1500字\n4. 直接输出续写的正文内容，不要输出JSON或其他格式标记\n5. 不要重复原文内容',
     fanficCommentPrompt: '你是一个同人文评论生成器。请根据提供的同人文内容和世界观设定，生成若干条风格各异的读者评论。\n\n请严格按以下JSON数组格式输出（不要输出任何其他内容，只输出JSON）：\n[\n  {\n    "author": "评论者昵称(2-6个字，符合世界观的名字风格)",\n    "avatarEmoji": "一个emoji表情作为头像",\n    "content": "评论内容(10-150字，语言风格像文学社区/同人论坛评论，可以包含表情符号)",\n    "likes": 随机数0-999\n  }\n]\n\n要求：\n- 生成10到15条评论\n- 每条评论的作者和写作风格都不同\n- 评论类型要多样化：有表白的、有分析剧情的、有催更的、有讨论CP的、有吐槽的、有写长评的、有纯尖叫的\n- 评论内容必须贴合同人文的剧情和人物\n- 有的评论可以很短（如"啊啊啊好甜""呜呜呜刀了""前排""催更！"等粉丝风格）\n- 有的评论可以比较长（认真分析剧情、讨论人物心理）\n- 评论要有真实感，像真人在同人社区里互动\n- 数字字段请直接写数字，不要加引号',
+    // 论坛独立世界书
+    forumWorldBookId: '',
+    forumCustomWorldBook: [],
+    forumWorldBookExcluded: [],
+    // 同人文独立世界书
+    fanficWorldBookId: '',
+    fanficCustomWorldBook: [],
+    fanficWorldBookExcluded: [],
 
     // 自定义动作精灵图
     customSprites: [],        // [{name: '动作名', image: 'base64...'}]
@@ -629,6 +651,21 @@
     achievementClaimed: [],       // 已领取奖励的成就ID
     forumPosts: [],               // 论坛生成的帖子 [{author, avatarEmoji, title, content, ...}]
     forumGenerating: false,       // 是否正在生成中
+    // 消息会话列表
+    conversationsList: [],
+    // 每个会话结构：
+    // {
+    //   id: 'conv_xxx',
+    //   contactId: 'contact_xxx',   // 关联的联系人ID
+    //   chatHistory: [],             // 这个会话的聊天记录
+    //   memories: [],                // 这个会话的记忆条目
+    //   summary: '',                 // 这个会话的对话总结
+    //   chatArchive: [],             // 这个会话的归档记录
+    //   lastMessageTime: 0,          // 最后消息时间（用于排序）
+    //   lastMessage: '',             // 最后一条消息预览
+    // }
+    activeConversationId: '',        // 当前打开的会话ID
+
     fanficGenerating: false,          // 同人文是否正在生成中
 
   };
@@ -957,6 +994,7 @@
 let _lastCleanupTime = 0;
 
 function saveData() {
+  saveActiveConversation();
   state.lastOnlineTimestamp = Date.now();
 
   // 清理逻辑每60 秒最多执行一次，不在每次保存时都跑
@@ -1765,6 +1803,30 @@ function saveData() {
               <label style="margin-top:8px;">背景模糊: <span id="sp-chat-bg-blur-val">${settings.chatBackgroundBlur ?? 0}px</span></label>
               <input type="range" id="sp-chat-bg-blur" min="0" max="20" step="1" value="${settings.chatBackgroundBlur ?? 0}" style="width:100%;" /><p style="font-size:9px;color:var(--sp-text-muted);margin:6px 0 0;">上传聊天背景后可调节透明度、明暗和模糊程度</p>
             </div>
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">🧠 本会话记忆条目</div>
+              <p style="font-size:10px;color:var(--sp-text-muted);margin:0 0 8px;">每个聊天对象拥有独立的记忆池，仅影响当前会话</p>
+              <div id="sp-chat-memories-list"></div>
+              <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+                <button class="sp-phone-btn" id="sp-chat-add-memory" type="button">+ 新增记忆</button>
+                <button class="sp-phone-btn" id="sp-chat-extract-memory" type="button">🤖 AI提取记忆</button>
+              </div>
+            </div>
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">📝 本会话对话总结</div>
+              <textarea id="sp-chat-current-summary" style="width:100%;min-height:60px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;"></textarea>
+              <div style="display:flex;gap:6px;margin-top:8px;">
+                <button class="sp-phone-btn" id="sp-chat-save-summary" type="button">保存总结</button>
+                <button class="sp-phone-btn" id="sp-chat-trigger-summary" type="button">手动总结</button>
+              </div>
+            </div>
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">💬 本会话聊天记录 (<span id="sp-chat-history-count2">0</span>条)</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                <button class="sp-phone-btn" id="sp-chat-clear-history2" type="button" style="color:#f66;">🗑️ 清空本会话聊天</button>
+                <button class="sp-phone-btn" id="sp-chat-export-history2" type="button">📄 导出TXT</button>
+              </div>
+            </div>
             <button class="sp-phone-btn sp-phone-btn-primary" id="sp-chat-settings-save">💾 保存</button>
           </div>
         </div>
@@ -1879,42 +1941,84 @@ function saveData() {
             <div id="sp-bs-shelf-list"></div>
           </div>
         </div>
-
         <div id="sp-phone-contacts" class="sp-phone-page">
           <div class="sp-phone-page-header">
             <button class="sp-phone-back" data-back="home">‹</button>
             <span>📇 通讯录</span>
+            <button id="sp-contacts-add-btn" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--sp-text-primary);padding:2px 6px;">＋</button>
+          </div>
+          <div class="sp-phone-page-content" id="sp-contacts-list-content">
+            <!-- 联系人列表由JS动态渲染 -->
+          </div>
+        </div>
+        <div id="sp-phone-contact-new" class="sp-phone-page">
+          <div class="sp-phone-page-header">
+            <button class="sp-phone-back" data-back="contacts">‹</button>
+            <span>新建联系人</span>
             <span style="width:24px;"></span>
           </div>
-          <div class="sp-phone-page-content" id="sp-contacts-page-content">
+          <div class="sp-phone-page-content" id="sp-contact-new-content"><div style="display:flex;flex-direction:column;gap:12px;padding:8px;">
+              <button id="sp-contact-from-tavern" class="sp-phone-btn sp-phone-btn-primary" style="padding:16px;font-size:14px;">🎭 从酒馆角色卡导入</button>
+              <button id="sp-contact-from-custom" class="sp-phone-btn" style="padding:16px;font-size:14px;">✏️ 手动新建人物</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="sp-phone-contact-import" class="sp-phone-page">
+          <div class="sp-phone-page-header">
+            <button class="sp-phone-back" data-back="contact-new">‹</button>
+            <span>导入角色卡</span>
+            <span style="width:24px;"></span>
+          </div>
+          <div class="sp-phone-page-content" id="sp-contact-import-content">
             <div class="sp-phone-setting-block">
-              <div class="sp-phone-setting-title">🎭 角色卡</div>
+              <div class="sp-phone-setting-title">🎭 选择角色卡</div>
               <div class="sp-search-select">
-                <input type="text" id="sp-character-id" value="${settings.characterId}" placeholder="搜索角色卡..." autocomplete="off" />
-                <div class="sp-search-dropdown" id="sp-char-dropdown"></div>
+                <input type="text" id="sp-contact-import-char" placeholder="搜索角色卡..." autocomplete="off" />
+                <div class="sp-search-dropdown" id="sp-contact-import-char-dropdown"></div>
+              </div></div>
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">📖 关联世界书（可选）</div>
+              <div class="sp-search-select">
+                <input type="text" id="sp-contact-import-world" placeholder="搜索世界书..." autocomplete="off" />
+                <div class="sp-search-dropdown" id="sp-contact-import-world-dropdown"></div>
               </div>
-              <div class="sp-preview-box" id="sp-char-preview" style="display:none;">
-                <div class="sp-preview-header">
-                  <span>📋 角色描述预览</span>
-                  <button class="sp-btn sp-preview-toggle" id="sp-char-preview-toggle">展开</button>
-                </div>
-                <div class="sp-preview-content" id="sp-char-preview-content"></div>
-              </div>
+            </div><button id="sp-contact-import-save" class="sp-phone-btn sp-phone-btn-primary">✅ 添加到通讯录</button>
+          </div>
+        </div>
+
+        <div id="sp-phone-contact-create" class="sp-phone-page">
+          <div class="sp-phone-page-header">
+            <button class="sp-phone-back" data-back="contact-new">‹</button>
+            <span>手动新建</span>
+            <span style="width:24px;"></span>
+          </div>
+          <div class="sp-phone-page-content" id="sp-contact-create-content">
+            <div class="sp-phone-setting-block">
+              <label>角色姓名</label>
+              <input type="text" id="sp-contact-create-name" placeholder="角色名字" />
             </div>
             <div class="sp-phone-setting-block">
-              <div class="sp-phone-setting-title">📖 世界书</div>
-              <div class="sp-search-select">
-                <input type="text" id="sp-worldbook-id" value="${settings.worldBookId}" placeholder="搜索世界书..." autocomplete="off" />
-                <div class="sp-search-dropdown" id="sp-world-dropdown"></div>
-              </div>
-              <div class="sp-preview-box" id="sp-world-preview" style="display:none;">
-                <div class="sp-preview-header">
-                  <span>📋 世界书条目 (<span id="sp-world-count">0</span>)</span>
-                </div>
-                <div class="sp-preview-content sp-world-entries-list" id="sp-world-preview-content"></div>
-              </div>
+              <label>角色描述</label>
+              <textarea id="sp-contact-create-desc" style="width:100%;min-height:100px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;" placeholder="描述这个角色的性格、外貌、背景..."></textarea>
             </div>
-            <button id="sp-contacts-save" class="sp-phone-btn sp-phone-btn-primary">💾 保存</button>
+            <div class="sp-phone-setting-block">
+              <div class="sp-phone-setting-title">📖 世界书条目</div>
+              <div id="sp-contact-create-worldbook-list"></div>
+              <button id="sp-contact-create-add-wb" class="sp-phone-btn" style="margin-top:8px;">＋ 添加世界书条目</button>
+            </div>
+            <button id="sp-contact-create-save" class="sp-phone-btn sp-phone-btn-primary">✅ 保存到通讯录</button>
+          </div>
+        </div>
+
+        <div id="sp-phone-contact-detail" class="sp-phone-page">
+          <div class="sp-phone-page-header">
+            <button class="sp-phone-back" data-back="contacts">‹</button>
+            <span id="sp-contact-detail-title">联系人详情</span>
+            <button id="sp-contact-detail-delete" style="background:none;border:none;font-size:14px;cursor:pointer;color:#f66;padding:2px 6px;">🗑️</button>
+          </div>
+          <div class="sp-phone-page-content" id="sp-contact-detail-content">
+            <!-- 由JS动态渲染 -->
           </div>
         </div>
 
@@ -1983,35 +2087,6 @@ function saveData() {
               <label>AI提取记忆提示词</label>
               <textarea id="sp-extract-prompt" style="width:100%;min-height:60px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${settings.extractPrompt}</textarea>
             </div>
-            <div class="sp-phone-setting-block">
-              <div class="sp-phone-setting-title">📰 论坛提示词</div>
-              <textarea id="sp-forum-prompt" style="width:100%;min-height:80px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${settings.forumPrompt || ''}</textarea>
-              <label class="sp-phone-switch-row" style="margin-top:8px;">
-                <span>生成论坛时发送世界书</span>
-                <label class="sp-toggle-switch"><input type="checkbox" id="sp-forum-send-worldbook" ${settings.forumSendWorldBook !== false ? 'checked' : ''} /><span class="sp-toggle-slider"></span></label>
-              </label>
-              <p style="font-size:10px;color:var(--sp-text-muted);margin:4px 0 0;line-height:1.6;">生成论坛帖子时发送：${'{'}<span style="color:rgba(100,180,255,0.8);">世界书</span>${'}'}<span style="font-size:9px;">（由上方开关控制）</span> + <span style="color:rgba(255,180,100,0.8);">破限</span> + <span style="color:rgba(100,220,100,0.8);">此提示词</span><br/>在「📇 通讯录」中关联世界书，在上方「破限」区域编辑破限内容</p>
-            </div>
-            <div class="sp-phone-setting-block">
-              <div class="sp-phone-setting-title">💬 论坛评论提示词</div>
-              <textarea id="sp-forum-comment-prompt" style="width:100%;min-height:80px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${settings.forumCommentPrompt || ''}</textarea>
-              <p style="font-size:10px;color:var(--sp-text-muted);margin:4px 0 0;line-height:1.6;">生成论坛评论时发送：${'{'}<span style="color:rgba(100,180,255,0.8);">世界书</span>${'}'}<span style="font-size:9px;">（由「论坛提示词」的开关控制）</span> + <span style="color:rgba(200,150,255,0.8);">帖子标题和正文</span> + <span style="color:rgba(255,180,100,0.8);">破限</span> + <span style="color:rgba(100,220,100,0.8);">此提示词</span><br/>每次生成10~15条风格各异的评论，生成后追加到帖子详情的评论区</p>
-            </div>
-            <div class="sp-phone-setting-block">
-              <div class="sp-phone-setting-title">📝 同人文生成提示词</div>
-              <textarea id="sp-fanfic-generate-prompt" style="width:100%;min-height:80px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${settings.fanficGeneratePrompt || ''}</textarea>
-              <div class="sp-phone-setting-title" style="margin-top:10px;">📝 同人文续写提示词</div>
-              <textarea id="sp-fanfic-continue-prompt" style="width:100%;min-height:60px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${settings.fanficContinuePrompt || ''}</textarea>
-              <div class="sp-phone-setting-title" style="margin-top:10px;">💬 同人文评论提示词</div>
-              <textarea id="sp-fanfic-comment-prompt" style="width:100%;min-height:80px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${settings.fanficCommentPrompt || ''}</textarea>
-              <p style="font-size:10px;color:var(--sp-text-muted);margin:4px 0 0;line-height:1.6;">生成同人文评论时发送：${'{'}<span style="color:rgba(100,180,255,0.8);">世界书</span>${'}'}<span style="font-size:9px;">（由下方开关控制）</span> + <span style="color:rgba(200,150,255,0.8);">同人文标题和正文</span> + <span style="color:rgba(255,180,100,0.8);">破限</span> + <span style="color:rgba(100,220,100,0.8);">此提示词</span><br/>每次生成10~15条风格各异的评论，生成后追加到同人文阅读页的评论区</p>
-
-              <label class="sp-phone-switch-row" style="margin-top:8px;">
-                <span>生成同人文时发送世界书</span>
-                <label class="sp-toggle-switch"><input type="checkbox" id="sp-fanfic-send-worldbook" ${settings.fanficSendWorldBook !== false ? 'checked' : ''} /><span class="sp-toggle-slider"></span></label>
-              </label>
-              <p style="font-size:10px;color:var(--sp-text-muted);margin:4px 0 0;">生成同人文时发送：${'{'}世界书${'}'} + 破限 + 生成/续写提示词</p>
-            </div>
             <button id="sp-profile-save" class="sp-phone-btn sp-phone-btn-primary">💾 保存</button>
           </div>
         </div>
@@ -2043,7 +2118,7 @@ function saveData() {
             <div id="sp-forum-topbar" style="display:flex;align-items:center;padding:8px 12px;border-bottom:1px solid var(--sp-border-light);flex-shrink:0;">
               <button class="sp-phone-back" data-back="home" style="font-size:22px;background:none;border:none;color:var(--sp-text-primary);cursor:pointer;width:24px;line-height:1;padding:0;">‹</button>
               <span style="flex:1;text-align:center;font-size:14px;font-weight:600;color:var(--sp-text-primary);">📰 论坛</span>
-              <span style="width:24px;"></span>
+              <button id="sp-forum-settings-btn" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--sp-text-secondary);padding:2px 6px;transition:color 0.2s;" title="论坛设置">⚙️</button>
             </div>
             <div id="sp-forum-content" style="flex:1;overflow-y:auto;position:relative;">
               <div id="sp-forum-home-view"></div>
@@ -2062,7 +2137,7 @@ function saveData() {
             <div id="sp-fanfic-topbar" style="display:flex;align-items:center;padding:8px 12px;border-bottom:1px solid var(--sp-border-light);flex-shrink:0;">
               <button class="sp-phone-back" data-back="home" style="font-size:22px;background:none;border:none;color:var(--sp-text-primary);cursor:pointer;width:24px;line-height:1;padding:0;">‹</button>
               <span style="flex:1;text-align:center;font-size:14px;font-weight:600;color:var(--sp-text-primary);">📝 同人文</span>
-              <span style="width:24px;"></span>
+              <button id="sp-fanfic-settings-btn" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--sp-text-secondary);padding:2px 6px;transition:color 0.2s;" title="同人文设置">⚙️</button>
             </div>
             <div id="sp-fanfic-content" style="flex:1;overflow-y:auto;position:relative;">
               <div id="sp-fanfic-home-view"></div>
@@ -2077,10 +2152,41 @@ function saveData() {
             </div>
           </div>
         </div>
+        <div id="sp-phone-forum-settings" class="sp-phone-page">
+          <div class="sp-phone-page-header">
+            <button class="sp-phone-back" data-back="forum">‹</button>
+            <span>📰 论坛设置</span>
+            <span style="width:24px;"></span>
+          </div>
+          <div class="sp-phone-page-content" id="sp-forum-settings-content">
+          </div>
+        </div>
+
+        <div id="sp-phone-fanfic-settings" class="sp-phone-page">
+          <div class="sp-phone-page-header">
+            <button class="sp-phone-back" data-back="fanfic">‹</button>
+            <span>📝 同人文设置</span>
+            <span style="width:24px;"></span>
+          </div>
+          <div class="sp-phone-page-content" id="sp-fanfic-settings-content">
+          </div>
+        </div>
+
+
+        <div id="sp-phone-msglist" class="sp-phone-page">
+          <div class="sp-phone-page-header">
+            <button class="sp-phone-back" data-back="home">‹</button>
+            <span>💬 消息</span>
+            <button id="sp-msglist-add-btn" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--sp-text-primary);padding:2px 6px;">＋</button>
+          </div>
+          <div class="sp-phone-page-content" id="sp-msglist-content">
+            <!-- 消息列表由JS动态渲染 -->
+          </div>
+        </div>
 
         <div id="sp-phone-chat" class="sp-phone-page">
           <div id="sp-phone-chat-topbar">
-            <button class="sp-phone-back" data-back="home">‹</button>
+            <button class="sp-phone-back" data-back="msglist">‹</button>
             <span id="sp-chat-title-name">${settings.chatRemark || settings.petName || '咪噗'}</span>
             <div style="display:flex;gap:4px;align-items:center;">
               <button id="sp-chat-mode-toggle" title="桌宠模式（点击切换）">🐾</button>
@@ -3862,19 +3968,6 @@ function showInventoryPopup(category, quickKey, onUse) {
       case 'chat': toggleChat(); break;
       case 'diary': toggleDiary(); break;
       case 'game': showGameSelector(); break;
-      case 'settings': toggleSettings(); break;
-    }
-    toggleMenu();
-  }
-
-   function handleMenuAction(action) {
-    switch (action) {
-      case 'feed': feedPet(); break;
-      case 'bath': bathPet(); break;
-      case 'sleep': sleepPet(); break;
-      case 'chat': toggleChat(); break;
-      case 'diary': toggleDiary(); break;
-      case 'game': showGameSelector(); break;
       case 'house': toggleHouse(); break;
       case 'settings': toggleSettings(); break;
     }
@@ -4897,16 +4990,20 @@ if (hasEmoji) {
       bookshelf: 'sp-phone-bookshelf',
       bookreader: 'sp-phone-bookreader',
       contacts: 'sp-phone-contacts',
+      'contact-new': 'sp-phone-contact-new',
+      'contact-import': 'sp-phone-contact-import',
+      'contact-create': 'sp-phone-contact-create',
+      'contact-detail': 'sp-phone-contact-detail',
+      msglist: 'sp-phone-msglist',
       profile: 'sp-phone-profile',
       forum: 'sp-phone-forum',
-      fanfic: 'sp-phone-fanfic',
-
+      fanfic: 'sp-phone-fanfic','forum-settings': 'sp-phone-forum-settings',
+      'fanfic-settings': 'sp-phone-fanfic-settings',
     };
     Object.keys(map).forEach(p => {
       const el = document.getElementById(map[p]);
       if (el) el.classList.toggle('active', p === page);
-    });
-    if (page === 'chat') {
+    });if (page === 'chat') {
       const titleName = document.getElementById('sp-chat-title-name');
       if (titleName) titleName.textContent = settings.chatRemark || settings.petName || '咪噗';
     }
@@ -5903,11 +6000,11 @@ if (hasEmoji) {
 
         if (!appEl) return;
         const target = appEl.dataset.app;
-        if (target === 'chat') { switchPhonePage('chat'); renderChatHistory(); }
+        if (target === 'chat') { switchPhonePage('msglist'); renderMsgListPage(); }
         else if (target === 'settings') { switchPhonePage('settings'); syncPhoneSettingsUI(); }
         else if (target === 'theme') { switchPhonePage('theme'); renderThemePage(); }
         else if (target === 'bookshelf') { switchPhonePage('bookshelf'); bsRenderShelf(); bsRenderHistory(); bsRenderTagBar(); }
-        else if (target === 'contacts') { switchPhonePage('contacts'); renderContactsPage(); }
+        else if (target === 'contacts') { switchPhonePage('contacts'); renderContactsListPage(); }
         else if (target === 'profile') { switchPhonePage('profile'); renderProfilePage(); }
         else if (target === 'forum') { switchPhonePage('forum'); renderForumPage(); }
         else if (target === 'fanfic') { switchPhonePage('fanfic'); renderFanficHomePage(); }
@@ -6023,6 +6120,145 @@ if (hasEmoji) {
   function bindPhoneEvents() {
     // 防止重复绑定：整个函数只执行一次
     if (bindPhoneEvents._done) return;
+    // ===== 通讯录事件 =====
+    document.getElementById('sp-contacts-add-btn')?.addEventListener('click', () => {
+      switchPhonePage('contact-new');
+    });
+
+    // 新建联系人：从酒馆导入
+    document.getElementById('sp-contact-from-tavern')?.addEventListener('click', () => {
+      switchPhonePage('contact-import');
+      //绑定搜索下拉
+      bindSearchInput('sp-contact-import-char', 'sp-contact-import-char-dropdown', getAvailableCharacters, (name) => {
+        document.getElementById('sp-contact-import-char').value = name;
+      });
+      bindSearchInput('sp-contact-import-world', 'sp-contact-import-world-dropdown', getAvailableWorldBooks, (name) => {
+        document.getElementById('sp-contact-import-world').value = name;
+      });
+    });
+
+    // 新建联系人：手动创建
+    document.getElementById('sp-contact-from-custom')?.addEventListener('click', () => {
+      switchPhonePage('contact-create');
+    });
+
+    // 导入角色卡保存
+    document.getElementById('sp-contact-import-save')?.addEventListener('click', () => {
+      const charName = document.getElementById('sp-contact-import-char')?.value?.trim();
+      if (!charName) { showBubble('请先选择一个角色卡', 2000); return; }
+      const worldBookName = document.getElementById('sp-contact-import-world')?.value?.trim() || '';
+
+      if (!settings.contactsList) settings.contactsList = [];
+
+      // 检查是否已存在
+      if (settings.contactsList.find(c => c.characterId === charName)) {
+        showBubble(`「${charName}」已在通讯录中`, 2000);
+        return;
+      }
+
+      settings.contactsList.push({
+        id: 'contact_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        name: charName,
+        avatar: '',
+        source: 'tavern',
+        characterId: charName,
+        customDescription: '',
+        worldBookId: worldBookName,
+        customWorldBook: [],
+        worldBookExcluded: [],
+        createdTime: Date.now(),});
+
+      saveData();
+      showBubble(`🎭「${charName}」已添加到通讯录！`, 2000);
+      switchPhonePage('contacts');
+      renderContactsListPage();
+
+      // 清空输入
+      const charInput = document.getElementById('sp-contact-import-char');
+      const worldInput = document.getElementById('sp-contact-import-world');
+      if (charInput) charInput.value = '';
+      if (worldInput) worldInput.value = '';
+    });
+
+    // 手动创建保存
+    document.getElementById('sp-contact-create-save')?.addEventListener('click', () => {
+      const name = document.getElementById('sp-contact-create-name')?.value?.trim();
+      if (!name) { showBubble('请输入角色姓名', 2000); return; }
+      const desc = document.getElementById('sp-contact-create-desc')?.value?.trim() || '';
+
+      if (!settings.contactsList) settings.contactsList = [];
+
+      // 收集世界书条目
+      const wbEntries = [];
+      document.querySelectorAll('#sp-contact-create-worldbook-list .sp-cwb-create-entry').forEach(entry => {
+        const entryName = entry.querySelector('.sp-cwb-c-name')?.value?.trim() || '';
+        const entryKeys = entry.querySelector('.sp-cwb-c-keys')?.value?.trim() || '';
+        const entryContent = entry.querySelector('.sp-cwb-c-content')?.value?.trim() || '';
+        if (entryContent) {
+          wbEntries.push({ name: entryName, keys: entryKeys, content: entryContent });
+        }
+      });
+
+      settings.contactsList.push({
+        id: 'contact_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        name: name,
+        avatar: '',
+        source: 'custom',
+        characterId: '',
+        customDescription: desc,
+        worldBookId: '',
+        customWorldBook: wbEntries,
+        worldBookExcluded: [],
+        createdTime: Date.now(),
+      });
+
+      saveData();
+      showBubble(`✏️「${name}」已添加到通讯录！`, 2000);
+      switchPhonePage('contacts');
+      renderContactsListPage();
+
+      // 清空表单
+      const nameInput = document.getElementById('sp-contact-create-name');
+      const descInput = document.getElementById('sp-contact-create-desc');
+      if (nameInput) nameInput.value = '';
+      if (descInput) descInput.value = '';
+      document.getElementById('sp-contact-create-worldbook-list').innerHTML = '';
+    });
+
+    // 手动创建：添加世界书条目按钮
+    document.getElementById('sp-contact-create-add-wb')?.addEventListener('click', () => {
+      const list = document.getElementById('sp-contact-create-worldbook-list');
+      if (!list) return;
+      const div = document.createElement('div');
+      div.className = 'sp-cwb-create-entry';
+      div.style.cssText = 'margin-bottom:8px;padding:8px;background:rgba(255,255,255,0.04);border:1px solid var(--sp-border-light);border-radius:8px;';
+      div.innerHTML = `
+        <div style="display:flex;gap:6px;margin-bottom:4px;">
+          <input type="text" class="sp-cwb-c-name" placeholder="条目名" style="flex:1;padding:4px 8px;font-size:11px;border:1px solid var(--sp-border);border-radius:6px;background:var(--sp-bg-light);color:var(--sp-text-primary);box-sizing:border-box;" />
+          <input type="text" class="sp-cwb-c-keys" placeholder="关键词(逗号分隔)" style="flex:1;padding:4px 8px;font-size:11px;border:1px solid var(--sp-border);border-radius:6px;background:var(--sp-bg-light);color:var(--sp-text-primary);box-sizing:border-box;" />
+          <button onclick="this.closest('.sp-cwb-create-entry').remove();" style="background:none;border:none;color:#f66;cursor:pointer;font-size:14px;padding:0 4px;">✕</button>
+        </div>
+        <textarea class="sp-cwb-c-content" placeholder="条目内容..." style="width:100%;min-height:50px;padding:6px 8px;font-size:12px;border:1px solid var(--sp-border);border-radius:6px;background:var(--sp-bg-light);color:var(--sp-text-primary);resize:vertical;box-sizing:border-box;"></textarea>
+      `;
+      list.appendChild(div);});
+
+    // ===== 消息列表事件 =====
+    document.getElementById('sp-msglist-add-btn')?.addEventListener('click', () => {
+      showAddFriendPicker();
+    });
+
+    // 论坛设置按钮
+    document.getElementById('sp-forum-settings-btn')?.addEventListener('click', () => {
+      switchPhonePage('forum-settings');
+      renderForumSettingsPage();
+    });
+
+    // 同人文设置按钮
+    document.getElementById('sp-fanfic-settings-btn')?.addEventListener('click', () => {
+      switchPhonePage('fanfic-settings');
+      renderFanficSettingsPage();
+    });
+
     bindPhoneEvents._done = true;
 
     // 渲染 4×4 主屏网格
@@ -6136,7 +6372,13 @@ if (hasEmoji) {
     }
 
     document.querySelectorAll('#silly-pet-chat .sp-phone-back').forEach(btn => {
-      btn.onclick = () => switchPhonePage(btn.dataset.back || 'home');
+      btn.onclick = () => {
+        saveActiveConversation();
+        saveDataDebounced('聊天返回保存');
+        const backTarget = btn.dataset.back || 'home';
+        switchPhonePage(backTarget);
+        if (backTarget === 'msglist') renderMsgListPage();
+      };
     });
 
     const closeBtn = document.getElementById('sp-phone-close');
@@ -6436,6 +6678,109 @@ if (hasEmoji) {
       switchPhonePage('chat');
     };
 
+    // 聊天设置：记忆管理按钮
+    const chatAddMemBtn = document.getElementById('sp-chat-add-memory');
+    if (chatAddMemBtn) {
+      chatAddMemBtn.onclick = () => {
+        state.memories.push({ content: '', tag: '', importance: 3, timestamp: Date.now() });
+        renderChatSettingsMemories();
+        saveData();
+      };
+    }
+
+    const chatExtractMemBtn = document.getElementById('sp-chat-extract-memory');
+    if (chatExtractMemBtn) {
+      chatExtractMemBtn.onclick = async () => {
+        if (state.petChatHistory.length < 3) {
+          showBubble('聊天记录太少，再聊聊吧', 2000);
+          return;
+        }
+        showBubble('🧠 正在提取关键记忆…', 3000);
+        const recent = state.petChatHistory.slice(-20).map(m => {
+          const name = m.role === 'user' ? '主人' : '桌宠';
+          return `${name}: ${m.content}`;
+        }).join('\n');
+        const extractPrompt = `${settings.extractPrompt}\n\n对话内容：\n${recent}`;
+        const result = await callPetAPI('summary', extractPrompt);
+        if (result) {
+          const lines = result.split('\n').filter(l => l.trim());
+          let added = 0;
+          lines.forEach(line => {
+            const match = line.match(/^\[(.+?)\]\s*(.+)/);
+            if (match) {
+              state.memories.push({ content: match[2].trim(), tag: match[1].trim(), importance: 3, timestamp: Date.now() });
+              added++;
+            } else if (line.trim()) {
+              state.memories.push({ content: line.trim(), tag: '', importance: 3, timestamp: Date.now() });
+              added++;
+            }
+          });
+          saveData();
+          renderChatSettingsMemories();
+          showBubble(`✨ 提取了 ${added} 条新记忆`, 3000);
+        } else {
+          showBubble('提取失败了', 3000);
+        }
+      };
+    }
+
+    const chatSaveSummaryBtn = document.getElementById('sp-chat-save-summary');
+    if (chatSaveSummaryBtn) {
+      chatSaveSummaryBtn.onclick = () => {
+        const t = document.getElementById('sp-chat-current-summary');
+        if (t) { state.summary = t.value.trim(); saveData(); showBubble('本会话总结已保存！', 2000); }
+      };
+    }
+
+    const chatTriggerSummaryBtn = document.getElementById('sp-chat-trigger-summary');
+    if (chatTriggerSummaryBtn) {
+      chatTriggerSummaryBtn.onclick = () => {
+        if (state.petChatHistory.length === 0) { showBubble('没有聊天记录可总结', 2000); return; }
+        triggerSummary();
+      };
+    }
+
+    const chatClearHistory2Btn = document.getElementById('sp-chat-clear-history2');
+    if (chatClearHistory2Btn) {
+      chatClearHistory2Btn.onclick = () => {
+        if (state.petChatHistory.length === 0) return;
+        showConfirmDialog({
+          title: '🗑️ 清空本会话聊天？',
+          desc: '此操作不可撤销',
+          confirmText: '清空',
+          cancelText: '取消',
+          onConfirm: () => {
+            state.petChatHistory = [];
+            saveData();
+            renderChatHistory();
+            const c2 = document.getElementById('sp-chat-history-count2');
+            if (c2) c2.textContent = '0';
+            showBubble('本会话聊天记录已清空', 2000);
+          }
+        });
+      };
+    }
+
+    const chatExportHistory2Btn = document.getElementById('sp-chat-export-history2');
+    if (chatExportHistory2Btn) {
+      chatExportHistory2Btn.onclick = () => {
+        if (state.petChatHistory.length === 0) { showBubble('没有聊天记录可导出', 2000); return; }
+        const lines = state.petChatHistory.map(msg => {
+          const name = msg.role === 'user' ? '主人' : '桌宠';
+          return `【${name}】\n${msg.content}\n`;
+        });
+        const text = `═══════════════════════════════\n  聊天记录导出\n导出时间: ${new Date().toLocaleString()}\n  共 ${state.petChatHistory.length} 条消息\n═══════════════════════════════\n\n` + lines.join('\n─────────────────────────────\n\n');
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `聊天记录_${new Date().toLocaleDateString().replace(/\//g, '-')}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showBubble('📄 聊天记录已导出', 2000);
+      };
+    }
+
     // 主题页绑定
     const themeApp = document.querySelector('.sp-phone-app[data-app="theme"]');
     if (themeApp) themeApp.onclick = () => {
@@ -6586,7 +6931,14 @@ if (hasEmoji) {
     if (chatBgBlur) chatBgBlur.value = settings.chatBackgroundBlur ?? 0;
     const chatBgBlurVal = document.getElementById('sp-chat-bg-blur-val');
     if (chatBgBlurVal) chatBgBlurVal.textContent = (settings.chatBackgroundBlur ?? 0) + 'px';
-  }
+    // 渲染本会话记忆列表
+    renderChatSettingsMemories();
+    // 同步总结文本
+    const chatSummaryArea = document.getElementById('sp-chat-current-summary');
+    if (chatSummaryArea) chatSummaryArea.value = state.summary || '';
+    // 同步聊天记录条数
+    const chatHistCount2 = document.getElementById('sp-chat-history-count2');
+    if (chatHistCount2) chatHistCount2.textContent = state.petChatHistory.length;
 
     // 头像框预览同步
     const charFramePreview = document.getElementById('sp-chat-char-frame-preview');
@@ -6599,6 +6951,70 @@ if (hasEmoji) {
     const userVisToggle = document.getElementById('sp-chat-user-avatar-visible');
     if (charVisToggle) charVisToggle.checked = settings.chatCharAvatarVisible !== false;
     if (userVisToggle) userVisToggle.checked = settings.chatUserAvatarVisible !== false;
+ }
+
+  function renderChatSettingsMemories() {
+    const container = document.getElementById('sp-chat-memories-list');
+    if (!container) return;
+    container.innerHTML = '';
+
+    state.memories = state.memories.map(mem => {
+      if (typeof mem === 'string') return { content: mem, tag: '', importance: 3, timestamp: Date.now() };
+      return mem;
+    });
+
+    const sorted = [...state.memories].sort((a, b) => (b.importance || 3) - (a.importance || 3));
+
+    sorted.forEach((mem) => {
+      const realIdx = state.memories.indexOf(mem);
+      const item = document.createElement('div');
+      item.className = 'sp-memory-item';
+      const stars = '★'.repeat(mem.importance || 3) + '☆'.repeat(5 - (mem.importance || 3));
+      const timeStr = mem.timestamp ? new Date(mem.timestamp).toLocaleDateString() : '';
+      item.innerHTML = `
+        <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+            <input type="text" class="sp-chat-mem-tag" data-idx="${realIdx}" value="${mem.tag || ''}" placeholder="标签" style="width:70px;padding:3px 6px;font-size:11px;margin:0;border:1px solid var(--sp-border);border-radius:6px;background:var(--sp-bg-light);color:var(--sp-text-primary);box-sizing:border-box;" />
+            <span class="sp-chat-mem-stars" data-idx="${realIdx}" style="cursor:pointer;font-size:12px;color:#ffb347;" title="点击调整重要度">${stars}</span>
+            <span style="font-size:10px;color:#666;">${timeStr}</span>
+          </div>
+          <textarea class="sp-chat-mem-text" data-idx="${realIdx}" style="width:100%;min-height:36px;padding:6px 8px;font-size:12px;border:1px solid var(--sp-border);border-radius:6px;background:var(--sp-bg-light);color:var(--sp-text-primary);resize:vertical;box-sizing:border-box;margin:0;">${mem.content}</textarea>
+        </div>
+        <button class="sp-btn sp-btn-danger sp-chat-mem-delete" data-idx="${realIdx}" style="align-self:flex-start;padding:4px 8px;font-size:11px;border-radius:6px;background:rgba(239,83,80,0.4);color:#fff;border:1px solid rgba(239,83,80,0.5);cursor:pointer;">✕</button>
+      `;
+      container.appendChild(item);
+    });
+
+    // 绑定事件
+    container.querySelectorAll('.sp-chat-mem-text').forEach(t => {
+      t.onchange = () => {
+        const idx = parseInt(t.dataset.idx);
+        if (state.memories[idx]) { state.memories[idx].content = t.value; saveDataDebounced('聊天记忆编辑'); }
+      };
+    });container.querySelectorAll('.sp-chat-mem-tag').forEach(t => {
+      t.onchange = () => {
+        const idx = parseInt(t.dataset.idx);
+        if (state.memories[idx]) { state.memories[idx].tag = t.value.trim(); saveDataDebounced('聊天记忆标签'); }
+      };
+    });
+    container.querySelectorAll('.sp-chat-mem-stars').forEach(el => {
+      el.onclick = () => {
+        const idx = parseInt(el.dataset.idx);
+        if (!state.memories[idx]) return;
+        let imp = (state.memories[idx].importance || 3) + 1;
+        if (imp > 5) imp = 1;
+        state.memories[idx].importance = imp;
+        saveDataDebounced('聊天记忆重要度');renderChatSettingsMemories();
+      };
+    });
+    container.querySelectorAll('.sp-chat-mem-delete').forEach(b => {
+      b.onclick = () => {
+        state.memories.splice(parseInt(b.dataset.idx), 1);
+        saveDataImmediate('删除聊天记忆');
+        renderChatSettingsMemories();
+      };
+    });
+  }
 
   function renderThemePage() {
     const wpPreview = document.getElementById('sp-phone-wallpaper-preview');
@@ -6647,6 +7063,600 @@ if (hasEmoji) {
   }
 
   // ============================================================
+  // 📇 通讯录系统 - 联系人管理
+  // ============================================================
+
+  //渲染通讯录列表
+  function renderContactsListPage() {
+    const container = document.getElementById('sp-contacts-list-content');
+    if (!container) return;
+
+    const contacts = settings.contactsList || [];
+
+    if (contacts.length === 0) {
+      container.innerHTML = `
+        <div style="text-align:center;padding:60px 20px;color:var(--sp-text-muted);">
+          <div style="font-size:48px;margin-bottom:16px;">📇</div>
+          <div style="font-size:14px;margin-bottom:8px;">通讯录空空如也</div>
+          <div style="font-size:12px;">点击右上角 ＋ 添加联系人</div>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = contacts.map((contact, idx) => {
+      const avatar = contact.avatar
+        ? `<img src="${contact.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`
+        : `<span style="font-size:20px;">${contact.source === 'tavern' ? '🎭' : '👤'}</span>`;
+      const sourceTag = contact.source === 'tavern'
+        ? '<span style="font-size:9px;color:rgba(100,180,255,0.8);background:rgba(100,180,255,0.1);padding:1px 6px;border-radius:8px;">酒馆卡</span>'
+        : '<span style="font-size:9px;color:rgba(100,220,100,0.8);background:rgba(100,220,100,0.1);padding:1px 6px;border-radius:8px;">自建</span>';
+
+      return `
+        <div class="sp-contact-list-item" data-contact-id="${contact.id}" style="display:flex;align-items:center;gap:12px;padding:12px;margin-bottom:6px;background:var(--sp-bg-light);border:1px solid var(--sp-border-light);border-radius:12px;cursor:pointer;transition:all 0.15s;">
+          <div style="width:44px;height:44px;border-radius:50%;background:var(--sp-bg-secondary);border:2px solid var(--sp-border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">${avatar}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:14px;font-weight:600;color:var(--sp-text-primary);margin-bottom:2px;">${(contact.name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+            <div style="display:flex;gap:4px;align-items:center;">
+              ${sourceTag}
+              ${contact.worldBookId ? '<span style="font-size:9px;color:var(--sp-text-muted);">📖 有世界书</span>' : ''}
+              ${(contact.customWorldBook || []).length > 0 ? `<span style="font-size:9px;color:var(--sp-text-muted);">📖 ${contact.customWorldBook.length}条</span>` : ''}
+            </div>
+          </div>
+          <span style="font-size:16px;color:var(--sp-text-muted);">›</span>
+        </div>
+      `;
+    }).join('');
+
+    // 绑定点击事件
+    container.querySelectorAll('.sp-contact-list-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const contactId = item.dataset.contactId;
+        openContactDetail(contactId);
+      });
+    });
+  }
+
+  // 打开联系人详情页
+  function openContactDetail(contactId) {
+    const contact = (settings.contactsList || []).find(c => c.id === contactId);
+    if (!contact) return;
+
+    switchPhonePage('contact-detail');
+    const titleEl = document.getElementById('sp-contact-detail-title');
+    if (titleEl) titleEl.textContent = contact.name;
+
+    const container = document.getElementById('sp-contact-detail-content');
+    if (!container) return;
+
+    // 获取角色描述
+    let descText = '';
+    if (contact.source === 'tavern' && contact.characterId) {
+      descText = getCharacterDescriptionById(contact.characterId) || '（未获取到角色描述）';
+    }
+    if (contact.customDescription) {
+      descText = contact.customDescription;
+    }
+
+    container.innerHTML = `
+      <div class="sp-phone-setting-block">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+          <div id="sp-contact-detail-avatar" style="width:56px;height:56px;border-radius:50%;background:var(--sp-bg-secondary);border:2px solid var(--sp-border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;cursor:pointer;" title="点击更换头像">
+            ${contact.avatar ? `<img src="${contact.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '<span style="font-size:28px;">👤</span>'}
+          </div>
+          <div>
+            <div style="font-size:16px;font-weight:700;color:var(--sp-text-primary);">${contact.name}</div>
+            <div style="font-size:11px;color:var(--sp-text-muted);">${contact.source === 'tavern' ? '🎭 酒馆角色卡: ' + (contact.characterId || '无') : '✏️ 手动创建'}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sp-phone-setting-block">
+        <div class="sp-phone-setting-title">📝 角色描述</div>
+        <textarea id="sp-contact-detail-desc" style="width:100%;min-height:100px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${descText}</textarea>
+      </div>
+
+      ${contact.source === 'tavern' && contact.worldBookId ? `
+        <div class="sp-phone-setting-block">
+          <div class="sp-phone-setting-title">📖 酒馆世界书: ${contact.worldBookId}</div>
+          <div id="sp-contact-detail-wb-tavern" style="max-height:200px;overflow-y:auto;">加载中...</div>
+        </div>
+      ` : ''}
+
+      <div class="sp-phone-setting-block">
+        <div class="sp-phone-setting-title">📖 自定义世界书条目 (<span id="sp-contact-wb-count">${(contact.customWorldBook || []).length}</span>)</div>
+        <div id="sp-contact-detail-wb-list"></div>
+        <button id="sp-contact-detail-add-wb" class="sp-phone-btn" style="margin-top:8px;">＋ 添加条目</button>
+      </div>
+
+      <button id="sp-contact-detail-save" class="sp-phone-btn sp-phone-btn-primary" style="margin-top:8px;">💾 保存修改</button>
+    `;
+
+    // 渲染自定义世界书条目
+    renderContactWorldBookEntries(contact);
+
+    // 如果有酒馆世界书，异步加载
+    if (contact.source === 'tavern' && contact.worldBookId) {
+      loadContactTavernWorldBook(contact);
+    }
+
+    // 绑定保存按钮
+    document.getElementById('sp-contact-detail-save').onclick = () => {
+      const descEl = document.getElementById('sp-contact-detail-desc');
+      if (descEl) contact.customDescription = descEl.value.trim();
+      saveData();
+      showBubble('联系人已保存 ✨', 2000);
+      switchPhonePage('contacts');
+      renderContactsListPage();
+    };
+
+    // 绑定添加世界书条目
+    document.getElementById('sp-contact-detail-add-wb').onclick = () => {
+      if (!contact.customWorldBook) contact.customWorldBook = [];
+      contact.customWorldBook.push({ name: '', keys: '', content: '' });
+      renderContactWorldBookEntries(contact);};
+
+    // 绑定删除联系人
+    document.getElementById('sp-contact-detail-delete').onclick = () => {
+      showConfirmDialog({
+        title: '🗑️ 删除联系人？',
+        desc: `确定删除「${contact.name}」吗？<br/>关联的消息记录也会被删除。`,
+        confirmText: '删除',
+        cancelText: '取消',
+        onConfirm: () => {
+          settings.contactsList = (settings.contactsList || []).filter(c => c.id !== contactId);
+          // 同时删除关联的会话
+          state.conversationsList = (state.conversationsList || []).filter(conv => conv.contactId !== contactId);
+          saveData();
+          switchPhonePage('contacts');
+          renderContactsListPage();
+          showBubble('联系人已删除', 2000);
+        }
+      });
+    };
+
+    // 绑定头像上传
+    document.getElementById('sp-contact-detail-avatar').onclick = () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          contact.avatar = await compressImage(ev.target.result, 120, 0.8);
+          saveData();
+          openContactDetail(contactId); // 刷新页面
+        };
+        reader.readAsDataURL(file);
+      };
+      input.click();
+    };
+  }
+
+  // 渲染联系人的自定义世界书条目
+  function renderContactWorldBookEntries(contact) {
+    const container = document.getElementById('sp-contact-detail-wb-list');
+    if (!container) return;
+    if (!contact.customWorldBook) contact.customWorldBook = [];
+
+    container.innerHTML = contact.customWorldBook.map((entry, idx) => `
+      <div style="margin-bottom:8px;padding:8px;background:rgba(255,255,255,0.04);border:1px solid var(--sp-border-light);border-radius:8px;${entry.excluded ? 'opacity:0.45;' : ''}">
+        <div style="display:flex;gap:6px;margin-bottom:4px;align-items:center;">
+          <label style="display:flex;align-items:center;cursor:pointer;flex-shrink:0;margin:0;" title="${entry.excluded ? '已排除，勾选启用' : '已启用，取消勾选排除'}">
+            <input type="checkbox" class="sp-cwb-enabled" data-idx="${idx}" ${entry.excluded ? '' : 'checked'} style="accent-color:#64b4ff;width:14px;height:14px;cursor:pointer;margin:0;" />
+          </label>
+          <input type="text" class="sp-cwb-name" data-idx="${idx}" value="${entry.name || ''}" placeholder="条目名" style="flex:1;padding:4px 8px;font-size:11px;border:1px solid var(--sp-border);border-radius:6px;background:var(--sp-bg-light);color:var(--sp-text-primary);box-sizing:border-box;" />
+          <input type="text" class="sp-cwb-keys" data-idx="${idx}" value="${entry.keys || ''}" placeholder="关键词(逗号分隔)" style="flex:1;padding:4px 8px;font-size:11px;border:1px solid var(--sp-border);border-radius:6px;background:var(--sp-bg-light);color:var(--sp-text-primary);box-sizing:border-box;" />
+          <button class="sp-cwb-delete" data-idx="${idx}" style="background:none;border:none;color:#f66;cursor:pointer;font-size:14px;padding:0 4px;">✕</button>
+        </div>
+        <textarea class="sp-cwb-content" data-idx="${idx}" placeholder="条目内容..." style="width:100%;min-height:50px;padding:6px 8px;font-size:12px;border:1px solid var(--sp-border);border-radius:6px;background:var(--sp-bg-light);color:var(--sp-text-primary);resize:vertical;box-sizing:border-box;">${entry.content || ''}</textarea>
+      </div>
+    `).join('') || '<div style="text-align:center;padding:12px;color:var(--sp-text-muted);font-size:12px;">暂无自定义条目</div>';
+
+    const countEl = document.getElementById('sp-contact-wb-count');
+    if (countEl) countEl.textContent = contact.customWorldBook.length;
+
+    container.querySelectorAll('.sp-cwb-enabled').forEach(cb => {
+      cb.onchange = () => {
+        const idx = parseInt(cb.dataset.idx);
+        if (contact.customWorldBook[idx]) {
+          contact.customWorldBook[idx].excluded = !cb.checked;
+          saveDataDebounced('自定义世界书排除');
+          renderContactWorldBookEntries(contact);
+        }
+      };
+    });
+
+    container.querySelectorAll('.sp-cwb-name').forEach(input => {
+      input.onchange = () => {
+        const idx = parseInt(input.dataset.idx);
+        if (contact.customWorldBook[idx]) contact.customWorldBook[idx].name = input.value.trim();
+      };
+    });
+
+    container.querySelectorAll('.sp-cwb-keys').forEach(input => {
+      input.onchange = () => {
+        const idx = parseInt(input.dataset.idx);
+        if (contact.customWorldBook[idx]) contact.customWorldBook[idx].keys = input.value.trim();
+      };
+    });
+
+    container.querySelectorAll('.sp-cwb-content').forEach(textarea => {
+      textarea.onchange = () => {
+        const idx = parseInt(textarea.dataset.idx);
+        if (contact.customWorldBook[idx]) contact.customWorldBook[idx].content = textarea.value;
+      };
+    });
+
+    container.querySelectorAll('.sp-cwb-delete').forEach(btn => {
+      btn.onclick = () => {
+        const idx = parseInt(btn.dataset.idx);
+        contact.customWorldBook.splice(idx, 1);
+        renderContactWorldBookEntries(contact);
+      };
+    });
+  }
+  
+  // 根据角色卡名获取描述
+  function getCharacterDescriptionById(charName) {
+    try {
+      const context = getContext();
+      if (context && context.characters) {
+        const char = context.characters.find(c => (c.name || c.data?.name) === charName);
+        if (char) return char.description || char.data?.description || '';
+      }
+      if (window.characters && Array.isArray(window.characters)) {
+        const char = window.characters.find(c => (c.name || c.data?.name) === charName);
+        if (char) return char.description || char.data?.description || '';
+      }
+    } catch (e) {}
+    return '';
+  }
+
+  // 加载酒馆世界书条目到联系人详情页
+  async function loadContactTavernWorldBook(contact) {
+    const container = document.getElementById('sp-contact-detail-wb-tavern');
+    if (!container) return;
+
+    const origWorldBookId = settings.worldBookId;
+    settings.worldBookId = contact.worldBookId;
+    const entries = await getWorldBookEntries();
+    settings.worldBookId = origWorldBookId;
+
+    if (entries.length === 0) {
+      container.innerHTML = '<div style="font-size:12px;color:var(--sp-text-muted);padding:8px;">暂无条目或加载失败</div>';
+      return;
+    }
+
+    if (!contact.worldBookExcluded) contact.worldBookExcluded = [];
+
+    container.innerHTML = '<div class="sp-world-entries-list">' + entries.map((entry, idx) => {
+      const excluded = contact.worldBookExcluded.includes(idx);
+      return `
+        <div class="sp-wi-entry ${excluded ? 'sp-wi-excluded' : ''}" data-wi-idx="${idx}">
+          <div class="sp-wi-entry-header">
+            <div class="sp-wi-header-left">
+              <span class="sp-wi-check" onclick="event.stopPropagation()">
+                <input type="checkbox" data-wi-idx="${idx}" ${excluded ? '' : 'checked'} />
+              </span>
+              <span class="sp-wi-index">#${idx + 1}</span>
+              ${entry.name ? `<span class="sp-wi-name" title="${entry.name}">${entry.name}</span>` : ''}
+              ${entry.keys ? `<span class="sp-wi-keys" title="${entry.keys}">[${entry.keys}]</span>` : ''}
+            </div>
+            <span class="sp-wi-expand-arrow">▶</span>
+          </div>
+          <div class="sp-wi-entry-body">${entry.content}</div>
+        </div>
+      `;
+    }).join('') + '</div>';
+
+    container.querySelectorAll('input[data-wi-idx]').forEach(cb => {
+      cb.onchange = (e) => {
+        e.stopPropagation();
+        const entryIdx = parseInt(cb.dataset.wiIdx);
+        if (cb.checked) {
+          contact.worldBookExcluded = contact.worldBookExcluded.filter(i => i !== entryIdx);
+        } else {
+          if (!contact.worldBookExcluded.includes(entryIdx)) {
+            contact.worldBookExcluded.push(entryIdx);
+          }
+        }
+        cb.closest('.sp-wi-entry').classList.toggle('sp-wi-excluded', !cb.checked);
+        saveDataDebounced('联系人世界书排除');
+      };
+    });
+
+    container.querySelectorAll('.sp-wi-entry-header').forEach(header => {
+      header.addEventListener('click', (e) => {
+        if (e.target.closest('.sp-wi-check')) return;
+        const entry = header.closest('.sp-wi-entry');
+        entry.classList.toggle('sp-wi-expanded');
+      });
+    });
+  }
+
+  // ============================================================
+  // 💬 消息系统 - 会话管理
+  // ============================================================
+
+  // 渲染消息列表页
+  function renderMsgListPage() {
+    const container = document.getElementById('sp-msglist-content');
+    if (!container) return;
+
+    const conversations = (state.conversationsList || []).sort((a, b) => (b.lastMessageTime || 0) - (a.lastMessageTime || 0));
+
+    if (conversations.length === 0) {
+      container.innerHTML = `
+        <div style="text-align:center;padding:60px 20px;color:var(--sp-text-muted);">
+          <div style="font-size:48px;margin-bottom:16px;">💬</div>
+          <div style="font-size:14px;margin-bottom:8px;">暂无消息</div>
+          <div style="font-size:12px;">点击右上角 ＋ 从通讯录添加好友开始聊天</div>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = conversations.map(conv => {
+      const contact = (settings.contactsList || []).find(c => c.id === conv.contactId);
+      if (!contact) return '';
+
+      const avatar = contact.avatar
+        ? `<img src="${contact.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`
+        : `<span style="font-size:20px;">👤</span>`;
+
+      const lastMsg = conv.lastMessage ? conv.lastMessage.slice(0, 30) + (conv.lastMessage.length > 30 ? '…' : '') : '暂无消息';
+      const timeStr = conv.lastMessageTime ? new Date(conv.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+      return `
+        <div class="sp-msglist-item" data-conv-id="${conv.id}" style="display:flex;align-items:center;gap:12px;padding:12px;margin-bottom:4px;background:var(--sp-bg-light);border:1px solid var(--sp-border-light);border-radius:12px;cursor:pointer;transition:all 0.15s;">
+          <div style="width:44px;height:44px;border-radius:50%;background:var(--sp-bg-secondary);border:2px solid var(--sp-border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">${avatar}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+              <span style="font-size:14px;font-weight:600;color:var(--sp-text-primary);">${contact.name}</span>
+              <span style="font-size:10px;color:var(--sp-text-muted);">${timeStr}</span>
+            </div>
+            <div style="font-size:12px;color:var(--sp-text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${lastMsg}</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // 绑定点击事件 - 打开对应会话的聊天页面
+    container.querySelectorAll('.sp-msglist-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const convId = item.dataset.convId;
+        openConversation(convId);
+      });
+    });
+
+    container.querySelectorAll('.sp-msglist-item').forEach(item => {
+      let longTimer = null;
+      let longFired = false;
+
+      item.addEventListener('touchstart', () => {
+        longFired = false;
+        longTimer = setTimeout(() => {
+          longFired = true;
+          if (navigator.vibrate) navigator.vibrate(50);
+          const convId = item.dataset.convId;
+          const conv = (state.conversationsList || []).find(c => c.id === convId);
+          const contact = conv ? (settings.contactsList || []).find(c => c.id === conv.contactId) : null;
+          showConfirmDialog({
+            title: '🗑️ 删除会话？',
+            desc: `删除与「${contact ? contact.name : '未知'}」的所有聊天记录？<br/>此操作不可撤销。`,
+            confirmText: '删除',
+            cancelText: '取消',
+            onConfirm: () => {
+              // 如果删的是当前活跃会话，先清除
+              if (state.activeConversationId === convId) {
+                state.activeConversationId = '';
+                state.petChatHistory = [];
+                state.memories = [];
+                state.summary = '';
+                state.petChatArchive = [];
+              }
+              state.conversationsList = (state.conversationsList || []).filter(c => c.id !== convId);
+              saveData();
+              renderMsgListPage();
+              showBubble('会话已删除', 2000);
+            }
+          });
+        }, 600);
+      }, { passive: true });
+
+      item.addEventListener('touchend', (e) => {
+        clearTimeout(longTimer);
+        if (longFired) {
+          e.preventDefault();
+          e.stopPropagation();}
+      });
+
+      item.addEventListener('touchmove', () => {
+        clearTimeout(longTimer);
+      });
+
+      // PC端右键删除
+      item.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const convId = item.dataset.convId;
+        const conv = (state.conversationsList || []).find(c => c.id === convId);
+        const contact = conv ? (settings.contactsList || []).find(c => c.id === conv.contactId) : null;
+        showConfirmDialog({
+          title: '🗑️ 删除会话？',
+          desc: `删除与「${contact ? contact.name : '未知'}」的所有聊天记录？`,
+          confirmText: '删除',
+          cancelText: '取消',
+          onConfirm: () => {
+            if (state.activeConversationId === convId) {
+              state.activeConversationId = '';
+              state.petChatHistory = [];
+              state.memories = [];
+              state.summary = '';
+              state.petChatArchive = [];
+            }
+            state.conversationsList = (state.conversationsList || []).filter(c => c.id !== convId);
+            saveData();
+            renderMsgListPage();
+            showBubble('会话已删除', 2000);
+          }
+        });
+      });
+    });
+
+  }
+
+  // 打开一个会话进入聊天
+  function openConversation(convId) {
+    const conv = (state.conversationsList || []).find(c => c.id === convId);
+    if (!conv) return;
+
+    const contact = (settings.contactsList || []).find(c => c.id === conv.contactId);
+    if (!contact) return;
+
+    // ===== 第一步：保存当前活跃会话（如果有）=====
+    if (state.activeConversationId && state.activeConversationId !== convId) {
+      saveActiveConversation();
+    }
+
+    // ===== 第二步：设置新的活跃会话ID =====
+    state.activeConversationId = convId;
+
+    // ===== 第三步：从会话数据加载到全局状态 =====
+    state.petChatHistory = conv.chatHistory ? [...conv.chatHistory] : [];
+    state.memories = conv.memories ? [...conv.memories] : [];
+    state.summary = conv.summary || '';
+    state.petChatArchive = conv.chatArchive ? [...conv.chatArchive] : [];
+
+    // ===== 第四步：不再覆写全局角色卡/世界书 =====
+    // 会话级的角色卡和世界书由buildPromptMessages() 根据 activeContact 自动读取，
+    // 不需要写入全局 settings，避免污染全局配置。
+
+    // ===== 第五步：更新聊天页UI =====
+    const titleName = document.getElementById('sp-chat-title-name');
+    if (titleName) titleName.textContent = contact.name;
+
+    //更新聊天头像（如果联系人有头像就用它）
+    if (contact.avatar) {
+      settings.chatCharAvatar = contact.avatar;
+    }
+
+    // 切换到聊天页
+    switchPhonePage('chat');
+    renderChatHistory();
+
+    // 预估token
+    buildPromptMessages('chat', '').then(msgs => {
+      const tokens = estimateMessagesTokens(msgs);
+      updateTokenDisplay(tokens);
+    });
+
+    saveDataDebounced('切换会话');
+  }
+
+
+  // 从当前聊天保存回会话数据
+  //从当前全局状态保存回活跃会话
+  function saveActiveConversation() {
+    if (!state.activeConversationId) return;
+    const conv = (state.conversationsList || []).find(c => c.id === state.activeConversationId);
+    if (!conv) return;
+
+    // 同步聊天记录
+    conv.chatHistory = state.petChatHistory ? [...state.petChatHistory] : [];
+    // 同步记忆
+    conv.memories = state.memories ? [...state.memories] : [];
+    // 同步总结
+    conv.summary = state.summary || '';
+    // 同步归档
+    conv.chatArchive = state.petChatArchive ? [...state.petChatArchive] : [];
+
+    // 更新最后消息预览
+    const lastMsg = (conv.chatHistory || [])[(conv.chatHistory || []).length - 1];
+    if (lastMsg) {
+      conv.lastMessage = lastMsg.content || '';
+      conv.lastMessageTime = lastMsg.timestamp || Date.now();
+    }
+  }
+
+  // 添加好友（从通讯录选择联系人创建会话）
+  function showAddFriendPicker() {
+    const contacts = settings.contactsList || [];
+    const existingContactIds = new Set((state.conversationsList || []).map(c => c.contactId));
+
+    // 过滤掉已有会话的联系人
+    const available = contacts.filter(c => !existingContactIds.has(c.id));
+
+    if (available.length === 0) {
+      if (contacts.length === 0) {
+        showBubble('通讯录为空，先去通讯录添加联系人吧', 3000);
+      } else {
+        showBubble('所有联系人都已添加为好友', 2000);
+      }
+      return;
+    }
+
+    // 显示联系人选择列表
+    document.getElementById('sp-friend-picker-overlay')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-friend-picker-overlay';
+    overlay.className = 'sp-confirm-overlay';
+    overlay.innerHTML = `
+      <div class="sp-confirm-box" style="max-width:300px;text-align:left;max-height:70vh;overflow-y:auto;">
+        <div class="sp-confirm-title">💬 选择联系人开始聊天</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${available.map(contact => `
+            <div class="sp-friend-pick-item" data-contact-id="${contact.id}" style="display:flex;align-items:center;gap:10px;padding:10px;background:rgba(255,255,255,0.05);border:1px solid var(--sp-border-light);border-radius:10px;cursor:pointer;transition:all 0.15s;">
+              <div style="width:36px;height:36px;border-radius:50%;background:var(--sp-bg-secondary);border:1px solid var(--sp-border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
+                ${contact.avatar ? `<img src="${contact.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />` : '<span style="font-size:18px;">👤</span>'}
+              </div>
+              <span style="font-size:13px;font-weight:600;color:var(--sp-text-primary);">${contact.name}</span></div>
+          `).join('')}
+        </div>
+        <div class="sp-confirm-actions" style="margin-top:12px;">
+          <button class="sp-confirm-btn sp-confirm-btn-cancel" id="sp-friend-picker-cancel">取消</button></div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    document.getElementById('sp-friend-picker-cancel').onclick = () => overlay.remove();
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+    overlay.querySelectorAll('.sp-friend-pick-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const contactId = item.dataset.contactId;
+        const contact = contacts.find(c => c.id === contactId);
+        if (!contact) return;
+
+        // 创建新会话
+        if (!state.conversationsList) state.conversationsList = [];
+        const newConv = {
+          id: 'conv_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+          contactId: contactId,
+          chatHistory: [],
+          memories: [],
+          summary: '',
+          chatArchive: [],
+          lastMessageTime: Date.now(),
+          lastMessage: '',
+        };
+        state.conversationsList.push(newConv);
+        saveData();
+
+        overlay.remove();
+        showBubble(`已添加「${contact.name}」为好友！`, 2000);
+        renderMsgListPage();
+
+        // 直接打开会话
+        openConversation(newConv.id);
+      });
+    });
+  }
+
+  // ============================================================
   // 📰 论坛模块
   // ============================================================
   //论坛选择删除模式
@@ -6676,6 +7686,305 @@ if (hasEmoji) {
       });
     });
   }
+
+  //============================================================
+  // 📰 论坛设置页面渲染
+  // ============================================================
+  function renderForumSettingsPage() {
+    const container = document.getElementById('sp-forum-settings-content');
+    if (!container) return;
+
+    container.innerHTML = `
+      <div class="sp-phone-setting-block">
+        <div class="sp-phone-setting-title">📰 论坛生成提示词</div>
+        <textarea id="sp-forum-s-prompt" style="width:100%;min-height:80px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${settings.forumPrompt || ''}</textarea>
+      </div>
+      <div class="sp-phone-setting-block">
+        <div class="sp-phone-setting-title">💬 论坛评论提示词</div>
+        <textarea id="sp-forum-s-comment-prompt" style="width:100%;min-height:80px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${settings.forumCommentPrompt || ''}</textarea>
+      </div>
+      <div class="sp-phone-setting-block">
+        <label class="sp-phone-switch-row">
+          <span>生成论坛时发送世界书</span>
+          <label class="sp-toggle-switch"><input type="checkbox" id="sp-forum-s-send-worldbook" ${settings.forumSendWorldBook !== false ? 'checked' : ''} /><span class="sp-toggle-slider"></span></label>
+        </label>
+      </div>
+      <div class="sp-phone-setting-block">
+        <div class="sp-phone-setting-title">📖 关联酒馆世界书</div>
+        <div class="sp-search-select">
+          <input type="text" id="sp-forum-s-worldbook" placeholder="搜索世界书..." autocomplete="off" value="${settings.forumWorldBookId || ''}" />
+          <div class="sp-search-dropdown" id="sp-forum-s-worldbook-dropdown"></div>
+        </div>
+        ${settings.forumWorldBookId ? `<div id="sp-forum-s-wb-tavern" style="max-height:200px;overflow-y:auto;margin-top:8px;">加载中...</div>` : ''}
+      </div>
+      <div class="sp-phone-setting-block">
+        <div class="sp-phone-setting-title">📖 自定义世界书条目 (<span id="sp-forum-s-wb-count">${(settings.forumCustomWorldBook || []).length}</span>)</div>
+        <div id="sp-forum-s-wb-list"></div>
+        <button id="sp-forum-s-add-wb" class="sp-phone-btn" style="margin-top:8px;">＋ 添加条目</button>
+      </div>
+      <button id="sp-forum-s-save" class="sp-phone-btn sp-phone-btn-primary">💾 保存论坛设置</button>
+    `;
+
+    // 搜索下拉绑定
+    bindSearchInput('sp-forum-s-worldbook', 'sp-forum-s-worldbook-dropdown', getAvailableWorldBooks, (name) => {
+      document.getElementById('sp-forum-s-worldbook').value = name;
+      settings.forumWorldBookId = name;
+      saveData();
+      // 重新渲染以加载世界书条目
+      renderForumSettingsPage();
+    });
+
+    // 加载酒馆世界书条目
+    if (settings.forumWorldBookId) {
+      loadModuleWorldBook('forum');
+    }
+
+    // 渲染自定义世界书
+    renderModuleCustomWB('forum');
+
+    // 添加条目按钮
+    document.getElementById('sp-forum-s-add-wb')?.addEventListener('click', () => {
+      if (!settings.forumCustomWorldBook) settings.forumCustomWorldBook = [];
+      settings.forumCustomWorldBook.push({ name: '', keys: '', content: '' });
+      renderModuleCustomWB('forum');});
+
+    // 保存按钮
+    document.getElementById('sp-forum-s-save')?.addEventListener('click', () => {
+      const promptEl = document.getElementById('sp-forum-s-prompt');
+      if (promptEl) settings.forumPrompt = promptEl.value.trim() || DEFAULT_SETTINGS.forumPrompt;
+      const commentEl = document.getElementById('sp-forum-s-comment-prompt');
+      if (commentEl) settings.forumCommentPrompt = commentEl.value.trim() || DEFAULT_SETTINGS.forumCommentPrompt;
+      const wbToggle = document.getElementById('sp-forum-s-send-worldbook');
+      if (wbToggle) settings.forumSendWorldBook = wbToggle.checked;
+      saveData();
+      showBubble('论坛设置已保存 ✨', 2000);
+      switchPhonePage('forum');
+    });
+  }
+
+  // ============================================================
+  // 📝 同人文设置页面渲染
+  // ============================================================
+  function renderFanficSettingsPage() {
+    const container = document.getElementById('sp-fanfic-settings-content');
+    if (!container) return;
+
+    container.innerHTML = `
+      <div class="sp-phone-setting-block">
+        <div class="sp-phone-setting-title">📝 同人文生成提示词</div>
+        <textarea id="sp-fanfic-s-gen-prompt" style="width:100%;min-height:80px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${settings.fanficGeneratePrompt || ''}</textarea>
+      </div>
+      <div class="sp-phone-setting-block">
+        <div class="sp-phone-setting-title">📝 同人文续写提示词</div>
+        <textarea id="sp-fanfic-s-cont-prompt" style="width:100%;min-height:60px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${settings.fanficContinuePrompt || ''}</textarea>
+      </div>
+      <div class="sp-phone-setting-block">
+        <div class="sp-phone-setting-title">💬 同人文评论提示词</div>
+        <textarea id="sp-fanfic-s-comment-prompt" style="width:100%;min-height:80px;resize:vertical;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-bg-secondary);color:var(--sp-text-primary);font-size:13px;box-sizing:border-box;">${settings.fanficCommentPrompt || ''}</textarea>
+      </div>
+      <div class="sp-phone-setting-block">
+        <label class="sp-phone-switch-row">
+          <span>生成同人文时发送世界书</span>
+          <label class="sp-toggle-switch"><input type="checkbox" id="sp-fanfic-s-send-worldbook" ${settings.fanficSendWorldBook !== false ? 'checked' : ''} /><span class="sp-toggle-slider"></span></label>
+        </label>
+      </div>
+      <div class="sp-phone-setting-block">
+        <div class="sp-phone-setting-title">📖 关联酒馆世界书</div>
+        <div class="sp-search-select">
+          <input type="text" id="sp-fanfic-s-worldbook" placeholder="搜索世界书..." autocomplete="off" value="${settings.fanficWorldBookId || ''}" />
+          <div class="sp-search-dropdown" id="sp-fanfic-s-worldbook-dropdown"></div>
+        </div>
+        ${settings.fanficWorldBookId ? `<div id="sp-fanfic-s-wb-tavern" style="max-height:200px;overflow-y:auto;margin-top:8px;">加载中...</div>` : ''}
+      </div>
+      <div class="sp-phone-setting-block">
+        <div class="sp-phone-setting-title">📖 自定义世界书条目 (<span id="sp-fanfic-s-wb-count">${(settings.fanficCustomWorldBook || []).length}</span>)</div>
+        <div id="sp-fanfic-s-wb-list"></div>
+        <button id="sp-fanfic-s-add-wb" class="sp-phone-btn" style="margin-top:8px;">＋ 添加条目</button>
+      </div>
+      <button id="sp-fanfic-s-save" class="sp-phone-btn sp-phone-btn-primary">💾 保存同人文设置</button>
+    `;
+
+    // 搜索下拉绑定
+    bindSearchInput('sp-fanfic-s-worldbook', 'sp-fanfic-s-worldbook-dropdown', getAvailableWorldBooks, (name) => {
+      document.getElementById('sp-fanfic-s-worldbook').value = name;
+      settings.fanficWorldBookId = name;
+      saveData();
+      renderFanficSettingsPage();
+    });
+
+    // 加载酒馆世界书条目
+    if (settings.fanficWorldBookId) {
+      loadModuleWorldBook('fanfic');
+    }
+
+    // 渲染自定义世界书
+    renderModuleCustomWB('fanfic');
+
+    // 添加条目按钮
+    document.getElementById('sp-fanfic-s-add-wb')?.addEventListener('click', () => {
+      if (!settings.fanficCustomWorldBook) settings.fanficCustomWorldBook = [];
+      settings.fanficCustomWorldBook.push({ name: '', keys: '', content: '' });
+      renderModuleCustomWB('fanfic');
+    });
+
+    // 保存按钮
+    document.getElementById('sp-fanfic-s-save')?.addEventListener('click', () => {
+      const genEl = document.getElementById('sp-fanfic-s-gen-prompt');
+      if (genEl) settings.fanficGeneratePrompt = genEl.value.trim() || DEFAULT_SETTINGS.fanficGeneratePrompt;
+      const contEl = document.getElementById('sp-fanfic-s-cont-prompt');
+      if (contEl) settings.fanficContinuePrompt = contEl.value.trim() || DEFAULT_SETTINGS.fanficContinuePrompt;
+      const commentEl = document.getElementById('sp-fanfic-s-comment-prompt');
+      if (commentEl) settings.fanficCommentPrompt = commentEl.value.trim() || DEFAULT_SETTINGS.fanficCommentPrompt;
+      const wbToggle = document.getElementById('sp-fanfic-s-send-worldbook');
+      if (wbToggle) settings.fanficSendWorldBook = wbToggle.checked;
+      saveData();
+      showBubble('同人文设置已保存 ✨', 2000);
+      switchPhonePage('fanfic');
+    });
+  }
+
+  // ============================================================
+  // 📖 论坛/同人文 模块世界书通用渲染
+  // ============================================================
+  async function loadModuleWorldBook(module) {
+    const prefix = module === 'forum' ? 'sp-forum-s' : 'sp-fanfic-s';
+    const container = document.getElementById(`${prefix}-wb-tavern`);
+    if (!container) return;
+
+    const wbId = module === 'forum' ? settings.forumWorldBookId : settings.fanficWorldBookId;
+    const excluded = module === 'forum' ? (settings.forumWorldBookExcluded || []) : (settings.fanficWorldBookExcluded || []);
+
+    const origWbId = settings.worldBookId;
+    const origExcluded = settings.worldBookExcluded;
+    settings.worldBookId = wbId;
+    settings.worldBookExcluded = [];
+    const entries = await getWorldBookEntries();
+    settings.worldBookId = origWbId;
+    settings.worldBookExcluded = origExcluded;
+
+    if (entries.length === 0) {
+      container.innerHTML = '<div style="font-size:12px;color:var(--sp-text-muted);padding:8px;">暂无条目或加载失败</div>';
+      return;
+    }
+
+    container.innerHTML = '<div class="sp-world-entries-list">' + entries.map((entry, idx) => {
+      const isExcluded = excluded.includes(idx);
+      return `
+        <div class="sp-wi-entry ${isExcluded ? 'sp-wi-excluded' : ''}" data-wi-idx="${idx}">
+          <div class="sp-wi-entry-header">
+            <div class="sp-wi-header-left">
+              <span class="sp-wi-check" onclick="event.stopPropagation()">
+                <input type="checkbox" data-module="${module}" data-wi-idx="${idx}" ${isExcluded ? '' : 'checked'} /></span>
+              <span class="sp-wi-index">#${idx + 1}</span>${entry.name ? `<span class="sp-wi-name" title="${entry.name}">${entry.name}</span>` : ''}
+              ${entry.keys ? `<span class="sp-wi-keys" title="${entry.keys}">[${entry.keys}]</span>` : ''}
+            </div>
+            <span class="sp-wi-expand-arrow">▶</span>
+          </div>
+          <div class="sp-wi-entry-body">${entry.content}</div>
+        </div>
+      `;
+    }).join('') + '</div>';
+
+    // 绑定勾选框
+    container.querySelectorAll('input[data-wi-idx]').forEach(cb => {
+      cb.onchange = (e) => {
+        e.stopPropagation();
+        const mod = cb.dataset.module;
+        const entryIdx = parseInt(cb.dataset.wiIdx);
+        const excludedArr = mod === 'forum' ? 'forumWorldBookExcluded' : 'fanficWorldBookExcluded';
+        if (!settings[excludedArr]) settings[excludedArr] = [];
+        if (cb.checked) {
+          settings[excludedArr] = settings[excludedArr].filter(i => i !== entryIdx);
+        } else {
+          if (!settings[excludedArr].includes(entryIdx)) {
+            settings[excludedArr].push(entryIdx);
+          }
+        }
+        cb.closest('.sp-wi-entry').classList.toggle('sp-wi-excluded', !cb.checked);
+        saveDataDebounced('模块世界书排除');
+      };
+    });
+
+    // 绑定展开
+    container.querySelectorAll('.sp-wi-entry-header').forEach(header => {
+      header.addEventListener('click', (e) => {
+        if (e.target.closest('.sp-wi-check')) return;
+        header.closest('.sp-wi-entry').classList.toggle('sp-wi-expanded');
+      });
+    });
+  }
+
+  function renderModuleCustomWB(module) {
+    const prefix = module === 'forum' ? 'sp-forum-s' : 'sp-fanfic-s';
+    const settingsKey = module === 'forum' ? 'forumCustomWorldBook' : 'fanficCustomWorldBook';
+    const container = document.getElementById(`${prefix}-wb-list`);
+    if (!container) return;
+    if (!settings[settingsKey]) settings[settingsKey] = [];
+
+    const entries = settings[settingsKey];
+
+    container.innerHTML = entries.map((entry, idx) => `
+      <div style="margin-bottom:8px;padding:8px;background:rgba(255,255,255,0.04);border:1px solid var(--sp-border-light);border-radius:8px;${entry.excluded ? 'opacity:0.45;' : ''}">
+        <div style="display:flex;gap:6px;margin-bottom:4px;align-items:center;">
+          <label style="display:flex;align-items:center;cursor:pointer;flex-shrink:0;margin:0;" title="${entry.excluded ? '已排除，勾选启用' : '已启用，取消勾选排除'}">
+            <input type="checkbox" class="sp-mwb-enabled" data-module="${module}" data-idx="${idx}" ${entry.excluded ? '' : 'checked'} style="accent-color:#64b4ff;width:14px;height:14px;cursor:pointer;margin:0;" />
+          </label>
+          <input type="text" class="sp-mwb-name" data-module="${module}" data-idx="${idx}" value="${entry.name || ''}" placeholder="条目名" style="flex:1;padding:4px 8px;font-size:11px;border:1px solid var(--sp-border);border-radius:6px;background:var(--sp-bg-light);color:var(--sp-text-primary);box-sizing:border-box;" /><input type="text" class="sp-mwb-keys" data-module="${module}" data-idx="${idx}" value="${entry.keys || ''}" placeholder="关键词(逗号分隔)" style="flex:1;padding:4px 8px;font-size:11px;border:1px solid var(--sp-border);border-radius:6px;background:var(--sp-bg-light);color:var(--sp-text-primary);box-sizing:border-box;" />
+          <button class="sp-mwb-delete" data-module="${module}" data-idx="${idx}" style="background:none;border:none;color:#f66;cursor:pointer;font-size:14px;padding:04px;">✕</button>
+        </div>
+        <textarea class="sp-mwb-content" data-module="${module}" data-idx="${idx}" placeholder="条目内容..." style="width:100%;min-height:50px;padding:6px 8px;font-size:12px;border:1px solid var(--sp-border);border-radius:6px;background:var(--sp-bg-light);color:var(--sp-text-primary);resize:vertical;box-sizing:border-box;">${entry.content || ''}</textarea>
+      </div>
+    `).join('') || '<div style="text-align:center;padding:12px;color:var(--sp-text-muted);font-size:12px;">暂无自定义条目</div>';
+
+    const countEl = document.getElementById(`${prefix}-wb-count`);
+    if (countEl) countEl.textContent = entries.length;
+
+    // 绑定启用/禁用
+    container.querySelectorAll('.sp-mwb-enabled').forEach(cb => {
+      cb.onchange = () => {
+        const mod = cb.dataset.module;
+        const idx = parseInt(cb.dataset.idx);
+        const key = mod === 'forum' ? 'forumCustomWorldBook' : 'fanficCustomWorldBook';
+        if (settings[key][idx]) {
+          settings[key][idx].excluded = !cb.checked;
+          saveDataDebounced('模块自定义世界书排除');renderModuleCustomWB(mod);
+        }
+      };
+    });
+
+    container.querySelectorAll('.sp-mwb-name').forEach(input => {
+      input.onchange = () => {
+        const key = input.dataset.module === 'forum' ? 'forumCustomWorldBook' : 'fanficCustomWorldBook';
+        const idx = parseInt(input.dataset.idx);
+        if (settings[key][idx]) settings[key][idx].name = input.value.trim();
+      };
+    });
+
+    container.querySelectorAll('.sp-mwb-keys').forEach(input => {
+      input.onchange = () => {
+        const key = input.dataset.module === 'forum' ? 'forumCustomWorldBook' : 'fanficCustomWorldBook';
+        const idx = parseInt(input.dataset.idx);
+        if (settings[key][idx]) settings[key][idx].keys = input.value.trim();
+      };
+    });
+
+    container.querySelectorAll('.sp-mwb-content').forEach(textarea => {
+      textarea.onchange = () => {
+        const key = textarea.dataset.module === 'forum' ? 'forumCustomWorldBook' : 'fanficCustomWorldBook';
+        const idx = parseInt(textarea.dataset.idx);
+        if (settings[key][idx]) settings[key][idx].content = textarea.value;
+      };
+    });
+
+    container.querySelectorAll('.sp-mwb-delete').forEach(btn => {
+      btn.onclick = () => {
+        const key = btn.dataset.module === 'forum' ? 'forumCustomWorldBook' : 'fanficCustomWorldBook';
+        settings[key].splice(parseInt(btn.dataset.idx), 1);
+        renderModuleCustomWB(btn.dataset.module);
+      };
+    });
+  }
+
 
   function renderForumPage() {
     _forumCurrentTab = 'home';
@@ -7046,10 +8355,14 @@ if (hasEmoji) {
       const commentPrompt = settings.forumCommentPrompt || DEFAULT_SETTINGS.forumCommentPrompt;
       let sysContent = commentPrompt + '\n\n[帖子标题]\n' + (post.title || '无题') + '\n\n[帖子内容]\n' + (post.content || '');
 
-      // 根据开关决定是否发送世界书（与论坛生成共用同一个开关）
+      // 根据开关决定是否发送世界书（使用论坛独立世界书）
       if (settings.forumSendWorldBook !== false) {
         let worldInfo = '';
-        try { worldInfo = await getWorldBookContent(); } catch(e) { console.warn('[meep-pet] 论坛评论：世界书加载失败'); }
+        try {
+          const wbId = settings.forumWorldBookId || settings.worldBookId;
+          const wbExcluded = settings.forumWorldBookId ? (settings.forumWorldBookExcluded || []) : (settings.worldBookExcluded || []);
+          worldInfo = await getWorldBookContentForModule(wbId, wbExcluded, settings.forumCustomWorldBook);
+        } catch(e) { console.warn('[meep-pet] 论坛评论：世界书加载失败'); }
         if (worldInfo) {
           sysContent += '\n\n[世界观设定]\n' + worldInfo;
         }
@@ -7407,10 +8720,15 @@ if (hasEmoji) {
       const forumPrompt = settings.forumPrompt || DEFAULT_SETTINGS.forumPrompt;
       let sysContent = forumPrompt;
 
-      // 2. 拼接世界书内容（根据开关决定是否发送）
+      // 2. 拼接世界书内容（优先使用论坛独立世界书，否则用全局）
       if (settings.forumSendWorldBook !== false) {
         let worldInfo = '';
-        try { worldInfo = await getWorldBookContent(); } catch(e) { console.warn('[meep-pet] 论坛：世界书加载失败'); }
+        try {
+          const wbId = settings.forumWorldBookId || settings.worldBookId;
+          const wbExcluded = settings.forumWorldBookId ? (settings.forumWorldBookExcluded || []) : (settings.worldBookExcluded || []);
+          const customWb = settings.forumCustomWorldBook || [];
+          worldInfo = await getWorldBookContentForModule(wbId, wbExcluded, customWb);
+        } catch(e) { console.warn('[meep-pet] 论坛：世界书加载失败'); }
         if (worldInfo) {
           sysContent += '\n\n[世界观设定]\n' + worldInfo;
         } else {
@@ -7514,20 +8832,6 @@ if (hasEmoji) {
     if (manualRadio) manualRadio.checked = settings.userPersonaSource !== 'card';
     const manualSection = document.getElementById('sp-persona-manual-section');
     if (manualSection) manualSection.style.display = settings.userPersonaSource === 'card' ? 'none' : '';
-    // 论坛世界书开关同步
-    const forumWbToggle = document.getElementById('sp-forum-send-worldbook');
-    if (forumWbToggle) forumWbToggle.checked = settings.forumSendWorldBook !== false;
-    const forumCommentPrompt = document.getElementById('sp-forum-comment-prompt');
-    if (forumCommentPrompt) forumCommentPrompt.value = settings.forumCommentPrompt || '';
-    // 同人文提示词同步
-    const fanficGenPrompt = document.getElementById('sp-fanfic-generate-prompt');
-    if (fanficGenPrompt) fanficGenPrompt.value = settings.fanficGeneratePrompt || '';
-    const fanficContPrompt = document.getElementById('sp-fanfic-continue-prompt');
-    if (fanficContPrompt) fanficContPrompt.value = settings.fanficContinuePrompt || '';
-    const fanficCommentPrompt = document.getElementById('sp-fanfic-comment-prompt');
-    if (fanficCommentPrompt) fanficCommentPrompt.value = settings.fanficCommentPrompt || '';
-    const fanficWbToggle = document.getElementById('sp-fanfic-send-worldbook');
-    if (fanficWbToggle) fanficWbToggle.checked = settings.fanficSendWorldBook !== false;
     // 预设下拉同步
     const presetSelect = document.getElementById('sp-prompt-preset-select');
     if (presetSelect) presetSelect.value = settings.currentPreset || '';
@@ -8356,6 +9660,17 @@ function toggleChat() {
 
   async function buildPromptMessages(mode, userMessage) {
     const messages = [];
+
+    // ===== 判断是否有活跃会话，读取对应联系人数据 =====
+    let activeContact = null;
+    let activeConv = null;
+    if (state.activeConversationId) {
+      activeConv = (state.conversationsList || []).find(c => c.id === state.activeConversationId);
+      if (activeConv) {
+        activeContact = (settings.contactsList || []).find(c => c.id === activeConv.contactId);
+      }
+    }
+
     let sys = settings.systemPrompt + '\n\n' + getMoodModifier() + '\n';
 
     // 拼接关系描述
@@ -8368,13 +9683,51 @@ function toggleChat() {
       sys += `\n[主人人设]\n${userPersona}\n`;
     }
 
-    const charDesc = getCharacterDescription();
+    // ===== 角色描述：优先用联系人的，否则用全局的 =====
+    let charDesc = '';
+    if (activeContact) {
+      if (activeContact.source === 'tavern' && activeContact.characterId) {
+        charDesc = getCharacterDescriptionById(activeContact.characterId);
+      }
+      if (activeContact.customDescription) {
+        charDesc = activeContact.customDescription;
+      }
+    } else {
+      charDesc = getCharacterDescription();
+    }
     if (charDesc) sys += `\n[角色背景参考]\n${charDesc}\n`;
 
+    // ===== 世界书：优先用联系人的，否则用全局的 =====
     let worldInfo = '';
-    try { worldInfo = await getWorldBookContent(); } catch(e) { console.warn('[meep-pet] 世界书加载失败，跳过'); }
+    try {
+      if (activeContact) {
+        // 联系人的酒馆世界书
+        if (activeContact.worldBookId) {
+          const origWbId = settings.worldBookId;
+          const origExcluded = settings.worldBookExcluded;
+          settings.worldBookId = activeContact.worldBookId;
+          settings.worldBookExcluded = activeContact.worldBookExcluded || [];
+          worldInfo = await getWorldBookContent();
+          settings.worldBookId = origWbId;
+          settings.worldBookExcluded = origExcluded;
+        }
+        // 联系人的自定义世界书条目
+        if (activeContact.customWorldBook && activeContact.customWorldBook.length > 0) {
+          const customWbText = activeContact.customWorldBook
+            .filter(e => e.content && !e.excluded)
+            .map(e => e.content)
+            .join('\n');
+          if (customWbText) {
+            worldInfo = worldInfo ? (worldInfo + '\n' + customWbText) : customWbText;
+          }
+        }
+      } else {
+        worldInfo = await getWorldBookContent();
+      }
+    } catch(e) { console.warn('[meep-pet] 世界书加载失败，跳过'); }
     if (worldInfo) sys += `\n[世界设定参考]\n${worldInfo}\n`;
 
+    // ===== 记忆和总结：用当前全局的（已由 openConversation 同步）=====
     if (state.summary) sys += `\n[记忆总结]\n${state.summary}\n`;
     if (state.memories.length > 0) {
       const mems = state.memories
@@ -8388,7 +9741,7 @@ function toggleChat() {
       }).join('\n');
       sys += `\n[重要记忆]\n${memText}\n`;
     }
-    sys += `\n[状态] 饱食:${Math.round(state.hunger)}% 清洁:${Math.round(state.cleanliness)}% 精力:${Math.round(state.energy)}% 心情:${state.mood}`;
+    sys += `\n[状态]饱食:${Math.round(state.hunger)}% 清洁:${Math.round(state.cleanliness)}% 精力:${Math.round(state.energy)}% 心情:${state.mood}`;
     if (settings.enableTimeAwareness) {
       const now = new Date();
       const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
@@ -8402,7 +9755,6 @@ function toggleChat() {
       else if (hour >= 22 || hour < 5) timeOfDay = '深夜';
       sys += `\n[时间] ${now.getMonth()+1}月${now.getDate()}日 星期${weekDays[now.getDay()]} ${hour}:${String(now.getMinutes()).padStart(2,'0')} (${timeOfDay})`;
 
-      // 最后一条聊天的时间
       const lastMsg = state.petChatHistory[state.petChatHistory.length - 1];
       if (lastMsg && lastMsg.timestamp) {
         const lastD = new Date(lastMsg.timestamp);
@@ -8432,7 +9784,6 @@ function toggleChat() {
     } else if (mode === 'chat') {
       state.petChatHistory.slice(-(settings.petChatRounds || 20)).forEach(msg => {
         if (msg.image && settings.enableVision) {
-          // 多模态格式：图片 + 文字
           messages.push({
             role: msg.role,
             content: [
@@ -8454,6 +9805,7 @@ function toggleChat() {
 
     return messages;
   }
+
 
 
   // ============================================================
@@ -8628,6 +9980,28 @@ async function refreshWorldPreview() {
     content.innerHTML = '<p style="font-size:12px;color:#999;">暂无条目或加载失败</p>';
   }
 }
+
+  async function getWorldBookContentForModule(wbId, wbExcluded, customEntries) {let worldInfo = '';
+    if (wbId) {
+      const origWbId = settings.worldBookId;
+      const origExcluded = settings.worldBookExcluded;
+      settings.worldBookId = wbId;
+      settings.worldBookExcluded = wbExcluded || [];
+      try { worldInfo = await getWorldBookContent(); } catch(e) {}
+      settings.worldBookId = origWbId;
+      settings.worldBookExcluded = origExcluded;
+    }
+    if (customEntries && customEntries.length > 0) {
+      const customText = customEntries
+        .filter(e => e.content && !e.excluded)
+        .map(e => e.content)
+        .join('\n');
+      if (customText) {
+        worldInfo = worldInfo ? (worldInfo + '\n' + customText) : customText;
+      }
+    }
+    return worldInfo;
+  }
 
 
 
@@ -14049,11 +15423,6 @@ document.getElementById('sp-export')?.addEventListener('click', async () => {
     settings.onlinePrompt = v('sp-online-prompt');
     settings.diaryPrompt = v('sp-diary-prompt');
     settings.forumPrompt = v('sp-forum-prompt') || DEFAULT_SETTINGS.forumPrompt;
-    settings.forumCommentPrompt = v('sp-forum-comment-prompt') || DEFAULT_SETTINGS.forumCommentPrompt;
-    settings.forumSendWorldBook = document.getElementById('sp-forum-send-worldbook')?.checked !== false;
-    settings.fanficSendWorldBook = document.getElementById('sp-fanfic-send-worldbook')?.checked !== false;settings.fanficGeneratePrompt = v('sp-fanfic-generate-prompt') || DEFAULT_SETTINGS.fanficGeneratePrompt;
-    settings.fanficContinuePrompt = v('sp-fanfic-continue-prompt') || DEFAULT_SETTINGS.fanficContinuePrompt;
-    settings.fanficCommentPrompt = v('sp-fanfic-comment-prompt') || DEFAULT_SETTINGS.fanficCommentPrompt;
 
     settings.summaryMode = v('sp-summary-mode') || 'incremental';
     settings.summaryTrigger = document.getElementById('sp-summary-auto')?.checked ? 'auto' : 'manual';
@@ -28819,10 +30188,14 @@ window.addEventListener('beforeunload', () => {
       // 1. 系统消息：同人文生成提示词
       let sysContent = settings.fanficGeneratePrompt || DEFAULT_SETTINGS.fanficGeneratePrompt;
 
-      // 2. 拼接世界书内容（根据开关决定是否发送）
+      // 2. 拼接世界书内容（优先使用同人文独立世界书，否则用全局）
       if (settings.fanficSendWorldBook !== false) {
         let worldInfo = '';
-        try { worldInfo = await getWorldBookContent(); } catch(e) {}
+        try {
+          const wbId = settings.fanficWorldBookId || settings.worldBookId;
+          const wbExcluded = settings.fanficWorldBookId ? (settings.fanficWorldBookExcluded || []) : (settings.worldBookExcluded || []);
+          worldInfo = await getWorldBookContentForModule(wbId, wbExcluded, settings.fanficCustomWorldBook);
+        } catch(e) {}
         if (worldInfo) {
           sysContent += '\n\n[世界观设定]\n' + worldInfo;
         }
@@ -29090,10 +30463,14 @@ window.addEventListener('beforeunload', () => {
       const fullContent = post.content + (post.continuations || []).map(c => '\n\n' + c).join('');
       let sysContent = commentPrompt + '\n\n[同人文标题]\n' + (post.title || '无题') + '\n\n[同人文正文]\n' + fullContent;
 
-      // 根据开关决定是否发送世界书（与同人文生成共用同一个开关）
+      // 根据开关决定是否发送世界书（使用同人文独立世界书）
       if (settings.fanficSendWorldBook !== false) {
         let worldInfo = '';
-        try { worldInfo = await getWorldBookContent(); } catch(e) { console.warn('[meep-pet] 同人文评论：世界书加载失败'); }
+        try {
+          const wbId = settings.fanficWorldBookId || settings.worldBookId;
+          const wbExcluded = settings.fanficWorldBookId ? (settings.fanficWorldBookExcluded || []) : (settings.worldBookExcluded || []);
+          worldInfo = await getWorldBookContentForModule(wbId, wbExcluded, settings.fanficCustomWorldBook);
+        } catch(e) { console.warn('[meep-pet] 同人文评论：世界书加载失败'); }
         if (worldInfo) {
           sysContent += '\n\n[世界观设定]\n' + worldInfo;
         }
@@ -29157,9 +30534,13 @@ window.addEventListener('beforeunload', () => {
       // 续写提示词
       let sysContent = settings.fanficContinuePrompt || DEFAULT_SETTINGS.fanficContinuePrompt;
 
-      // 世界书
+      // 世界书（优先同人文独立世界书）
       let worldInfo = '';
-      try { worldInfo = await getWorldBookContent(); } catch(e) {}
+      try {
+        const wbId = settings.fanficWorldBookId || settings.worldBookId;
+        const wbExcluded = settings.fanficWorldBookId ? (settings.fanficWorldBookExcluded || []) : (settings.worldBookExcluded || []);
+        worldInfo = await getWorldBookContentForModule(wbId, wbExcluded, settings.fanficCustomWorldBook);
+      } catch(e) {}
       if (worldInfo) sysContent += '\n\n[世界观设定]\n' + worldInfo;
 
       messages.push({ role: 'system', content: sysContent });
