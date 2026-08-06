@@ -33860,6 +33860,20 @@ window.addEventListener('beforeunload', () => {
       </div>
     `;
     document.body.appendChild(overlay);
+
+    // 居中定位（兼容安卓）
+    requestAnimationFrame(() => {
+      const box = overlay.querySelector('.sp-confirm-box');
+      if (box) {
+        const boxH = box.offsetHeight || 250;
+        const boxW = box.offsetWidth || 280;
+        box.style.position = 'fixed';
+        box.style.top = Math.max(20, Math.floor((window.innerHeight - boxH) / 2)) + 'px';
+        box.style.left = Math.floor((window.innerWidth - boxW) / 2) + 'px';
+        box.style.margin = '0';
+      }
+    });
+
     document.getElementById('sp-manor-seed-cancel').onclick = () => overlay.remove();
     overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
     overlay.querySelectorAll('.sp-manor-seed-option').forEach(el => {
@@ -34008,6 +34022,20 @@ window.addEventListener('beforeunload', () => {
       </div>
     `;
     document.body.appendChild(overlay);
+
+    // 居中定位（兼容安卓）
+    requestAnimationFrame(() => {
+      const box = overlay.querySelector('.sp-confirm-box');
+      if (box) {
+        const boxH = box.offsetHeight || 220;
+        const boxW = box.offsetWidth || 260;
+        box.style.position = 'fixed';
+        box.style.top = Math.max(20, Math.floor((window.innerHeight - boxH) / 2)) + 'px';
+        box.style.left = Math.floor((window.innerWidth - boxW) / 2) + 'px';
+        box.style.margin = '0';
+      }
+    });
+
     document.getElementById('sp-mfp-cancel').onclick = () => overlay.remove();
     overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
     overlay.querySelectorAll('.sp-manor-fish-opt').forEach(el => {
@@ -34213,6 +34241,20 @@ window.addEventListener('beforeunload', () => {
       </div>
     `;
     document.body.appendChild(overlay);
+
+    // 居中定位（兼容安卓）
+    requestAnimationFrame(() => {
+      const box = overlay.querySelector('.sp-confirm-box');
+      if (box) {
+        const boxH = box.offsetHeight || 220;
+        const boxW = box.offsetWidth || 260;
+        box.style.position = 'fixed';
+        box.style.top = Math.max(20, Math.floor((window.innerHeight - boxH) / 2)) + 'px';
+        box.style.left = Math.floor((window.innerWidth - boxW) / 2) + 'px';
+        box.style.margin = '0';
+      }
+    });
+
     document.getElementById('sp-map-cancel').onclick = () => overlay.remove();
     overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
     overlay.querySelectorAll('.sp-manor-animal-opt').forEach(el => {
