@@ -630,6 +630,31 @@
     gameStaminaInventory: { stamina30: 0, stamina50: 0, stamina100: 0 },  // 体力道具背包
     gameStaminaShopLog: {},  // {'2026-07-15': {'stamina30': 2, ...}}
     gameResetCooldown: 0,  // 上次重置全部游戏数据的时间戳
+    // ===== 庄园系统状态 =====
+    // 每块田地有4个小格子(2×2)，每个格子独立种植
+    manorFarmPlots: [{
+      unlocked: true,
+      cells: [
+        { seed: null, plantedTime: 0, watered: 0, fertilized: 0, stage: 'empty' },
+        { seed: null, plantedTime: 0, watered: 0, fertilized: 0, stage: 'empty' },
+        { seed: null, plantedTime: 0, watered: 0, fertilized: 0, stage: 'empty' },
+        { seed: null, plantedTime: 0, watered: 0, fertilized: 0, stage: 'empty' },
+      ]
+    }],
+    // 每个鱼塘有4个小格子(2×2)，每格放1条鱼
+    manorFishPonds: [{
+      unlocked: true,
+      cells: [null, null, null, null],  // 每格: null 或 {fishId, gender, stage, placedTime, fed}
+      lastFedTime: 0
+    }],
+    // 每个牧场有4个小格子(2×2)，每格放1只动物
+    manorPastures: [{
+      unlocked: true,
+      cells: [null, null, null, null],  // 每格: null 或 {animalId, gender, stage, placedTime, fed, lastProductTime}
+    }],
+    manorInventory: [],
+    manorCollection: [],
+    manorLastTickTime: Date.now(),
     fridgeInventory: [],  // [{foodId: 'cola', count: 3}, ...] 冰箱食物库存
     fridgePropInventory: { compress: 0, backpack: 0, organize: 0 },  // 冰箱道具背包
     fridgePropShopLog: {},  // {'2026-07-15': {'compress': 2, ...}}
@@ -3689,6 +3714,102 @@ function showInventoryPopup(category, quickKey, onUse) {
       }
 
       // 追加餐厅出餐台菜品到投喂列表
+
+      // 追加庄园农产品到投喂列表
+      if (category === 'food') {
+        const manorFoodItems = (state.manorInventory || []).filter(i => i.count > 0 && (i.type === 'harvest' || i.type === 'product'));
+        manorFoodItems.forEach(inv => {
+          let name = inv.itemId, emoji = '🌾', feedAmt = 5;
+          const harvestSeed = MANOR_SEEDS.find(s => s.harvestItem === inv.itemId);
+          if (harvestSeed && harvestSeed.category === 'food') {
+            name = harvestSeed.harvestName; emoji = harvestSeed.harvestEmoji; feedAmt = harvestSeed.feedAmount;
+          }
+          const harvestFish = MANOR_FISH.find(f => 'harvest_' + f.id === inv.itemId);
+          if (harvestFish) { name = harvestFish.adultName; emoji = harvestFish.adultEmoji; feedAmt = harvestFish.feedAmount; }
+          const prodAnimal = MANOR_ANIMALS.find(a => a.productItem === inv.itemId);
+          // 动物产品（排除羊毛，羊毛不能投喂）
+          const productFeedMap = { 'product_egg': 8, 'product_duckegg': 8, 'product_milk': 10, 'product_goatmilk': 10, 'product_truffle': 12 };
+          if (prodAnimal && inv.itemId !== 'product_wool') {
+            name = prodAnimal.productName;
+            emoji = prodAnimal.productEmoji;
+            feedAmt = productFeedMap[inv.itemId] || 5;
+          }
+          // 屠宰肉类也可以投喂（修复：以前名字保持 itemId 字符串被跳过）
+          const slaughterAnimal = MANOR_ANIMALS.find(a => a.slaughterItem === inv.itemId);
+          if (slaughterAnimal) {
+            name = slaughterAnimal.slaughterName;
+            emoji = slaughterAnimal.slaughterEmoji;
+            feedAmt = slaughterAnimal.slaughterFeedAmount || 12;
+          }
+          // 猫薄荷/薰衣草等抚慰类跳过（单独在精力/清洁分类处理）
+          if (harvestSeed && harvestSeed.category !== 'food') return;
+          // 非食物类产品跳过（羊毛、松露油）
+          if (inv.itemId === 'product_wool' || inv.itemId === 'product_truffle_oil') return;
+          if (!name || name === inv.itemId) return;
+
+          itemsHtml += `
+            <div class="sp-inv-item" data-manor-food="${inv.itemId}">
+              <span class="sp-inv-item-emoji">${emoji}</span>
+              <div class="sp-inv-item-info">
+                <span class="sp-inv-item-name">🏡 ${name}</span>
+                <span class="sp-inv-item-detail">+${feedAmt} | 庄园库存: ${inv.count}</span>
+              </div>
+              <div class="sp-inv-item-actions">
+                <button class="sp-inv-use-btn sp-inv-manor-food-use" data-manor-food="${inv.itemId}" data-feed="${feedAmt}">使用</button>
+              </div>
+            </div>
+          `;
+        });
+      }
+
+      // 庄园猫薄荷 → 精力恢复
+      if (category === 'energy') {
+        const catnipInv = (state.manorInventory || []).find(i => i.itemId === 'crop_catnip' && i.count > 0);
+        if (catnipInv) {
+          const catnipDef = MANOR_SEEDS.find(s => s.harvestItem === 'crop_catnip');
+          const catnipRestore = catnipDef?.comfortAmount || 15;
+          itemsHtml += `
+            <div class="sp-inv-item" data-manor-comfort="crop_catnip">
+              <span class="sp-inv-item-emoji">${catnipDef?.harvestEmoji || '🌿'}</span>
+              <div class="sp-inv-item-info">
+                <span class="sp-inv-item-name">🏡 ${catnipDef?.harvestName || '猫薄荷'}</span>
+                <span class="sp-inv-item-detail">+${catnipRestore}精力 | 庄园库存: ${catnipInv.count}</span>
+              </div>
+              <div class="sp-inv-item-actions">
+                <button class="sp-inv-use-btn sp-inv-manor-comfort-use"
+                  data-manor-comfort="crop_catnip"
+                  data-restore="${catnipRestore}"
+                  data-type="energy">使用</button>
+              </div>
+            </div>
+          `;
+        }
+      }
+
+      // 庄园薰衣草 → 清洁恢复
+      if (category === 'clean') {
+        const lavenderInv = (state.manorInventory || []).find(i => i.itemId === 'crop_lavender' && i.count > 0);
+        if (lavenderInv) {
+          const lavenderDef = MANOR_SEEDS.find(s => s.harvestItem === 'crop_lavender');
+          const lavenderRestore = lavenderDef?.comfortAmount || 20;
+          itemsHtml += `
+            <div class="sp-inv-item" data-manor-comfort="crop_lavender">
+              <span class="sp-inv-item-emoji">${lavenderDef?.harvestEmoji || '💐'}</span>
+              <div class="sp-inv-item-info">
+                <span class="sp-inv-item-name">🏡 ${lavenderDef?.harvestName || '薰衣草'}</span>
+                <span class="sp-inv-item-detail">+${lavenderRestore}清洁 | 庄园库存: ${lavenderInv.count}</span>
+              </div>
+              <div class="sp-inv-item-actions">
+                <button class="sp-inv-use-btn sp-inv-manor-comfort-use"
+                  data-manor-comfort="crop_lavender"
+                  data-restore="${lavenderRestore}"
+                  data-type="clean">使用</button>
+              </div>
+            </div>
+          `;
+        }
+      }
+
       const cookedDishes = (state.restaurantCookedDishes || []).filter(d => d.count > 0);
       cookedDishes.forEach(d => {
         const recipe = RESTAURANT_RECIPES.find(r => r.id === d.recipeId);
@@ -3840,6 +3961,53 @@ function showInventoryPopup(category, quickKey, onUse) {
           state.energy = Math.min(100, state.energy + recipe.energyAmount);
         }
         saveDataDebounced('使用餐厅菜品投喂');
+      };
+    });
+
+    // 庄园农产品使用按钮
+    overlay.querySelectorAll('.sp-inv-manor-food-use').forEach(btn => {
+      btn.onclick = () => {
+        const itemId = btn.dataset.manorFood;
+        const feedAmt = parseInt(btn.dataset.feed) || 5;
+        const inv = (state.manorInventory || []).find(i => i.itemId === itemId && i.count > 0);
+        if (!inv) { showBubble('庄园库存没了', 2000); overlay.remove(); return; }
+        inv.count--;
+        if (inv.count <= 0) state.manorInventory = state.manorInventory.filter(i => i.count > 0);
+        overlay.remove();
+        onUse({ name: itemId, emoji: '🏡' }, feedAmt);
+        saveDataDebounced('使用庄园食物');
+      };
+    });
+
+    // 庄园抚慰品使用按钮（猫薄荷→精力 / 薰衣草→清洁）
+    overlay.querySelectorAll('.sp-inv-manor-comfort-use').forEach(btn => {
+      btn.onclick = () => {
+        const itemId = btn.dataset.manorComfort;
+        const restore = parseInt(btn.dataset.restore) || 15;
+        const type = btn.dataset.type;
+        const inv = (state.manorInventory || []).find(i => i.itemId === itemId && i.count > 0);
+        if (!inv) { showBubble('庄园库存没了', 2000); overlay.remove(); return; }
+        inv.count--;
+        if (inv.count <= 0) state.manorInventory = state.manorInventory.filter(i => i.count > 0);
+        overlay.remove();
+        if (type === 'energy') {
+          state.energy = Math.min(100, state.energy + restore);
+          const actionSprite = settings.spriteEat || settings.spriteHappy;
+          if (actionSprite) {
+            const dur = (settings.spriteDurations && settings.spriteDurations.spriteEat) || 2000;
+            setSpriteWithLock('eat', actionSprite, dur);
+          }
+          showBubble(`🌿 猫薄荷让你精神抖擞！精力 +${restore}`, 3000);
+        } else if (type === 'clean') {
+          state.cleanliness = Math.min(100, state.cleanliness + restore);
+          if (settings.spriteBath) {
+            const dur = (settings.spriteDurations && settings.spriteDurations.spriteBath) || 2500;
+            setSpriteWithLock('bath', settings.spriteBath, dur);
+          }
+          showBubble(`💐 薰衣草香气让你焕然一新！清洁 +${restore}`, 3000);
+        }
+        state.totalInteractions++;
+        updateMood(); updateStatusBars(); saveDataDebounced('使用庄园抚慰品');
       };
     });
 
@@ -4081,7 +4249,14 @@ function showInventoryPopup(category, quickKey, onUse) {
               <div class="sp-game-selector-desc">查看已解锁的成就和进度</div>
             </div>
           </div>
-          <div class="sp-game-selector-card" data-game="unifiedCollection" style="grid-column:span 2;">
+          <div class="sp-game-selector-card" data-game="manor">
+            <div class="sp-game-selector-icon">${getGameIconHtml('manor', '🏡')}</div>
+            <div class="sp-game-selector-info">
+              <div class="sp-game-selector-name">庄园</div>
+              <div class="sp-game-selector-desc">种田、养鱼、养动物，经营你的庄园</div>
+            </div>
+          </div>
+          <div class="sp-game-selector-card" data-game="unifiedCollection">
             <div class="sp-game-selector-icon">${getGameIconHtml('unifiedCollection', '📖')}</div>
             <div class="sp-game-selector-info">
               <div class="sp-game-selector-name">图鉴合集</div>
@@ -4146,6 +4321,8 @@ function showInventoryPopup(category, quickKey, onUse) {
           showTotalInventory();
         } else if (game === 'achievements') {
           showAchievementsPanel();
+        } else if (game === 'manor') {          // ← 新增这两行
+          toggleManorGame();                    // ← 新增这两行
         } else if (game === 'unifiedCollection') {
           showUnifiedCollection();
         }
@@ -18454,6 +18631,13 @@ window.addEventListener('beforeunload', () => {
               state.tanghuluSugarCrystal = 0;
               state.tanghuluPropInventory = { extraStick: 0, undo: 0, lubricant: 0 };
               state.tanghuluPropShopLog = {};
+              // 庄园
+              state.manorFarmPlots = [{ unlocked: true, seed: null, plantedTime: 0, watered: 0, fertilized: 0, stage: 'empty', lastWaterTime: 0, lastFertilizeTime: 0 }];
+              state.manorFishPonds = [{ unlocked: true, fishes: [], lastFedTime: 0 }];
+              state.manorPastures = [{ unlocked: true, animals: [] }];
+              state.manorInventory = [];
+              state.manorCollection = [];
+              state.manorLastTickTime = Date.now();
               // 记录重置冷却时间
               state.gameResetCooldown = Date.now();
               saveDataImmediate('全部游戏重置');
@@ -23470,6 +23654,7 @@ window.addEventListener('beforeunload', () => {
     { id: 'curry',   name: '咖喱粉', emoji: '🍛', price: 16, reputationRequired: 15 },
     { id: 'coconut', name: '椰浆',   emoji: '🥥', price: 14, reputationRequired: 10 },
     { id: 'essence', name: '万味精华', emoji: '🏺', price: 30, reputationRequired: 20 },
+    { id: 'truffle_oil', name: '松露油', emoji: '🫒', price: 40, reputationRequired: 15 },
 
   ];
 
@@ -24884,6 +25069,49 @@ window.addEventListener('beforeunload', () => {
       check: () => settings.petName && settings.petName.trim().length > 6 },
     { id: 'total_3000_actions',   name: '三千之缘',           emoji: '🌠', desc: '总互动+聊天+日记超过3000次', category: 'milestone', tier: 5,
       check: () => state.totalInteractions + state.petChatHistory.length + (state.diaryEntries || []).length >= 3000 },
+    // ===================== 庄园类 =====================
+    { id: 'manor_first_plant',    name: '第一颗种子',       emoji: '🌱', desc: '种下第一颗种子', category: 'minigame', tier: 1,
+      check: () => (state.manorCollection || []).some(k => k.startsWith('seed_')) },
+    { id: 'manor_first_harvest',  name: '丰收喜悦',         emoji: '🌾', desc: '收获第一个农作物', category: 'minigame', tier: 1,
+      check: () => (state.manorCollection || []).some(k => k.startsWith('crop_')) },
+    { id: 'manor_harvest_5',      name: '小农场主',         emoji: '👨‍🌾', desc: '庄园图鉴解锁5种', category: 'minigame', tier: 2,
+      check: () => (state.manorCollection || []).length >= 5 },
+    { id: 'manor_harvest_15',     name: '庄园达人',         emoji: '🏡', desc: '庄园图鉴解锁15种', category: 'minigame', tier: 3,
+      check: () => (state.manorCollection || []).length >= 15 },
+    { id: 'manor_harvest_30',     name: '庄园大师',         emoji: '🌟', desc: '庄园图鉴解锁30种', category: 'minigame', tier: 4,
+      check: () => (state.manorCollection || []).length >= 30 },
+    { id: 'manor_farm_3',         name: '三亩良田',         emoji: '🌾', desc: '解锁3块田地', category: 'minigame', tier: 1,
+      check: () => (state.manorFarmPlots || []).filter(p => p.unlocked).length >= 3 },
+    { id: 'manor_farm_6',         name: '六亩肥田',         emoji: '🌻', desc: '解锁6块田地', category: 'minigame', tier: 2,
+      check: () => (state.manorFarmPlots || []).filter(p => p.unlocked).length >= 6 },
+    { id: 'manor_farm_12',        name: '田产万顷',         emoji: '🏞️', desc: '解锁全部12块田地', category: 'minigame', tier: 4,
+      check: () => (state.manorFarmPlots || []).filter(p => p.unlocked).length >= 12 },
+    { id: 'manor_first_fish',     name: '初次垂钓',         emoji: '🐠', desc: '鱼塘放入第一条鱼苗', category: 'minigame', tier: 1,
+      check: () => (state.manorCollection || []).some(k => k.startsWith('fish_')) },
+    { id: 'manor_fish_breed',     name: '鱼塘新生',         emoji: '🐟', desc: '鱼塘繁殖出第一条小鱼', category: 'minigame', tier: 3,
+      check: () => (state.manorFishPonds || []).some(p => p.fishes.length >= 3) },
+    { id: 'manor_pond_3',         name: '三塘碧水',         emoji: '🌊', desc: '解锁3个鱼塘', category: 'minigame', tier: 2,
+      check: () => (state.manorFishPonds || []).filter(p => p.unlocked).length >= 3 },
+    { id: 'manor_first_animal',   name: '初养幼崽',         emoji: '🐣', desc: '牧场放入第一只动物', category: 'minigame', tier: 1,
+      check: () => (state.manorCollection || []).some(k => k.startsWith('animal_')) },
+    { id: 'manor_first_product',  name: '第一份产品',       emoji: '🥚', desc: '收取第一个动物产品', category: 'minigame', tier: 2,
+      check: () => (state.manorCollection || []).some(k => k.startsWith('product_')) },
+    { id: 'manor_animal_breed',   name: '牧场新丁',         emoji: '🐮', desc: '牧场繁殖出第一只小动物', category: 'minigame', tier: 3,
+      check: () => (state.manorPastures || []).some(p => p.animals.length >= 3) },
+    { id: 'manor_pasture_3',      name: '三圈牧场',         emoji: '🌿', desc: '解锁3个牧场', category: 'minigame', tier: 2,
+      check: () => (state.manorPastures || []).filter(p => p.unlocked).length >= 3 },
+    { id: 'manor_all_unlocked',   name: '庄园满建',         emoji: '🏰', desc: '田地+鱼塘+牧场全部解锁', category: 'minigame', tier: 5,
+      check: () => (state.manorFarmPlots || []).filter(p => p.unlocked).length >= 12 &&
+                   (state.manorFishPonds || []).filter(p => p.unlocked).length >= 12 &&
+                   (state.manorPastures || []).filter(p => p.unlocked).length >= 12 },
+    { id: 'manor_catnip',         name: '猫薄荷种植者',     emoji: '🍀', desc: '种出猫薄荷', category: 'minigame', tier: 2,
+      check: () => (state.manorCollection || []).includes('crop_catnip') },
+    { id: 'manor_all_seeds',      name: '种子收藏家',       emoji: '🌱', desc: '所有种子类型都种过', category: 'minigame', tier: 4,
+      check: () => MANOR_SEEDS.every(s => (state.manorCollection || []).includes(s.id)) },
+    { id: 'manor_all_fish',       name: '鱼类博物馆',       emoji: '🐡', desc: '所有鱼类都养过', category: 'minigame', tier: 4,
+      check: () => MANOR_FISH.every(f => (state.manorCollection || []).includes(f.id)) },
+    { id: 'manor_all_animals',    name: '动物园长',         emoji: '🦁', desc: '所有动物都养过', category: 'minigame', tier: 4,
+      check: () => MANOR_ANIMALS.every(a => (state.manorCollection || []).includes(a.id)) },
 
   ];
 
@@ -28179,6 +28407,125 @@ window.addEventListener('beforeunload', () => {
   }
 
   // ============================================================
+  // 🏡 庄园系统常量定义 - MeepManor
+  // ============================================================
+
+  // ===== 田地解锁费用（递增）=====
+  const MANOR_FARM_UNLOCK_COSTS = [
+    0, 50, 120, 200, 300, 420, 560, 720, 900, 1100, 1320, 1560
+  ];  // 12块田地，第1块免费
+
+  // ===== 鱼塘解锁费用（递增）=====
+  const MANOR_POND_UNLOCK_COSTS = [
+    0, 80, 160, 280, 420, 580, 760, 960, 1180, 1420, 1680, 1960
+  ];
+
+  // ===== 牧场解锁费用（递增）=====
+  const MANOR_PASTURE_UNLOCK_COSTS = [
+    0, 100, 220, 360, 520, 700, 900, 1120, 1360, 1620, 1900, 2200
+  ];
+
+  // ===== 种子定义 =====
+  const MANOR_SEEDS = [
+    // 基础农作物（成熟时间短，产出基本食物）
+    { id: 'seed_wheat',      name: '小麦种子',     emoji: '🌾', price: 5,   growTime: 3 * 60 * 1000,   needWater: 1, needFertilize: 1,
+      harvestItem: 'crop_wheat',    harvestEmoji: '🌾', harvestName: '小麦',     matureEmoji: '🌾',
+      category: 'food', feedAmount: 3, sellPrice: 8, desc: '基础粮食作物' },
+    { id: 'seed_carrot',     name: '胡萝卜种子',   emoji: '🥕', price: 8,   growTime: 5 * 60 * 1000,   needWater: 1, needFertilize: 1,
+      harvestItem: 'crop_carrot',   harvestEmoji: '🥕', harvestName: '胡萝卜',   matureEmoji: '🥕',
+      category: 'food', feedAmount: 5, sellPrice: 12, desc: '冰箱食材联动' },
+    { id: 'seed_tomato',     name: '番茄种子',     emoji: '🍅', price: 10,  growTime: 8 * 60 * 1000,   needWater: 2, needFertilize: 1,
+      harvestItem: 'crop_tomato',   harvestEmoji: '🍅', harvestName: '番茄',     matureEmoji: '🍅',
+      category: 'food', feedAmount: 6, sellPrice: 15, desc: '餐厅食材联动' },
+    { id: 'seed_potato',     name: '土豆种子',     emoji: '🥔', price: 8,   growTime: 6 * 60 * 1000,   needWater: 1, needFertilize: 1,
+      harvestItem: 'crop_potato',   harvestEmoji: '🥔', harvestName: '土豆',     matureEmoji: '🥔',
+      category: 'food', feedAmount: 4, sellPrice: 10, desc: '基础蔬菜' },
+    { id: 'seed_corn',       name: '玉米种子',     emoji: '🌽', price: 12,  growTime: 10 * 60 * 1000,  needWater: 2, needFertilize: 1,
+      harvestItem: 'crop_corn',     harvestEmoji: '🌽', harvestName: '甜玉米',   matureEmoji: '🌽',
+      category: 'food', feedAmount: 7, sellPrice: 18, desc: '中级农作物' },
+    // 高级农作物（成熟时间长，需要施肥）
+    { id: 'seed_strawberry', name: '草莓种子',     emoji: '🍓', price: 20,  growTime: 15 * 60 * 1000,  needWater: 2, needFertilize: 1,
+      harvestItem: 'crop_strawberry', harvestEmoji: '🍓', harvestName: '草莓', matureEmoji: '🍓',
+      category: 'food', feedAmount: 10, sellPrice: 30, desc: '高级水果' },
+    { id: 'seed_pumpkin',    name: '南瓜种子',     emoji: '🎃', price: 25,  growTime: 20 * 60 * 1000,  needWater: 3, needFertilize: 2,
+      harvestItem: 'crop_pumpkin',  harvestEmoji: '🎃', harvestName: '大南瓜',   matureEmoji: '🎃',
+      category: 'food', feedAmount: 12, sellPrice: 40, desc: '餐厅高级食材' },
+    // 桌宠抚慰类
+    { id: 'seed_catnip',     name: '猫薄荷种子',   emoji: '🌿', price: 30,  growTime: 25 * 60 * 1000,  needWater: 2, needFertilize: 1,
+      harvestItem: 'crop_catnip',   harvestEmoji: '🌿', harvestName: '猫薄荷',   matureEmoji: '🍀',
+      category: 'comfort', comfortAmount: 15, sellPrice: 35, desc: '桌宠抚慰用品，恢复精力' },
+    { id: 'seed_lavender',   name: '薰衣草种子',   emoji: '💜', price: 35,  growTime: 30 * 60 * 1000,  needWater: 3, needFertilize: 2,
+      harvestItem: 'crop_lavender', harvestEmoji: '💐', harvestName: '薰衣草',   matureEmoji: '💜',
+      category: 'comfort', comfortAmount: 20, sellPrice: 45, desc: '桌宠清洁抚慰用品' },
+    // 餐厅食材类
+    { id: 'seed_mushroom',   name: '蘑菇菌种',     emoji: '🍄', price: 15,  growTime: 12 * 60 * 1000,  needWater: 2, needFertilize: 1,
+      harvestItem: 'crop_mushroom', harvestEmoji: '🍄', harvestName: '香菇',     matureEmoji: '🍄',
+      category: 'food', feedAmount: 8, sellPrice: 22, desc: '餐厅蘑菇食材' },
+    { id: 'seed_onion',      name: '洋葱种子',     emoji: '🧅', price: 8,   growTime: 7 * 60 * 1000,   needWater: 1, needFertilize: 1,
+      harvestItem: 'crop_onion',    harvestEmoji: '🧅', harvestName: '洋葱',     matureEmoji: '🧅',
+      category: 'food', feedAmount: 4, sellPrice: 12, desc: '餐厅基础蔬菜' },
+    { id: 'seed_watermelon', name: '西瓜种子',     emoji: '🍉', price: 40,  growTime: 40 * 60 * 1000,  needWater: 4, needFertilize: 2,
+      harvestItem: 'crop_watermelon', harvestEmoji: '🍉', harvestName: '大西瓜', matureEmoji: '🍉',
+      category: 'food', feedAmount: 18, sellPrice: 60, desc: '高级水果·成熟时间长' },
+  ];
+
+  // ===== 鱼苗定义 =====
+  const MANOR_FISH = [
+    { id: 'fish_goldfish',   name: '金鱼苗',     emoji: '🐠', price: 15,  growTime: 10 * 60 * 1000,  gender: 'random',
+      adultEmoji: '🐠', adultName: '金鱼',     sellPrice: 25,  feedAmount: 5,  breedChance: 0.03, desc: '观赏鱼·便宜' },
+    { id: 'fish_koi',        name: '锦鲤苗',     emoji: '🐟', price: 30,  growTime: 20 * 60 * 1000,  gender: 'random',
+      adultEmoji: '🐟', adultName: '锦鲤',     sellPrice: 50,  feedAmount: 8,  breedChance: 0.025, desc: '观赏鱼·中等' },
+    { id: 'fish_salmon',     name: '三文鱼苗',   emoji: '🐡', price: 50,  growTime: 30 * 60 * 1000,  gender: 'random',
+      adultEmoji: '🐡', adultName: '三文鱼',   sellPrice: 80,  feedAmount: 12, breedChance: 0.02, desc: '餐厅食材联动' },
+    { id: 'fish_catfish',    name: '鲶鱼苗',     emoji: '🐟', price: 25,  growTime: 15 * 60 * 1000,  gender: 'random',
+      adultEmoji: '🐟', adultName: '鲶鱼',     sellPrice: 40,  feedAmount: 7,  breedChance: 0.03, desc: '普通食用鱼' },
+    { id: 'fish_shrimp',     name: '虾苗',       emoji: '🦐', price: 20,  growTime: 12 * 60 * 1000,  gender: 'random',
+      adultEmoji: '🦐', adultName: '大虾',     sellPrice: 35,  feedAmount: 6,  breedChance: 0.04, desc: '餐厅虾仁联动' },
+    { id: 'fish_lobster',    name: '龙虾苗',     emoji: '🦞', price: 80,  growTime: 45 * 60 * 1000,  gender: 'random',
+      adultEmoji: '🦞', adultName: '大龙虾',   sellPrice: 130, feedAmount: 18, breedChance: 0.015, desc: '高级食材·成长慢' },
+    { id: 'fish_pufferfish', name: '河豚苗',     emoji: '🐡', price: 60,  growTime: 35 * 60 * 1000,  gender: 'random',
+      adultEmoji: '🐡', adultName: '河豚',     sellPrice: 100, feedAmount: 14, breedChance: 0.02, desc: '稀有鱼类' },
+    { id: 'fish_turtle',     name: '小龟苗',     emoji: '🐢', price: 100, growTime: 60 * 60 * 1000,  gender: 'random',
+      adultEmoji: '🐢', adultName: '大海龟',   sellPrice: 180, feedAmount: 22, breedChance: 0.01, desc: '最贵·成长最慢' },
+  ];
+
+  // ===== 动物定义 =====
+  const MANOR_ANIMALS = [
+    { id: 'animal_chicken',  name: '小鸡',   emoji: '🐣', price: 20,  growTime: 15 * 60 * 1000, gender: 'random',
+      adultEmoji: '🐔', adultName: '鸡',   productItem: 'product_egg',    productEmoji: '🥚', productName: '鸡蛋',
+      productTime: 10 * 60 * 1000, productSellPrice: 12, feedAmount: 5,  breedChance: 0.025, desc: '产蛋',
+      slaughterItem: 'meat_chicken', slaughterEmoji: '🍗', slaughterName: '鸡肉', slaughterSellPrice: 30, slaughterFeedAmount: 12 },
+    { id: 'animal_duck',     name: '小鸭',   emoji: '🐥', price: 25,  growTime: 18 * 60 * 1000, gender: 'random',
+      adultEmoji: '🦆', adultName: '鸭',   productItem: 'product_duckegg', productEmoji: '🥚', productName: '鸭蛋',
+      productTime: 12 * 60 * 1000, productSellPrice: 15, feedAmount: 6,  breedChance: 0.025, desc: '产蛋',
+      slaughterItem: 'meat_duck', slaughterEmoji: '🍖', slaughterName: '鸭肉', slaughterSellPrice: 35, slaughterFeedAmount: 14 },
+    { id: 'animal_cow',      name: '小牛',   emoji: '🐄', price: 80,  growTime: 30 * 60 * 1000, gender: 'random',
+      adultEmoji: '🐮', adultName: '奶牛', productItem: 'product_milk',    productEmoji: '🥛', productName: '牛奶',
+      productTime: 20 * 60 * 1000, productSellPrice: 25, feedAmount: 10, breedChance: 0.015, desc: '产奶',
+      slaughterItem: 'meat_beef', slaughterEmoji: '🥩', slaughterName: '牛肉', slaughterSellPrice: 80, slaughterFeedAmount: 25 },
+    { id: 'animal_sheep',    name: '小羊',   emoji: '🐑', price: 60,  growTime: 25 * 60 * 1000, gender: 'random',
+      adultEmoji: '🐏', adultName: '绵羊', productItem: 'product_wool',    productEmoji: '🧶', productName: '羊毛',
+      productTime: 25 * 60 * 1000, productSellPrice: 20, feedAmount: 8,  breedChance: 0.02, desc: '产毛',
+      slaughterItem: 'meat_lamb', slaughterEmoji: '🍖', slaughterName: '羊肉', slaughterSellPrice: 60, slaughterFeedAmount: 20 },
+    { id: 'animal_pig',      name: '小猪',   emoji: '🐷', price: 50,  growTime: 22 * 60 * 1000, gender: 'random',
+      adultEmoji: '🐖', adultName: '猪',   productItem: 'product_truffle', productEmoji: '🍄', productName: '松露',
+      productTime: 30 * 60 * 1000, productSellPrice: 35, feedAmount: 12, breedChance: 0.02, desc: '找松露',
+      slaughterItem: 'meat_pork', slaughterEmoji: '🥓', slaughterName: '猪肉', slaughterSellPrice: 50, slaughterFeedAmount: 18 },
+    { id: 'animal_goat',     name: '小山羊', emoji: '🐐', price: 70,  growTime: 28 * 60 * 1000, gender: 'random',
+      adultEmoji: '🐐', adultName: '山羊', productItem: 'product_goatmilk', productEmoji: '🥛', productName: '羊奶',
+      productTime: 22 * 60 * 1000, productSellPrice: 28, feedAmount: 9,  breedChance: 0.018, desc: '产羊奶',
+      slaughterItem: 'meat_goat', slaughterEmoji: '🍖', slaughterName: '山羊肉', slaughterSellPrice: 65, slaughterFeedAmount: 22 },
+  ];
+
+  // ===== 庄园商店物品：饲料/鱼饲料/肥料/浇水壶 =====
+  const MANOR_SHOP_ITEMS = [
+    { id: 'item_water',       name: '浇水壶',     emoji: '🚿', price: 0,   category: 'tool',   desc: '免费浇水' },
+    { id: 'item_fertilizer',  name: '肥料',       emoji: '💩', price: 5,   category: 'tool',   desc: '给田地施肥' },
+    { id: 'item_animalfeed',  name: '动物饲料',   emoji: '🌾', price: 8,   category: 'feed',   desc: '喂养牧场动物' },
+    { id: 'item_fishfeed',    name: '鱼饲料',     emoji: '🐛', price: 6,   category: 'feed',   desc: '喂养鱼塘里的鱼' },
+  ];
+
+  // ============================================================
   // 🛒 货架整理游戏模块 - MeepShelfSort
   // ============================================================
 
@@ -29984,6 +30331,7 @@ window.addEventListener('beforeunload', () => {
       { id: 'fridge',           emoji: '🧊', name: '冰箱整理' },
       { id: 'tanghulu',         emoji: '🍢', name: '糖葫芦工坊' },
       { id: 'shelf',            emoji: '🛒', name: '整理货架' },
+      { id: 'manor',            emoji: '🏡', name: '庄园' },
       { id: 'inventory',        emoji: '🎒', name: '总背包' },
       { id: 'achievements',     emoji: '🏆', name: '成就' },
       { id: 'unifiedCollection', emoji: '📖', name: '图鉴合集' },
@@ -30103,6 +30451,35 @@ window.addEventListener('beforeunload', () => {
     bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">🛒 货架商品 <span style="font-size:10px;color:var(--sp-text-muted);">（🔗部分联动冰箱/餐厅/糖葫芦）</span></summary><div class="sp-guide-details-content"><div class="sp-unified-coll-grid">';
     SHELF_ITEMS.forEach(item => {
       bodyHtml += renderItem(`shelf_item_${item.id}`, item.emoji, item.name, item.category, false);
+    });
+    bodyHtml += '</div></div></details>';
+
+    // ===== 庄园种子 =====
+    bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">🌱 庄园种子</summary><div class="sp-guide-details-content"><div class="sp-unified-coll-grid">';
+    MANOR_SEEDS.forEach(seed => {
+      bodyHtml += renderItem(`manor_seed_${seed.id}`, seed.emoji, seed.name, seed.desc, false);
+    });
+    bodyHtml += '</div></div></details>';
+
+    // ===== 庄园收获物 =====
+    bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">🌾 庄园收获物</summary><div class="sp-guide-details-content"><div class="sp-unified-coll-grid">';
+    MANOR_SEEDS.forEach(seed => {
+      bodyHtml += renderItem(`manor_harvest_${seed.harvestItem}`, seed.harvestEmoji, seed.harvestName, '', false);
+    });
+    bodyHtml += '</div></div></details>';
+
+    // ===== 庄园鱼类 =====
+    bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">🐟 庄园鱼类</summary><div class="sp-guide-details-content"><div class="sp-unified-coll-grid">';
+    MANOR_FISH.forEach(fish => {
+      bodyHtml += renderItem(`manor_fish_${fish.id}`, fish.adultEmoji, fish.adultName, fish.desc, false);
+    });
+    bodyHtml += '</div></div></details>';
+
+    // ===== 庄园动物 & 产品 =====
+    bodyHtml += '<details class="sp-guide-details"><summary class="sp-guide-summary">🐮 庄园动物 & 产品</summary><div class="sp-guide-details-content"><div class="sp-unified-coll-grid">';
+    MANOR_ANIMALS.forEach(animal => {
+      bodyHtml += renderItem(`manor_animal_${animal.id}`, animal.adultEmoji, animal.adultName, animal.desc, false);
+      bodyHtml += renderItem(`manor_product_${animal.productItem}`, animal.productEmoji, animal.productName, '', false);
     });
     bodyHtml += '</div></div></details>';
 
@@ -32862,6 +33239,1214 @@ window.addEventListener('beforeunload', () => {
     if (data.bookmarks) settings.bookshelfBookmarks = { ...(settings.bookshelfBookmarks || {}), ...data.bookmarks };
     saveData(); bsRenderShelf(); bsRenderTagBar();
     showBubble(`📂 还原完成！共${data.books.length}本`, 3000);
+  }
+
+  // ============================================================
+  // 🏡 庄园游戏模块 - MeepManor
+  // ============================================================
+
+  let isManorOpen = false;
+  let manorTickTimer = null;
+
+  // ===== 初始化庄园数据 =====
+  function manorInit() {
+    if (!state.manorFarmPlots || state.manorFarmPlots.length === 0) {
+      state.manorFarmPlots = [{
+        unlocked: true,
+        cells: [
+          { seed: null, plantedTime: 0, watered: 0, fertilized: 0, stage: 'empty' },
+          { seed: null, plantedTime: 0, watered: 0, fertilized: 0, stage: 'empty' },
+          { seed: null, plantedTime: 0, watered: 0, fertilized: 0, stage: 'empty' },
+          { seed: null, plantedTime: 0, watered: 0, fertilized: 0, stage: 'empty' },
+        ]
+      }];
+    }
+    while (state.manorFarmPlots.length < 12) {
+      state.manorFarmPlots.push({
+        unlocked: false,
+        cells: [
+          { seed: null, plantedTime: 0, watered: 0, fertilized: 0, stage: 'empty' },
+          { seed: null, plantedTime: 0, watered: 0, fertilized: 0, stage: 'empty' },
+          { seed: null, plantedTime: 0, watered: 0, fertilized: 0, stage: 'empty' },
+          { seed: null, plantedTime: 0, watered: 0, fertilized: 0, stage: 'empty' },
+        ]
+      });
+    }
+    state.manorFarmPlots.forEach(plot => {
+      if (!plot.cells) {
+        plot.cells = [
+          { seed: plot.seed || null, plantedTime: plot.plantedTime || 0, watered: plot.watered || 0, fertilized: plot.fertilized || 0, stage: plot.stage || 'empty' },
+          { seed: null, plantedTime: 0, watered: 0, fertilized: 0, stage: 'empty' },
+          { seed: null, plantedTime: 0, watered: 0, fertilized: 0, stage: 'empty' },
+          { seed: null, plantedTime: 0, watered: 0, fertilized: 0, stage: 'empty' },
+        ];
+      }
+    });
+
+    if (!state.manorFishPonds || state.manorFishPonds.length === 0) {
+      state.manorFishPonds = [{ unlocked: true, cells: [null, null, null, null], lastFedTime: 0 }];
+    }
+    while (state.manorFishPonds.length < 12) {
+      state.manorFishPonds.push({ unlocked: false, cells: [null, null, null, null], lastFedTime: 0 });
+    }
+    state.manorFishPonds.forEach(pond => {
+      if (!pond.cells) {
+        pond.cells = [null, null, null, null];
+        if (pond.fishes && pond.fishes.length > 0) {
+          pond.fishes.slice(0, 4).forEach((f, i) => { pond.cells[i] = f; });
+        }
+      }
+      if (pond.fishes) delete pond.fishes;
+    });
+
+    if (!state.manorPastures || state.manorPastures.length === 0) {
+      state.manorPastures = [{ unlocked: true, cells: [null, null, null, null] }];
+    }
+    while (state.manorPastures.length < 12) {
+      state.manorPastures.push({ unlocked: false, cells: [null, null, null, null] });
+    }
+    state.manorPastures.forEach(pasture => {
+      if (!pasture.cells) {
+        pasture.cells = [null, null, null, null];
+        if (pasture.animals && pasture.animals.length > 0) {
+          pasture.animals.slice(0, 4).forEach((a, i) => { pasture.cells[i] = a; });
+        }
+      }
+      if (pasture.animals) delete pasture.animals;
+    });
+
+    if (!state.manorInventory) state.manorInventory = [];
+    if (!state.manorCollection) state.manorCollection = [];
+  }
+
+  // ===== 时间推进 =====
+  function manorTick() {
+    const now = Date.now();
+    state.manorLastTickTime = now;
+
+    state.manorFarmPlots.forEach(plot => {
+      if (!plot.unlocked) return;
+      plot.cells.forEach(cell => {
+        if (!cell || cell.stage === 'empty' || cell.stage === 'mature' || !cell.seed) return;
+        const seedDef = MANOR_SEEDS.find(s => s.id === cell.seed);
+        if (!seedDef) return;
+        if (cell.watered < seedDef.needWater) return;
+        if (cell.fertilized < seedDef.needFertilize) return;
+        const elapsed = now - cell.plantedTime;
+        if (elapsed >= seedDef.growTime) {
+          cell.stage = 'mature';
+        } else {
+          const progress = elapsed / seedDef.growTime;
+          if (progress < 0.33) cell.stage = 'sprout';
+          else if (progress < 0.66) cell.stage = 'growing';
+          else cell.stage = 'almost';
+        }
+      });
+    });
+
+    state.manorFishPonds.forEach(pond => {
+      if (!pond.unlocked) return;
+      pond.cells.forEach(fish => {
+        if (!fish || fish.stage === 'adult') return;
+        const fishDef = MANOR_FISH.find(f => f.id === fish.fishId);
+        if (!fishDef || !fish.fed) return;
+        if (now - fish.placedTime >= fishDef.growTime) fish.stage = 'adult';
+      });
+      const occupiedCount = pond.cells.filter(c => c !== null).length;
+      const hasEmptySlot = pond.cells.some(c => c === null);
+      if (occupiedCount >= 2 && hasEmptySlot) {
+        const adults = pond.cells.filter(c => c && c.stage === 'adult');
+        const byType = {};
+        adults.forEach(f => {
+          if (!byType[f.fishId]) byType[f.fishId] = { male: 0, female: 0 };
+          if (f.gender === 'male') byType[f.fishId].male++;
+          else byType[f.fishId].female++;
+        });
+        for (const [fishId, counts] of Object.entries(byType)) {
+          if (counts.male >= 1 && counts.female >= 1) {
+            const fishDef = MANOR_FISH.find(f => f.id === fishId);
+            if (fishDef && Math.random() < fishDef.breedChance) {
+              const slot = pond.cells.findIndex(c => c === null);
+              if (slot >= 0) {
+                pond.cells[slot] = {
+                  fishId, gender: Math.random() < 0.5 ? 'male' : 'female',
+                  stage: 'baby', placedTime: now, fed: false,
+                };
+                manorShowNotice(`🐟 鱼塘里诞生了一条小${fishDef.adultName}！`);
+                break;
+              }
+            }
+          }
+        }
+      }
+    });
+
+    state.manorPastures.forEach(pasture => {
+      if (!pasture.unlocked) return;
+      pasture.cells.forEach(animal => {
+        if (!animal) return;
+        const def = MANOR_ANIMALS.find(a => a.id === animal.animalId);
+        if (!def) return;
+        if (animal.stage === 'baby') {
+          if (!animal.fed) return;
+          if (now - animal.placedTime >= def.growTime) {
+            animal.stage = 'adult';
+            animal.lastProductTime = now;
+          }
+        } else if (animal.stage === 'adult' && animal.fed) {
+          if (now - (animal.lastProductTime || now) >= def.productTime) {
+            manorAddToInventory(def.productItem, 1, 'product');
+            // 动物产品 → 冰箱联动（让餐厅能使用）
+            const tickProdFridgeMap = {
+              'product_egg': 'eggs', 'product_duckegg': 'eggs',
+              'product_milk': 'milk', 'product_goatmilk': 'milk',
+              'product_truffle': 'mushroom'
+            };
+            const tickFridgeId = tickProdFridgeMap[def.productItem];
+            if (tickFridgeId) {
+              if (!state.fridgeInventory) state.fridgeInventory = [];
+              const tickEx = state.fridgeInventory.find(i => i.foodId === tickFridgeId);
+              if (tickEx) tickEx.count++;
+              else state.fridgeInventory.push({ foodId: tickFridgeId, count: 1 });
+            }
+            animal.lastProductTime = now;
+            animal.fed = false;
+            if (!state.manorCollection.includes(def.productItem)) state.manorCollection.push(def.productItem);
+          }
+        }
+      });
+      const occupiedCount = pasture.cells.filter(c => c !== null).length;
+      if (occupiedCount >= 2 && occupiedCount < 4) {
+        const adults = pasture.cells.filter(c => c && c.stage === 'adult');
+        const byType = {};
+        adults.forEach(a => {
+          if (!byType[a.animalId]) byType[a.animalId] = { male: 0, female: 0 };
+          if (a.gender === 'male') byType[a.animalId].male++;
+          else byType[a.animalId].female++;
+        });
+        for (const [animalId, counts] of Object.entries(byType)) {
+          if (counts.male >= 1 && counts.female >= 1) {
+            const def = MANOR_ANIMALS.find(a => a.id === animalId);
+            if (def && Math.random() < def.breedChance) {
+              const slot = pasture.cells.findIndex(c => c === null);
+              if (slot >= 0) {
+                pasture.cells[slot] = {
+                  animalId, gender: Math.random() < 0.5 ? 'male' : 'female',
+                  stage: 'baby', placedTime: now, fed: false, lastProductTime: 0,
+                };
+                manorShowNotice(`🐣 牧场里诞生了一只小${def.name}！`);
+                break;
+              }
+            }
+          }
+        }
+      }
+    });
+
+    saveDataDebounced('庄园时间推进');
+  }
+
+  // ===== 庄园背包操作 =====
+  function manorAddToInventory(itemId, count, type) {
+    if (!state.manorInventory) state.manorInventory = [];
+    const existing = state.manorInventory.find(i => i.itemId === itemId);
+    if (existing) {
+      existing.count += count;
+    } else {
+      state.manorInventory.push({ itemId, count, type });
+    }
+  }
+
+  // ===== 种植 =====
+  function manorPlantSeed(plotIdx, cellIdx, seedId) {
+    const cell = state.manorFarmPlots[plotIdx]?.cells[cellIdx];
+    if (!cell || cell.stage !== 'empty') { manorShowNotice('这个格子不能种！'); return; }
+    const seedDef = MANOR_SEEDS.find(s => s.id === seedId);
+    if (!seedDef) return;
+    const inv = (state.manorInventory || []).find(i => i.itemId === seedId && i.count > 0);
+    if (!inv) { manorShowNotice('没有这种种子了！'); return; }
+    inv.count--;
+    if (inv.count <= 0) state.manorInventory = state.manorInventory.filter(i => i.count > 0);
+    cell.seed = seedId;
+    cell.plantedTime = Date.now();
+    cell.watered = 0;
+    cell.fertilized = 0;
+    cell.stage = 'planted';
+    if (!state.manorCollection.includes(seedId)) state.manorCollection.push(seedId);
+    manorShowNotice(`🌱 种下了 ${seedDef.name}！`);
+    saveDataDebounced('庄园种植');
+    manorRender();
+  }
+
+  // ===== 浇水 =====
+  function manorWaterCell(plotIdx, cellIdx) {
+    const cell = state.manorFarmPlots[plotIdx]?.cells[cellIdx];
+    if (!cell || cell.stage === 'empty' || cell.stage === 'mature') return;
+    const seedDef = MANOR_SEEDS.find(s => s.id === cell.seed);
+    if (!seedDef || cell.watered >= seedDef.needWater) { manorShowNotice('已经浇够水了'); return; }
+    cell.watered++;
+    manorShowNotice(`💧 浇水 (${cell.watered}/${seedDef.needWater})`);
+    saveDataDebounced('庄园浇水');
+    manorRender();
+  }
+
+  // ===== 施肥 =====
+  function manorFertilizeCell(plotIdx, cellIdx) {
+    const cell = state.manorFarmPlots[plotIdx]?.cells[cellIdx];
+    if (!cell || cell.stage === 'empty' || cell.stage === 'mature') return;
+    const seedDef = MANOR_SEEDS.find(s => s.id === cell.seed);
+    if (!seedDef || seedDef.needFertilize === 0 || cell.fertilized >= seedDef.needFertilize) { manorShowNotice('不需要施肥或已施够'); return; }
+    const fertInv = (state.manorInventory || []).find(i => i.itemId === 'item_fertilizer' && i.count > 0);
+    if (!fertInv) { manorShowNotice('没有肥料了！'); return; }
+    fertInv.count--;
+    if (fertInv.count <= 0) state.manorInventory = state.manorInventory.filter(i => i.count > 0);
+    cell.fertilized++;
+    manorShowNotice(`💩 施肥 (${cell.fertilized}/${seedDef.needFertilize})`);
+    saveDataDebounced('庄园施肥');
+    manorRender();
+  }
+
+  // ===== 收获 =====
+  function manorHarvestCell(plotIdx, cellIdx) {
+    const cell = state.manorFarmPlots[plotIdx]?.cells[cellIdx];
+    if (!cell || cell.stage !== 'mature') return;
+    const seedDef = MANOR_SEEDS.find(s => s.id === cell.seed);
+    if (!seedDef) return;
+    manorAddToInventory(seedDef.harvestItem, 1, 'harvest');
+    if (seedDef.category === 'food') {
+      // 草莓 → 糖葫芦库存联动（而非错误地映射到苹果）
+      if (seedDef.harvestItem === 'crop_strawberry') {
+        if (!state.tanghuluInventory) state.tanghuluInventory = [];
+        const tangEx = state.tanghuluInventory.find(i => i.fruitKey === 'strawberry');
+        if (tangEx) tangEx.count++;
+        else state.tanghuluInventory.push({ fruitKey: 'strawberry', count: 1 });
+      }
+      // 庄园收获物 → 冰箱食材的映射（只有在FRIDGE_FOODS中存在的才能联动）
+      const manorToFridgeMap = {
+        'crop_carrot': 'carrot', 'crop_tomato': 'tomato', 'crop_potato': 'potato',
+        'crop_corn': 'corn', 'crop_pumpkin': 'pumpkin',
+        'crop_mushroom': 'mushroom', 'crop_onion': 'onion', 'crop_watermelon': 'watermelon',
+      };
+      const fridgeFoodId = (manorToFridgeMap[seedDef.harvestItem] !== undefined)
+        ? manorToFridgeMap[seedDef.harvestItem]
+        : seedDef.harvestItem.replace('crop_', '');
+      if (fridgeFoodId) {
+        const fridgeFood = FRIDGE_FOODS.find(f => f.id === fridgeFoodId);
+        if (fridgeFood) {
+          if (!state.fridgeInventory) state.fridgeInventory = [];
+          const existing = state.fridgeInventory.find(i => i.foodId === fridgeFoodId);
+          if (existing) existing.count++;
+          else state.fridgeInventory.push({ foodId: fridgeFoodId, count: 1 });
+        }
+      }
+    }
+    if (!state.manorCollection.includes(seedDef.harvestItem)) state.manorCollection.push(seedDef.harvestItem);
+    cell.seed = null; cell.plantedTime = 0; cell.watered = 0; cell.fertilized = 0; cell.stage = 'empty';
+    manorShowNotice(`🎉 收获了 ${seedDef.harvestEmoji} ${seedDef.harvestName}！`);
+    saveDataDebounced('庄园收获');
+    checkAchievements();
+    manorRender();
+  }
+
+  // ===== 解锁田地/鱼塘/牧场 =====
+  function manorUnlockPlot(type, idx) {
+    let costs, arr, typeName;
+    if (type === 'farm') { costs = MANOR_FARM_UNLOCK_COSTS; arr = state.manorFarmPlots; typeName = '田地'; }
+    else if (type === 'pond') { costs = MANOR_POND_UNLOCK_COSTS; arr = state.manorFishPonds; typeName = '鱼塘'; }
+    else if (type === 'pasture') { costs = MANOR_PASTURE_UNLOCK_COSTS; arr = state.manorPastures; typeName = '牧场'; }
+    else return;
+    if (idx >= arr.length || arr[idx].unlocked) return;
+    const cost = costs[idx] || 9999;
+    if (state.gameGold < cost) { manorShowNotice(`金币不足！需要 ${cost} 🪙`); return; }
+    showConfirmDialog({
+      title: `🔓 解锁${typeName}？`,
+      desc: `解锁第 ${idx + 1} 块${typeName}需要 ${cost} 🪙`,
+      confirmText: '解锁',
+      cancelText: '取消',
+      onConfirm: () => {
+        state.gameGold -= cost;
+        arr[idx].unlocked = true;
+        saveDataDebounced('庄园解锁');
+        manorShowNotice(`🔓 第 ${idx + 1} 块${typeName}已解锁！`);
+        manorRender();
+      }
+    });
+  }
+
+  // ===== 通知 =====
+  function manorShowNotice(text) {
+    const notice = document.getElementById('sp-manor-notice');
+    if (!notice) return;
+    notice.textContent = text;
+    notice.classList.add('visible');
+    clearTimeout(notice._timer);
+    notice._timer = setTimeout(() => notice.classList.remove('visible'), 3000);
+  }
+
+  // ===== 渲染入口 =====
+  function manorRenderTab(tabName) {
+    if (tabName === 'farm') manorRenderFarm();
+    else if (tabName === 'pond') manorRenderPond();
+    else if (tabName === 'pasture') manorRenderPasture();
+    else if (tabName === 'shop') manorRenderShop();
+    else if (tabName === 'bag') manorRenderBag();
+    else if (tabName === 'collection') manorRenderCollection();
+  }
+
+  function manorRender() {
+    const activeTab = document.querySelector('#sp-manor-panel .sp-game-tab.active[data-manor-tab]');
+    if (activeTab) manorRenderTab(activeTab.dataset.manorTab);
+    const goldEl = document.getElementById('sp-manor-gold');
+    if (goldEl) goldEl.textContent = state.gameGold;
+  }
+
+  // ===== 种田渲染 =====
+  function manorRenderFarm() {
+    const container = document.getElementById('sp-manor-tab-farm');
+    if (!container) return;
+    const now = Date.now();
+    let html = '<div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">🌾 田地 <span style="font-size:10px;color:var(--sp-text-muted);font-weight:400;">每块田有2×2=4个种植格</span></div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">';
+    state.manorFarmPlots.forEach((plot, plotIdx) => {
+      if (!plot.unlocked) {
+        const cost = MANOR_FARM_UNLOCK_COSTS[plotIdx] || 9999;
+        html += `<div class="sp-manor-block sp-manor-locked" data-unlock-type="farm" data-unlock-idx="${plotIdx}" style="border-radius:12px;border:2px dashed rgba(139,90,43,0.2);background:rgba(0,0,0,0.08);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;padding:12px;gap:4px;min-height:90px;">
+          <span style="font-size:20px;">🔒</span>
+          <span style="font-size:10px;color:var(--sp-text-muted);">第${plotIdx + 1}块</span>
+          <span style="font-size:11px;color:#ffb347;font-weight:600;">${cost} 🪙</span>
+        </div>`;
+      } else {
+        let cellsHtml = '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:3px;">';
+        plot.cells.forEach((cell, cellIdx) => {
+          let cellContent = '';
+          let cellBg = 'rgba(139,90,43,0.12)';
+          let cellBorder = 'rgba(139,90,43,0.25)';
+          if (cell.stage === 'empty') {
+            cellContent = '<span style="font-size:14px;opacity:0.25;">➕</span>';
+          } else if (cell.stage === 'mature') {
+            const seedDef = MANOR_SEEDS.find(s => s.id === cell.seed);
+            cellContent = `<span style="font-size:18px;">${seedDef?.matureEmoji || '🌾'}</span>`;
+            cellBg = 'rgba(100,220,100,0.12)';
+            cellBorder = 'rgba(100,220,100,0.4)';
+          } else {
+            const stageEmojis = { planted: '🌱', sprout: '🌿', growing: '🪴', almost: '🌳' };
+            const seedDef = MANOR_SEEDS.find(s => s.id === cell.seed);
+            const elapsed = now - cell.plantedTime;
+            const waterOk = seedDef ? cell.watered >= seedDef.needWater : true;
+            const fertOk = seedDef ? cell.fertilized >= seedDef.needFertilize : true;
+            const canGrow = waterOk && fertOk;
+            const progress = (seedDef && canGrow) ? Math.min(100, Math.round((elapsed / seedDef.growTime) * 100)) : 0;
+            const needIcon = (!waterOk ? '💧' : '') + (!fertOk ? '💩' : '');
+            const seedImgKey = seedDef ? `manor_seed_${seedDef.id}` : '';
+            const seedCustomImg = seedImgKey ? getLinkedImage(seedImgKey) : '';
+            const seedDisplay = seedCustomImg
+              ? `<img src="${seedCustomImg}" style="width:14px;height:14px;object-fit:contain;border-radius:2px;vertical-align:middle;" />`
+              : (seedDef ? seedDef.emoji : '');
+            cellContent = `<span style="font-size:14px;">${stageEmojis[cell.stage] || '🌱'}</span>${seedDisplay ? `<span style="font-size:9px;position:absolute;top:1px;left:1px;">${seedDisplay}</span>` : ''}`;
+            if (needIcon) cellContent += `<span style="font-size:7px;position:absolute;bottom:1px;right:1px;">${needIcon}</span>`;
+            cellContent += `<div style="position:absolute;bottom:0;left:0;right:0;height:2px;background:rgba(0,0,0,0.2);border-radius:0 0 4px 4px;"><div style="width:${canGrow ? progress : 0}%;height:100%;background:${canGrow ? 'rgba(100,220,100,0.6)' : 'rgba(255,180,50,0.5)'};border-radius:0 0 4px 4px;"></div></div>`;
+          }
+          cellsHtml += `<div class="sp-manor-cell" data-plot="${plotIdx}" data-cell="${cellIdx}" style="aspect-ratio:1;border-radius:6px;border:1px solid ${cellBorder};background:${cellBg};display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;transition:all 0.12s;min-height:32px;">
+            ${cellContent}
+          </div>`;
+        });
+        cellsHtml += '</div>';
+        // 检查该田是否有需要浇水或施肥的格子
+        let plotNeedWater = false;
+        let plotNeedFert = false;
+        plot.cells.forEach(c => {
+          if (!c || c.stage === 'empty' || c.stage === 'mature' || !c.seed) return;
+          const sd = MANOR_SEEDS.find(s => s.id === c.seed);
+          if (!sd) return;
+          if (c.watered < sd.needWater) plotNeedWater = true;
+          if (sd.needFertilize > 0 && c.fertilized < sd.needFertilize) plotNeedFert = true;
+        });
+        const hasPlants = plot.cells.some(c => c && c.stage !== 'empty' && c.stage !== 'mature');
+        let plotQuickBtns = '';
+        if (hasPlants && (plotNeedWater || plotNeedFert)) {
+          plotQuickBtns = '<div style="display:flex;gap:3px;justify-content:center;margin-top:3px;">';
+          if (plotNeedWater) {
+            plotQuickBtns += `<button class="sp-manor-quick-water" data-plot="${plotIdx}" style="padding:1px 6px;font-size:8px;border-radius:4px;border:1px solid rgba(100,180,255,0.4);background:rgba(100,180,255,0.12);color:#64b4ff;cursor:pointer;transition:all 0.15s;">💧浇水</button>`;
+          }
+          if (plotNeedFert) {
+            plotQuickBtns += `<button class="sp-manor-quick-fert" data-plot="${plotIdx}" style="padding:1px 6px;font-size:8px;border-radius:4px;border:1px solid rgba(180,130,60,0.4);background:rgba(180,130,60,0.12);color:#b4823c;cursor:pointer;transition:all 0.15s;">💩施肥</button>`;
+          }
+          plotQuickBtns += '</div>';
+        }
+        html += `<div style="border-radius:12px;border:2px solid rgba(139,90,43,0.3);background:rgba(139,90,43,0.06);padding:6px;position:relative;">
+          <span style="position:absolute;top:2px;left:6px;font-size:7px;color:var(--sp-text-muted);opacity:0.6;">田#${plotIdx + 1}</span>
+          ${cellsHtml}
+          ${plotQuickBtns}
+        </div>`;
+      }
+    });
+    html += '</div>';
+    container.innerHTML = html;
+    container.querySelectorAll('.sp-manor-locked[data-unlock-type="farm"]').forEach(el => {
+      el.onclick = () => manorUnlockPlot('farm', parseInt(el.dataset.unlockIdx));
+    });
+    container.querySelectorAll('.sp-manor-cell').forEach(el => {
+      el.onclick = () => {
+        const plotIdx = parseInt(el.dataset.plot);
+        const cellIdx = parseInt(el.dataset.cell);
+        manorShowCellActions(plotIdx, cellIdx);
+      };
+    });
+    // 快捷浇水按钮
+    container.querySelectorAll('.sp-manor-quick-water').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const pi = parseInt(btn.dataset.plot);
+        const plot = state.manorFarmPlots[pi];
+        if (!plot) return;
+        let count = 0;
+        plot.cells.forEach(cell => {
+          if (!cell || cell.stage === 'empty' || cell.stage === 'mature' || !cell.seed) return;
+          const sd = MANOR_SEEDS.find(s => s.id === cell.seed);
+          if (!sd || cell.watered >= sd.needWater) return;
+          cell.watered++;
+          count++;
+        });
+        if (count > 0) {
+          manorShowNotice(`💧 田#${pi + 1} 浇水完成（${count}格）`);
+          saveDataDebounced('庄园批量浇水');
+          manorRender();
+        } else {
+          manorShowNotice('已经浇够水了');
+        }
+      };
+    });
+    container.querySelectorAll('.sp-manor-quick-fert').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const pi = parseInt(btn.dataset.plot);
+        const plot = state.manorFarmPlots[pi];
+        if (!plot) return;
+        let count = 0;
+        plot.cells.forEach(cell => {
+          if (!cell || cell.stage === 'empty' || cell.stage === 'mature' || !cell.seed) return;
+          const sd = MANOR_SEEDS.find(s => s.id === cell.seed);
+          if (!sd || sd.needFertilize === 0 || cell.fertilized >= sd.needFertilize) return;
+          const fertInv = (state.manorInventory || []).find(i => i.itemId === 'item_fertilizer' && i.count > 0);
+          if (!fertInv) return;
+          fertInv.count--;
+          if (fertInv.count <= 0) state.manorInventory = state.manorInventory.filter(i => i.count > 0);
+          cell.fertilized++;
+          count++;
+        });
+        if (count > 0) {
+          manorShowNotice(`💩 田#${pi + 1} 施肥完成（${count}格）`);
+          saveDataDebounced('庄园批量施肥');
+          manorRender();
+        } else {
+          manorShowNotice('没有肥料了或不需要施肥');
+        }
+      };
+    });
+  }
+
+  // ===== 田地小格操作 =====
+  function manorShowCellActions(plotIdx, cellIdx) {
+    const plot = state.manorFarmPlots[plotIdx];
+    if (!plot || !plot.unlocked) return;
+    const cell = plot.cells[cellIdx];
+    if (!cell) return;
+    if (cell.stage === 'empty') {
+      manorShowSeedPicker(plotIdx, cellIdx);
+    } else if (cell.stage === 'mature') {
+      manorHarvestCell(plotIdx, cellIdx);
+    } else {
+      const seedDef = MANOR_SEEDS.find(s => s.id === cell.seed);
+      if (!seedDef) return;
+      const waterOk = cell.watered >= seedDef.needWater;
+      const fertOk = cell.fertilized >= seedDef.needFertilize;
+      const now = Date.now();
+      const elapsed = now - cell.plantedTime;
+      const progress = Math.min(100, Math.round((elapsed / seedDef.growTime) * 100));
+      let desc = `${seedDef.emoji} ${seedDef.name}<br/>进度: ${progress}%<br/>💧 浇水: ${cell.watered}/${seedDef.needWater} ${waterOk ? '✅' : '❌'}<br/>`;
+      if (seedDef.needFertilize > 0) desc += `💩 施肥: ${cell.fertilized}/${seedDef.needFertilize} ${fertOk ? '✅' : '❌'}<br/>`;
+      if (!waterOk || !fertOk) desc += '<span style="color:#f66;">⚠️ 条件不足，暂停生长</span>';
+
+      // 移除旧弹窗
+      document.getElementById('sp-manor-cell-action-overlay')?.remove();
+
+      const overlay = document.createElement('div');
+      overlay.id = 'sp-manor-cell-action-overlay';
+      overlay.className = 'sp-confirm-overlay';
+      overlay.innerHTML = `
+        <div class="sp-confirm-box" style="max-width:260px;text-align:left;">
+          <div class="sp-confirm-title">🌱 田#${plotIdx + 1} 格${cellIdx + 1}</div>
+          <div class="sp-confirm-desc" style="text-align:left;">${desc}</div>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-top:12px;">
+            ${!waterOk ? `<button id="sp-manor-act-water" style="width:100%;padding:9px;font-size:13px;font-weight:600;border-radius:8px;border:1px solid rgba(100,180,255,0.5);background:rgba(100,180,255,0.15);color:#64b4ff;cursor:pointer;transition:all 0.2s;">💧 浇水 (${cell.watered}/${seedDef.needWater})</button>` : ''}
+            ${seedDef.needFertilize > 0 && !fertOk ? `<button id="sp-manor-act-fert" style="width:100%;padding:9px;font-size:13px;font-weight:600;border-radius:8px;border:1px solid rgba(180,130,60,0.5);background:rgba(180,130,60,0.15);color:#b4823c;cursor:pointer;transition:all 0.2s;">💩 施肥 (${cell.fertilized}/${seedDef.needFertilize})</button>` : ''}
+            ${waterOk && fertOk ? '<div style="text-align:center;padding:6px;color:var(--sp-text-muted);font-size:12px;">⏳ 条件已满足，等待成熟…</div>' : ''}
+            <button id="sp-manor-act-close" style="width:100%;padding:8px;font-size:12px;border-radius:8px;border:1px solid var(--sp-border);background:var(--sp-bg-light);color:var(--sp-text-secondary);cursor:pointer;transition:all 0.2s;">关闭</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      // 居中定位
+      requestAnimationFrame(() => {
+        const box = overlay.querySelector('.sp-confirm-box');
+        if (box) {
+          const boxH = box.offsetHeight || 200;
+          const boxW = box.offsetWidth || 260;
+          box.style.position = 'fixed';
+          box.style.top = Math.max(20, Math.floor((window.innerHeight - boxH) / 2)) + 'px';
+          box.style.left = Math.floor((window.innerWidth - boxW) / 2) + 'px';
+          box.style.margin = '0';
+        }
+      });
+
+      // 拖拽
+      const actTitle = overlay.querySelector('.sp-confirm-title');
+      const actBox = overlay.querySelector('.sp-confirm-box');
+      bindPopupDrag(actTitle, actBox);
+
+      // 关闭
+      document.getElementById('sp-manor-act-close').onclick = () => overlay.remove();
+      overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+      // 浇水按钮
+      const waterBtn = document.getElementById('sp-manor-act-water');
+      if (waterBtn) {
+        waterBtn.onclick = () => {
+          manorWaterCell(plotIdx, cellIdx);
+          overlay.remove();
+          // 重新打开弹窗以刷新状态
+          setTimeout(() => manorShowCellActions(plotIdx, cellIdx), 100);
+        };
+      }
+
+      // 施肥按钮
+      const fertBtn = document.getElementById('sp-manor-act-fert');
+      if (fertBtn) {
+        fertBtn.onclick = () => {
+          manorFertilizeCell(plotIdx, cellIdx);
+          overlay.remove();
+          // 重新打开弹窗以刷新状态
+          setTimeout(() => manorShowCellActions(plotIdx, cellIdx), 100);
+        };
+      }
+    }
+  }
+
+  // ===== 种子选择器 =====
+  function manorShowSeedPicker(plotIdx, cellIdx) {
+    const seeds = (state.manorInventory || []).filter(i => i.type === 'seed' && i.count > 0);
+    if (seeds.length === 0) { manorShowNotice('没有种子了！去商店购买吧'); return; }
+    document.getElementById('sp-manor-seed-picker')?.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-manor-seed-picker';
+    overlay.className = 'sp-confirm-overlay';
+    overlay.innerHTML = `
+      <div class="sp-confirm-box" style="max-width:280px;text-align:left;">
+        <div class="sp-confirm-title">🌱 种到田#${plotIdx + 1}的格${cellIdx + 1}</div>
+        <div style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;">
+          ${seeds.map(inv => {
+            const def = MANOR_SEEDS.find(s => s.id === inv.itemId);
+            if (!def) return '';
+            return `<div class="sp-manor-seed-option" data-seed="${inv.itemId}" style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(255,255,255,0.05);border:1px solid var(--sp-border-light);border-radius:8px;cursor:pointer;transition:all 0.15s;">
+              <span style="font-size:18px;">${def.emoji}</span>
+              <div style="flex:1;"><div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);">${def.name}</div><div style="font-size:9px;color:var(--sp-text-muted);">×${inv.count} | ${def.desc}</div></div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div class="sp-confirm-actions" style="margin-top:10px;">
+          <button class="sp-confirm-btn sp-confirm-btn-cancel" id="sp-manor-seed-cancel">取消</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    document.getElementById('sp-manor-seed-cancel').onclick = () => overlay.remove();
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    overlay.querySelectorAll('.sp-manor-seed-option').forEach(el => {
+      el.onclick = () => { overlay.remove(); manorPlantSeed(plotIdx, cellIdx, el.dataset.seed); };
+    });
+  }
+
+  // ===== 鱼塘渲染 =====
+  function manorRenderPond() {
+    const container = document.getElementById('sp-manor-tab-pond');
+    if (!container) return;
+    const now = Date.now();
+    let html = '<div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">🐟 鱼塘 <span style="font-size:10px;color:var(--sp-text-muted);font-weight:400;">每塘2×2=4格·每格1条鱼</span></div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">';
+    state.manorFishPonds.forEach((pond, pondIdx) => {
+      if (!pond.unlocked) {
+        const cost = MANOR_POND_UNLOCK_COSTS[pondIdx] || 9999;
+        html += `<div class="sp-manor-block sp-manor-locked" data-unlock-type="pond" data-unlock-idx="${pondIdx}" style="border-radius:12px;border:2px dashed rgba(100,180,255,0.2);background:rgba(0,30,80,0.06);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;padding:12px;gap:4px;min-height:90px;">
+          <span style="font-size:20px;">🔒</span>
+          <span style="font-size:10px;color:var(--sp-text-muted);">第${pondIdx + 1}塘</span>
+          <span style="font-size:11px;color:#ffb347;font-weight:600;">${cost} 🪙</span>
+        </div>`;
+      } else {
+        let cellsHtml = '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:3px;">';
+        pond.cells.forEach((fish, ci) => {
+          let cellContent = '';
+          let cellBg = 'rgba(100,180,255,0.08)';
+          let cellBorder = 'rgba(100,180,255,0.2)';
+          if (!fish) {
+            cellContent = '<span style="font-size:14px;opacity:0.2;">🌊</span>';
+          } else {
+            const def = MANOR_FISH.find(f => f.id === fish.fishId);
+            const emoji = fish.stage === 'adult' ? (def?.adultEmoji || '🐟') : (def?.emoji || '🐠');
+            const gIcon = fish.gender === 'male' ? '♂' : '♀';
+            cellContent = `<span style="font-size:16px;">${emoji}</span><span style="font-size:7px;color:var(--sp-text-muted);position:absolute;bottom:1px;right:2px;">${gIcon}</span>`;
+            if (fish.stage === 'adult') { cellBg = 'rgba(100,220,100,0.1)'; cellBorder = 'rgba(100,220,100,0.3)'; }
+            if (!fish.fed) cellContent += '<span style="font-size:7px;position:absolute;top:1px;right:1px;">❌</span>';
+          }
+          cellsHtml += `<div class="sp-manor-pcell" data-pond="${pondIdx}" data-cell="${ci}" style="aspect-ratio:1;border-radius:6px;border:1px solid ${cellBorder};background:${cellBg};display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;transition:all 0.12s;min-height:32px;">
+            ${cellContent}
+          </div>`;
+        });
+        cellsHtml += '</div>';
+        const fishCount = pond.cells.filter(c => c !== null).length;
+        html += `<div style="border-radius:12px;border:2px solid rgba(100,180,255,0.3);background:linear-gradient(180deg,rgba(100,180,255,0.03),rgba(0,40,100,0.08));padding:6px;position:relative;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
+            <span style="font-size:7px;color:var(--sp-text-muted);opacity:0.6;">塘#${pondIdx + 1}</span>
+            <span style="font-size:7px;color:var(--sp-text-muted);">${fishCount}/4</span>
+          </div>
+          ${cellsHtml}
+          <div style="text-align:center;margin-top:3px;">
+            <button class="sp-manor-feed-pond-btn" data-pond="${pondIdx}" style="padding:2px 8px;font-size:9px;border-radius:4px;border:1px solid rgba(100,180,255,0.3);background:rgba(100,180,255,0.1);color:var(--sp-text-secondary);cursor:pointer;">🐛喂食</button>
+          </div>
+        </div>`;
+      }
+    });
+    html += '</div>';
+    container.innerHTML = html;
+    container.querySelectorAll('.sp-manor-locked[data-unlock-type="pond"]').forEach(el => {
+      el.onclick = () => manorUnlockPlot('pond', parseInt(el.dataset.unlockIdx));
+    });
+    container.querySelectorAll('.sp-manor-pcell').forEach(el => {
+      el.onclick = () => {
+        const pondIdx = parseInt(el.dataset.pond);
+        const cellIdx = parseInt(el.dataset.cell);
+        const pond = state.manorFishPonds[pondIdx];
+        const fish = pond?.cells[cellIdx];
+        if (!fish) {
+          manorShowFishPicker(pondIdx, cellIdx);
+        } else if (fish.stage === 'adult') {
+          const def = MANOR_FISH.find(f => f.id === fish.fishId);
+          showConfirmDialog({
+            title: `🐟 ${def?.adultName || '成鱼'}`,
+            desc: `${fish.gender === 'male' ? '♂公' : '♀母'} | 成鱼<br/>收获后可卖${def?.sellPrice || 0}🪙或投喂+${def?.feedAmount || 0}`,
+            confirmText: '🎣 收获', cancelText: '留着',
+            onConfirm: () => {
+              manorAddToInventory('harvest_' + def.id, 1, 'harvest');
+              if (!state.manorCollection.includes('harvest_' + def.id)) state.manorCollection.push('harvest_' + def.id);
+              // 鱼 → 冰箱食材联动（让餐厅能用鱼做菜）
+              const fishFridgeMap = {
+                'fish_salmon': 'fish', 'fish_catfish': 'fish',
+                'fish_shrimp': 'shrimp', 'fish_lobster': 'lobster',
+                'fish_pufferfish': 'fish'
+              };
+              const fishFridgeId = fishFridgeMap[fish.fishId];
+              if (fishFridgeId) {
+                if (!state.fridgeInventory) state.fridgeInventory = [];
+                const fishEx = state.fridgeInventory.find(i => i.foodId === fishFridgeId);
+                if (fishEx) fishEx.count++;
+                else state.fridgeInventory.push({ foodId: fishFridgeId, count: 1 });
+              }
+              pond.cells[cellIdx] = null;
+              manorShowNotice(`🎣 收获了 ${def.adultEmoji} ${def.adultName}！`);
+              saveDataDebounced('庄园收鱼'); manorRender();
+            }
+          });
+        } else {
+          const def = MANOR_FISH.find(f => f.id === fish.fishId);
+          const elapsed = Date.now() - fish.placedTime;
+          const progress = def ? Math.min(100, Math.round((elapsed / def.growTime) * 100)) : 0;
+          showAlertDialog({ title: `🐠 ${def?.name || '鱼苗'}`, desc: `${fish.gender === 'male' ? '♂公' : '♀母'} | 鱼苗 ${progress}%<br/>${fish.fed ? '✅已喂食' : '❌需要喂鱼饲料才能成长'}` });
+        }
+      };
+    });
+    container.querySelectorAll('.sp-manor-feed-pond-btn').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const pondIdx = parseInt(btn.dataset.pond);
+        const pond = state.manorFishPonds[pondIdx];
+        const feed = (state.manorInventory || []).find(i => i.itemId === 'item_fishfeed' && i.count > 0);
+        if (!feed) { manorShowNotice('没有鱼饲料了！'); return; }
+        const fishCount = pond.cells.filter(c => c !== null).length;
+        if (fishCount === 0) { manorShowNotice('塘里没有鱼'); return; }
+        feed.count--;
+        if (feed.count <= 0) state.manorInventory = state.manorInventory.filter(i => i.count > 0);
+        pond.cells.forEach(f => { if (f) f.fed = true; });
+        pond.lastFedTime = Date.now();
+        manorShowNotice(`🐛 鱼塘#${pondIdx + 1}的鱼都喂饱了！`);
+        saveDataDebounced('庄园喂鱼'); manorRender();
+      };
+    });
+  }
+
+  // ===== 放鱼苗选择器 =====
+  function manorShowFishPicker(pondIdx, cellIdx) {
+    const fishInBag = (state.manorInventory || []).filter(i => i.type === 'fish' && i.count > 0);
+    if (fishInBag.length === 0) { manorShowNotice('没有鱼苗了·去商店买'); return; }
+    document.getElementById('sp-manor-fish-picker')?.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-manor-fish-picker';
+    overlay.className = 'sp-confirm-overlay';
+    overlay.innerHTML = `
+      <div class="sp-confirm-box" style="max-width:260px;text-align:left;">
+        <div class="sp-confirm-title">🐠 放鱼苗到塘#${pondIdx + 1}</div>
+        <div style="max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;">
+          ${fishInBag.map(inv => {
+            const def = MANOR_FISH.find(f => f.id === inv.itemId);
+            if (!def) return '';
+            return `<div class="sp-manor-fish-opt" data-fid="${inv.itemId}" style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:rgba(255,255,255,0.05);border:1px solid var(--sp-border-light);border-radius:8px;cursor:pointer;">
+              <span style="font-size:18px;">${def.emoji}</span>
+              <div style="flex:1;"><span style="font-size:11px;font-weight:600;color:var(--sp-text-primary);">${def.name}</span><br/><span style="font-size:9px;color:var(--sp-text-muted);">×${inv.count}</span></div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div class="sp-confirm-actions" style="margin-top:8px;"><button class="sp-confirm-btn sp-confirm-btn-cancel" id="sp-mfp-cancel">取消</button></div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    document.getElementById('sp-mfp-cancel').onclick = () => overlay.remove();
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    overlay.querySelectorAll('.sp-manor-fish-opt').forEach(el => {
+      el.onclick = () => {
+        const fid = el.dataset.fid;
+        const inv = (state.manorInventory || []).find(i => i.itemId === fid && i.count > 0);
+        if (!inv) return;
+        inv.count--;
+        if (inv.count <= 0) state.manorInventory = state.manorInventory.filter(i => i.count > 0);
+        const gender = Math.random() < 0.5 ? 'male' : 'female';
+        state.manorFishPonds[pondIdx].cells[cellIdx] = { fishId: fid, gender, stage: 'baby', placedTime: Date.now(), fed: false };
+        if (!state.manorCollection.includes(fid)) state.manorCollection.push(fid);
+        const def = MANOR_FISH.find(f => f.id === fid);
+        manorShowNotice(`🐠 放入${def?.name || '鱼苗'}（${gender === 'male' ? '♂' : '♀'}）`);
+        saveDataDebounced('庄园放鱼'); overlay.remove(); manorRender();
+      };
+    });
+  }
+
+  // ===== 牧场渲染 =====
+  function manorRenderPasture() {
+    const container = document.getElementById('sp-manor-tab-pasture');
+    if (!container) return;
+    const now = Date.now();
+    let html = '<div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">🐮 牧场 <span style="font-size:10px;color:var(--sp-text-muted);font-weight:400;">每牧场2×2=4格·每格1只动物</span></div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">';
+    state.manorPastures.forEach((pasture, pIdx) => {
+      if (!pasture.unlocked) {
+        const cost = MANOR_PASTURE_UNLOCK_COSTS[pIdx] || 9999;
+        html += `<div class="sp-manor-block sp-manor-locked" data-unlock-type="pasture" data-unlock-idx="${pIdx}" style="border-radius:12px;border:2px dashed rgba(100,220,100,0.2);background:rgba(0,60,0,0.05);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;padding:12px;gap:4px;min-height:90px;">
+          <span style="font-size:20px;">🔒</span>
+          <span style="font-size:10px;color:var(--sp-text-muted);">第${pIdx + 1}牧场</span>
+          <span style="font-size:11px;color:#ffb347;font-weight:600;">${cost} 🪙</span>
+        </div>`;
+      } else {
+        let cellsHtml = '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:3px;">';
+        pasture.cells.forEach((animal, ci) => {
+          let cellContent = '';
+          let cellBg = 'rgba(100,220,100,0.06)';
+          let cellBorder = 'rgba(100,220,100,0.2)';
+          if (!animal) {
+            cellContent = '<span style="font-size:14px;opacity:0.2;">🌿</span>';
+          } else {
+            const def = MANOR_ANIMALS.find(a => a.id === animal.animalId);
+            const emoji = animal.stage === 'adult' ? (def?.adultEmoji || '🐾') : (def?.emoji || '🐣');
+            const gIcon = animal.gender === 'male' ? '♂' : '♀';
+            const canCollect = animal.stage === 'adult' && animal.fed && def && (now - (animal.lastProductTime || 0)) >= def.productTime;
+            cellContent = `<span style="font-size:16px;">${emoji}</span><span style="font-size:7px;color:var(--sp-text-muted);position:absolute;bottom:1px;right:2px;">${gIcon}</span>`;
+            if (canCollect) cellContent += '<span style="font-size:9px;position:absolute;top:0px;right:0px;">🎁</span>';
+            if (!animal.fed) cellContent += '<span style="font-size:7px;position:absolute;top:1px;left:1px;">❌</span>';
+            if (animal.stage === 'adult') { cellBg = 'rgba(100,220,100,0.1)'; cellBorder = 'rgba(100,220,100,0.35)'; }
+          }
+          cellsHtml += `<div class="sp-manor-acell" data-pasture="${pIdx}" data-cell="${ci}" style="aspect-ratio:1;border-radius:6px;border:1px solid ${cellBorder};background:${cellBg};display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;transition:all 0.12s;min-height:32px;">
+            ${cellContent}
+          </div>`;
+        });
+        cellsHtml += '</div>';
+        const animalCount = pasture.cells.filter(c => c !== null).length;
+        html += `<div style="border-radius:12px;border:2px solid rgba(100,220,100,0.3);background:linear-gradient(180deg,rgba(100,220,100,0.03),rgba(34,139,34,0.06));padding:6px;position:relative;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
+            <span style="font-size:7px;color:var(--sp-text-muted);opacity:0.6;">牧#${pIdx + 1}</span>
+            <span style="font-size:7px;color:var(--sp-text-muted);">${animalCount}/4</span>
+          </div>
+          ${cellsHtml}
+          <div style="text-align:center;margin-top:3px;">
+            <button class="sp-manor-feed-pasture-btn" data-pasture="${pIdx}" style="padding:2px 8px;font-size:9px;border-radius:4px;border:1px solid rgba(100,220,100,0.3);background:rgba(100,220,100,0.1);color:var(--sp-text-secondary);cursor:pointer;">🌾喂食</button>
+          </div>
+        </div>`;
+      }
+    });
+    html += '</div>';
+    container.innerHTML = html;
+    container.querySelectorAll('.sp-manor-locked[data-unlock-type="pasture"]').forEach(el => {
+      el.onclick = () => manorUnlockPlot('pasture', parseInt(el.dataset.unlockIdx));
+    });
+    container.querySelectorAll('.sp-manor-acell').forEach(el => {
+      el.onclick = () => {
+        const pIdx = parseInt(el.dataset.pasture);
+        const ci = parseInt(el.dataset.cell);
+        const animal = state.manorPastures[pIdx]?.cells[ci];
+        const now = Date.now();
+        if (!animal) {
+          manorShowAnimalPicker(pIdx, ci);
+        } else {
+          const def = MANOR_ANIMALS.find(a => a.id === animal.animalId);
+          const isAdult = animal.stage === 'adult';
+          const canCollect = isAdult && animal.fed && def && (now - (animal.lastProductTime || 0)) >= def.productTime;
+          if (canCollect) {
+            manorAddToInventory(def.productItem, 1, 'product');
+            const fridgeLinkMap = { 'product_egg': 'eggs', 'product_milk': 'milk', 'product_duckegg': 'eggs', 'product_goatmilk': 'milk', 'product_truffle': 'mushroom' };
+            const fridgeId = fridgeLinkMap[def.productItem];
+            if (fridgeId) {
+              if (!state.fridgeInventory) state.fridgeInventory = [];
+              const existing = state.fridgeInventory.find(i => i.foodId === fridgeId);
+              if (existing) existing.count++;
+              else state.fridgeInventory.push({ foodId: fridgeId, count: 1 });
+            }
+            if (!state.manorCollection.includes(def.productItem)) state.manorCollection.push(def.productItem);
+            animal.lastProductTime = Date.now();
+            animal.fed = false;
+            manorShowNotice(`🎁 收取了 ${def.productEmoji} ${def.productName}！`);
+            saveDataDebounced('庄园收产品'); manorRender();
+          } else {
+            const def = MANOR_ANIMALS.find(a => a.id === animal.animalId);
+            const elapsed = now - animal.placedTime;
+            const isAdult = animal.stage === 'adult';
+            const progress = isAdult ? 100 : (def ? Math.min(100, Math.round((elapsed / def.growTime) * 100)) : 0);
+            let prodText = '';
+            if (isAdult && def) {
+              const sinceProd = now - (animal.lastProductTime || now);
+              const prodProg = Math.min(100, Math.round((sinceProd / def.productTime) * 100));
+              prodText = `<br/>${def.productEmoji}产出: ${prodProg}%${!animal.fed ? '<br/><span style="color:#f66;">需喂食才能产出</span>' : ''}`;
+            }
+            if (isAdult && def && def.slaughterItem) {
+              showConfirmDialog({
+                title: `${def.adultEmoji} ${def.adultName}`,
+                desc: `${animal.gender === 'male' ? '♂公' : '♀母'} | 成年<br/>${animal.fed ? '✅已喂食' : '❌需要饲料'}${prodText}<br/><br/>🔪 屠宰可获得 ${def.slaughterEmoji} ${def.slaughterName}（售${def.slaughterSellPrice}🪙）`,
+                confirmText: '🔪 屠宰',
+                cancelText: '留着',
+                onConfirm: () => {
+                  manorAddToInventory(def.slaughterItem, 1, 'harvest');
+                  if (!state.manorCollection.includes(def.slaughterItem)) state.manorCollection.push(def.slaughterItem);
+                  // 松露→食用油联动
+                  if (def.slaughterItem === 'meat_pork') {
+                    const truffleInv = (state.manorInventory || []).find(i => i.itemId === 'product_truffle' && i.count > 0);
+                    if (truffleInv && truffleInv.count >= 2) {
+                      truffleInv.count -= 2;
+                      if (truffleInv.count <= 0) state.manorInventory = state.manorInventory.filter(i => i.count > 0);
+                      manorAddToInventory('product_truffle_oil', 1, 'product');
+                      if (!state.manorCollection.includes('product_truffle_oil')) state.manorCollection.push('product_truffle_oil');
+                      if (!state.restaurantSeasonings) state.restaurantSeasonings = {};
+                      state.restaurantSeasonings['truffle_oil'] = (state.restaurantSeasonings['truffle_oil'] || 0) + 1;
+                      manorShowNotice(`🔪 获得 ${def.slaughterEmoji} ${def.slaughterName} + 🫒 松露油×1（2松露→1油，已存入餐厅调料）`);
+                    } else {
+                      manorShowNotice(`🔪 获得 ${def.slaughterEmoji} ${def.slaughterName}！（松露不足2个，未产出松露油）`);
+                    }
+                  } else {
+                    manorShowNotice(`🔪 获得 ${def.slaughterEmoji} ${def.slaughterName}！`);
+                  }
+                  // 肉类同步到冰箱
+                  const meatToFridge = {
+                    'meat_chicken': 'chicken', 'meat_duck': 'chicken', 'meat_beef': 'steak',
+                    'meat_lamb': 'steak', 'meat_pork': 'chicken', 'meat_goat': 'steak'
+                  };
+                  const fridgeId = meatToFridge[def.slaughterItem];
+                  if (fridgeId) {
+                    if (!state.fridgeInventory) state.fridgeInventory = [];
+                    const existing = state.fridgeInventory.find(i => i.foodId === fridgeId);
+                    if (existing) existing.count++;
+                    else state.fridgeInventory.push({ foodId: fridgeId, count: 1 });
+                  }
+                  state.manorPastures[pIdx].cells[ci] = null;
+                  saveDataDebounced('庄园屠宰'); manorRender(); checkAchievements();
+                }
+              });
+            } else {
+              showAlertDialog({ title: `${isAdult ? def?.adultEmoji : def?.emoji} ${isAdult ? def?.adultName : def?.name}`, desc: `${animal.gender === 'male' ? '♂公' : '♀母'} | ${isAdult ? '成年' : '幼崽 ' + progress + '%'}<br/>${animal.fed ? '✅已喂食' : '❌需要饲料'}${prodText}` });
+            }
+          }
+        }
+      };
+    });
+    container.querySelectorAll('.sp-manor-feed-pasture-btn').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const pIdx = parseInt(btn.dataset.pasture);
+        const pasture = state.manorPastures[pIdx];
+        const feed = (state.manorInventory || []).find(i => i.itemId === 'item_animalfeed' && i.count > 0);
+        if (!feed) { manorShowNotice('没有饲料了！'); return; }
+        const count = pasture.cells.filter(c => c !== null).length;
+        if (count === 0) { manorShowNotice('牧场里没有动物'); return; }
+        feed.count--;
+        if (feed.count <= 0) state.manorInventory = state.manorInventory.filter(i => i.count > 0);
+        pasture.cells.forEach(a => { if (a) a.fed = true; });
+        manorShowNotice(`🌾 牧场#${pIdx + 1}的动物都喂饱了！`);
+        saveDataDebounced('庄园喂动物'); manorRender();
+      };
+    });
+  }
+
+  // ===== 放动物选择器 =====
+  function manorShowAnimalPicker(pIdx, cellIdx) {
+    const animalsInBag = (state.manorInventory || []).filter(i => i.type === 'animal' && i.count > 0);
+    if (animalsInBag.length === 0) { manorShowNotice('没有幼崽了·去商店买'); return; }
+    document.getElementById('sp-manor-animal-picker')?.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'sp-manor-animal-picker';
+    overlay.className = 'sp-confirm-overlay';
+    overlay.innerHTML = `
+      <div class="sp-confirm-box" style="max-width:260px;text-align:left;">
+        <div class="sp-confirm-title">🐣 放幼崽到牧场#${pIdx + 1}</div>
+        <div style="max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;">
+          ${animalsInBag.map(inv => {
+            const def = MANOR_ANIMALS.find(a => a.id === inv.itemId);
+            if (!def) return '';
+            return `<div class="sp-manor-animal-opt" data-aid="${inv.itemId}" style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:rgba(255,255,255,0.05);border:1px solid var(--sp-border-light);border-radius:8px;cursor:pointer;">
+              <span style="font-size:18px;">${def.emoji}</span>
+              <div style="flex:1;"><span style="font-size:11px;font-weight:600;color:var(--sp-text-primary);">${def.name}</span><br/><span style="font-size:9px;color:var(--sp-text-muted);">×${inv.count} | 产${def.productName}</span></div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div class="sp-confirm-actions" style="margin-top:8px;"><button class="sp-confirm-btn sp-confirm-btn-cancel" id="sp-map-cancel">取消</button></div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    document.getElementById('sp-map-cancel').onclick = () => overlay.remove();
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    overlay.querySelectorAll('.sp-manor-animal-opt').forEach(el => {
+      el.onclick = () => {
+        const aid = el.dataset.aid;
+        const inv = (state.manorInventory || []).find(i => i.itemId === aid && i.count > 0);
+        if (!inv) return;
+        inv.count--;
+        if (inv.count <= 0) state.manorInventory = state.manorInventory.filter(i => i.count > 0);
+        const gender = Math.random() < 0.5 ? 'male' : 'female';
+        state.manorPastures[pIdx].cells[cellIdx] = { animalId: aid, gender, stage: 'baby', placedTime: Date.now(), fed: false, lastProductTime: 0 };
+        if (!state.manorCollection.includes(aid)) state.manorCollection.push(aid);
+        const def = MANOR_ANIMALS.find(a => a.id === aid);
+        manorShowNotice(`🐣 放入${def?.name || '幼崽'}（${gender === 'male' ? '♂' : '♀'}）`);
+        saveDataDebounced('庄园放动物'); overlay.remove(); manorRender();
+      };
+    });
+  }
+
+  // ===== 商店 =====
+  function manorRenderShop() {
+    const container = document.getElementById('sp-manor-tab-shop');
+    if (!container) return;
+    let html = '';
+    html += '<div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin:0 0 6px;">🌱 种子</div>';
+    MANOR_SEEDS.forEach(seed => {
+      html += `<div class="sp-manor-shop-item" data-buy-type="seed" data-buy-id="${seed.id}" style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:rgba(255,255,255,0.04);border:1px solid var(--sp-border-light);border-radius:8px;margin-bottom:4px;cursor:pointer;transition:background 0.15s;">
+        <span style="font-size:18px;">${seed.emoji}</span>
+        <div style="flex:1;"><div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);">${seed.name}</div><div style="font-size:9px;color:var(--sp-text-muted);">${seed.desc}</div></div>
+        <button style="padding:3px 8px;font-size:10px;border-radius:5px;border:1px solid rgba(255,180,50,0.5);background:rgba(255,180,50,0.15);color:#ffb347;cursor:pointer;">🪙${seed.price}</button>
+      </div>`;
+    });
+    html += '<div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin:12px 0 6px;">🐟 鱼苗</div>';
+    MANOR_FISH.forEach(fish => {
+      html += `<div class="sp-manor-shop-item" data-buy-type="fish" data-buy-id="${fish.id}" style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:rgba(255,255,255,0.04);border:1px solid var(--sp-border-light);border-radius:8px;margin-bottom:4px;cursor:pointer;transition:background 0.15s;">
+        <span style="font-size:18px;">${fish.emoji}</span>
+        <div style="flex:1;"><div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);">${fish.name}</div><div style="font-size:9px;color:var(--sp-text-muted);">${fish.desc}</div></div>
+        <button style="padding:3px 8px;font-size:10px;border-radius:5px;border:1px solid rgba(255,180,50,0.5);background:rgba(255,180,50,0.15);color:#ffb347;cursor:pointer;">🪙${fish.price}</button>
+      </div>`;
+    });
+    html += '<div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin:12px 0 6px;">🐮 动物幼崽</div>';
+    MANOR_ANIMALS.forEach(animal => {
+      html += `<div class="sp-manor-shop-item" data-buy-type="animal" data-buy-id="${animal.id}" style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:rgba(255,255,255,0.04);border:1px solid var(--sp-border-light);border-radius:8px;margin-bottom:4px;cursor:pointer;transition:background 0.15s;">
+        <span style="font-size:18px;">${animal.emoji}</span>
+        <div style="flex:1;"><div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);">${animal.name}</div><div style="font-size:9px;color:var(--sp-text-muted);">${animal.desc}</div></div>
+        <button style="padding:3px 8px;font-size:10px;border-radius:5px;border:1px solid rgba(255,180,50,0.5);background:rgba(255,180,50,0.15);color:#ffb347;cursor:pointer;">🪙${animal.price}</button>
+      </div>`;
+    });
+    html += '<div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin:12px 0 6px;">🧰 工具/饲料</div>';
+    MANOR_SHOP_ITEMS.forEach(item => {
+      if (item.id === 'item_water') return;
+      html += `<div class="sp-manor-shop-item" data-buy-type="tool" data-buy-id="${item.id}" style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:rgba(255,255,255,0.04);border:1px solid var(--sp-border-light);border-radius:8px;margin-bottom:4px;cursor:pointer;transition:background 0.15s;">
+        <span style="font-size:18px;">${item.emoji}</span>
+        <div style="flex:1;"><div style="font-size:11px;font-weight:600;color:var(--sp-text-primary);">${item.name}</div><div style="font-size:9px;color:var(--sp-text-muted);">${item.desc}</div></div>
+        <button style="padding:3px 8px;font-size:10px;border-radius:5px;border:1px solid rgba(255,180,50,0.5);background:rgba(255,180,50,0.15);color:#ffb347;cursor:pointer;">🪙${item.price}</button>
+      </div>`;
+    });
+    container.innerHTML = html;
+    container.querySelectorAll('.sp-manor-shop-item').forEach(el => {
+      el.onclick = () => manorBuyItem(el.dataset.buyType, el.dataset.buyId);
+    });
+  }
+
+  // ===== 购买 =====
+  function manorBuyItem(type, id) {
+    let price = 0, name = '', itemType = '';
+    if (type === 'seed') { const def = MANOR_SEEDS.find(s => s.id === id); if (!def) return; price = def.price; name = def.name; itemType = 'seed'; }
+    else if (type === 'fish') { const def = MANOR_FISH.find(f => f.id === id); if (!def) return; price = def.price; name = def.name; itemType = 'fish'; }
+    else if (type === 'animal') { const def = MANOR_ANIMALS.find(a => a.id === id); if (!def) return; price = def.price; name = def.name; itemType = 'animal'; }
+    else if (type === 'tool') { const def = MANOR_SHOP_ITEMS.find(i => i.id === id); if (!def) return; price = def.price; name = def.name; itemType = 'tool'; }
+    if (state.gameGold < price) { manorShowNotice(`金币不足！需要 ${price} 🪙`); return; }
+    state.gameGold -= price;
+    manorAddToInventory(id, 1, itemType);
+    manorShowNotice(`购买了 ${name}，已放入背包！`);
+    saveDataDebounced('庄园购买');
+    manorRender();
+  }
+
+  // ===== 背包（带出售）=====
+  function manorRenderBag() {
+    const container = document.getElementById('sp-manor-tab-bag');
+    if (!container) return;
+    const inv = (state.manorInventory || []).filter(i => i.count > 0);
+    if (inv.length === 0) {
+      container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--sp-text-muted);font-size:12px;">背包空空如也～</div>';
+      return;
+    }
+    let html = '';
+    inv.forEach(item => {
+      let name = item.itemId, emoji = '📦', sellPrice = 0;
+      const seed = MANOR_SEEDS.find(s => s.id === item.itemId); if (seed) { name = seed.name; emoji = seed.emoji; }
+      const fish = MANOR_FISH.find(f => f.id === item.itemId); if (fish) { name = fish.name; emoji = fish.emoji; }
+      const animal = MANOR_ANIMALS.find(a => a.id === item.itemId); if (animal) { name = animal.name; emoji = animal.emoji; }
+      const tool = MANOR_SHOP_ITEMS.find(t => t.id === item.itemId); if (tool) { name = tool.name; emoji = tool.emoji; }
+      const harvestSeed = MANOR_SEEDS.find(s => s.harvestItem === item.itemId);
+      if (harvestSeed) { name = harvestSeed.harvestName; emoji = harvestSeed.harvestEmoji; sellPrice = harvestSeed.sellPrice; }
+      const harvestFish = MANOR_FISH.find(f => 'harvest_' + f.id === item.itemId);
+      if (harvestFish) { name = harvestFish.adultName; emoji = harvestFish.adultEmoji; sellPrice = harvestFish.sellPrice; }
+      const prodAnimal = MANOR_ANIMALS.find(a => a.productItem === item.itemId);
+      if (prodAnimal) { name = prodAnimal.productName; emoji = prodAnimal.productEmoji; sellPrice = prodAnimal.productSellPrice; }
+      const slaughterAnimal = MANOR_ANIMALS.find(a => a.slaughterItem === item.itemId);
+      if (slaughterAnimal) { name = slaughterAnimal.slaughterName; emoji = slaughterAnimal.slaughterEmoji; sellPrice = slaughterAnimal.slaughterSellPrice; }
+      if (item.itemId === 'product_truffle_oil') { name = '松露油'; emoji = '🫒'; sellPrice = 60; }
+      const canSell = sellPrice > 0;
+      html += `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:rgba(255,255,255,0.04);border:1px solid var(--sp-border-light);border-radius:8px;margin-bottom:4px;">
+        <span style="font-size:18px;">${emoji}</span>
+        <div style="flex:1;"><div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);">${name}</div>${canSell ? `<div style="font-size:9px;color:var(--sp-text-muted);">售价 ${sellPrice}🪙</div>` : ''}</div>
+        <span style="font-size:12px;font-weight:700;color:var(--sp-text-primary);min-width:30px;text-align:right;">×${item.count}</span>
+        ${canSell ? `<button class="sp-manor-sell-btn" data-item="${item.itemId}" data-price="${sellPrice}" style="padding:3px 8px;font-size:10px;border-radius:5px;border:1px solid rgba(255,180,50,0.5);background:rgba(255,180,50,0.15);color:#ffb347;cursor:pointer;flex-shrink:0;">💰卖</button>` : ''}
+      </div>`;
+    });
+    container.innerHTML = html;
+    container.querySelectorAll('.sp-manor-sell-btn').forEach(btn => {
+      btn.onclick = () => {
+        const itemId = btn.dataset.item;
+        const price = parseInt(btn.dataset.price);
+        const inv = (state.manorInventory || []).find(i => i.itemId === itemId && i.count > 0);
+        if (!inv) return;
+        inv.count--;
+        if (inv.count <= 0) state.manorInventory = state.manorInventory.filter(i => i.count > 0);
+        state.gameGold += price;
+        manorShowNotice(`💰 卖出 +${price} 🪙`);
+        saveDataDebounced('庄园出售');
+        manorRender();
+      };
+    });
+  }
+
+  // ===== 图鉴 =====
+  function manorRenderCollection() {
+    const container = document.getElementById('sp-manor-tab-collection');
+    if (!container) return;
+    let html = '<div style="font-size:12px;font-weight:600;color:var(--sp-text-primary);margin-bottom:8px;">📖 庄园图鉴</div>';
+    const renderSection = (title, items, getKey, getEmoji, getName) => {
+      html += `<div style="font-size:11px;font-weight:600;color:var(--sp-text-secondary);margin:8px 0 4px;">${title}</div>`;
+      html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;">';
+      items.forEach(item => {
+        const key = getKey(item);
+        const unlocked = (state.manorCollection || []).includes(key);
+        html += `<div style="aspect-ratio:1;border-radius:6px;border:1px solid ${unlocked ? 'rgba(100,180,255,0.3)' : 'rgba(255,255,255,0.08)'};background:rgba(255,255,255,0.04);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;opacity:${unlocked ? '1' : '0.4'};">
+          <span style="font-size:18px;">${unlocked ? getEmoji(item) : '🔒'}</span>
+          <span style="font-size:7px;color:var(--sp-text-muted);">${unlocked ? getName(item) : '???'}</span>
+        </div>`;
+      });
+      html += '</div>';
+    };
+    renderSection('🌱 种子', MANOR_SEEDS, s => s.id, s => s.emoji, s => s.name.replace('种子', ''));
+    renderSection('🌾 收获物', MANOR_SEEDS, s => s.harvestItem, s => s.harvestEmoji, s => s.harvestName);
+    renderSection('🐟 鱼类', MANOR_FISH, f => f.id, f => f.adultEmoji, f => f.adultName);
+    renderSection('🐟 鱼收获', MANOR_FISH, f => 'harvest_' + f.id, f => f.adultEmoji, f => f.adultName);
+    renderSection('🐮 动物', MANOR_ANIMALS, a => a.id, a => a.adultEmoji, a => a.adultName);
+    renderSection('🎁 产品', MANOR_ANIMALS, a => a.productItem, a => a.productEmoji, a => a.productName);
+    container.innerHTML = html;
+  }
+
+  // ===== 渲染面板 =====
+  function manorRenderPanel() {
+    let panel = document.getElementById('sp-manor-panel');
+    if (panel) panel.remove();
+    panel = document.createElement('div');
+    panel.id = 'sp-manor-panel';
+    panel.style.cssText = 'position:fixed;width:420px;max-width:95vw;max-height:90vh;background:var(--sp-bg-main);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--sp-border);border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.4);display:none;flex-direction:column;z-index:2147483646;overflow:hidden;';
+    panel.innerHTML = `
+      <div id="sp-manor-header" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--sp-bg-light);border-bottom:1px solid var(--sp-border-light);font-size:14px;font-weight:700;color:var(--sp-text-primary);cursor:grab;user-select:none;">
+        <span>${getGameIconHtml('manor', '🏡', 18)} 庄园</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:12px;color:#ffb347;font-weight:600;">🪙 <span id="sp-manor-gold">${state.gameGold}</span></span>
+          <button id="sp-manor-minimize" style="background:none;border:none;font-size:14px;cursor:pointer;color:var(--sp-text-muted);padding:2px 6px;">─</button>
+          <button id="sp-manor-close" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--sp-text-muted);padding:2px 6px;">✕</button>
+        </div>
+      </div>
+      <div id="sp-manor-notice" style="position:absolute;top:50px;left:14px;right:14px;padding:6px 14px;font-size:12px;color:var(--sp-text-primary);background:var(--sp-bg-secondary);border:1px solid var(--sp-primary-border);border-radius:8px;text-align:center;opacity:0;pointer-events:none;transform:translateY(-6px);transition:opacity 0.2s,transform 0.2s;z-index:10;"></div>
+      <div style="display:flex;gap:3px;padding:5px 8px;background:rgba(255,255,255,0.03);border-bottom:1px solid var(--sp-border-light);">
+        <button class="sp-game-tab active" data-manor-tab="farm">🌾 种田</button>
+        <button class="sp-game-tab" data-manor-tab="pond">🐟 鱼塘</button>
+        <button class="sp-game-tab" data-manor-tab="pasture">🐮 牧场</button>
+        <button class="sp-game-tab" data-manor-tab="shop">🛒 商店</button>
+        <button class="sp-game-tab" data-manor-tab="bag">🎒 背包</button>
+        <button class="sp-game-tab" data-manor-tab="collection">📖 图鉴</button>
+      </div>
+      <div id="sp-manor-body" style="flex:1;overflow-y:auto;padding:10px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.2) transparent;">
+        <div id="sp-manor-tab-farm"></div>
+        <div id="sp-manor-tab-pond" style="display:none;"></div>
+        <div id="sp-manor-tab-pasture" style="display:none;"></div>
+        <div id="sp-manor-tab-shop" style="display:none;"></div>
+        <div id="sp-manor-tab-bag" style="display:none;"></div>
+        <div id="sp-manor-tab-collection" style="display:none;"></div>
+      </div>
+    `;
+    document.body.appendChild(panel);
+    const tabs = ['farm', 'pond', 'pasture', 'shop', 'bag', 'collection'];
+    panel.querySelectorAll('.sp-game-tab[data-manor-tab]').forEach(tab => {
+      tab.onclick = () => {
+        panel.querySelectorAll('.sp-game-tab[data-manor-tab]').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        tabs.forEach(t => {
+          const el = document.getElementById(`sp-manor-tab-${t}`);
+          if (el) el.style.display = tab.dataset.manorTab === t ? '' : 'none';
+        });
+        manorRenderTab(tab.dataset.manorTab);
+      };
+    });
+    document.getElementById('sp-manor-close').onclick = () => toggleManorGame();
+    document.getElementById('sp-manor-minimize').onclick = () => { panel.classList.toggle('sp-manor-minimized'); };
+    bindPopupDrag(document.getElementById('sp-manor-header'), panel);
+  }
+
+  // ===== 开关庄园 =====
+  function toggleManorGame() {
+    isManorOpen = !isManorOpen;
+    let panel = document.getElementById('sp-manor-panel');
+    if (isManorOpen) {
+      manorInit();
+      if (panel) panel.remove();
+      manorRenderPanel();
+      panel = document.getElementById('sp-manor-panel');
+      panel.style.display = 'flex';
+      const w = Math.min(420, window.innerWidth - 20);
+      panel.style.width = w + 'px';
+      requestAnimationFrame(() => {
+        const h = panel.offsetHeight;
+        const maxTop = window.innerHeight - h - 20;
+        const centerTop = Math.floor((window.innerHeight - h) / 2);
+        panel.style.left = Math.floor((window.innerWidth - w) / 2) + 'px';
+        panel.style.top = Math.max(10, Math.min(centerTop, maxTop)) + 'px';
+      });
+      manorRenderTab('farm');
+      if (manorTickTimer) clearInterval(manorTickTimer);
+      manorTickTimer = setInterval(() => { if (isManorOpen) { manorTick(); manorRender(); } }, 30000);
+      manorTick();
+    } else {
+      if (panel) panel.remove();
+      if (manorTickTimer) { clearInterval(manorTickTimer); manorTickTimer = null; }
+    }
   }
 
 })();

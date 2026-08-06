@@ -10640,3 +10640,160 @@
 #sp-contact-detail-content {
   contain: layout style;
 }
+
+/* ============================================================ */
+/* 🏡 庄园游戏样式                                               */
+/* ============================================================ */
+
+#sp-manor-panel {
+  position: fixed;
+  z-index: 2147483646;
+  overflow: hidden;
+}
+
+#sp-manor-panel.sp-manor-minimized {
+  width: 160px !important;
+  min-width: 160px !important;
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
+}
+
+#sp-manor-panel.sp-manor-minimized #sp-manor-body,
+#sp-manor-panel.sp-manor-minimized #sp-manor-notice {
+  display: none !important;
+}
+
+#sp-manor-panel.sp-manor-minimized > div:nth-child(3) {
+  display: none !important;
+}
+
+#sp-manor-panel.sp-manor-minimized #sp-manor-header {
+  border-bottom: none;
+  border-radius: 16px;
+}
+
+#sp-manor-notice.visible {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: translateY(0) !important;
+}
+
+.sp-manor-plot:hover,
+.sp-manor-pond:hover,
+.sp-manor-pasture:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 8px rgba(100,180,255,0.3);
+}
+
+.sp-manor-locked:hover {
+  border-color: rgba(255,200,50,0.4) !important;
+  background: rgba(255,200,50,0.05) !important;
+}
+
+.sp-manor-shop-item:hover {
+  background: rgba(255,255,255,0.08) !important;
+}
+
+@media (max-width: 768px) {
+  #sp-manor-panel {
+    width: calc(100vw - 16px) !important;
+    max-width: 420px;
+    max-height: 90vh;
+  }
+}
+
+/* ============================================================ */
+/* 🏡 庄园游戏样式                                               */
+/* ============================================================ */
+
+#sp-manor-panel.sp-manor-minimized {
+  width: 160px !important;
+  min-width: 160px !important;
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
+}
+
+#sp-manor-panel.sp-manor-minimized #sp-manor-body,
+#sp-manor-panel.sp-manor-minimized #sp-manor-notice {
+  display: none !important;
+}
+
+#sp-manor-panel.sp-manor-minimized > div:nth-child(3) {
+  display: none !important;
+}
+
+#sp-manor-panel.sp-manor-minimized #sp-manor-header {
+  border-bottom: none;
+  border-radius: 16px;
+}
+
+#sp-manor-notice.visible {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: translateY(0) !important;
+}
+
+.sp-manor-plot,
+.sp-manor-pond,
+.sp-manor-pasture {
+  transition: all 0.15s ease;
+}
+
+.sp-manor-plot:hover,
+.sp-manor-pond:hover,
+.sp-manor-pasture:hover {
+  transform: scale(1.03);
+  box-shadow: 0 0 12px rgba(100,180,255,0.2);
+}
+
+.sp-manor-locked:hover {
+  border-color: rgba(255,200,50,0.5) !important;
+  background: rgba(255,200,50,0.06) !important;
+  box-shadow: 0 0 8px rgba(255,200,50,0.2);
+}
+
+.sp-manor-shop-item:hover {
+  background: rgba(255,255,255,0.08) !important;
+}
+
+@media (max-width: 768px) {
+  #sp-manor-panel {
+    width: calc(100vw - 16px) !important;
+    max-width: 420px;
+    max-height: 90vh;
+  }
+}
+
+/* 庄园2×2小格子 */
+.sp-manor-cell:hover,
+.sp-manor-pcell:hover,
+.sp-manor-acell:hover {
+  transform: scale(1.08);
+  box-shadow: 0 0 6px rgba(100,180,255,0.25);
+  z-index: 2;
+}
+
+.sp-manor-cell:active,
+.sp-manor-pcell:active,
+.sp-manor-acell:active {
+  transform: scale(0.95);
+}
+
+/* 大方框hover效果移除（避免和小格子冲突） */
+.sp-manor-plot:hover,
+.sp-manor-pond:hover,
+.sp-manor-pasture:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+@media (max-width: 480px) {
+  .sp-manor-cell,
+  .sp-manor-pcell,
+  .sp-manor-acell {
+    min-height: 28px !important;
+    font-size: 12px;
+  }
+}
